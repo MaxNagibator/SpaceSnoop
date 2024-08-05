@@ -28,83 +28,83 @@
         /// </summary>
         private void InitializeComponent()
         {
-            hardDiskComboBox = new ComboBox();
-            startButton = new Button();
-            stopButton = new Button();
-            treeView1 = new TreeView();
-            uiLogsTextBox = new TextBox();
+            _hardDiskComboBox = new ComboBox();
+            _startButton = new Button();
+            _stopButton = new Button();
+            _directoriesTreeView = new TreeView();
+            _uiLogsTextBox = new TextBox();
             SuspendLayout();
             // 
-            // hardDiskComboBox
+            // _hardDiskComboBox
             // 
-            hardDiskComboBox.FormattingEnabled = true;
-            hardDiskComboBox.Location = new Point(12, 12);
-            hardDiskComboBox.Name = "hardDiskComboBox";
-            hardDiskComboBox.Size = new Size(203, 23);
-            hardDiskComboBox.TabIndex = 0;
+            _hardDiskComboBox.FormattingEnabled = true;
+            _hardDiskComboBox.Location = new Point(12, 12);
+            _hardDiskComboBox.Name = "_hardDiskComboBox";
+            _hardDiskComboBox.Size = new Size(203, 23);
+            _hardDiskComboBox.TabIndex = 0;
             // 
-            // startButton
+            // _startButton
             // 
-            startButton.Location = new Point(12, 41);
-            startButton.Name = "startButton";
-            startButton.Size = new Size(203, 23);
-            startButton.TabIndex = 1;
-            startButton.Text = "start";
-            startButton.UseVisualStyleBackColor = true;
-            startButton.Click += startButton_Click;
+            _startButton.Location = new Point(12, 41);
+            _startButton.Name = "_startButton";
+            _startButton.Size = new Size(203, 23);
+            _startButton.TabIndex = 1;
+            _startButton.Text = "start";
+            _startButton.UseVisualStyleBackColor = true;
+            _startButton.Click += OnStartButtonClicked;
             // 
-            // stopButton
+            // _stopButton
             // 
-            stopButton.Location = new Point(12, 70);
-            stopButton.Name = "stopButton";
-            stopButton.Size = new Size(203, 23);
-            stopButton.TabIndex = 2;
-            stopButton.Text = "stop";
-            stopButton.UseVisualStyleBackColor = true;
-            stopButton.Click += stopButton_Click;
+            _stopButton.Location = new Point(12, 70);
+            _stopButton.Name = "_stopButton";
+            _stopButton.Size = new Size(203, 23);
+            _stopButton.TabIndex = 2;
+            _stopButton.Text = "stop";
+            _stopButton.UseVisualStyleBackColor = true;
+            _stopButton.Click += OnStopButtonClicked;
             // 
-            // treeView1
+            // _directoriesTreeView
             // 
-            treeView1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-            treeView1.Location = new Point(221, 12);
-            treeView1.Name = "treeView1";
-            treeView1.Size = new Size(596, 533);
-            treeView1.TabIndex = 3;
-            treeView1.BeforeExpand += treeView1_BeforeExpand;
+            _directoriesTreeView.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            _directoriesTreeView.Location = new Point(221, 12);
+            _directoriesTreeView.Name = "_directoriesTreeView";
+            _directoriesTreeView.Size = new Size(596, 533);
+            _directoriesTreeView.TabIndex = 3;
+            _directoriesTreeView.BeforeExpand += OnDirectoriesTreeViewBeforeExpanded;
             // 
-            // uiLogsTextBox
+            // _uiLogsTextBox
             // 
-            uiLogsTextBox.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-            uiLogsTextBox.Location = new Point(12, 99);
-            uiLogsTextBox.Multiline = true;
-            uiLogsTextBox.Name = "uiLogsTextBox";
-            uiLogsTextBox.ScrollBars = ScrollBars.Vertical;
-            uiLogsTextBox.Size = new Size(203, 446);
-            uiLogsTextBox.TabIndex = 4;
+            _uiLogsTextBox.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
+            _uiLogsTextBox.Location = new Point(12, 99);
+            _uiLogsTextBox.Multiline = true;
+            _uiLogsTextBox.Name = "_uiLogsTextBox";
+            _uiLogsTextBox.ScrollBars = ScrollBars.Vertical;
+            _uiLogsTextBox.Size = new Size(203, 446);
+            _uiLogsTextBox.TabIndex = 4;
             // 
             // MainForm
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(829, 557);
-            Controls.Add(uiLogsTextBox);
-            Controls.Add(treeView1);
-            Controls.Add(stopButton);
-            Controls.Add(startButton);
-            Controls.Add(hardDiskComboBox);
+            Controls.Add(_uiLogsTextBox);
+            Controls.Add(_directoriesTreeView);
+            Controls.Add(_stopButton);
+            Controls.Add(_startButton);
+            Controls.Add(_hardDiskComboBox);
             Name = "MainForm";
             Text = "SpaceSnoop";
-            Load += MainForm_Load;
+            Load += OnFormLoaded;
             ResumeLayout(false);
             PerformLayout();
         }
 
         #endregion
 
-        private ComboBox hardDiskComboBox;
-        private Button startButton;
-        private Button stopButton;
-        private TreeView treeView1;
-        private TextBox uiLogsTextBox;
+        private ComboBox _hardDiskComboBox;
+        private Button _startButton;
+        private Button _stopButton;
+        private TreeView _directoriesTreeView;
+        private TextBox _uiLogsTextBox;
     }
 }
