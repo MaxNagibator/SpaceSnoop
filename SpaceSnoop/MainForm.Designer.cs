@@ -32,7 +32,9 @@
             _startButton = new Button();
             _stopButton = new Button();
             _directoriesTreeView = new TreeView();
-            _uiLogsTextBox = new TextBox();
+            _useMultithreadingCheckBox = new CheckBox();
+            _uiLogsTextBox = new RichTextBox();
+            _calculateProgressBar = new ProgressBar();
             SuspendLayout();
             // 
             // _hardDiskComboBox
@@ -45,9 +47,9 @@
             // 
             // _startButton
             // 
-            _startButton.Location = new Point(12, 41);
+            _startButton.Location = new Point(101, 41);
             _startButton.Name = "_startButton";
-            _startButton.Size = new Size(203, 23);
+            _startButton.Size = new Size(114, 23);
             _startButton.TabIndex = 1;
             _startButton.Text = "start";
             _startButton.UseVisualStyleBackColor = true;
@@ -55,7 +57,7 @@
             // 
             // _stopButton
             // 
-            _stopButton.Location = new Point(12, 70);
+            _stopButton.Location = new Point(12, 93);
             _stopButton.Name = "_stopButton";
             _stopButton.Size = new Size(203, 23);
             _stopButton.TabIndex = 2;
@@ -71,23 +73,44 @@
             _directoriesTreeView.Size = new Size(596, 533);
             _directoriesTreeView.TabIndex = 3;
             _directoriesTreeView.BeforeExpand += OnDirectoriesTreeViewBeforeExpanded;
+            _directoriesTreeView.NodeMouseClick += OnNodeMouseClicked;
+            // 
+            // _useMultithreadingCheckBox
+            // 
+            _useMultithreadingCheckBox.AutoSize = true;
+            _useMultithreadingCheckBox.Location = new Point(12, 44);
+            _useMultithreadingCheckBox.Name = "_useMultithreadingCheckBox";
+            _useMultithreadingCheckBox.Size = new Size(90, 19);
+            _useMultithreadingCheckBox.TabIndex = 5;
+            _useMultithreadingCheckBox.Text = "MultiThread";
+            _useMultithreadingCheckBox.UseVisualStyleBackColor = true;
             // 
             // _uiLogsTextBox
             // 
             _uiLogsTextBox.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
-            _uiLogsTextBox.Location = new Point(12, 99);
-            _uiLogsTextBox.Multiline = true;
+            _uiLogsTextBox.Location = new Point(12, 122);
             _uiLogsTextBox.Name = "_uiLogsTextBox";
-            _uiLogsTextBox.ScrollBars = ScrollBars.Vertical;
-            _uiLogsTextBox.Size = new Size(203, 446);
-            _uiLogsTextBox.TabIndex = 4;
+            _uiLogsTextBox.ReadOnly = true;
+            _uiLogsTextBox.Size = new Size(203, 423);
+            _uiLogsTextBox.TabIndex = 6;
+            _uiLogsTextBox.Text = "";
+            // 
+            // _calculateProgressBar
+            // 
+            _calculateProgressBar.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+            _calculateProgressBar.Location = new Point(12, 70);
+            _calculateProgressBar.Name = "_calculateProgressBar";
+            _calculateProgressBar.Size = new Size(203, 17);
+            _calculateProgressBar.TabIndex = 7;
             // 
             // MainForm
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(829, 557);
+            Controls.Add(_calculateProgressBar);
             Controls.Add(_uiLogsTextBox);
+            Controls.Add(_useMultithreadingCheckBox);
             Controls.Add(_directoriesTreeView);
             Controls.Add(_stopButton);
             Controls.Add(_startButton);
@@ -105,6 +128,8 @@
         private Button _startButton;
         private Button _stopButton;
         private TreeView _directoriesTreeView;
-        private TextBox _uiLogsTextBox;
+        private CheckBox _useMultithreadingCheckBox;
+        private RichTextBox _uiLogsTextBox;
+        private ProgressBar _calculateProgressBar;
     }
 }
