@@ -12,18 +12,25 @@ public class DirectorySpace
     ///     Инициализирует новый экземпляр класса DirectorySpace.
     /// </summary>
     /// <param name="name">Название директории.</param>
-    public DirectorySpace(string name)
+    /// <param name="path">Полный путь до директории</param>
+    public DirectorySpace(string name, string path)
     {
         _sizeFormatter = new SizeFormatter();
 
         Name = name;
+        Path = path;
         _subDirectories = [];
     }
 
     /// <summary>
-    ///     Имя директории.
+    ///     Название директории.
     /// </summary>
     public string Name { get; }
+
+    /// <summary>
+    ///     Полный путь до директории.
+    /// </summary>
+    public string Path { get; }
 
     /// <summary>
     ///     Общий размер всех файлов в директории, включая подкаталоги.
