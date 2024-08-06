@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using SpaceSnoop.Sorters;
 
 namespace SpaceSnoop;
 
@@ -7,6 +8,7 @@ public partial class MainForm : Form
 {
     private readonly BackgroundWorker _backgroundWorker;
     private readonly DiskSpaceCalculator _diskSpaceCalculator;
+    private bool _isSorting;
 
     public MainForm()
     {
@@ -17,21 +19,35 @@ public partial class MainForm : Form
         InitializeWorker();
     }
 
-    private void InitializeWorker()
-    {
-        _backgroundWorker.DoWork += OnDoWork;
-        _backgroundWorker.RunWorkerCompleted += OnRunWorkerCompleted;
-        _backgroundWorker.WorkerSupportsCancellation = true;
-    }
-
     private void OnFormLoaded(object sender, EventArgs args)
     {
+        SorterMode[] sorterModes =
+        [
+            SorterMode.ByName,
+            SorterMode.BySize,
+            SorterMode.ByDate,
+            SorterMode.ByLastAccessTime
+        ];
+
+        _sortModeComboBox.Items.AddRange(sorterModes);
+
         DriveInfo[] hardDisk = DriveInfo.GetDrives();
 
         foreach (DriveInfo disk in hardDisk)
         {
             _hardDiskComboBox.Items.Add(disk.Name);
         }
+
+        _sortModeComboBox.SelectedIndexChanged += OnSortModeChanged;
+    }
+
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        _backgroundWorker.DoWork -= OnDoWork;
+        _backgroundWorker.RunWorkerCompleted -= OnRunWorkerCompleted;
+        _sortModeComboBox.SelectedIndexChanged -= OnSortModeChanged;
+
+        base.OnFormClosing(e);
     }
 
     private void OnStartButtonClicked(object sender, EventArgs args)
@@ -45,7 +61,8 @@ public partial class MainForm : Form
 
         _calculateProgressBar.Invoke(() => _calculateProgressBar.Style = ProgressBarStyle.Marquee);
 
-        _directoriesTreeView.Nodes.Clear();
+        RemoveDiskNode(disk);
+
         _backgroundWorker.RunWorkerAsync(disk);
     }
 
@@ -94,13 +111,19 @@ public partial class MainForm : Form
         }
 
         _directoriesTreeView.Nodes.AddDirectoryNode(data).AddDirectoryNodes(data);
+        SortNodes();
 
         _calculateProgressBar.Invoke(() => _calculateProgressBar.Style = ProgressBarStyle.Blocks);
     }
 
+    private void OnSortModeChanged(object? sender, EventArgs e)
+    {
+        SortNodes();
+    }
+
     private void OnDirectoriesTreeViewBeforeExpanded(object sender, TreeViewCancelEventArgs args)
     {
-        if (args.Node == null)
+        if (args.Node == null || _isSorting)
         {
             return;
         }
@@ -114,11 +137,6 @@ public partial class MainForm : Form
         }
     }
 
-    private void Log(string text)
-    {
-        _uiLogsTextBox.Invoke(() => _uiLogsTextBox.Text += $@"{text}{Environment.NewLine}");
-    }
-
     private void OnNodeMouseClicked(object sender, TreeNodeMouseClickEventArgs args)
     {
         if (args.Button != MouseButtons.Right)
@@ -130,5 +148,53 @@ public partial class MainForm : Form
         {
             Process.Start("explorer.exe", selectedDirectory.Path);
         }
+    }
+
+    private void OnInvertSortCheckBoxChanged(object sender, EventArgs e)
+    {
+        // TODO Крайне неудачное решение
+        NodeSorterBase.SetInversion(_invertSortCheckBox.Checked);
+        SortNodes();
+    }
+
+    private void InitializeWorker()
+    {
+        _backgroundWorker.DoWork += OnDoWork;
+        _backgroundWorker.RunWorkerCompleted += OnRunWorkerCompleted;
+        _backgroundWorker.WorkerSupportsCancellation = true;
+    }
+
+    private void RemoveDiskNode(string disk)
+    {
+        for (int i = 0; i < _directoriesTreeView.Nodes.Count; i++)
+        {
+            TreeNode node = _directoriesTreeView.Nodes[i];
+
+            if (node.Text.StartsWith(disk, StringComparison.InvariantCultureIgnoreCase) == false)
+            {
+                continue;
+            }
+
+            _directoriesTreeView.Nodes.Remove(node);
+            break;
+        }
+    }
+
+    private void SortNodes()
+    {
+        if (_sortModeComboBox.SelectedItem is not SorterMode selectedSortMode)
+        {
+            return;
+        }
+
+        _isSorting = true;
+        _directoriesTreeView.TreeViewNodeSorter = selectedSortMode.Comparer;
+        _directoriesTreeView.Sort();
+        _isSorting = false;
+    }
+
+    private void Log(string text)
+    {
+        _uiLogsTextBox.Invoke(() => _uiLogsTextBox.Text += $@"{text}{Environment.NewLine}");
     }
 }

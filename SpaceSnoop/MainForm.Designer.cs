@@ -35,6 +35,10 @@
             _useMultithreadingCheckBox = new CheckBox();
             _uiLogsTextBox = new RichTextBox();
             _calculateProgressBar = new ProgressBar();
+            _sortGroupBox = new GroupBox();
+            _invertSortCheckBox = new CheckBox();
+            _sortModeComboBox = new ComboBox();
+            _sortGroupBox.SuspendLayout();
             SuspendLayout();
             // 
             // _hardDiskComboBox
@@ -47,9 +51,9 @@
             // 
             // _startButton
             // 
-            _startButton.Location = new Point(101, 41);
+            _startButton.Location = new Point(12, 41);
             _startButton.Name = "_startButton";
-            _startButton.Size = new Size(114, 23);
+            _startButton.Size = new Size(107, 23);
             _startButton.TabIndex = 1;
             _startButton.Text = "start";
             _startButton.UseVisualStyleBackColor = true;
@@ -78,7 +82,7 @@
             // _useMultithreadingCheckBox
             // 
             _useMultithreadingCheckBox.AutoSize = true;
-            _useMultithreadingCheckBox.Location = new Point(12, 44);
+            _useMultithreadingCheckBox.Location = new Point(125, 44);
             _useMultithreadingCheckBox.Name = "_useMultithreadingCheckBox";
             _useMultithreadingCheckBox.Size = new Size(90, 19);
             _useMultithreadingCheckBox.TabIndex = 5;
@@ -88,10 +92,10 @@
             // _uiLogsTextBox
             // 
             _uiLogsTextBox.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
-            _uiLogsTextBox.Location = new Point(12, 122);
+            _uiLogsTextBox.Location = new Point(12, 179);
             _uiLogsTextBox.Name = "_uiLogsTextBox";
             _uiLogsTextBox.ReadOnly = true;
-            _uiLogsTextBox.Size = new Size(203, 423);
+            _uiLogsTextBox.Size = new Size(203, 366);
             _uiLogsTextBox.TabIndex = 6;
             _uiLogsTextBox.Text = "";
             // 
@@ -103,11 +107,42 @@
             _calculateProgressBar.Size = new Size(203, 17);
             _calculateProgressBar.TabIndex = 7;
             // 
+            // _sortGroupBox
+            // 
+            _sortGroupBox.Controls.Add(_invertSortCheckBox);
+            _sortGroupBox.Controls.Add(_sortModeComboBox);
+            _sortGroupBox.Location = new Point(12, 122);
+            _sortGroupBox.Name = "_sortGroupBox";
+            _sortGroupBox.Size = new Size(203, 51);
+            _sortGroupBox.TabIndex = 8;
+            _sortGroupBox.TabStop = false;
+            _sortGroupBox.Text = "Сортировка";
+            // 
+            // _invertSortCheckBox
+            // 
+            _invertSortCheckBox.AutoSize = true;
+            _invertSortCheckBox.Location = new Point(141, 24);
+            _invertSortCheckBox.Name = "_invertSortCheckBox";
+            _invertSortCheckBox.Size = new Size(56, 19);
+            _invertSortCheckBox.TabIndex = 9;
+            _invertSortCheckBox.Text = "Invert";
+            _invertSortCheckBox.UseVisualStyleBackColor = true;
+            _invertSortCheckBox.CheckedChanged += OnInvertSortCheckBoxChanged;
+            // 
+            // _sortModeComboBox
+            // 
+            _sortModeComboBox.FormattingEnabled = true;
+            _sortModeComboBox.Location = new Point(6, 22);
+            _sortModeComboBox.Name = "_sortModeComboBox";
+            _sortModeComboBox.Size = new Size(129, 23);
+            _sortModeComboBox.TabIndex = 0;
+            // 
             // MainForm
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(829, 557);
+            Controls.Add(_sortGroupBox);
             Controls.Add(_calculateProgressBar);
             Controls.Add(_uiLogsTextBox);
             Controls.Add(_useMultithreadingCheckBox);
@@ -118,6 +153,8 @@
             Name = "MainForm";
             Text = "SpaceSnoop";
             Load += OnFormLoaded;
+            _sortGroupBox.ResumeLayout(false);
+            _sortGroupBox.PerformLayout();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -131,5 +168,8 @@
         private CheckBox _useMultithreadingCheckBox;
         private RichTextBox _uiLogsTextBox;
         private ProgressBar _calculateProgressBar;
+        private GroupBox _sortGroupBox;
+        private ComboBox _sortModeComboBox;
+        private CheckBox _invertSortCheckBox;
     }
 }

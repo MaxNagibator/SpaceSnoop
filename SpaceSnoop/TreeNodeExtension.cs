@@ -4,7 +4,13 @@ public static class TreeNodeExtension
 {
     public static TreeNode AddDirectoryNode(this TreeNodeCollection nodeCollection, DirectorySpace spaceData)
     {
-        return nodeCollection.Add(spaceData.ToString());
+        TreeNode node = new(spaceData.ToString())
+        {
+            Tag = spaceData
+        };
+
+        nodeCollection.Add(node);
+        return node;
     }
 
     public static TreeNode AddDirectoryNode(this TreeNode parent, DirectorySpace spaceData)
