@@ -7,6 +7,7 @@ public class DirectorySpace
 {
     private readonly List<DirectorySpace> _subDirectories;
     private readonly SizeFormatter _sizeFormatter;
+    private long? _maxTotalSize;
 
     /// <summary>
     ///     Инициализирует новый экземпляр класса DirectorySpace.
@@ -72,6 +73,11 @@ public class DirectorySpace
     public IReadOnlyList<DirectorySpace> SubDirectories => _subDirectories;
 
     /// <summary>
+    ///     Максимальный размер среди подкаталогов.
+    /// </summary>
+    public long MaxTotalSize => _maxTotalSize ??= GetMaxSize();
+
+    /// <summary>
     ///     Добавляет подкаталог в список подкаталогов и обновляет общий размер директории.
     /// </summary>
     /// <param name="subDirectory">Подкаталог, который нужно добавить.</param>
@@ -79,6 +85,7 @@ public class DirectorySpace
     {
         TotalSize += subDirectory.TotalSize;
         _subDirectories.Add(subDirectory);
+        _maxTotalSize = null;
     }
 
     /// <summary>
@@ -93,10 +100,42 @@ public class DirectorySpace
         }
 
         TotalSize = Size;
+        _maxTotalSize = null;
     }
 
+    /// <summary>
+    ///     Возвращает строку, представляющую информацию о директории для tooltip.
+    /// </summary>
+    /// <returns>Информация о директории в формате tooltip.</returns>
+    public string GetTooltipText()
+    {
+        return $"""
+                Название: {Name}
+                Путь: {Path} 
+                Дата создания: {CreationDate} 
+                Последний доступ: {LastAccessTime}
+                Общий размер: {TotalSizeText}
+                Размер файлов в директории, исключая подкаталоги: {SizeText}
+                """;
+    }
+
+    /// <summary>
+    ///     Возвращает строковое представление директории.
+    /// </summary>
+    /// <returns>Строковое представление директории.</returns>
     public override string ToString()
     {
         return $"{Name} [{SizeText}] {TotalSizeText}";
+    }
+
+    /// <summary>
+    ///     Возвращает максимальный размер среди подкаталогов.
+    /// </summary>
+    /// <returns>Максимальный размер среди подкаталогов.</returns>
+    private long GetMaxSize()
+    {
+        return _subDirectories.Select(subDirectory => subDirectory.MaxTotalSize)
+            .Prepend(TotalSize)
+            .Max();
     }
 }

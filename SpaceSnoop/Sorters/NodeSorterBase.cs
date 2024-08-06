@@ -1,6 +1,4 @@
-﻿using System.Collections;
-
-namespace SpaceSnoop.Sorters;
+﻿namespace SpaceSnoop.Sorters;
 
 public abstract class NodeSorterBase : IComparer
 {

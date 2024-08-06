@@ -1,7 +1,4 @@
-﻿using System.Collections;
-using SpaceSnoop.Sorters;
-
-namespace SpaceSnoop;
+﻿namespace SpaceSnoop.Core;
 
 public class SorterMode(string name, IComparer comparer)
 {
