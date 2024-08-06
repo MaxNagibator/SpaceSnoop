@@ -1,6 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
-using SpaceSnoop.Sorters;
+using SpaceSnoop.Extensions;
 
 namespace SpaceSnoop;
 
@@ -17,6 +17,8 @@ public partial class MainForm : Form
 
         _backgroundWorker = new BackgroundWorker();
         InitializeWorker();
+
+        _directoriesTreeView.ShowNodeToolTips = true;
     }
 
     private void OnFormLoaded(object sender, EventArgs args)

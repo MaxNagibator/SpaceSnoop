@@ -1,4 +1,4 @@
-﻿namespace SpaceSnoop;
+﻿namespace SpaceSnoop.Extensions;
 
 public static class TreeNodeExtension
 {
@@ -6,7 +6,8 @@ public static class TreeNodeExtension
     {
         TreeNode node = new(spaceData.ToString())
         {
-            Tag = spaceData
+            Tag = spaceData,
+            ToolTipText = spaceData.GetTooltipText()
         };
 
         nodeCollection.Add(node);
@@ -16,16 +17,17 @@ public static class TreeNodeExtension
     public static TreeNode AddDirectoryNode(this TreeNode parent, DirectorySpace spaceData)
     {
         TreeNode newParent = parent.Nodes.AddDirectoryNode(spaceData);
-        newParent.Tag = spaceData;
-
         return newParent;
     }
 
     public static void AddDirectoryNodes(this TreeNode parent, DirectorySpace spaceData)
     {
+        long maxSize = spaceData.MaxTotalSize;
+
         foreach (DirectorySpace diskSpace in spaceData.SubDirectories)
         {
-            parent.AddDirectoryNode(diskSpace);
+            TreeNode node = parent.AddDirectoryNode(diskSpace);
+            node.ForeColor = diskSpace.GetColorBasedOnSize(maxSize);
         }
     }
 }
