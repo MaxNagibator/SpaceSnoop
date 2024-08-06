@@ -1,123 +1,103 @@
-using System.Windows.Forms;
+using System.ComponentModel;
 
-namespace SpaceSnoop
+namespace SpaceSnoop;
+
+public partial class MainForm : Form
 {
-    public partial class MainForm : Form
+    private readonly BackgroundWorker _backgroundWorker;
+    private readonly DiskSpaceCalculator _diskSpaceCalculator;
+
+    public MainForm()
     {
-        Thread _workerThred;
-        public MainForm()
+        _diskSpaceCalculator = new DiskSpaceCalculator();
+        InitializeComponent();
+
+        _backgroundWorker = new BackgroundWorker();
+        InitializeWorker();
+    }
+
+    private void InitializeWorker()
+    {
+        _backgroundWorker.DoWork += OnDoWork;
+        _backgroundWorker.RunWorkerCompleted += OnRunWorkerCompleted;
+        _backgroundWorker.WorkerSupportsCancellation = true;
+    }
+
+    private void OnFormLoaded(object sender, EventArgs args)
+    {
+        DriveInfo[] hardDisk = DriveInfo.GetDrives();
+
+        foreach (DriveInfo disk in hardDisk)
         {
-            InitializeComponent();
-        }
-
-        private void MainForm_Load(object sender, EventArgs e)
-        {
-            var hardDisk = DriveInfo.GetDrives();
-            foreach (var disk in hardDisk)
-            {
-                hardDiskComboBox.Items.Add(disk.Name);
-            }
-        }
-
-        private void startButton_Click(object sender, EventArgs e)
-        {
-            var disk = hardDiskComboBox.SelectedItem?.ToString();
-           // disk = "D:\\Games";
-            _workerThred = new Thread(HardDiskSpaceCalculate);
-            _workerThred.Start(disk);
-        }
-
-        private void stopButton_Click(object sender, EventArgs e)
-        {
-            _workerThred?.Abort();
-        }
-
-        private void HardDiskSpaceCalculate(object? obj)
-        {
-            var disk = obj?.ToString();
-            var dir = new DirectoryInfo(disk);
-            var data = DirSize(dir);
-
-            this.UIThread(() =>
-            {
-                foreach (var diskSpace in data.SubDirs)
-                {
-                    var parent = treeView1.Nodes.Add(diskSpace.Name + " " + diskSpace.TotalSizeText);
-                    parent.Tag = diskSpace;
-                    AddTreeNodes(parent, diskSpace);
-                }
-            });
-        }
-
-        public DirectorySpace DirSize(DirectoryInfo d)
-        {
-            var dirSpace = new DirectorySpace();
-            dirSpace.Name = d.Name;
-            dirSpace.SubDirs = new List<DirectorySpace>();
-
-            try
-            {
-                FileInfo[] fis = d.GetFiles();
-                foreach (FileInfo fi in fis)
-                {
-                    dirSpace.Size += fi.Length;
-                }
-
-                dirSpace.TotalSize = dirSpace.Size;
-
-                DirectoryInfo[] dis = d.GetDirectories();
-                foreach (DirectoryInfo di in dis)//.Take(4))
-                {
-                    var subDir = DirSize(di);
-                    dirSpace.TotalSize += subDir.TotalSize;
-                    dirSpace.SubDirs.Add(subDir);
-                }
-            }
-            catch (Exception ex)
-            {
-                // logs
-            }
-            return dirSpace;
-        }
-
-        private void treeView1_BeforeExpand(object sender, TreeViewCancelEventArgs e)
-        {
-            foreach (TreeNode node in e.Node.Nodes)
-            {
-                var diskSpace = (DirectorySpace)node.Tag;
-                AddTreeNodes(node, diskSpace);
-            }
-
-        }
-
-        private void AddTreeNodes(TreeNode parent, DirectorySpace spaceData)
-        {
-            foreach (var diskSpace in spaceData.SubDirs)
-            {
-                var newParent = parent.Nodes.Add(diskSpace.Name + " " + diskSpace.TotalSizeText);
-                newParent.Tag = diskSpace;
-                // Local123(newParent, d);
-            }
+            _hardDiskComboBox.Items.Add(disk.Name);
         }
     }
 
-
-    public static class ControlExtensions
+    private void OnStartButtonClicked(object sender, EventArgs args)
     {
-        /// <summary>
-        /// Executes the Action asynchronously on the UI thread, does not block execution on the calling thread.
-        /// </summary>
-        /// <param name="control"></param>
-        /// <param name="code"></param>
-        public static void UIThread(this Control @this, Action code)
+        string? disk = _hardDiskComboBox.SelectedItem?.ToString();
+
+        if (string.IsNullOrWhiteSpace(disk))
         {
-            if (@this.InvokeRequired)
+            return;
+        }
+
+        _directoriesTreeView.Nodes.Clear();
+        _backgroundWorker.RunWorkerAsync(disk);
+    }
+
+    private void OnStopButtonClicked(object sender, EventArgs args)
+    {
+        _backgroundWorker.CancelAsync();
+    }
+
+    private void OnDoWork(object? sender, DoWorkEventArgs args)
+    {
+        string? disk = args.Argument?.ToString();
+
+        if (string.IsNullOrWhiteSpace(disk))
+        {
+            return;
+        }
+
+        DirectoryInfo directory = new(disk);
+        DirectorySpace data = _diskSpaceCalculator.Calculate(directory);
+
+        args.Result = data;
+    }
+
+    private void OnRunWorkerCompleted(object? sender, RunWorkerCompletedEventArgs args)
+    {
+        if (args.Error != null)
+        {
+            return;
+        }
+
+        if (args.Cancelled)
+        {
+            return;
+        }
+
+        if (args.Result is not DirectorySpace data)
+        {
+            return;
+        }
+
+        _directoriesTreeView.Nodes.AddDirectoryNode(data).AddDirectoryNodes(data);
+    }
+
+    private void OnDirectoriesTreeViewBeforeExpanded(object sender, TreeViewCancelEventArgs args)
+    {
+        if (args.Node == null)
+        {
+            return;
+        }
+
+        foreach (TreeNode node in args.Node.Nodes)
+        {
+            if (node.Tag is DirectorySpace diskSpace)
             {
-                @this.BeginInvoke(code);
-            }
-            else
-            {
-                code.Invoke();
+                node.AddDirectoryNodes(diskSpace);
             }
         }
     }
