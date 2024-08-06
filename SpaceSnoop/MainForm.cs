@@ -38,6 +38,7 @@ public partial class MainForm : Form
         foreach (DriveInfo disk in hardDisk)
         {
             _hardDiskComboBox.Items.Add(disk.Name);
+            _hardDiskComboBox.Items.Add("E:\\Games");
         }
 
         _sortModeComboBox.SelectedIndexChanged += OnSortModeChanged;

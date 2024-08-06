@@ -10,7 +10,7 @@ public static class DirectorySpaceExtension
         int maxComponentValue = 255;
 
         int red = (int)(maxComponentValue * ratio * intensity);
-
-        return Color.FromArgb(red > maxComponentValue ? maxComponentValue : red, 0, 0);
+        red = Math.Max(0, Math.Min(255, red));
+        return Color.FromArgb(red, 0, 0);
     }
 }
