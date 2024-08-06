@@ -13,13 +13,17 @@ public class DirectorySpace
     /// </summary>
     /// <param name="name">Название директории.</param>
     /// <param name="path">Полный путь до директории</param>
-    public DirectorySpace(string name, string path)
+    /// <param name="creationDate">Дата создания директории.</param>
+    /// <param name="lastAccessTime">Время последнего доступа к директории.</param>
+    public DirectorySpace(string name, string path, DateTime creationDate, DateTime lastAccessTime)
     {
         _sizeFormatter = new SizeFormatter();
+        _subDirectories = [];
 
         Name = name;
         Path = path;
-        _subDirectories = [];
+        CreationDate = creationDate;
+        LastAccessTime = lastAccessTime;
     }
 
     /// <summary>
@@ -31,6 +35,16 @@ public class DirectorySpace
     ///     Полный путь до директории.
     /// </summary>
     public string Path { get; }
+
+    /// <summary>
+    ///     Дата создания директории.
+    /// </summary>
+    public DateTime CreationDate { get; }
+
+    /// <summary>
+    ///     Время последнего доступа к директории.
+    /// </summary>
+    public DateTime LastAccessTime { get; }
 
     /// <summary>
     ///     Общий размер всех файлов в директории, включая подкаталоги.

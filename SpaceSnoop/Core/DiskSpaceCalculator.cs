@@ -15,7 +15,7 @@ public class DiskSpaceCalculator
     /// <returns>Объект <see cref="DirectorySpace" /> с вычисленной информацией о занимаемом дисковом пространстве.</returns>
     public DirectorySpace Calculate(DirectoryInfo directory)
     {
-        DirectorySpace directorySpace = new(directory.Name, directory.FullName);
+        DirectorySpace directorySpace = new(directory.Name, directory.FullName, directory.CreationTime, directory.LastAccessTime);
 
         try
         {
@@ -46,7 +46,7 @@ public class DiskSpaceCalculator
     /// <remarks>Повышенное выделение памяти</remarks>
     public DirectorySpace CalculateMultithreaded(DirectoryInfo directory)
     {
-        DirectorySpace directorySpace = new(directory.Name, directory.FullName);
+        DirectorySpace directorySpace = new(directory.Name, directory.FullName, directory.CreationTime, directory.LastAccessTime);
 
         try
         {
