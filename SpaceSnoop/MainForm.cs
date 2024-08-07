@@ -8,11 +8,13 @@ public partial class MainForm : Form
 {
     private readonly BackgroundWorker _backgroundWorker;
     private readonly DiskSpaceCalculator _diskSpaceCalculator;
+    private readonly SpaceColorCalculator _spaceColorCalculator;
     private bool _isSorting;
 
     public MainForm()
     {
-        _diskSpaceCalculator = new DiskSpaceCalculator();
+        _spaceColorCalculator = new SpaceColorCalculator();
+        _diskSpaceCalculator = new DiskSpaceCalculator(LogInformation);
         InitializeComponent();
 
         _backgroundWorker = new BackgroundWorker();
@@ -38,35 +40,38 @@ public partial class MainForm : Form
         foreach (DriveInfo disk in hardDisk)
         {
             _hardDiskComboBox.Items.Add(disk.Name);
-            _hardDiskComboBox.Items.Add("E:\\Games");
         }
+
+        SetDefaultSettings();
 
         _sortModeComboBox.SelectedIndexChanged += OnSortModeChanged;
     }
 
-    protected override void OnFormClosing(FormClosingEventArgs e)
+    protected override void OnFormClosing(FormClosingEventArgs args)
     {
         _backgroundWorker.DoWork -= OnDoWork;
         _backgroundWorker.RunWorkerCompleted -= OnRunWorkerCompleted;
         _sortModeComboBox.SelectedIndexChanged -= OnSortModeChanged;
 
-        base.OnFormClosing(e);
+        base.OnFormClosing(args);
     }
 
     private void OnStartButtonClicked(object sender, EventArgs args)
     {
-        string? disk = _hardDiskComboBox.SelectedItem?.ToString();
+        string disk = _hardDiskComboBox.SelectedItem?.ToString() ?? _hardDiskComboBox.Text;
 
         if (string.IsNullOrWhiteSpace(disk))
         {
             return;
         }
 
-        _calculateProgressBar.Invoke(() => _calculateProgressBar.Style = ProgressBarStyle.Marquee);
+        StartScanning(disk);
+    }
 
-        RemoveDiskNode(disk);
-
-        _backgroundWorker.RunWorkerAsync(disk);
+    private void OnIntensityChanged(object sender, EventArgs e)
+    {
+        _spaceColorCalculator.Intensity = (int)_intensityNumericUpDown.Value;
+        UpdateNodeColors();
     }
 
     private void OnStopButtonClicked(object sender, EventArgs args)
@@ -83,21 +88,31 @@ public partial class MainForm : Form
             return;
         }
 
-        Stopwatch stopwatch = Stopwatch.StartNew();
         DirectoryInfo directory = new(disk);
 
+        if (directory.Exists == false)
+        {
+            LogWarning($@"Расчет для каталога {directory.FullName} невозможен. Директория не найдена.");
+            return;
+        }
+
+        Stopwatch stopwatch = Stopwatch.StartNew();
+
+        // TODO не работает остановка
         DirectorySpace data = _useMultithreadingCheckBox.Checked
             ? _diskSpaceCalculator.CalculateMultithreaded(directory)
             : _diskSpaceCalculator.Calculate(directory);
 
         stopwatch.Stop();
-        Log($@"Расчет для каталога {directory.FullName} завершен через {stopwatch.ElapsedMilliseconds:F2} мс.");
+        LogInformation($@"Расчет для каталога {directory.FullName} завершен через {stopwatch.ElapsedMilliseconds:F2} мс.");
 
         args.Result = data;
     }
 
     private void OnRunWorkerCompleted(object? sender, RunWorkerCompletedEventArgs args)
     {
+        _calculateProgressBar.Invoke(() => _calculateProgressBar.Style = ProgressBarStyle.Blocks);
+
         if (args.Error != null)
         {
             return;
@@ -113,10 +128,9 @@ public partial class MainForm : Form
             return;
         }
 
-        _directoriesTreeView.Nodes.AddDirectoryNode(data).AddDirectoryNodes(data);
+        TreeNode addedParent = _directoriesTreeView.Nodes.AddDirectoryNode(data).AddDirectoryNodes(data);
+        UpdateNodeColors(addedParent);
         SortNodes();
-
-        _calculateProgressBar.Invoke(() => _calculateProgressBar.Style = ProgressBarStyle.Blocks);
     }
 
     private void OnSortModeChanged(object? sender, EventArgs e)
@@ -126,17 +140,27 @@ public partial class MainForm : Form
 
     private void OnDirectoriesTreeViewBeforeExpanded(object sender, TreeViewCancelEventArgs args)
     {
-        if (args.Node == null || _isSorting)
+        TreeNode? parent = args.Node;
+
+        if (parent == null || _isSorting || parent.Nodes.Count <= 0)
         {
             return;
         }
 
-        foreach (TreeNode node in args.Node.Nodes)
+        foreach (TreeNode node in parent.Nodes)
         {
-            if (node.Tag is DirectorySpace diskSpace)
+            if (node.Tag is not DirectorySpace diskSpace)
             {
-                node.AddDirectoryNodes(diskSpace);
+                continue;
             }
+
+            if (node.Nodes.Count > 0)
+            {
+                break;
+            }
+
+            node.AddDirectoryNodes(diskSpace);
+            UpdateNodeColors(node);
         }
     }
 
@@ -147,9 +171,9 @@ public partial class MainForm : Form
             return;
         }
 
-        if (args.Node.Tag is DirectorySpace selectedDirectory)
+        if (args.Node.Tag is SpaceBase selectedSpace)
         {
-            Process.Start("explorer.exe", selectedDirectory.Path);
+            Process.Start("explorer.exe", selectedSpace.Path);
         }
     }
 
@@ -165,6 +189,23 @@ public partial class MainForm : Form
         _backgroundWorker.DoWork += OnDoWork;
         _backgroundWorker.RunWorkerCompleted += OnRunWorkerCompleted;
         _backgroundWorker.WorkerSupportsCancellation = true;
+    }
+
+    private void SetDefaultSettings()
+    {
+        Text = AdministratorChecker.Instance.IsCurrentUserAdmin()
+            ? "SpaceSnoop (Запущено от имени администратора)"
+            : "SpaceSnoop";
+
+        _hardDiskComboBox.SelectedIndex = 0;
+        _sortModeComboBox.SelectedIndex = 1;
+
+        _useMultithreadingCheckBox.Checked = true;
+        _invertSortCheckBox.Checked = true;
+
+        _intensityNumericUpDown.Minimum = SpaceColorCalculator.MinIntensity;
+        _intensityNumericUpDown.Maximum = SpaceColorCalculator.MaxIntensity;
+        _intensityNumericUpDown.Value = SpaceColorCalculator.DefaultIntensity;
     }
 
     private void RemoveDiskNode(string disk)
@@ -196,8 +237,92 @@ public partial class MainForm : Form
         _isSorting = false;
     }
 
-    private void Log(string text)
+    private void UpdateNodeColors()
     {
-        _uiLogsTextBox.Invoke(() => _uiLogsTextBox.Text += $@"{text}{Environment.NewLine}");
+        foreach (TreeNode node in _directoriesTreeView.Nodes)
+        {
+            UpdateNodeColors(node);
+        }
+    }
+
+    private void UpdateNodeColors(TreeNode parent)
+    {
+        foreach (TreeNode node in parent.Nodes)
+        {
+            if (parent.Tag is DirectorySpace directorySpace)
+            {
+                UpdateNodeColor(node, directorySpace);
+            }
+        }
+    }
+
+    private void UpdateNodeColor(TreeNode node, DirectorySpace parent)
+    {
+        if (node.Tag is DirectorySpace directorySpace)
+        {
+            node.ForeColor = _spaceColorCalculator.GetColorBasedOnSize(directorySpace, parent.MaxTotalSize);
+
+            foreach (TreeNode childNode in node.Nodes)
+            {
+                UpdateNodeColor(childNode, directorySpace);
+            }
+        }
+        else if (node.Tag is FileSpace fileSpace)
+        {
+            node.ForeColor = _spaceColorCalculator.GetColorBasedOnSize(fileSpace, parent.Size);
+        }
+    }
+
+    private void Log(string message, string level = "INFO")
+    {
+        _uiLogsRichTextBox.Invoke(() => AppendLog(message, level));
+    }
+
+    private void AppendLog(string message, string level)
+    {
+        _uiLogsRichTextBox.AppendText($@"[{level}] {message}{Environment.NewLine}");
+        _uiLogsRichTextBox.SelectionStart = _uiLogsRichTextBox.Text.Length;
+        _uiLogsRichTextBox.ScrollToCaret();
+    }
+
+    private void LogInformation(string text)
+    {
+        Log(text);
+    }
+
+    private void LogWarning(string text)
+    {
+        Log(text, "WARN");
+    }
+
+    private void StartScanning(string disk)
+    {
+        _calculateProgressBar.Invoke(() => _calculateProgressBar.Style = ProgressBarStyle.Marquee);
+
+        RemoveDiskNode(disk);
+
+        _backgroundWorker.RunWorkerAsync(disk);
+    }
+
+    private void RefreshColorButtonClicked(object sender, EventArgs e)
+    {
+        UpdateNodeColors();
+    }
+
+    private void OnChooseDirectoryClicked(object sender, EventArgs e)
+    {
+        using FolderBrowserDialog folderBrowserDialog = new();
+
+        DialogResult result = folderBrowserDialog.ShowDialog();
+
+        if (result != DialogResult.OK || string.IsNullOrWhiteSpace(folderBrowserDialog.SelectedPath))
+        {
+            return;
+        }
+
+        string selectedPath = folderBrowserDialog.SelectedPath;
+        _hardDiskComboBox.SelectedIndex = _hardDiskComboBox.Items.Add(selectedPath);
+
+        StartScanning(selectedPath);
     }
 }

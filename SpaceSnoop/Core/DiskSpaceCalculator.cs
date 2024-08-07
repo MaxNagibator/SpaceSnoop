@@ -6,7 +6,7 @@ namespace SpaceSnoop.Core;
 /// <summary>
 ///     Калькулятор для вычисления занимаемого дискового пространства директории и ее подкаталогов.
 /// </summary>
-public class DiskSpaceCalculator
+public class DiskSpaceCalculator(Action<string>? log = null)
 {
     /// <summary>
     ///     Вычисляет занимаемое дисковое пространство указанной директории и ее подкаталогов.
@@ -32,7 +32,7 @@ public class DiskSpaceCalculator
         }
         catch (Exception exception) when (exception is UnauthorizedAccessException or SecurityException)
         {
-            // Отказано в доступе
+            log?.Invoke($"Отказано в доступе к каталогу:\n{directory.FullName}\n");
         }
 
         return directorySpace;
@@ -69,7 +69,7 @@ public class DiskSpaceCalculator
         }
         catch (Exception exception) when (exception is UnauthorizedAccessException or SecurityException)
         {
-            // Отказано в доступе
+            log?.Invoke($"Отказано в доступе к каталогу:\n{directory.FullName}\n");
         }
 
         return directorySpace;

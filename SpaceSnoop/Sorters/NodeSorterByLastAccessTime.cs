@@ -6,4 +6,9 @@ public class NodeSorterByLastAccessTime : NodeSorterBase
     {
         return directoryX.LastAccessTime.CompareTo(directoryY.LastAccessTime);
     }
+
+    protected override int CompareFileSpace(FileSpace fileX, FileSpace fileY)
+    {
+        return fileX.LastAccessTime.CompareTo(fileY.LastAccessTime);
+    }
 }
