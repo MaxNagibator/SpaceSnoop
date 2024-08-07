@@ -6,4 +6,9 @@ public class NodeSorterByDate : NodeSorterBase
     {
         return directoryX.CreationDate.CompareTo(directoryY.CreationDate);
     }
+
+    protected override int CompareFileSpace(FileSpace fileX, FileSpace fileY)
+    {
+        return fileX.CreationDate.CompareTo(fileY.CreationDate);
+    }
 }

@@ -11,12 +11,15 @@ public abstract class NodeSorterBase : IComparer
             return 0;
         }
 
-        if (nodeX.Tag is not DirectorySpace directoryX || nodeY.Tag is not DirectorySpace directoryY)
+        int result = nodeX.Tag switch
         {
-            return 0;
-        }
+            FileSpace when nodeY.Tag is DirectorySpace => _isInverted ? -1 : 1,
+            DirectorySpace when nodeY.Tag is FileSpace => _isInverted ? 1 : -1,
+            DirectorySpace directoryX when nodeY.Tag is DirectorySpace directoryY => CompareDirectorySpace(directoryX, directoryY),
+            FileSpace fileX when nodeY.Tag is FileSpace fileY => CompareFileSpace(fileX, fileY),
+            var _ => 0
+        };
 
-        int result = CompareDirectorySpace(directoryX, directoryY);
         return _isInverted ? -result : result;
     }
 
@@ -26,4 +29,5 @@ public abstract class NodeSorterBase : IComparer
     }
 
     protected abstract int CompareDirectorySpace(DirectorySpace directoryX, DirectorySpace directoryY);
+    protected abstract int CompareFileSpace(FileSpace fileX, FileSpace fileY);
 }

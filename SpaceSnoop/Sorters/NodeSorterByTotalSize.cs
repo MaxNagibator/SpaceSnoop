@@ -6,4 +6,9 @@ public class NodeSorterByTotalSize : NodeSorterBase
     {
         return directoryX.TotalSize.CompareTo(directoryY.TotalSize);
     }
+
+    protected override int CompareFileSpace(FileSpace fileX, FileSpace fileY)
+    {
+        return fileX.Size.CompareTo(fileY.Size);
+    }
 }
