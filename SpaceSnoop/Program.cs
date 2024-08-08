@@ -1,3 +1,11 @@
+using System.ComponentModel;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using NLog;
+using NLog.Extensions.Logging;
+using NLog.Windows.Forms;
+using LogLevel = Microsoft.Extensions.Logging.LogLevel;
+
 namespace SpaceSnoop;
 
 internal static class Program
@@ -8,22 +16,57 @@ internal static class Program
     [STAThread]
     private static void Main()
     {
-        if (AdministratorChecker.Instance.IsCurrentUserAdmin() == false)
-        {
-            DialogResult result = MessageBox.Show("""
-                                                  Программа запущена не от имени администратора из-за чего у могут отображаться не все директории. 
-                                                  Рекомендуется запустить её от имени администратора. 
-                                                  Хотите перезапустить от имени администратора?
-                                                  """, "Предупреждение", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+        Logger? logger = LogManager.GetCurrentClassLogger();
 
-            if (result == DialogResult.Yes)
+        try
+        {
+            IConfigurationRoot config = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json", true, true)
+                .Build();
+
+            using ServiceProvider servicesProvider = new ServiceCollection()
+                .ConfigureServices()
+                .AddLogging(loggingBuilder =>
+                {
+                    loggingBuilder.ClearProviders();
+                    loggingBuilder.SetMinimumLevel(LogLevel.Trace);
+                    loggingBuilder.AddNLog(config);
+                })
+                .BuildServiceProvider();
+
+            IAdministratorChecker administratorChecker = servicesProvider.GetRequiredService<IAdministratorChecker>();
+
+            if (administratorChecker.IsRestartRequired())
             {
-                AdministratorChecker.Instance.RestartAsAdmin();
                 return;
             }
-        }
 
-        ApplicationConfiguration.Initialize();
-        Application.Run(new MainForm());
+            ApplicationConfiguration.Initialize();
+
+            MainForm form = servicesProvider.GetRequiredService<MainForm>();
+            RichTextBoxTarget.ReInitializeAllTextboxes(form);
+
+            Application.Run(form);
+        }
+        catch (Exception exception)
+        {
+            logger.Error(exception, "Программа остановлена из-за исключения");
+            throw;
+        }
+        finally
+        {
+            LogManager.Shutdown();
+        }
+    }
+
+    private static IServiceCollection ConfigureServices(this IServiceCollection services)
+    {
+        return services
+                .AddSingleton<MainForm>()
+                .AddTransient<BackgroundWorker>()
+                .AddTransient<IDiskSpaceCalculator, DiskSpaceCalculator>()
+                .AddSingleton<IAdministratorChecker, AdministratorChecker>()
+            ;
     }
 }

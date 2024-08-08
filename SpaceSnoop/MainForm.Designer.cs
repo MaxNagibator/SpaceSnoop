@@ -111,6 +111,7 @@
             _uiLogsRichTextBox.Size = new Size(222, 298);
             _uiLogsRichTextBox.TabIndex = 6;
             _uiLogsRichTextBox.Text = "";
+            _uiLogsRichTextBox.BackColor = Color.WhiteSmoke;
             // 
             // _calculateProgressBar
             // 
@@ -147,7 +148,6 @@
             _invertSortCheckBox.TabIndex = 9;
             _invertSortCheckBox.Text = "Invert";
             _invertSortCheckBox.UseVisualStyleBackColor = true;
-            _invertSortCheckBox.CheckedChanged += OnInvertSortCheckBoxChanged;
             // 
             // _controlGroupBox
             // 
@@ -168,7 +168,6 @@
             _refreshNodesButton.TabIndex = 11;
             _refreshNodesButton.Text = "обновить";
             _refreshNodesButton.UseVisualStyleBackColor = true;
-            _refreshNodesButton.Click += RefreshColorButtonClicked;
             // 
             // _intensityNumericUpDown
             // 
@@ -176,7 +175,6 @@
             _intensityNumericUpDown.Name = "_intensityNumericUpDown";
             _intensityNumericUpDown.Size = new Size(115, 23);
             _intensityNumericUpDown.TabIndex = 10;
-            _intensityNumericUpDown.ValueChanged += OnIntensityChanged;
             // 
             // _chooseFolderButton
             // 
