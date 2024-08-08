@@ -6,28 +6,22 @@ public partial class MainForm
 
     private void InitializeColor()
     {
-        _refreshNodesButton.Click += OnRefreshColorClicked;
-        _intensityNumericUpDown.ValueChanged += OnIntensityChanged;
+        _intensityBar.ValueChanged += OnIntensityChanged;
 
-        _intensityNumericUpDown.Minimum = SpaceColorCalculator.MinIntensity;
-        _intensityNumericUpDown.Maximum = SpaceColorCalculator.MaxIntensity;
-        _intensityNumericUpDown.Value = SpaceColorCalculator.DefaultIntensity;
+        _intensityBar.Minimum = SpaceColorCalculator.MinIntensity;
+        _intensityBar.Maximum = SpaceColorCalculator.MaxIntensity;
+        _intensityBar.Value = SpaceColorCalculator.DefaultIntensity;
     }
 
     private void FinalizeColor()
     {
-        _refreshNodesButton.Click -= OnRefreshColorClicked;
-        _intensityNumericUpDown.ValueChanged -= OnIntensityChanged;
+        _intensityBar.ValueChanged -= OnIntensityChanged;
     }
 
     private void OnIntensityChanged(object? sender, EventArgs e)
     {
-        _spaceColorCalculator.Intensity = (int)_intensityNumericUpDown.Value;
-        UpdateNodeColors();
-    }
-
-    private void OnRefreshColorClicked(object? sender, EventArgs e)
-    {
+        _controlGroupBox.Text = $"Интенсивность: {_intensityBar.Value}";
+        _spaceColorCalculator.Intensity = _intensityBar.Value;
         UpdateNodeColors();
     }
 

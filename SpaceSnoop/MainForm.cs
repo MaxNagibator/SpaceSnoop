@@ -91,7 +91,7 @@ public partial class MainForm : Form
                 break;
             }
 
-            node.AddDirectoryNodes(diskSpace);
+            node.FillParentNode(diskSpace);
             UpdateNodeColors(node);
         }
     }

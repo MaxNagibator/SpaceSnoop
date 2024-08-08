@@ -47,38 +47,47 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator> logger) : IDiskSpa
     {
         DirectorySpace directorySpace = new(directory.Name, directory.FullName, directory.CreationTime, directory.LastAccessTime);
 
-        try
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            IEnumerable<FileInfo> files = directory.EnumerateFiles();
-            directorySpace.AddFiles(files);
-
-            IEnumerable<DirectoryInfo> subDirectories = directory.EnumerateDirectories();
-            ConcurrentBag<DirectorySpace> subDirSpaces = [];
-
-            Parallel.ForEach(subDirectories, new ParallelOptions { CancellationToken = cancellationToken }, subDirectory =>
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                DirectorySpace subDir = CalculateMultithreaded(subDirectory, cancellationToken);
-                subDirSpaces.Add(subDir);
-            });
-
-            foreach (DirectorySpace subDirSpace in subDirSpaces)
-            {
-                directorySpace.Add(subDirSpace);
-            }
-        }
-        catch (OperationCanceledException)
+        if (cancellationToken.IsCancellationRequested)
         {
             logger.LogInformation("Операция вычисления пространства для каталога {Directory} была отменена.", directory.FullName);
-            throw;
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        IEnumerable<FileInfo> files;
+
+        try
+        {
+            files = directory.EnumerateFiles();
         }
         catch (Exception exception) when (exception is UnauthorizedAccessException or SecurityException)
         {
-            logger.LogError("Отказано в доступе к каталогу: {Directory}", directory.FullName);
+            logger.LogError("Отказано в доступе к директории: {Directory}", directory.FullName);
+            return directorySpace;
         }
 
+        directorySpace.AddFiles(files);
+
+        AddSubDirectories(directorySpace, directory, cancellationToken);
+
         return directorySpace;
+    }
+
+    private void AddSubDirectories(DirectorySpace directorySpace, DirectoryInfo directory, CancellationToken cancellationToken)
+    {
+        IEnumerable<DirectoryInfo> subDirectories = directory.EnumerateDirectories();
+        ConcurrentBag<DirectorySpace> subDirSpaces = [];
+
+        Parallel.ForEach(subDirectories, new ParallelOptions { CancellationToken = cancellationToken }, subDirectory =>
+        {
+            DirectorySpace subDir = CalculateMultithreaded(subDirectory, cancellationToken);
+            subDirSpaces.Add(subDir);
+        });
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        foreach (DirectorySpace subDirSpace in subDirSpaces)
+        {
+            directorySpace.Add(subDirSpace);
+        }
     }
 }

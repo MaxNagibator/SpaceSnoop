@@ -80,7 +80,7 @@ public partial class MainForm
         }
         else if (args.Result is DirectorySpace data)
         {
-            TreeNode addedParent = _directoriesTreeView.Nodes.AddDirectoryNode(data).AddDirectoryNodes(data);
+            TreeNode addedParent = _directoriesTreeView.Nodes.AddSpaceNode(data).FillParentNode(data);
             UpdateNodeColors(addedParent);
             SortNodes();
         }

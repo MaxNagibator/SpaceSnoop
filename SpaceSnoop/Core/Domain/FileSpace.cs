@@ -1,4 +1,4 @@
-﻿namespace SpaceSnoop.Core;
+﻿namespace SpaceSnoop.Core.Domain;
 
 public class FileSpace : SpaceBase
 {
