@@ -28,6 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
             _hardDiskComboBox = new ComboBox();
             _startButton = new Button();
             _stopButton = new Button();
@@ -234,6 +235,7 @@
             Controls.Add(_mainTabControl);
             Controls.Add(_uiLogsRichTextBox);
             Controls.Add(_directoriesTreeView);
+            Icon = (Icon)resources.GetObject("$this.Icon");
             MinimumSize = new Size(463, 316);
             Name = "MainForm";
             Text = "SpaceSnoop";
