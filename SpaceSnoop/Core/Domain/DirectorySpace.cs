@@ -1,4 +1,4 @@
-﻿namespace SpaceSnoop.Core;
+﻿namespace SpaceSnoop.Core.Domain;
 
 /// <summary>
 ///     Представляет директорию с информацией о размере файлов в ней.

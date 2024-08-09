@@ -2,40 +2,35 @@
 
 public static class TreeNodeExtensions
 {
-    public static TreeNode AddDirectoryNode(this TreeNodeCollection nodeCollection, DirectorySpace spaceData)
+    /// <summary>
+    ///     Преобразовать данные о пространстве в узел и добавить в коллекцию.
+    /// </summary>
+    public static TreeNode AddSpaceNode(this TreeNodeCollection nodes, SpaceBase space)
     {
-        TreeNode node = new(spaceData.ToString())
+        TreeNode node = new(space.ToString())
         {
-            Tag = spaceData,
-            ToolTipText = spaceData.GetTooltipText()
+            Tag = space,
+            ToolTipText = space.GetTooltipText()
         };
 
-        nodeCollection.Add(node);
+        nodes.Add(node);
 
         return node;
     }
 
-    public static TreeNode AddDirectoryNode(this TreeNode parent, DirectorySpace spaceData)
+    /// <summary>
+    ///     Добавить к родительскому узлу файлы и подкаталоги, которые находятся в директории родительского узла.
+    /// </summary>
+    public static TreeNode FillParentNode(this TreeNode parent, DirectorySpace directory)
     {
-        return parent.Nodes.AddDirectoryNode(spaceData);
-    }
-
-    public static TreeNode AddDirectoryNodes(this TreeNode parent, DirectorySpace spaceData)
-    {
-        foreach (DirectorySpace diskSpace in spaceData.SubDirectories)
+        foreach (FileSpace file in directory.Files)
         {
-            parent.AddDirectoryNode(diskSpace);
+            parent.Nodes.AddSpaceNode(file);
         }
 
-        foreach (FileSpace file in spaceData.Files)
+        foreach (DirectorySpace subDirectory in directory.SubDirectories)
         {
-            TreeNode fileNode = new(file.ToString())
-            {
-                Tag = file,
-                ToolTipText = file.GetTooltipText()
-            };
-
-            parent.Nodes.Add(fileNode);
+            parent.Nodes.AddSpaceNode(subDirectory);
         }
 
         return parent;

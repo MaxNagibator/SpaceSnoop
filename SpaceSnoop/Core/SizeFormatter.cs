@@ -3,17 +3,12 @@
 /// <summary>
 ///     Русифицированный форматировщик размера файла.
 /// </summary>
-public class SizeFormatter
+public class SizeFormatter : ISizeFormatter
 {
     private const decimal SizeUnit = 1024m;
     private readonly string[] _sizeSuffixes = ["байт", "КБ", "МБ", "ГБ", "ТБ"];
 
-    /// <summary>
-    ///     Форматирует размер в виде строки с суффиксом размера.
-    /// </summary>
-    /// <param name="size">Размер в байтах.</param>
-    /// <param name="decimalPlaces">Количество знаков после запятой.</param>
-    /// <returns>Строка с форматированным размером.</returns>
+    /// <inheritdoc />
     public string Format(long size, int decimalPlaces = 1)
     {
         if (size < 0)

@@ -1,8 +1,8 @@
-﻿namespace SpaceSnoop.Core;
+﻿namespace SpaceSnoop.Core.Domain;
 
 public abstract class SpaceBase(string name, string path, DateTime creationDate, DateTime lastAccessTime)
 {
-    protected readonly SizeFormatter SizeFormatter = new();
+    protected readonly ISizeFormatter SizeFormatter = new SizeFormatter();
 
     /// <summary>
     ///     Название директории.
