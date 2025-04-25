@@ -56,50 +56,82 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator> logger)
     /// <remarks>Повышенное выделение памяти</remarks>
     public DirectorySpace CalculateMultithreaded(DirectoryInfo directory, CancellationToken cancellationToken = default)
     {
-        var directorySpace = new DirectorySpace(directory.Name, directory.FullName, directory.CreationTime, directory.LastAccessTime);
+        var maxDegreeOfParallelism = Environment.ProcessorCount;
+        var counter = new InterlockedInt(maxDegreeOfParallelism);
 
-        if (cancellationToken.IsCancellationRequested)
-        {
-            logger.LogInformation("Операция вычисления пространства для каталога {Directory} была отменена.", directory.FullName);
-            cancellationToken.ThrowIfCancellationRequested();
-        }
+        return CalculateMultithreadedInner(directory, counter, cancellationToken);
+    }
 
-        IEnumerable<FileInfo> files;
+    private DirectorySpace CalculateMultithreadedInner(DirectoryInfo directory, InterlockedInt counter, CancellationToken cancellationToken)
+    {
+        counter.Dec();
 
         try
         {
-            files = directory.EnumerateFiles();
-        }
-        catch (Exception exception) when (exception is UnauthorizedAccessException or SecurityException)
-        {
-            logger.LogError("Отказано в доступе к директории: {Directory}", directory.FullName);
+            var directorySpace = new DirectorySpace(directory.Name, directory.FullName, directory.CreationTime, directory.LastAccessTime);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                logger.LogInformation("Операция вычисления пространства для каталога {Directory} была отменена.", directory.FullName);
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
+            IEnumerable<FileInfo> files;
+
+            try
+            {
+                files = directory.EnumerateFiles();
+            }
+            catch (Exception exception) when (exception is UnauthorizedAccessException or SecurityException)
+            {
+                logger.LogError("Отказано в доступе к директории: {Directory}", directory.FullName);
+                return directorySpace;
+            }
+
+            directorySpace.AddFiles(files);
+
+            AddSubDirectories(directorySpace, directory, counter, cancellationToken);
+
             return directorySpace;
         }
-
-        directorySpace.AddFiles(files);
-
-        AddSubDirectories(directorySpace, directory, cancellationToken);
-
-        return directorySpace;
+        finally
+        {
+            counter.Inc();
+        }
     }
 
-    private void AddSubDirectories(DirectorySpace directorySpace, DirectoryInfo directory, CancellationToken cancellationToken)
+    private void AddSubDirectories(DirectorySpace directorySpace, DirectoryInfo directory, InterlockedInt counter, CancellationToken cancellationToken)
     {
-        var subDirectories = directory.EnumerateDirectories();
-        ConcurrentBag<DirectorySpace> subDirSpaces = [];
+        counter.Dec();
 
-        Parallel.ForEach(subDirectories, new()
-            { CancellationToken = cancellationToken }, subDirectory =>
+        try
         {
-            var subDir = CalculateMultithreaded(subDirectory, cancellationToken);
-            subDirSpaces.Add(subDir);
-        });
+            var subDirectories = directory.EnumerateDirectories();
+            ConcurrentBag<DirectorySpace> subDirSpaces = [];
+            var availableDegreeOfParallelism = Math.Max(1, counter.Inc());
 
-        cancellationToken.ThrowIfCancellationRequested();
+            var parallelOptions = new ParallelOptions
+            {
+                MaxDegreeOfParallelism = availableDegreeOfParallelism,
+                CancellationToken = cancellationToken,
+            };
 
-        foreach (var subDirSpace in subDirSpaces)
+            Parallel.ForEach(subDirectories, parallelOptions, subDirectory =>
+            {
+                var subDir = CalculateMultithreaded(subDirectory, cancellationToken);
+                subDirSpaces.Add(subDir);
+            });
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            foreach (var subDirSpace in subDirSpaces)
+            {
+                directorySpace.Add(subDirSpace);
+            }
+        }
+        finally
         {
-            directorySpace.Add(subDirSpace);
+            counter.Inc();
         }
     }
 }

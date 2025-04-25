@@ -18,7 +18,7 @@ public class WorkerService : IDisposable
         Initialize();
     }
 
-    public event EventHandler<DirectorySpace>? WorkCompleted;
+    public event EventHandler<DirectorySpace?>? WorkCompleted;
 
     public void Dispose()
     {
@@ -30,15 +30,15 @@ public class WorkerService : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    public void StartWorker(string disk, CancellationToken cancellationToken)
+    public void StartWorker(string disk, bool isMultithread, CancellationToken cancellationToken)
     {
-        var workerRequest = new WorkerRequest(disk, cancellationToken);
+        var workerRequest = new WorkerRequest(disk, isMultithread, cancellationToken);
         _backgroundWorker.RunWorkerAsync(workerRequest);
     }
 
     private void OnDoWork(object? sender, DoWorkEventArgs args)
     {
-        if (args.Argument is not WorkerRequest(var disk, var cancellationToken) || string.IsNullOrWhiteSpace(disk))
+        if (args.Argument is not WorkerRequest(var disk, var isMultithread, var cancellationToken) || string.IsNullOrWhiteSpace(disk))
         {
             return;
         }
@@ -56,7 +56,10 @@ public class WorkerService : IDisposable
 
         try
         {
-            var directorySpace = _diskSpaceCalculator.Calculate(directoryInfo, cancellationToken);
+            var directorySpace = isMultithread
+                ? _diskSpaceCalculator.CalculateMultithreaded(directoryInfo, cancellationToken)
+                : _diskSpaceCalculator.Calculate(directoryInfo, cancellationToken);
+
             args.Result = directorySpace;
         }
         catch (OperationCanceledException)
@@ -77,6 +80,8 @@ public class WorkerService : IDisposable
 
     private void OnRunWorkerCompleted(object? sender, RunWorkerCompletedEventArgs args)
     {
+        DirectorySpace? data = null;
+
         if (args.Cancelled)
         {
             _logger.LogInformation("Сканирование было отменено пользователем.");
@@ -85,10 +90,12 @@ public class WorkerService : IDisposable
         {
             _logger.LogError(args.Error, "Произошла ошибка во время сканирования.");
         }
-        else if (args.Result is DirectorySpace data)
+        else if (args.Result is DirectorySpace space)
         {
-            WorkCompleted?.Invoke(this, data);
+            data = space;
         }
+
+        WorkCompleted?.Invoke(this, data);
     }
 
     private void Initialize()
@@ -98,5 +105,5 @@ public class WorkerService : IDisposable
         _backgroundWorker.WorkerSupportsCancellation = true;
     }
 
-    private record WorkerRequest(string Disk, CancellationToken CancellationToken);
+    private record WorkerRequest(string Disk, bool IsMultithread, CancellationToken CancellationToken);
 }

@@ -145,18 +145,22 @@ public partial class MainForm : Form
         _colorService.UpdateNodesColor(_directoriesTreeView.Nodes);
     }
 
-    private void OnWorkCompleted(object? sender, DirectorySpace directorySpace)
+    private void OnWorkCompleted(object? sender, DirectorySpace? directorySpace)
     {
-        var addedParent = _directoriesTreeView.Nodes.AddSpaceNode(directorySpace).FillParentNode(directorySpace);
-        _colorService.UpdateAssignedNodesColor(addedParent);
-        _sortService.SortNodes();
+        if (directorySpace != null)
+        {
+            var addedParent = _directoriesTreeView.Nodes.AddSpaceNode(directorySpace).FillParentNode(directorySpace);
+            _colorService.UpdateAssignedNodesColor(addedParent);
+            _sortService.SortNodes();
+        }
+
         StopProgressBar();
     }
 
     private void StartWorker(string disk)
     {
         _cancellationTokenSource = new();
-        _workerService.StartWorker(disk, _cancellationTokenSource.Token);
+        _workerService.StartWorker(disk, _useMultithreadingCheckBox.Checked, _cancellationTokenSource.Token);
     }
 
     private void StopWorker()
