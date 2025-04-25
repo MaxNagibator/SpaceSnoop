@@ -81,12 +81,12 @@ public class DirectorySpace : SpaceBase
     /// Добавляет файлы в директорию и обновляет размер директории.
     /// </summary>
     /// <param name="files">Список файлов, которые нужно добавить в директорию.</param>
-    public void AddFiles(IEnumerable<FileInfo> files)
+    public void AddFiles(Span<FileInfo> files)
     {
-        foreach (var file in files)
+        for (var i = 0; i < files.Length; i++)
         {
-            _files.Add(FileSpace.Create(file));
-            Size += file.Length;
+            _files.Add(FileSpace.Create(files[i]));
+            Size += files[i].Length;
         }
 
         TotalSize = Size;
