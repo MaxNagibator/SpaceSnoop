@@ -6,10 +6,10 @@ namespace SpaceSnoop.Services;
 public class WorkerService : IDisposable
 {
     private readonly BackgroundWorker _backgroundWorker;
-    private readonly IDiskSpaceCalculator _diskSpaceCalculator;
+    private readonly DiskSpaceCalculator _diskSpaceCalculator;
     private readonly ILogger<WorkerService> _logger;
 
-    public WorkerService(IDiskSpaceCalculator diskSpaceCalculator, BackgroundWorker backgroundWorker, ILogger<WorkerService> logger)
+    public WorkerService(DiskSpaceCalculator diskSpaceCalculator, BackgroundWorker backgroundWorker, ILogger<WorkerService> logger)
     {
         _diskSpaceCalculator = diskSpaceCalculator;
         _backgroundWorker = backgroundWorker;
@@ -17,6 +17,8 @@ public class WorkerService : IDisposable
 
         Initialize();
     }
+
+    public event EventHandler<DirectorySpace>? WorkCompleted;
 
     public void Dispose()
     {
@@ -28,18 +30,9 @@ public class WorkerService : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    public event EventHandler<DirectorySpace>? WorkCompleted;
-
-    private void Initialize()
-    {
-        _backgroundWorker.DoWork += OnDoWork;
-        _backgroundWorker.RunWorkerCompleted += OnRunWorkerCompleted;
-        _backgroundWorker.WorkerSupportsCancellation = true;
-    }
-
     public void StartWorker(string disk, CancellationToken cancellationToken)
     {
-        WorkerRequest workerRequest = new(disk, cancellationToken);
+        var workerRequest = new WorkerRequest(disk, cancellationToken);
         _backgroundWorker.RunWorkerAsync(workerRequest);
     }
 
@@ -50,7 +43,7 @@ public class WorkerService : IDisposable
             return;
         }
 
-        DirectoryInfo directory = new(disk);
+        var directory = new DirectoryInfo(disk);
 
         if (!directory.Exists)
         {
@@ -58,12 +51,12 @@ public class WorkerService : IDisposable
             return;
         }
 
-        Stopwatch stopwatch = Stopwatch.StartNew();
-        DirectoryInfo directoryInfo = new(disk);
+        var stopwatch = Stopwatch.StartNew();
+        var directoryInfo = new DirectoryInfo(disk);
 
         try
         {
-            DirectorySpace directorySpace = _diskSpaceCalculator.Calculate(directoryInfo, cancellationToken);
+            var directorySpace = _diskSpaceCalculator.Calculate(directoryInfo, cancellationToken);
             args.Result = directorySpace;
         }
         catch (OperationCanceledException)
@@ -96,6 +89,13 @@ public class WorkerService : IDisposable
         {
             WorkCompleted?.Invoke(this, data);
         }
+    }
+
+    private void Initialize()
+    {
+        _backgroundWorker.DoWork += OnDoWork;
+        _backgroundWorker.RunWorkerCompleted += OnRunWorkerCompleted;
+        _backgroundWorker.WorkerSupportsCancellation = true;
     }
 
     private record WorkerRequest(string Disk, CancellationToken CancellationToken);

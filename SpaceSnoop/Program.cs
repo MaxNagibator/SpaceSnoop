@@ -1,32 +1,29 @@
-using System.ComponentModel;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NLog;
 using NLog.Extensions.Logging;
 using NLog.Windows.Forms;
 using SpaceSnoop.Services;
+using System.ComponentModel;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace SpaceSnoop;
 
 internal static class Program
 {
-    /// <summary>
-    ///     The main entry point for the application.
-    /// </summary>
     [STAThread]
     private static void Main()
     {
-        Logger? logger = LogManager.GetCurrentClassLogger();
+        var logger = LogManager.GetCurrentClassLogger();
 
         try
         {
-            IConfigurationRoot config = new ConfigurationBuilder()
+            var config = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetCurrentDirectory())
                 .AddJsonFile("appsettings.json", true, true)
                 .Build();
 
-            using ServiceProvider servicesProvider = new ServiceCollection()
+            using var servicesProvider = new ServiceCollection()
                 .ConfigureServices()
                 .AddLogging(loggingBuilder =>
                 {
@@ -36,7 +33,7 @@ internal static class Program
                 })
                 .BuildServiceProvider();
 
-            IAdministratorChecker administratorChecker = servicesProvider.GetRequiredService<IAdministratorChecker>();
+            var administratorChecker = servicesProvider.GetRequiredService<AdministratorChecker>();
 
             if (administratorChecker.IsRestartRequired())
             {
@@ -45,7 +42,7 @@ internal static class Program
 
             ApplicationConfiguration.Initialize();
 
-            MainForm form = servicesProvider.GetRequiredService<MainForm>();
+            var form = servicesProvider.GetRequiredService<MainForm>();
             RichTextBoxTarget.ReInitializeAllTextboxes(form);
 
             Application.Run(form);
@@ -68,9 +65,9 @@ internal static class Program
                 .AddTransient<BackgroundWorker>()
                 .AddTransient<ColorService>()
                 .AddTransient<WorkerService>()
-                .AddTransient<ISpaceColorCalculator, SpaceColorCalculator>()
-                .AddTransient<IDiskSpaceCalculator, DiskSpaceCalculator>()
-                .AddSingleton<IAdministratorChecker, AdministratorChecker>()
+                .AddTransient<SpaceColorCalculator>()
+                .AddTransient<DiskSpaceCalculator>()
+                .AddSingleton<AdministratorChecker>()
             ;
     }
 }

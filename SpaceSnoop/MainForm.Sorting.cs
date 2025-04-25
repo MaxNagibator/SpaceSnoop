@@ -4,6 +4,17 @@ public partial class MainForm
 {
     private bool _isSorting;
 
+    private void OnSortModeChanged(object? sender, EventArgs e)
+    {
+        SortNodes();
+    }
+
+    private void OnInvertSortCheckBoxChanged(object? sender, EventArgs e)
+    {
+        NodeSorterBase.SetInversion(_invertSortCheckBox.Checked);
+        SortNodes();
+    }
+
     private void InitializeSorting()
     {
         _sortModeComboBox.SelectedIndexChanged += OnSortModeChanged;
@@ -14,7 +25,7 @@ public partial class MainForm
             SorterMode.ByName,
             SorterMode.BySize,
             SorterMode.ByDate,
-            SorterMode.ByLastAccessTime
+            SorterMode.ByLastAccessTime,
         ];
 
         _sortModeComboBox.Items.AddRange(sorterModes);
@@ -27,18 +38,6 @@ public partial class MainForm
     {
         _sortModeComboBox.SelectedIndexChanged -= OnSortModeChanged;
         _invertSortCheckBox.CheckedChanged -= OnInvertSortCheckBoxChanged;
-    }
-
-    private void OnSortModeChanged(object? sender, EventArgs e)
-    {
-        SortNodes();
-    }
-
-    private void OnInvertSortCheckBoxChanged(object? sender, EventArgs e)
-    {
-        // TODO Крайне неудачное решение
-        NodeSorterBase.SetInversion(_invertSortCheckBox.Checked);
-        SortNodes();
     }
 
     private void SortNodes()

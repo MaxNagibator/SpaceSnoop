@@ -10,7 +10,7 @@ public class FileSpace : SpaceBase
 
     public static FileSpace Create(FileInfo info)
     {
-        return new FileSpace(info.Name, info.FullName, info.CreationTime, info.LastAccessTime, info.Length);
+        return new(info.Name, info.FullName, info.CreationTime, info.LastAccessTime, info.Length);
     }
 
     public override string ToString()

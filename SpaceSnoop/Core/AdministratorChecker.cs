@@ -3,7 +3,7 @@ using System.Security.Principal;
 
 namespace SpaceSnoop.Core;
 
-public class AdministratorChecker(ILogger<AdministratorChecker> logger) : IAdministratorChecker
+public class AdministratorChecker(ILogger<AdministratorChecker> logger)
 {
     private const string? WarningMessage =
         """
@@ -14,8 +14,8 @@ public class AdministratorChecker(ILogger<AdministratorChecker> logger) : IAdmin
 
     public bool IsCurrentUserAdmin()
     {
-        using WindowsIdentity identity = WindowsIdentity.GetCurrent();
-        WindowsPrincipal principal = new(identity);
+        using var identity = WindowsIdentity.GetCurrent();
+        var principal = new WindowsPrincipal(identity);
         return principal.IsInRole(WindowsBuiltInRole.Administrator);
     }
 
@@ -26,7 +26,7 @@ public class AdministratorChecker(ILogger<AdministratorChecker> logger) : IAdmin
             return false;
         }
 
-        DialogResult result = MessageBox.Show(WarningMessage, "Предупреждение", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+        var result = MessageBox.Show(WarningMessage, "Предупреждение", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
 
         if (result != DialogResult.Yes)
         {
@@ -40,12 +40,12 @@ public class AdministratorChecker(ILogger<AdministratorChecker> logger) : IAdmin
 
     private void RestartAsAdmin()
     {
-        ProcessStartInfo startInfo = new()
+        var startInfo = new ProcessStartInfo
         {
             UseShellExecute = true,
             WorkingDirectory = Environment.CurrentDirectory,
             FileName = Application.ExecutablePath,
-            Verb = "runas"
+            Verb = "runas",
         };
 
         try

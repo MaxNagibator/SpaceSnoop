@@ -1,34 +1,36 @@
 ﻿namespace SpaceSnoop.Core;
 
 /// <summary>
-///     Калькулятор для вычисления цвета на основе размера файла или директории.
+/// Калькулятор для вычисления цвета на основе размера файла или директории.
 /// </summary>
-public class SpaceColorCalculator : ISpaceColorCalculator
+public class SpaceColorCalculator
 {
     /// <summary>
-    ///     Максимальное значение компонента цвета.
-    /// </summary>
-    private const int MaxComponentValue = 255;
-
-    /// <summary>
-    ///     Минимальная интенсивность цвета.
+    /// Минимальная интенсивность цвета.
     /// </summary>
     public const int MinIntensity = 0;
 
     /// <summary>
-    ///     Максимальная интенсивность цвета.
+    /// Максимальная интенсивность цвета.
     /// </summary>
     public const int MaxIntensity = 100;
 
     /// <summary>
-    ///     Значение интенсивности цвета по умолчанию.
+    /// Значение интенсивности цвета по умолчанию.
     /// </summary>
     public const int DefaultIntensity = 10;
+
+    /// <summary>
+    /// Максимальное значение компонента цвета.
+    /// </summary>
+    private const int MaxComponentValue = 255;
 
     /// <inheritdoc cref="Intensity" />
     private int _intensity = DefaultIntensity;
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Текущая интенсивность цвета (насколько выражен цвет в зависимости от размера).
+    /// </summary>
     public int Intensity
     {
         get => _intensity;
@@ -44,7 +46,7 @@ public class SpaceColorCalculator : ISpaceColorCalculator
     }
 
     /// <summary>
-    ///     Получает цвет на основе размера директории.
+    /// Получает цвет на основе размера директории.
     /// </summary>
     /// <param name="directory">Директория, для которой нужно получить цвет.</param>
     /// <param name="maxSize">Максимальный размер директории.</param>
@@ -55,7 +57,7 @@ public class SpaceColorCalculator : ISpaceColorCalculator
     }
 
     /// <summary>
-    ///     Получает цвет на основе размера файла.
+    /// Получает цвет на основе размера файла.
     /// </summary>
     /// <param name="file">Файл, для которого нужно получить цвет.</param>
     /// <param name="maxSize">Максимальный размер файла.</param>
@@ -66,26 +68,7 @@ public class SpaceColorCalculator : ISpaceColorCalculator
     }
 
     /// <summary>
-    ///     Вычисляет цвет на основе размера.
-    /// </summary>
-    /// <param name="size">Размер файла или директории.</param>
-    /// <param name="maxSize">Максимальный размер файла или директории.</param>
-    /// <returns>Цвет, соответствующий размеру.</returns>
-    private Color GetColor(long size, long maxSize)
-    {
-        int red = 0;
-
-        if (size > 0 && maxSize > 0 && maxSize >= size)
-        {
-            red = (int)(Map(size, 0, maxSize, 0, MaxComponentValue) * (Intensity / 10d));
-            red = Constrain(red, 0, MaxComponentValue);
-        }
-
-        return Color.FromArgb(red, 0, 0);
-    }
-
-    /// <summary>
-    ///     Линейно отображает значение из одного диапазона в другой.
+    /// Линейно отображает значение из одного диапазона в другой.
     /// </summary>
     /// <param name="x">Значение, которое нужно отобразить.</param>
     /// <param name="inMin">Минимальное значение входного диапазона.</param>
@@ -102,7 +85,7 @@ public class SpaceColorCalculator : ISpaceColorCalculator
     }
 
     /// <summary>
-    ///     Ограничивает значение в заданном диапазоне.
+    /// Ограничивает значение в заданном диапазоне.
     /// </summary>
     /// <param name="x">Значение, которое нужно ограничить.</param>
     /// <param name="min">Минимальное значение диапазона.</param>
@@ -124,5 +107,24 @@ public class SpaceColorCalculator : ISpaceColorCalculator
         }
 
         return x;
+    }
+
+    /// <summary>
+    /// Вычисляет цвет на основе размера.
+    /// </summary>
+    /// <param name="size">Размер файла или директории.</param>
+    /// <param name="maxSize">Максимальный размер файла или директории.</param>
+    /// <returns>Цвет, соответствующий размеру.</returns>
+    private Color GetColor(long size, long maxSize)
+    {
+        var red = 0;
+
+        if (size > 0 && maxSize > 0 && maxSize >= size)
+        {
+            red = (int)(Map(size, 0, maxSize, 0, MaxComponentValue) * (Intensity / 10d));
+            red = Constrain(red, 0, MaxComponentValue);
+        }
+
+        return Color.FromArgb(red, 0, 0);
     }
 }

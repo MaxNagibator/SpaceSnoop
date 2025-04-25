@@ -1,15 +1,19 @@
-using System.Diagnostics;
 using SpaceSnoop.Extensions;
 using SpaceSnoop.Services;
+using System.Diagnostics;
 
 namespace SpaceSnoop;
 
 public partial class MainForm : Form
 {
-    private readonly IAdministratorChecker _administratorChecker;
+    private readonly AdministratorChecker _administratorChecker;
+    private readonly ColorService _colorService;
+    private readonly WorkerService _workerService;
+
+    private CancellationTokenSource? _cancellationTokenSource;
 
     public MainForm(
-        IAdministratorChecker administratorChecker,
+        AdministratorChecker administratorChecker,
         WorkerService workerService,
         ColorService colorService)
     {
@@ -33,6 +37,15 @@ public partial class MainForm : Form
         return true;
     }
 
+    protected override void OnFormClosing(FormClosingEventArgs args)
+    {
+        FinalizeWorker();
+        FinalizeSorting();
+        FinalizeColorService();
+
+        base.OnFormClosing(args);
+    }
+
     private void OnFormLoaded(object sender, EventArgs args)
     {
         InitializeWorker();
@@ -44,18 +57,9 @@ public partial class MainForm : Form
         SetDefaultSettings();
     }
 
-    protected override void OnFormClosing(FormClosingEventArgs args)
-    {
-        FinalizeWorker();
-        FinalizeSorting();
-        FinalizeColorService();
-
-        base.OnFormClosing(args);
-    }
-
     private void OnStartButtonClicked(object sender, EventArgs args)
     {
-        string disk = _hardDiskComboBox.SelectedItem?.ToString() ?? _hardDiskComboBox.Text;
+        var disk = _hardDiskComboBox.SelectedItem?.ToString() ?? _hardDiskComboBox.Text;
 
         if (string.IsNullOrWhiteSpace(disk))
         {
@@ -72,7 +76,7 @@ public partial class MainForm : Form
 
     private void OnDirectoriesTreeViewBeforeExpanded(object sender, TreeViewCancelEventArgs args)
     {
-        TreeNode? parent = args.Node;
+        var parent = args.Node;
 
         if (parent == null || _isSorting || parent.Nodes.Count <= 0)
         {
@@ -111,24 +115,49 @@ public partial class MainForm : Form
 
     private void OnChooseDirectoryClicked(object sender, EventArgs e)
     {
-        using FolderBrowserDialog folderBrowserDialog = new();
+        using var folderBrowserDialog = new FolderBrowserDialog();
 
-        DialogResult result = folderBrowserDialog.ShowDialog();
+        var result = folderBrowserDialog.ShowDialog();
 
         if (result != DialogResult.OK || string.IsNullOrWhiteSpace(folderBrowserDialog.SelectedPath))
         {
             return;
         }
 
-        string selectedPath = folderBrowserDialog.SelectedPath;
+        var selectedPath = folderBrowserDialog.SelectedPath;
 
-        int index = _hardDiskComboBox.Items.IndexOf(selectedPath);
+        var index = _hardDiskComboBox.Items.IndexOf(selectedPath);
 
         _hardDiskComboBox.SelectedIndex = index == -1
             ? _hardDiskComboBox.Items.Add(selectedPath)
             : index;
 
         StartScanning(selectedPath);
+    }
+
+    private void OnIntensityChanged(object? sender, int intensity)
+    {
+        _intensityGroupBox.Text = $"Интенсивность: {intensity}";
+        _colorService.UpdateNodesColor(_directoriesTreeView.Nodes);
+    }
+
+    private void OnWorkCompleted(object? sender, DirectorySpace directorySpace)
+    {
+        var addedParent = _directoriesTreeView.Nodes.AddSpaceNode(directorySpace).FillParentNode(directorySpace);
+        _colorService.UpdateAssignedNodesColor(addedParent);
+        SortNodes();
+        StopProgressBar();
+    }
+
+    private void StartWorker(string disk)
+    {
+        _cancellationTokenSource = new();
+        _workerService.StartWorker(disk, _cancellationTokenSource.Token);
+    }
+
+    private void StopWorker()
+    {
+        _cancellationTokenSource?.Cancel();
     }
 
     private void SetDefaultSettings()
@@ -144,9 +173,9 @@ public partial class MainForm : Form
 
     private void FillDrives()
     {
-        DriveInfo[] hardDisk = DriveInfo.GetDrives();
+        var hardDisk = DriveInfo.GetDrives();
 
-        foreach (DriveInfo disk in hardDisk)
+        foreach (var disk in hardDisk)
         {
             _hardDiskComboBox.Items.Add(disk.Name);
         }
@@ -161,9 +190,9 @@ public partial class MainForm : Form
 
     private void RemovePathNode(string path)
     {
-        for (int i = 0; i < _directoriesTreeView.Nodes.Count; i++)
+        for (var i = 0; i < _directoriesTreeView.Nodes.Count; i++)
         {
-            TreeNode node = _directoriesTreeView.Nodes[i];
+            var node = _directoriesTreeView.Nodes[i];
 
             if (node.Tag is not SpaceBase space
                 || space.Path.EndsWith(path, StringComparison.CurrentCultureIgnoreCase) == false)
@@ -186,10 +215,6 @@ public partial class MainForm : Form
         _calculateProgressBar.Invoke(() => _calculateProgressBar.Style = ProgressBarStyle.Blocks);
     }
 
-    #region ColorService
-
-    private readonly ColorService _colorService;
-
     private void InitializeColorService()
     {
         _colorService.Initialize(_intensityBar);
@@ -202,19 +227,6 @@ public partial class MainForm : Form
         _colorService.Dispose();
     }
 
-    private void OnIntensityChanged(object? sender, int intensity)
-    {
-        _intensityGroupBox.Text = $"Интенсивность: {intensity}";
-        _colorService.UpdateNodesColor(_directoriesTreeView.Nodes);
-    }
-
-    #endregion
-
-    #region WorkerService
-
-    private readonly WorkerService _workerService;
-    private CancellationTokenSource? _cancellationTokenSource;
-
     private void InitializeWorker()
     {
         _workerService.WorkCompleted += OnWorkCompleted;
@@ -224,25 +236,4 @@ public partial class MainForm : Form
     {
         _workerService.WorkCompleted -= OnWorkCompleted;
     }
-
-    private void OnWorkCompleted(object? sender, DirectorySpace directorySpace)
-    {
-        TreeNode addedParent = _directoriesTreeView.Nodes.AddSpaceNode(directorySpace).FillParentNode(directorySpace);
-        _colorService.UpdateAssignedNodesColor(addedParent);
-        SortNodes();
-        StopProgressBar();
-    }
-
-    private void StartWorker(string disk)
-    {
-        _cancellationTokenSource = new CancellationTokenSource();
-        _workerService.StartWorker(disk, _cancellationTokenSource.Token);
-    }
-
-    public void StopWorker()
-    {
-        _cancellationTokenSource?.Cancel();
-    }
-
-    #endregion
 }

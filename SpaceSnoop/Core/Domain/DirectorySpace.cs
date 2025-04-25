@@ -1,7 +1,7 @@
 ﻿namespace SpaceSnoop.Core.Domain;
 
 /// <summary>
-///     Представляет директорию с информацией о размере файлов в ней.
+/// Представляет директорию с информацией о размере файлов в ней.
 /// </summary>
 public class DirectorySpace : SpaceBase
 {
@@ -10,7 +10,7 @@ public class DirectorySpace : SpaceBase
     private long? _maxTotalSize;
 
     /// <summary>
-    ///     Инициализирует новый экземпляр класса DirectorySpace.
+    /// Инициализирует новый экземпляр класса DirectorySpace.
     /// </summary>
     /// <param name="name">Название директории.</param>
     /// <param name="path">Полный путь до директории</param>
@@ -24,32 +24,50 @@ public class DirectorySpace : SpaceBase
     }
 
     /// <summary>
-    ///     Общий размер всех файлов в директории, включая подкаталоги.
+    /// Общий размер всех файлов в директории, включая подкаталоги.
     /// </summary>
     public long TotalSize { get; private set; }
 
     /// <summary>
-    ///     Общий размер всех файлов в директории в виде строки с суффиксом размера.
+    /// Общий размер всех файлов в директории в виде строки с суффиксом размера.
     /// </summary>
     public string TotalSizeText => SizeFormatter.Format(TotalSize);
 
     /// <summary>
-    ///     Список подкаталогов.
+    /// Список подкаталогов.
     /// </summary>
     public IReadOnlyList<FileSpace> Files => _files;
 
     /// <summary>
-    ///     Список подкаталогов.
+    /// Список подкаталогов.
     /// </summary>
     public IReadOnlyList<DirectorySpace> SubDirectories => _subDirectories;
 
     /// <summary>
-    ///     Максимальный размер среди подкаталогов.
+    /// Максимальный размер среди подкаталогов.
     /// </summary>
     public long MaxTotalSize => _maxTotalSize ??= GetMaxSize();
 
     /// <summary>
-    ///     Добавляет подкаталог в список подкаталогов и обновляет общий размер директории.
+    /// Возвращает строковое представление директории.
+    /// </summary>
+    /// <returns>Строковое представление директории.</returns>
+    public override string ToString()
+    {
+        return $"{Name} [{SizeText}] {TotalSizeText}";
+    }
+
+    public override string GetTooltipText()
+    {
+        return $"""
+                {base.GetTooltipText()}
+                Общий размер: {TotalSizeText}
+                Размер файлов в директории, исключая подкаталоги: {SizeText}
+                """;
+    }
+
+    /// <summary>
+    /// Добавляет подкаталог в список подкаталогов и обновляет общий размер директории.
     /// </summary>
     /// <param name="subDirectory">Подкаталог, который нужно добавить.</param>
     public void Add(DirectorySpace subDirectory)
@@ -60,12 +78,12 @@ public class DirectorySpace : SpaceBase
     }
 
     /// <summary>
-    ///     Добавляет файлы в директорию и обновляет размер директории.
+    /// Добавляет файлы в директорию и обновляет размер директории.
     /// </summary>
     /// <param name="files">Список файлов, которые нужно добавить в директорию.</param>
     public void AddFiles(IEnumerable<FileInfo> files)
     {
-        foreach (FileInfo file in files)
+        foreach (var file in files)
         {
             _files.Add(FileSpace.Create(file));
             Size += file.Length;
@@ -76,16 +94,7 @@ public class DirectorySpace : SpaceBase
     }
 
     /// <summary>
-    ///     Возвращает строковое представление директории.
-    /// </summary>
-    /// <returns>Строковое представление директории.</returns>
-    public override string ToString()
-    {
-        return $"{Name} [{SizeText}] {TotalSizeText}";
-    }
-
-    /// <summary>
-    ///     Возвращает максимальный размер среди подкаталогов.
+    /// Возвращает максимальный размер среди подкаталогов.
     /// </summary>
     /// <returns>Максимальный размер среди подкаталогов.</returns>
     private long GetMaxSize()
@@ -93,14 +102,5 @@ public class DirectorySpace : SpaceBase
         return _subDirectories.Select(subDirectory => subDirectory.MaxTotalSize)
             .Prepend(TotalSize)
             .Max();
-    }
-
-    public override string GetTooltipText()
-    {
-        return $"""
-                {base.GetTooltipText()}
-                Общий размер: {TotalSizeText}
-                Размер файлов в директории, исключая подкаталоги: {SizeText}
-                """;
     }
 }

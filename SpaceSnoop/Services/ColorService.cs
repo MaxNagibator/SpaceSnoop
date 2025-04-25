@@ -1,8 +1,10 @@
 ﻿namespace SpaceSnoop.Services;
 
-public class ColorService(ISpaceColorCalculator spaceColorCalculator) : IDisposable
+public class ColorService(SpaceColorCalculator spaceColorCalculator) : IDisposable
 {
     private TrackBar? _intensityBar;
+
+    public event EventHandler<int>? IntensityChanged;
 
     public void Dispose()
     {
@@ -14,8 +16,6 @@ public class ColorService(ISpaceColorCalculator spaceColorCalculator) : IDisposa
 
         GC.SuppressFinalize(this);
     }
-
-    public event EventHandler<int>? IntensityChanged;
 
     public void Initialize(TrackBar intensityBar)
     {
