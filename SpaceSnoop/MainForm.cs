@@ -9,17 +9,21 @@ public partial class MainForm : Form
     private readonly AdministratorChecker _administratorChecker;
     private readonly ColorService _colorService;
     private readonly WorkerService _workerService;
+    private readonly SortService _sortService;
 
     private CancellationTokenSource? _cancellationTokenSource;
 
     public MainForm(
-        AdministratorChecker administratorChecker,
         WorkerService workerService,
-        ColorService colorService)
+        ColorService colorService,
+        SortService sortService,
+        AdministratorChecker administratorChecker
+    )
     {
         _administratorChecker = administratorChecker;
         _workerService = workerService;
         _colorService = colorService;
+        _sortService = sortService;
 
         InitializeComponent();
 
@@ -78,7 +82,7 @@ public partial class MainForm : Form
     {
         var parent = args.Node;
 
-        if (parent == null || _isSorting || parent.Nodes.Count <= 0)
+        if (parent == null || _sortService.IsSorting || parent.Nodes.Count <= 0)
         {
             return;
         }
@@ -145,7 +149,7 @@ public partial class MainForm : Form
     {
         var addedParent = _directoriesTreeView.Nodes.AddSpaceNode(directorySpace).FillParentNode(directorySpace);
         _colorService.UpdateAssignedNodesColor(addedParent);
-        SortNodes();
+        _sortService.SortNodes();
         StopProgressBar();
     }
 
@@ -235,5 +239,15 @@ public partial class MainForm : Form
     private void FinalizeWorker()
     {
         _workerService.WorkCompleted -= OnWorkCompleted;
+    }
+
+    private void InitializeSorting()
+    {
+        _sortService.Initialize(_sortModeComboBox, _invertSortCheckBox, _directoriesTreeView);
+    }
+
+    private void FinalizeSorting()
+    {
+        _sortService.Dispose();
     }
 }

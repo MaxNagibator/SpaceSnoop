@@ -65,6 +65,7 @@ internal static class Program
                 .AddTransient<BackgroundWorker>()
                 .AddTransient<ColorService>()
                 .AddTransient<WorkerService>()
+                .AddTransient<SortService>()
                 .AddTransient<SpaceColorCalculator>()
                 .AddTransient<DiskSpaceCalculator>()
                 .AddSingleton<AdministratorChecker>()
