@@ -2,15 +2,20 @@
 
 public class FileSpace : SpaceBase
 {
-    public FileSpace(string absolutePath, DateTime creationDate, DateTime lastAccessTime, long size)
-        : base(absolutePath, creationDate, lastAccessTime)
+    private FileSpace(string name, SpaceBase? parent, DateTime creationDate, DateTime lastAccessTime, long size)
+        : base(name, parent, creationDate, lastAccessTime)
     {
         Size = size;
     }
 
-    public static FileSpace Create(FileInfo info)
+    /// <summary>
+    /// Инициализирует новый экземпляр класса FileSpace.
+    /// </summary>
+    /// <param name="info">Системная информация.</param>
+    /// <param name="parent">Родительская директория.</param>
+    public static FileSpace Create(FileInfo info, SpaceBase? parent)
     {
-        return new(info.FullName, info.CreationTime, info.LastAccessTime, info.Length);
+        return new(info.Name, parent, info.CreationTime, info.LastAccessTime, info.Length);
     }
 
     public override string ToString()

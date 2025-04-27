@@ -1,6 +1,6 @@
 ﻿namespace SpaceSnoop.Core;
 
-public ref struct InterlockedInt(int initValue)
+public struct InterlockedInt(int initValue)
 {
     private int _value = initValue;
 

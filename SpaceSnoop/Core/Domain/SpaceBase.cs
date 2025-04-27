@@ -1,18 +1,23 @@
 ﻿namespace SpaceSnoop.Core.Domain;
 
-public abstract class SpaceBase(string absolutePath, DateTime creationDate, DateTime lastAccessTime)
+public abstract class SpaceBase(string name, SpaceBase? parent, DateTime creationDate, DateTime lastAccessTime)
 {
     protected static readonly SizeFormatter SizeFormatter = new();
 
     /// <summary>
+    /// Родительская директория.
+    /// </summary>
+    public SpaceBase? Parent { get; } = parent;
+
+    /// <summary>
     /// Название директории.
     /// </summary>
-    public string Name => GetFileName();
+    public string Name { get; } = string.Intern(name);
 
     /// <summary>
     /// Полный путь до директории.
     /// </summary>
-    public string AbsolutePath { get; } = absolutePath;
+    public string AbsolutePath => GetAbsolutePath();
 
     /// <summary>
     /// Дата создания директории.
@@ -48,15 +53,19 @@ public abstract class SpaceBase(string absolutePath, DateTime creationDate, Date
                 """;
     }
 
-    private string GetFileName()
+    private string GetAbsolutePath()
     {
-        var fileName = Path.GetFileName(AbsolutePath);
+        var segments = new List<string>();
+        var current = this;
 
-        if (string.IsNullOrWhiteSpace(fileName))
+        while (current != null)
         {
-            fileName = Path.GetPathRoot(AbsolutePath);
+            segments.Add(current.Name);
+            current = current.Parent;
         }
 
-        return fileName ?? "Error";
+        var result = segments.ToArray();
+        result.AsSpan().Reverse();
+        return Path.Combine(result);
     }
 }

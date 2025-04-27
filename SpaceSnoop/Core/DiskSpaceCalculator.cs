@@ -16,7 +16,27 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator> logger)
     /// <returns>Объект <see cref="DirectorySpace" /> с вычисленной информацией о занимаемом дисковом пространстве.</returns>
     public DirectorySpace Calculate(DirectoryInfo directory, CancellationToken cancellationToken = default)
     {
-        var directorySpace = new DirectorySpace(directory.FullName, directory.CreationTime, directory.LastAccessTime);
+        return CalculateInner(directory, null, cancellationToken);
+    }
+
+    /// <summary>
+    /// Вычисляет занимаемое дисковое пространство указанной директории и ее подкаталогов в многопоточном режиме.
+    /// </summary>
+    /// <param name="directory">Директория, для которой нужно вычислить занимаемое дисковое пространство.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Объект <see cref="DirectorySpace" /> с вычисленной информацией о занимаемом дисковом пространстве.</returns>
+    /// <remarks>Повышенное выделение памяти</remarks>
+    public DirectorySpace CalculateMultithreaded(DirectoryInfo directory, CancellationToken cancellationToken = default)
+    {
+        var maxDegreeOfParallelism = Environment.ProcessorCount;
+        var counter = new InterlockedInt(maxDegreeOfParallelism);
+
+        return CalculateMultithreadedInner(directory, null, counter, cancellationToken);
+    }
+
+    private DirectorySpace CalculateInner(DirectoryInfo directory, DirectorySpace? parent, CancellationToken cancellationToken)
+    {
+        var directorySpace = new DirectorySpace(directory.Name, parent, directory.CreationTime, directory.LastAccessTime);
 
         try
         {
@@ -30,7 +50,7 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator> logger)
             foreach (var subDirectory in subDirectories)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var subDirectorySpace = Calculate(subDirectory, cancellationToken);
+                var subDirectorySpace = CalculateInner(subDirectory, directorySpace, cancellationToken);
                 directorySpace.Add(subDirectorySpace);
             }
         }
@@ -47,24 +67,9 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator> logger)
         return directorySpace;
     }
 
-    /// <summary>
-    /// Вычисляет занимаемое дисковое пространство указанной директории и ее подкаталогов в многопоточном режиме.
-    /// </summary>
-    /// <param name="directory">Директория, для которой нужно вычислить занимаемое дисковое пространство.</param>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
-    /// <returns>Объект <see cref="DirectorySpace" /> с вычисленной информацией о занимаемом дисковом пространстве.</returns>
-    /// <remarks>Повышенное выделение памяти</remarks>
-    public DirectorySpace CalculateMultithreaded(DirectoryInfo directory, CancellationToken cancellationToken = default)
+    private DirectorySpace CalculateMultithreadedInner(DirectoryInfo directory, DirectorySpace? parent, InterlockedInt counter, CancellationToken cancellationToken)
     {
-        var maxDegreeOfParallelism = Environment.ProcessorCount;
-        var counter = new InterlockedInt(maxDegreeOfParallelism);
-
-        return CalculateMultithreadedInner(directory, counter, cancellationToken);
-    }
-
-    private DirectorySpace CalculateMultithreadedInner(DirectoryInfo directory, InterlockedInt counter, CancellationToken cancellationToken)
-    {
-        var directorySpace = new DirectorySpace(directory.FullName, directory.CreationTime, directory.LastAccessTime);
+        var directorySpace = DirectorySpace.Create(directory, parent);
 
         if (cancellationToken.IsCancellationRequested)
         {
@@ -108,7 +113,7 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator> logger)
         {
             Parallel.For(0, subDirectories.Length, options, i =>
             {
-                var subDir = CalculateMultithreaded(subDirectories[i], cancellationToken);
+                var subDir = CalculateMultithreadedInner(subDirectories[i], directorySpace, counter, cancellationToken);
                 subDirSpaces.Add(subDir);
             });
 

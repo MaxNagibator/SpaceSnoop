@@ -111,7 +111,7 @@ public partial class MainForm : Form
             return;
         }
 
-        if (args.Node.Tag is SpaceBase selectedSpace)
+        if (args.Node?.Tag is SpaceBase selectedSpace)
         {
             Process.Start("explorer.exe", selectedSpace.AbsolutePath);
         }

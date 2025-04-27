@@ -12,11 +12,12 @@ public class DirectorySpace : SpaceBase
     /// <summary>
     /// Инициализирует новый экземпляр класса DirectorySpace.
     /// </summary>
-    /// <param name="absolutePath">Полный путь до директории</param>
+    /// <param name="name">Название директории.</param>
+    /// <param name="parent">Родительская директория.</param>
     /// <param name="creationDate">Дата создания директории.</param>
     /// <param name="lastAccessTime">Время последнего доступа к директории.</param>
-    public DirectorySpace(string absolutePath, DateTime creationDate, DateTime lastAccessTime)
-        : base(absolutePath, creationDate, lastAccessTime)
+    public DirectorySpace(string name, SpaceBase? parent, DateTime creationDate, DateTime lastAccessTime)
+        : base(name, parent, creationDate, lastAccessTime)
     {
         _subDirectories = [];
         _files = [];
@@ -48,6 +49,16 @@ public class DirectorySpace : SpaceBase
     public long MaxTotalSize => _maxTotalSize ??= GetMaxSize();
 
     /// <summary>
+    /// Инициализирует новый экземпляр класса DirectorySpace.
+    /// </summary>
+    /// <param name="info">Системная информация.</param>
+    /// <param name="parent">Родительская директория.</param>
+    public static DirectorySpace Create(DirectoryInfo info, DirectorySpace? parent)
+    {
+        return new(info.Name, parent, info.CreationTime, info.LastAccessTime);
+    }
+
+    /// <summary>
     /// Возвращает строковое представление директории.
     /// </summary>
     /// <returns>Строковое представление директории.</returns>
@@ -61,7 +72,7 @@ public class DirectorySpace : SpaceBase
         return $"""
                 {base.GetTooltipText()}
                 Общий размер: {TotalSizeText}
-                Размер файлов в директории, исключая подкаталоги: {SizeText}
+                Размер файлов в директории: {SizeText}
                 """;
     }
 
@@ -84,7 +95,7 @@ public class DirectorySpace : SpaceBase
     {
         for (var i = 0; i < files.Length; i++)
         {
-            _files.Add(FileSpace.Create(files[i]));
+            _files.Add(FileSpace.Create(files[i], this));
             Size += files[i].Length;
         }
 
