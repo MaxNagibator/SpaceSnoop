@@ -16,7 +16,7 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator> logger)
     /// <returns>Объект <see cref="DirectorySpace" /> с вычисленной информацией о занимаемом дисковом пространстве.</returns>
     public DirectorySpace Calculate(DirectoryInfo directory, CancellationToken cancellationToken = default)
     {
-        var directorySpace = new DirectorySpace(directory.Name, directory.FullName, directory.CreationTime, directory.LastAccessTime);
+        var directorySpace = new DirectorySpace(directory.FullName, directory.CreationTime, directory.LastAccessTime);
 
         try
         {
@@ -64,7 +64,7 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator> logger)
 
     private DirectorySpace CalculateMultithreadedInner(DirectoryInfo directory, InterlockedInt counter, CancellationToken cancellationToken)
     {
-        var directorySpace = new DirectorySpace(directory.Name, directory.FullName, directory.CreationTime, directory.LastAccessTime);
+        var directorySpace = new DirectorySpace(directory.FullName, directory.CreationTime, directory.LastAccessTime);
 
         if (cancellationToken.IsCancellationRequested)
         {
@@ -86,19 +86,19 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator> logger)
 
         directorySpace.AddFiles(files);
 
-        AddSubDirectories(directorySpace, directory, counter, cancellationToken);
+        AddSubDirectories(directorySpace, directory.GetDirectories(), counter, cancellationToken);
 
         return directorySpace;
     }
 
-    private void AddSubDirectories(DirectorySpace directorySpace, DirectoryInfo directory, InterlockedInt counter, CancellationToken cancellationToken)
+    private void AddSubDirectories(DirectorySpace directorySpace, DirectoryInfo[] subDirectories, InterlockedInt counter, CancellationToken cancellationToken)
     {
         counter.Dec();
 
         ConcurrentBag<DirectorySpace> subDirSpaces = [];
         var availableDegreeOfParallelism = Math.Max(1, counter.Inc());
 
-        var parallelOptions = new ParallelOptions
+        var options = new ParallelOptions
         {
             MaxDegreeOfParallelism = availableDegreeOfParallelism,
             CancellationToken = cancellationToken,
@@ -106,11 +106,9 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator> logger)
 
         try
         {
-            var subDirectories = directory.GetDirectories();
-
-            Parallel.ForEach(subDirectories, parallelOptions, subDirectory =>
+            Parallel.For(0, subDirectories.Length, options, i =>
             {
-                var subDir = CalculateMultithreaded(subDirectory, cancellationToken);
+                var subDir = CalculateMultithreaded(subDirectories[i], cancellationToken);
                 subDirSpaces.Add(subDir);
             });
 

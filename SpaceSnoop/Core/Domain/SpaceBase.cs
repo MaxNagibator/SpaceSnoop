@@ -1,18 +1,18 @@
 ﻿namespace SpaceSnoop.Core.Domain;
 
-public abstract class SpaceBase(string name, string path, DateTime creationDate, DateTime lastAccessTime)
+public abstract class SpaceBase(string absolutePath, DateTime creationDate, DateTime lastAccessTime)
 {
     protected static readonly SizeFormatter SizeFormatter = new();
 
     /// <summary>
     /// Название директории.
     /// </summary>
-    public string Name { get; } = name;
+    public string Name => GetFileName();
 
     /// <summary>
     /// Полный путь до директории.
     /// </summary>
-    public string Path { get; } = path;
+    public string AbsolutePath { get; } = absolutePath;
 
     /// <summary>
     /// Дата создания директории.
@@ -42,9 +42,21 @@ public abstract class SpaceBase(string name, string path, DateTime creationDate,
     {
         return $"""
                 Название: {Name}
-                Путь: {Path} 
+                Путь: {AbsolutePath} 
                 Дата создания: {CreationDate} 
                 Последний доступ: {LastAccessTime}
                 """;
+    }
+
+    private string GetFileName()
+    {
+        var fileName = Path.GetFileName(AbsolutePath);
+
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            fileName = Path.GetPathRoot(AbsolutePath);
+        }
+
+        return fileName ?? "Error";
     }
 }

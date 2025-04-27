@@ -113,7 +113,7 @@ public partial class MainForm : Form
 
         if (args.Node.Tag is SpaceBase selectedSpace)
         {
-            Process.Start("explorer.exe", selectedSpace.Path);
+            Process.Start("explorer.exe", selectedSpace.AbsolutePath);
         }
     }
 
@@ -203,7 +203,7 @@ public partial class MainForm : Form
             var node = _directoriesTreeView.Nodes[i];
 
             if (node.Tag is not SpaceBase space
-                || space.Path.EndsWith(path, StringComparison.CurrentCultureIgnoreCase) == false)
+                || space.AbsolutePath.EndsWith(path, StringComparison.CurrentCultureIgnoreCase) == false)
             {
                 continue;
             }

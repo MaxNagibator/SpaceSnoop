@@ -12,12 +12,11 @@ public class DirectorySpace : SpaceBase
     /// <summary>
     /// Инициализирует новый экземпляр класса DirectorySpace.
     /// </summary>
-    /// <param name="name">Название директории.</param>
-    /// <param name="path">Полный путь до директории</param>
+    /// <param name="absolutePath">Полный путь до директории</param>
     /// <param name="creationDate">Дата создания директории.</param>
     /// <param name="lastAccessTime">Время последнего доступа к директории.</param>
-    public DirectorySpace(string name, string path, DateTime creationDate, DateTime lastAccessTime)
-        : base(name, path, creationDate, lastAccessTime)
+    public DirectorySpace(string absolutePath, DateTime creationDate, DateTime lastAccessTime)
+        : base(absolutePath, creationDate, lastAccessTime)
     {
         _subDirectories = [];
         _files = [];

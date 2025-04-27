@@ -2,15 +2,15 @@
 
 public class FileSpace : SpaceBase
 {
-    public FileSpace(string name, string path, DateTime creationDate, DateTime lastAccessTime, long size)
-        : base(name, path, creationDate, lastAccessTime)
+    public FileSpace(string absolutePath, DateTime creationDate, DateTime lastAccessTime, long size)
+        : base(absolutePath, creationDate, lastAccessTime)
     {
         Size = size;
     }
 
     public static FileSpace Create(FileInfo info)
     {
-        return new(info.Name, info.FullName, info.CreationTime, info.LastAccessTime, info.Length);
+        return new(info.FullName, info.CreationTime, info.LastAccessTime, info.Length);
     }
 
     public override string ToString()
