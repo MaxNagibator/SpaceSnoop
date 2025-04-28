@@ -1,50 +1,62 @@
 ﻿using System.ComponentModel;
 using System.Diagnostics;
-using SpaceSnoop.Extensions;
 
-namespace SpaceSnoop;
+namespace SpaceSnoop.Services;
 
-public partial class MainForm
+public class WorkerService : IDisposable
 {
     private readonly BackgroundWorker _backgroundWorker;
-    private CancellationTokenSource? _cancellationTokenSource;
+    private readonly DiskSpaceCalculator _diskSpaceCalculator;
+    private readonly ILogger<WorkerService> _logger;
 
-    private void InitializeWorker()
+    public WorkerService(DiskSpaceCalculator diskSpaceCalculator, BackgroundWorker backgroundWorker, ILogger<WorkerService> logger)
     {
-        _backgroundWorker.DoWork += OnDoWork;
-        _backgroundWorker.RunWorkerCompleted += OnRunWorkerCompleted;
+        _diskSpaceCalculator = diskSpaceCalculator;
+        _backgroundWorker = backgroundWorker;
+        _logger = logger;
 
-        _backgroundWorker.WorkerSupportsCancellation = true;
+        Initialize();
     }
 
-    private void FinalizeWorker()
+    public event EventHandler<DirectorySpace?>? WorkCompleted;
+
+    public void Dispose()
     {
         _backgroundWorker.DoWork -= OnDoWork;
         _backgroundWorker.RunWorkerCompleted -= OnRunWorkerCompleted;
+
+        _backgroundWorker.Dispose();
+
+        GC.SuppressFinalize(this);
+    }
+
+    public void StartWorker(string disk, bool isMultithread, CancellationToken cancellationToken)
+    {
+        var workerRequest = new WorkerRequest(disk, isMultithread, cancellationToken);
+        _backgroundWorker.RunWorkerAsync(workerRequest);
     }
 
     private void OnDoWork(object? sender, DoWorkEventArgs args)
     {
-        if (args.Argument is not WorkerRequest(var disk, var cancellationToken)
-            || string.IsNullOrWhiteSpace(disk))
+        if (args.Argument is not WorkerRequest(var disk, var isMultithread, var cancellationToken) || string.IsNullOrWhiteSpace(disk))
         {
             return;
         }
 
-        DirectoryInfo directory = new(disk);
+        var directory = new DirectoryInfo(disk);
 
-        if (directory.Exists == false)
+        if (!directory.Exists)
         {
             _logger.LogError("Расчет для каталога {Directory} невозможен. Директория не найдена.", directory.FullName);
             return;
         }
 
-        Stopwatch stopwatch = Stopwatch.StartNew();
-        DirectoryInfo directoryInfo = new(disk);
+        var stopwatch = Stopwatch.StartNew();
+        var directoryInfo = new DirectoryInfo(disk);
 
         try
         {
-            DirectorySpace directorySpace = _useMultithreadingCheckBox.Checked
+            var directorySpace = isMultithread
                 ? _diskSpaceCalculator.CalculateMultithreaded(directoryInfo, cancellationToken)
                 : _diskSpaceCalculator.Calculate(directoryInfo, cancellationToken);
 
@@ -68,7 +80,7 @@ public partial class MainForm
 
     private void OnRunWorkerCompleted(object? sender, RunWorkerCompletedEventArgs args)
     {
-        StopProgressBar();
+        DirectorySpace? data = null;
 
         if (args.Cancelled)
         {
@@ -78,18 +90,20 @@ public partial class MainForm
         {
             _logger.LogError(args.Error, "Произошла ошибка во время сканирования.");
         }
-        else if (args.Result is DirectorySpace data)
+        else if (args.Result is DirectorySpace space)
         {
-            TreeNode addedParent = _directoriesTreeView.Nodes.AddSpaceNode(data).FillParentNode(data);
-            UpdateNodeColors(addedParent);
-            SortNodes();
+            data = space;
         }
+
+        WorkCompleted?.Invoke(this, data);
     }
 
-    private void StopWorker()
+    private void Initialize()
     {
-        _cancellationTokenSource?.Cancel();
+        _backgroundWorker.DoWork += OnDoWork;
+        _backgroundWorker.RunWorkerCompleted += OnRunWorkerCompleted;
+        _backgroundWorker.WorkerSupportsCancellation = true;
     }
 
-    private record WorkerRequest(string Disk, CancellationToken CancellationToken);
+    private record WorkerRequest(string Disk, bool IsMultithread, CancellationToken CancellationToken);
 }

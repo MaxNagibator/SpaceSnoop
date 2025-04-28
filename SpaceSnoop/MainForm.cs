@@ -1,21 +1,29 @@
-using System.ComponentModel;
-using System.Diagnostics;
 using SpaceSnoop.Extensions;
+using SpaceSnoop.Services;
+using System.Diagnostics;
 
 namespace SpaceSnoop;
 
 public partial class MainForm : Form
 {
-    private readonly IAdministratorChecker _administratorChecker;
-    private readonly IDiskSpaceCalculator _diskSpaceCalculator;
-    private readonly ILogger<MainForm> _logger;
+    private readonly AdministratorChecker _administratorChecker;
+    private readonly ColorService _colorService;
+    private readonly WorkerService _workerService;
+    private readonly SortService _sortService;
 
-    public MainForm(ILogger<MainForm> logger, IAdministratorChecker administratorChecker, IDiskSpaceCalculator spaceCalculator, BackgroundWorker worker)
+    private CancellationTokenSource? _cancellationTokenSource;
+
+    public MainForm(
+        WorkerService workerService,
+        ColorService colorService,
+        SortService sortService,
+        AdministratorChecker administratorChecker
+    )
     {
-        _logger = logger;
         _administratorChecker = administratorChecker;
-        _diskSpaceCalculator = spaceCalculator;
-        _backgroundWorker = worker;
+        _workerService = workerService;
+        _colorService = colorService;
+        _sortService = sortService;
 
         InitializeComponent();
 
@@ -33,29 +41,29 @@ public partial class MainForm : Form
         return true;
     }
 
+    protected override void OnFormClosing(FormClosingEventArgs args)
+    {
+        FinalizeWorker();
+        FinalizeSorting();
+        FinalizeColorService();
+
+        base.OnFormClosing(args);
+    }
+
     private void OnFormLoaded(object sender, EventArgs args)
     {
         InitializeWorker();
         InitializeSorting();
-        InitializeColor();
+        InitializeColorService();
 
         FillDrives();
 
         SetDefaultSettings();
     }
 
-    protected override void OnFormClosing(FormClosingEventArgs args)
-    {
-        FinalizeWorker();
-        FinalizeSorting();
-        FinalizeColor();
-
-        base.OnFormClosing(args);
-    }
-
     private void OnStartButtonClicked(object sender, EventArgs args)
     {
-        string disk = _hardDiskComboBox.SelectedItem?.ToString() ?? _hardDiskComboBox.Text;
+        var disk = _hardDiskComboBox.SelectedItem?.ToString() ?? _hardDiskComboBox.Text;
 
         if (string.IsNullOrWhiteSpace(disk))
         {
@@ -72,9 +80,9 @@ public partial class MainForm : Form
 
     private void OnDirectoriesTreeViewBeforeExpanded(object sender, TreeViewCancelEventArgs args)
     {
-        TreeNode? parent = args.Node;
+        var parent = args.Node;
 
-        if (parent == null || _isSorting || parent.Nodes.Count <= 0)
+        if (parent == null || _sortService.IsSorting || parent.Nodes.Count <= 0)
         {
             return;
         }
@@ -92,7 +100,7 @@ public partial class MainForm : Form
             }
 
             node.FillParentNode(diskSpace);
-            UpdateNodeColors(node);
+            _colorService.UpdateAssignedNodesColor(node);
         }
     }
 
@@ -103,32 +111,61 @@ public partial class MainForm : Form
             return;
         }
 
-        if (args.Node.Tag is SpaceBase selectedSpace)
+        if (args.Node?.Tag is SpaceBase selectedSpace)
         {
-            Process.Start("explorer.exe", selectedSpace.Path);
+            Process.Start("explorer.exe", selectedSpace.AbsolutePath);
         }
     }
 
     private void OnChooseDirectoryClicked(object sender, EventArgs e)
     {
-        using FolderBrowserDialog folderBrowserDialog = new();
+        using var folderBrowserDialog = new FolderBrowserDialog();
 
-        DialogResult result = folderBrowserDialog.ShowDialog();
+        var result = folderBrowserDialog.ShowDialog();
 
         if (result != DialogResult.OK || string.IsNullOrWhiteSpace(folderBrowserDialog.SelectedPath))
         {
             return;
         }
 
-        string selectedPath = folderBrowserDialog.SelectedPath;
+        var selectedPath = folderBrowserDialog.SelectedPath;
 
-        int index = _hardDiskComboBox.Items.IndexOf(selectedPath);
+        var index = _hardDiskComboBox.Items.IndexOf(selectedPath);
 
         _hardDiskComboBox.SelectedIndex = index == -1
             ? _hardDiskComboBox.Items.Add(selectedPath)
             : index;
 
         StartScanning(selectedPath);
+    }
+
+    private void OnIntensityChanged(object? sender, int intensity)
+    {
+        _intensityGroupBox.Text = $"Интенсивность: {intensity}";
+        _colorService.UpdateNodesColor(_directoriesTreeView.Nodes);
+    }
+
+    private void OnWorkCompleted(object? sender, DirectorySpace? directorySpace)
+    {
+        if (directorySpace != null)
+        {
+            var addedParent = _directoriesTreeView.Nodes.AddSpaceNode(directorySpace).FillParentNode(directorySpace);
+            _colorService.UpdateAssignedNodesColor(addedParent);
+            _sortService.SortNodes();
+        }
+
+        StopProgressBar();
+    }
+
+    private void StartWorker(string disk)
+    {
+        _cancellationTokenSource = new();
+        _workerService.StartWorker(disk, _useMultithreadingCheckBox.Checked, _cancellationTokenSource.Token);
+    }
+
+    private void StopWorker()
+    {
+        _cancellationTokenSource?.Cancel();
     }
 
     private void SetDefaultSettings()
@@ -144,9 +181,9 @@ public partial class MainForm : Form
 
     private void FillDrives()
     {
-        DriveInfo[] hardDisk = DriveInfo.GetDrives();
+        var hardDisk = DriveInfo.GetDrives();
 
-        foreach (DriveInfo disk in hardDisk)
+        foreach (var disk in hardDisk)
         {
             _hardDiskComboBox.Items.Add(disk.Name);
         }
@@ -155,21 +192,18 @@ public partial class MainForm : Form
     private void StartScanning(string disk)
     {
         StartProgressBar();
-
         RemovePathNode(disk);
-
-        _cancellationTokenSource = new CancellationTokenSource();
-        _backgroundWorker.RunWorkerAsync(new WorkerRequest(disk, _cancellationTokenSource.Token));
+        StartWorker(disk);
     }
 
     private void RemovePathNode(string path)
     {
-        for (int i = 0; i < _directoriesTreeView.Nodes.Count; i++)
+        for (var i = 0; i < _directoriesTreeView.Nodes.Count; i++)
         {
-            TreeNode node = _directoriesTreeView.Nodes[i];
+            var node = _directoriesTreeView.Nodes[i];
 
             if (node.Tag is not SpaceBase space
-                || space.Path.EndsWith(path, StringComparison.CurrentCultureIgnoreCase) == false)
+                || space.AbsolutePath.EndsWith(path, StringComparison.CurrentCultureIgnoreCase) == false)
             {
                 continue;
             }
@@ -187,5 +221,37 @@ public partial class MainForm : Form
     private void StopProgressBar()
     {
         _calculateProgressBar.Invoke(() => _calculateProgressBar.Style = ProgressBarStyle.Blocks);
+    }
+
+    private void InitializeColorService()
+    {
+        _colorService.Initialize(_intensityBar);
+        _colorService.IntensityChanged += OnIntensityChanged;
+    }
+
+    private void FinalizeColorService()
+    {
+        _colorService.IntensityChanged -= OnIntensityChanged;
+        _colorService.Dispose();
+    }
+
+    private void InitializeWorker()
+    {
+        _workerService.WorkCompleted += OnWorkCompleted;
+    }
+
+    private void FinalizeWorker()
+    {
+        _workerService.WorkCompleted -= OnWorkCompleted;
+    }
+
+    private void InitializeSorting()
+    {
+        _sortService.Initialize(_sortModeComboBox, _invertSortCheckBox, _directoriesTreeView);
+    }
+
+    private void FinalizeSorting()
+    {
+        _sortService.Dispose();
     }
 }

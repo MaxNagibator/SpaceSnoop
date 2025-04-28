@@ -1,50 +1,71 @@
 ﻿namespace SpaceSnoop.Core.Domain;
 
-public abstract class SpaceBase(string name, string path, DateTime creationDate, DateTime lastAccessTime)
+public abstract class SpaceBase(string name, SpaceBase? parent, DateTime creationDate, DateTime lastAccessTime)
 {
-    protected readonly ISizeFormatter SizeFormatter = new SizeFormatter();
+    protected static readonly SizeFormatter SizeFormatter = new();
 
     /// <summary>
-    ///     Название директории.
+    /// Родительская директория.
     /// </summary>
-    public string Name { get; } = name;
+    public SpaceBase? Parent { get; protected set; } = parent;
 
     /// <summary>
-    ///     Полный путь до директории.
+    /// Название директории.
     /// </summary>
-    public string Path { get; } = path;
+    public string Name { get; } = string.Intern(name);
 
     /// <summary>
-    ///     Дата создания директории.
+    /// Полный путь до директории.
+    /// </summary>
+    public string AbsolutePath => GetAbsolutePath();
+
+    /// <summary>
+    /// Дата создания директории.
     /// </summary>
     public DateTime CreationDate { get; } = creationDate;
 
     /// <summary>
-    ///     Время последнего доступа к директории.
+    /// Время последнего доступа к директории.
     /// </summary>
     public DateTime LastAccessTime { get; } = lastAccessTime;
 
     /// <summary>
-    ///     Размер файлов в директории, исключая подкаталоги.
+    /// Размер файлов в директории, исключая подкаталоги.
     /// </summary>
     public long Size { get; protected set; }
 
     /// <summary>
-    ///     Размер файлов в директории, исключая подкаталоги, в виде строки с суффиксом размера.
+    /// Размер файлов в директории, исключая подкаталоги, в виде строки с суффиксом размера.
     /// </summary>
     public string SizeText => SizeFormatter.Format(Size);
 
     /// <summary>
-    ///     Возвращает строку, представляющую информацию о директории для tooltip.
+    /// Возвращает строку, представляющую информацию о директории для tooltip.
     /// </summary>
     /// <returns>Информация о директории в формате tooltip.</returns>
     public virtual string GetTooltipText()
     {
         return $"""
                 Название: {Name}
-                Путь: {Path} 
+                Путь: {AbsolutePath} 
                 Дата создания: {CreationDate} 
                 Последний доступ: {LastAccessTime}
                 """;
+    }
+
+    private string GetAbsolutePath()
+    {
+        var segments = new List<string>();
+        var current = this;
+
+        while (current != null)
+        {
+            segments.Add(current.Name);
+            current = current.Parent;
+        }
+
+        var result = segments.ToArray();
+        result.AsSpan().Reverse();
+        return Path.Combine(result);
     }
 }

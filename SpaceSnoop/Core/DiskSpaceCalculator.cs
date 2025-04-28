@@ -4,28 +4,55 @@ using System.Security;
 namespace SpaceSnoop.Core;
 
 /// <summary>
-///     Калькулятор для вычисления занимаемого дискового пространства директории и ее подкаталогов.
+/// Калькулятор для вычисления занимаемого дискового пространства директории и ее подкаталогов.
 /// </summary>
-public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator> logger) : IDiskSpaceCalculator
+public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator> logger)
 {
-    /// <inheritdoc />
+    /// <summary>
+    /// Вычисляет занимаемое дисковое пространство указанной директории и ее подкаталогов.
+    /// </summary>
+    /// <param name="directory">Директория, для которой нужно вычислить занимаемое дисковое пространство.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Объект <see cref="DirectorySpace" /> с вычисленной информацией о занимаемом дисковом пространстве.</returns>
     public DirectorySpace Calculate(DirectoryInfo directory, CancellationToken cancellationToken = default)
     {
-        DirectorySpace directorySpace = new(directory.Name, directory.FullName, directory.CreationTime, directory.LastAccessTime);
+        return CalculateInner(directory, null, cancellationToken);
+    }
+
+    /// <summary>
+    /// Вычисляет занимаемое дисковое пространство указанной директории и ее подкаталогов в многопоточном режиме.
+    /// </summary>
+    /// <param name="directory">Директория, для которой нужно вычислить занимаемое дисковое пространство.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Объект <see cref="DirectorySpace" /> с вычисленной информацией о занимаемом дисковом пространстве.</returns>
+    /// <remarks>Повышенное выделение памяти</remarks>
+    public DirectorySpace CalculateMultithreaded(DirectoryInfo directory, CancellationToken cancellationToken = default)
+    {
+        var maxDegreeOfParallelism = Environment.ProcessorCount;
+        var counter = new InterlockedInt(maxDegreeOfParallelism);
+
+        var directorySpace = CalculateMultithreadedInner(directory, null, counter, cancellationToken);
+        directorySpace.FixAbsolutePath(directory);
+        return directorySpace;
+    }
+
+    private DirectorySpace CalculateInner(DirectoryInfo directory, DirectorySpace? parent, CancellationToken cancellationToken)
+    {
+        var directorySpace = new DirectorySpace(directory.Name, parent, directory.CreationTime, directory.LastAccessTime);
 
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            IEnumerable<FileInfo> files = directory.EnumerateFiles();
+            var files = directory.GetFiles();
             directorySpace.AddFiles(files);
 
-            IEnumerable<DirectoryInfo> subDirectories = directory.EnumerateDirectories();
+            var subDirectories = directory.EnumerateDirectories();
 
-            foreach (DirectoryInfo subDirectory in subDirectories)
+            foreach (var subDirectory in subDirectories)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                DirectorySpace subDirectorySpace = Calculate(subDirectory, cancellationToken);
+                var subDirectorySpace = CalculateInner(subDirectory, directorySpace, cancellationToken);
                 directorySpace.Add(subDirectorySpace);
             }
         }
@@ -42,10 +69,9 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator> logger) : IDiskSpa
         return directorySpace;
     }
 
-    /// <inheritdoc />
-    public DirectorySpace CalculateMultithreaded(DirectoryInfo directory, CancellationToken cancellationToken = default)
+    private DirectorySpace CalculateMultithreadedInner(DirectoryInfo directory, DirectorySpace? parent, InterlockedInt counter, CancellationToken cancellationToken)
     {
-        DirectorySpace directorySpace = new(directory.Name, directory.FullName, directory.CreationTime, directory.LastAccessTime);
+        var directorySpace = DirectorySpace.Create(directory, parent);
 
         if (cancellationToken.IsCancellationRequested)
         {
@@ -53,11 +79,11 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator> logger) : IDiskSpa
             cancellationToken.ThrowIfCancellationRequested();
         }
 
-        IEnumerable<FileInfo> files;
+        Span<FileInfo> files;
 
         try
         {
-            files = directory.EnumerateFiles();
+            files = directory.GetFiles();
         }
         catch (Exception exception) when (exception is UnauthorizedAccessException or SecurityException)
         {
@@ -67,27 +93,42 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator> logger) : IDiskSpa
 
         directorySpace.AddFiles(files);
 
-        AddSubDirectories(directorySpace, directory, cancellationToken);
+        AddSubDirectories(directorySpace, directory.GetDirectories(), counter, cancellationToken);
 
         return directorySpace;
     }
 
-    private void AddSubDirectories(DirectorySpace directorySpace, DirectoryInfo directory, CancellationToken cancellationToken)
+    private void AddSubDirectories(DirectorySpace directorySpace, DirectoryInfo[] subDirectories, InterlockedInt counter, CancellationToken cancellationToken)
     {
-        IEnumerable<DirectoryInfo> subDirectories = directory.EnumerateDirectories();
+        counter.Dec();
+
         ConcurrentBag<DirectorySpace> subDirSpaces = [];
+        var availableDegreeOfParallelism = Math.Max(1, counter.Inc());
 
-        Parallel.ForEach(subDirectories, new ParallelOptions { CancellationToken = cancellationToken }, subDirectory =>
+        var options = new ParallelOptions
         {
-            DirectorySpace subDir = CalculateMultithreaded(subDirectory, cancellationToken);
-            subDirSpaces.Add(subDir);
-        });
+            MaxDegreeOfParallelism = availableDegreeOfParallelism,
+            CancellationToken = cancellationToken,
+        };
 
-        cancellationToken.ThrowIfCancellationRequested();
-
-        foreach (DirectorySpace subDirSpace in subDirSpaces)
+        try
         {
-            directorySpace.Add(subDirSpace);
+            Parallel.For(0, subDirectories.Length, options, i =>
+            {
+                var subDir = CalculateMultithreadedInner(subDirectories[i], directorySpace, counter, cancellationToken);
+                subDirSpaces.Add(subDir);
+            });
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            foreach (var subDirSpace in subDirSpaces)
+            {
+                directorySpace.Add(subDirSpace);
+            }
+        }
+        finally
+        {
+            counter.Inc();
         }
     }
 }

@@ -39,14 +39,14 @@
             _sortGroupBox = new GroupBox();
             _sortModeComboBox = new ComboBox();
             _invertSortCheckBox = new CheckBox();
-            _controlGroupBox = new GroupBox();
+            _intensityGroupBox = new GroupBox();
             _intensityBar = new TrackBar();
             _chooseFolderButton = new Button();
             _mainTabControl = new TabControl();
             _controlTabPage = new TabPage();
             _settingsTabPage = new TabPage();
             _sortGroupBox.SuspendLayout();
-            _controlGroupBox.SuspendLayout();
+            _intensityGroupBox.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)_intensityBar).BeginInit();
             _mainTabControl.SuspendLayout();
             _controlTabPage.SuspendLayout();
@@ -159,17 +159,17 @@
             _invertSortCheckBox.Text = "Invert";
             _invertSortCheckBox.UseVisualStyleBackColor = true;
             // 
-            // _controlGroupBox
+            // _intensityGroupBox
             // 
-            _controlGroupBox.Controls.Add(_intensityBar);
-            _controlGroupBox.Location = new Point(11, 137);
-            _controlGroupBox.Margin = new Padding(6);
-            _controlGroupBox.Name = "_controlGroupBox";
-            _controlGroupBox.Padding = new Padding(6);
-            _controlGroupBox.Size = new Size(375, 105);
-            _controlGroupBox.TabIndex = 9;
-            _controlGroupBox.TabStop = false;
-            _controlGroupBox.Text = "Интенсивность";
+            _intensityGroupBox.Controls.Add(_intensityBar);
+            _intensityGroupBox.Location = new Point(11, 137);
+            _intensityGroupBox.Margin = new Padding(6);
+            _intensityGroupBox.Name = "_intensityGroupBox";
+            _intensityGroupBox.Padding = new Padding(6);
+            _intensityGroupBox.Size = new Size(375, 105);
+            _intensityGroupBox.TabIndex = 9;
+            _intensityGroupBox.TabStop = false;
+            _intensityGroupBox.Text = "Интенсивность";
             // 
             // _intensityBar
             // 
@@ -222,7 +222,7 @@
             // _settingsTabPage
             // 
             _settingsTabPage.Controls.Add(_sortGroupBox);
-            _settingsTabPage.Controls.Add(_controlGroupBox);
+            _settingsTabPage.Controls.Add(_intensityGroupBox);
             _settingsTabPage.Location = new Point(8, 46);
             _settingsTabPage.Margin = new Padding(6);
             _settingsTabPage.Name = "_settingsTabPage";
@@ -248,8 +248,8 @@
             Load += OnFormLoaded;
             _sortGroupBox.ResumeLayout(false);
             _sortGroupBox.PerformLayout();
-            _controlGroupBox.ResumeLayout(false);
-            _controlGroupBox.PerformLayout();
+            _intensityGroupBox.ResumeLayout(false);
+            _intensityGroupBox.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)_intensityBar).EndInit();
             _mainTabControl.ResumeLayout(false);
             _controlTabPage.ResumeLayout(false);
@@ -270,7 +270,7 @@
         private GroupBox _sortGroupBox;
         private ComboBox _sortModeComboBox;
         private CheckBox _invertSortCheckBox;
-        private GroupBox _controlGroupBox;
+        private GroupBox _intensityGroupBox;
         private Button _chooseFolderButton;
         private TabControl _mainTabControl;
         private TabPage _controlTabPage;
