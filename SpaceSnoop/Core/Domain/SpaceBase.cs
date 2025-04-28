@@ -7,7 +7,7 @@ public abstract class SpaceBase(string name, SpaceBase? parent, DateTime creatio
     /// <summary>
     /// Родительская директория.
     /// </summary>
-    public SpaceBase? Parent { get; } = parent;
+    public SpaceBase? Parent { get; protected set; } = parent;
 
     /// <summary>
     /// Название директории.

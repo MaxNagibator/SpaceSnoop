@@ -31,7 +31,9 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator> logger)
         var maxDegreeOfParallelism = Environment.ProcessorCount;
         var counter = new InterlockedInt(maxDegreeOfParallelism);
 
-        return CalculateMultithreadedInner(directory, null, counter, cancellationToken);
+        var directorySpace = CalculateMultithreadedInner(directory, null, counter, cancellationToken);
+        directorySpace.FixAbsolutePath(directory);
+        return directorySpace;
     }
 
     private DirectorySpace CalculateInner(DirectoryInfo directory, DirectorySpace? parent, CancellationToken cancellationToken)

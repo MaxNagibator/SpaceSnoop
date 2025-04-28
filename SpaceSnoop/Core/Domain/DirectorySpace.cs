@@ -113,4 +113,21 @@ public class DirectorySpace : SpaceBase
             .Prepend(TotalSize)
             .Max();
     }
+
+    public void FixAbsolutePath(DirectoryInfo directory)
+    {
+        if (directory.FullName == directory.Root.FullName)
+        {
+            return;
+        }
+
+        var parent = Directory.GetParent(directory.FullName);
+
+        if (parent == null)
+        {
+            return;
+        }
+
+        Parent = new DirectorySpace(parent.FullName, null, parent.CreationTime, parent.LastAccessTime);
+    }
 }
