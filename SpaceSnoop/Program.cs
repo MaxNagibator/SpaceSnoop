@@ -70,18 +70,22 @@ internal static class Program
 
     private static LoggingConfiguration ConfigureLogging()
     {
+        var logDirectory = Path.Combine(Path.GetTempPath(), "SpaceSnoop");
+        Directory.CreateDirectory(logDirectory);
+        logDirectory = logDirectory.Replace("\\", "/");
+
         var config = new LoggingConfiguration();
 
         var systemFile = new FileTarget("system")
         {
-            FileName = "${basedir}/logs/${shortdate}/system.log",
+            FileName = "${" + logDirectory + "}/logs/${shortdate}/system.log",
         };
 
         config.AddTarget(systemFile);
 
         var customFile = new FileTarget("custom")
         {
-            FileName = "${basedir}/logs/${shortdate}/${logger:shortName=True}.log",
+            FileName = "${" + logDirectory + "}/logs/${shortdate}/${logger:shortName=True}.log",
         };
 
         config.AddTarget(customFile);
