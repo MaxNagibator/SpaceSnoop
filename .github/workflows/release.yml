@@ -30,13 +30,26 @@ jobs:
           cache: true
           cache-dependency-path: "**/packages.lock.json"
 
+      - name: Determine release tag
+        id: determine-tag
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $tag = "${{ github.event.inputs.tag }}"
+          } else {
+            $tag = "${{ github.ref_name }}"
+          }
+          echo "TAG=$tag" >> $env:GITHUB_ENV
+
       - name: Publish
         run: |
           dotnet publish --configuration Release --runtime win-x64 -p:PublishSingleFile=true -p:PublishReadyToRun=true --no-self-contained
-          powershell Compress-Archive .\bin\Release\net9.0-windows\win-x64\publish\SpaceSnoop.exe SpaceSnoop.zip
+          Rename-Item -Path .\bin\Release\net9.0-windows\win-x64\publish\SpaceSnoop.exe -NewName "SpaceSnoop_$env:TAG.exe"
+          Compress-Archive -Path .\bin\Release\net9.0-windows\win-x64\publish\SpaceSnoop_$env:TAG.exe -DestinationPath SpaceSnoop_$env:TAG.zip
 
       - name: Upload
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}" .\bin\Release\net9.0-windows\win-x64\publish\SpaceSnoop.exe SpaceSnoop.zip
+          gh release upload $env:TAG `
+            .\bin\Release\net9.0-windows\win-x64\publish\SpaceSnoop_$env:TAG.exe `
+            SpaceSnoop_$env:TAG.zip
