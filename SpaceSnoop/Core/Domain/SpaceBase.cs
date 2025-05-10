@@ -30,9 +30,14 @@ public abstract class SpaceBase(string name, SpaceBase? parent, DateTime creatio
     public DateTime LastAccessTime { get; } = lastAccessTime;
 
     /// <summary>
-    /// Размер файлов в директории, исключая подкаталоги.
+    /// Размер.
     /// </summary>
     public long Size { get; protected set; }
+
+    /// <summary>
+    /// Занимаемый размер.
+    /// </summary>
+    public virtual long TotalSize => Size;
 
     /// <summary>
     /// Размер файлов в директории, исключая подкаталоги, в виде строки с суффиксом размера.

@@ -1,11 +1,12 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NLog;
+using NLog.Config;
 using NLog.Extensions.Logging;
+using NLog.Targets;
 using NLog.Windows.Forms;
 using SpaceSnoop.Services;
 using System.ComponentModel;
-using LogLevel = Microsoft.Extensions.Logging.LogLevel;
+using LogLevel = NLog.LogLevel;
 
 namespace SpaceSnoop;
 
@@ -18,18 +19,13 @@ internal static class Program
 
         try
         {
-            var config = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile("appsettings.json", true, true)
-                .Build();
-
             using var servicesProvider = new ServiceCollection()
                 .ConfigureServices()
                 .AddLogging(loggingBuilder =>
                 {
                     loggingBuilder.ClearProviders();
-                    loggingBuilder.SetMinimumLevel(LogLevel.Trace);
-                    loggingBuilder.AddNLog(config);
+                    loggingBuilder.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Trace);
+                    loggingBuilder.AddNLog(ConfigureLogging());
                 })
                 .BuildServiceProvider();
 
@@ -70,5 +66,59 @@ internal static class Program
                 .AddTransient<DiskSpaceCalculator>()
                 .AddSingleton<AdministratorChecker>()
             ;
+    }
+
+    private static LoggingConfiguration ConfigureLogging()
+    {
+        var config = new LoggingConfiguration();
+
+        var systemFile = new FileTarget("system")
+        {
+            FileName = "${basedir}/logs/${shortdate}/system.log",
+        };
+
+        config.AddTarget(systemFile);
+
+        var customFile = new FileTarget("custom")
+        {
+            FileName = "${basedir}/logs/${shortdate}/${logger:shortName=True}.log",
+        };
+
+        config.AddTarget(customFile);
+
+        var richTextBoxTarget = new RichTextBoxTarget
+        {
+            Name = "textBox",
+            Layout = "${longdate}${newline}[${level:uppercase=true}]|${logger:shortName=True}|${newline}${message}${newline}",
+            ControlName = "_uiLogsRichTextBox",
+            FormName = "MainForm",
+            Height = 600,
+            Width = 400,
+            AutoScroll = true,
+            MaxLines = 0,
+            ShowMinimized = false,
+            ToolWindow = true,
+            UseDefaultRowColoringRules = true,
+            AllowAccessoryFormCreation = false,
+            MessageRetention = RichTextBoxTargetMessageRetentionStrategy.All,
+            SupportLinks = false,
+        };
+
+        config.AddTarget(richTextBoxTarget);
+
+        config.LoggingRules.Add(new("*", LogLevel.Trace, richTextBoxTarget));
+
+        var customRule = new LoggingRule("SpaceSnoop.*", LogLevel.Trace, customFile)
+        {
+            Final = true,
+        };
+
+        config.LoggingRules.Add(customRule);
+
+        var systemRule = new LoggingRule("*", LogLevel.Info, systemFile);
+        systemRule.EnableLoggingForLevels(LogLevel.Debug, LogLevel.Error);
+        config.LoggingRules.Add(systemRule);
+
+        return config;
     }
 }

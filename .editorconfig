@@ -13,6 +13,11 @@ charset = utf-8-bom
 end_of_line = crlf
 insert_final_newline = true
 
+[*.{yml,json}]
+indent_size = 2
+indent_style = space
+tab_width = 2
+
 # Файлы C#
 
 [*.{cs,razor,chtml,razor.cs,chtml.cs}]

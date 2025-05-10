@@ -44,56 +44,7 @@ public partial class MainForm : Form
 
     protected override void OnFormClosing(FormClosingEventArgs args)
     {
-        var toDelete = GetAllMarkedForDeletion();
-
-        if (toDelete.Count != 0)
-        {
-            var count = toDelete.Count;
-            var totalBytes = toDelete.Sum(item => item.Size);
-            var totalSizeText = new SizeFormatter().Format(totalBytes);
-
-            var text = $"""
-                        Будут перемещены в корзину {count} элементов на общий объём {totalSizeText}.
-                        Продолжить?
-                        """;
-
-            var result = MessageBox.Show(this,
-                text,
-                "Подтверждение удаления",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Question);
-
-            if (result == DialogResult.Yes)
-            {
-                foreach (var (path, _) in toDelete)
-                {
-                    try
-                    {
-                        if (Directory.Exists(path))
-                        {
-                            FileSystem.DeleteDirectory(path,
-                                UIOption.OnlyErrorDialogs,
-                                RecycleOption.SendToRecycleBin);
-                        }
-                        else if (File.Exists(path))
-                        {
-                            FileSystem.DeleteFile(path,
-                                UIOption.OnlyErrorDialogs,
-                                RecycleOption.SendToRecycleBin);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"Ошибка удаления {path}: {ex.Message}");
-                    }
-                }
-            }
-            else
-            {
-                args.Cancel = true;
-                return;
-            }
-        }
+        PerformDelete();
 
         FinalizeWorker();
         FinalizeSorting();
@@ -317,9 +268,72 @@ public partial class MainForm : Form
         _sortService.Dispose();
     }
 
-    private List<(string Path, long Size)> GetAllMarkedForDeletion()
+    private void PerformDelete()
     {
-        var list = new List<(string, long)>();
+        var toDelete = GetAllMarkedForDeletion();
+
+        if (toDelete.Count == 0)
+        {
+            return;
+        }
+
+        var count = toDelete.Count;
+        var totalBytes = toDelete.Sum(item => item.TotalSize);
+        var totalSizeText = new SizeFormatter().Format(totalBytes);
+
+        var text = $"""
+                    В корзину будут перемещены {count} элементов. 
+                    Общий объём {totalSizeText}.
+
+                    Выполнить удаление?
+                    """;
+
+        var result = MessageBox.Show(this,
+            text,
+            "Удаление",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question);
+
+        if (result != DialogResult.Yes)
+        {
+            return;
+        }
+
+        var logFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "deleted.txt");
+
+        using var logWriter = new StreamWriter(logFilePath);
+
+        foreach (var path in toDelete.Select(x => x.AbsolutePath))
+        {
+            try
+            {
+                if (Directory.Exists(path))
+                {
+                    FileSystem.DeleteDirectory(path,
+                        UIOption.OnlyErrorDialogs,
+                        RecycleOption.SendToRecycleBin);
+
+                    logWriter.WriteLine(path);
+                }
+                else if (File.Exists(path))
+                {
+                    FileSystem.DeleteFile(path,
+                        UIOption.OnlyErrorDialogs,
+                        RecycleOption.SendToRecycleBin);
+
+                    logWriter.WriteLine(path);
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.WriteLine($"Ошибка удаления {path}: {exception.Message}");
+            }
+        }
+    }
+
+    private List<SpaceBase> GetAllMarkedForDeletion()
+    {
+        var list = new List<SpaceBase>();
         TraverseNodes(_directoriesTreeView.Nodes);
         return list;
 
@@ -329,9 +343,12 @@ public partial class MainForm : Form
             {
                 if (node.Tag is SpaceBase { State: SpaceState.Deleted } space)
                 {
-                    list.Add((space.AbsolutePath, space is DirectorySpace directorySpace
-                        ? directorySpace.TotalSize
-                        : space.Size));
+                    list.Add(space);
+
+                    if (space is DirectorySpace)
+                    {
+                        return;
+                    }
                 }
 
                 if (node.Nodes.Count > 0)
