@@ -39,6 +39,8 @@ public abstract class SpaceBase(string name, SpaceBase? parent, DateTime creatio
     /// </summary>
     public string SizeText => SizeFormatter.Format(Size);
 
+    public SpaceState State { get; private set; } = SpaceState.Added;
+
     /// <summary>
     /// Возвращает строку, представляющую информацию о директории для tooltip.
     /// </summary>
@@ -51,6 +53,16 @@ public abstract class SpaceBase(string name, SpaceBase? parent, DateTime creatio
                 Дата создания: {CreationDate} 
                 Последний доступ: {LastAccessTime}
                 """;
+    }
+
+    public virtual void SwapDelete()
+    {
+        State = State switch
+        {
+            SpaceState.Added => SpaceState.Deleted,
+            SpaceState.Deleted => SpaceState.Added,
+            _ => State,
+        };
     }
 
     private string GetAbsolutePath()

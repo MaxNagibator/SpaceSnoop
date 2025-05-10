@@ -56,11 +56,34 @@ public class ColorService(SpaceColorCalculator spaceColorCalculator) : IDisposab
         }
     }
 
+    private static Color? TryModifyByState(SpaceBase apace)
+    {
+        Color? color = null;
+
+        switch (apace.State)
+        {
+            case SpaceState.Deleted:
+                color = Color.Gray;
+                break;
+
+            case SpaceState.None:
+            case SpaceState.Added:
+            case SpaceState.Modified:
+            default:
+                break;
+        }
+
+        return color;
+    }
+
     private void UpdateSpaceNodeColor(TreeNode node, DirectorySpace parent)
     {
+        // TODO: Требуется переосмысление
+
         if (node.Tag is DirectorySpace directorySpace)
         {
-            node.ForeColor = spaceColorCalculator.GetColorBasedOnSize(directorySpace, parent.MaxTotalSize);
+            node.ForeColor = TryModifyByState(directorySpace)
+                             ?? spaceColorCalculator.GetColorBasedOnSize(directorySpace, parent.MaxTotalSize);
 
             foreach (TreeNode childNode in node.Nodes)
             {
@@ -69,7 +92,8 @@ public class ColorService(SpaceColorCalculator spaceColorCalculator) : IDisposab
         }
         else if (node.Tag is FileSpace fileSpace)
         {
-            node.ForeColor = spaceColorCalculator.GetColorBasedOnSize(fileSpace, parent.Size);
+            node.ForeColor = TryModifyByState(fileSpace)
+                             ?? spaceColorCalculator.GetColorBasedOnSize(fileSpace, parent.Size);
         }
     }
 }

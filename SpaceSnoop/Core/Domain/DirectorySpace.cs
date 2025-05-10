@@ -76,6 +76,21 @@ public class DirectorySpace : SpaceBase
                 """;
     }
 
+    public override void SwapDelete()
+    {
+        base.SwapDelete();
+
+        foreach (var space in _subDirectories)
+        {
+            space.SwapDelete();
+        }
+
+        foreach (var space in _files)
+        {
+            space.SwapDelete();
+        }
+    }
+
     /// <summary>
     /// Добавляет подкаталог в список подкаталогов и обновляет общий размер директории.
     /// </summary>
@@ -103,17 +118,6 @@ public class DirectorySpace : SpaceBase
         _maxTotalSize = null;
     }
 
-    /// <summary>
-    /// Возвращает максимальный размер среди подкаталогов.
-    /// </summary>
-    /// <returns>Максимальный размер среди подкаталогов.</returns>
-    private long GetMaxSize()
-    {
-        return _subDirectories.Select(subDirectory => subDirectory.MaxTotalSize)
-            .Prepend(TotalSize)
-            .Max();
-    }
-
     public void FixAbsolutePath(DirectoryInfo directory)
     {
         if (directory.FullName == directory.Root.FullName)
@@ -129,5 +133,16 @@ public class DirectorySpace : SpaceBase
         }
 
         Parent = new DirectorySpace(parent.FullName, null, parent.CreationTime, parent.LastAccessTime);
+    }
+
+    /// <summary>
+    /// Возвращает максимальный размер среди подкаталогов.
+    /// </summary>
+    /// <returns>Максимальный размер среди подкаталогов.</returns>
+    private long GetMaxSize()
+    {
+        return _subDirectories.Select(subDirectory => subDirectory.MaxTotalSize)
+            .Prepend(TotalSize)
+            .Max();
     }
 }

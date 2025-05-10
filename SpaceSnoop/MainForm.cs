@@ -1,3 +1,4 @@
+using Microsoft.VisualBasic.FileIO;
 using SpaceSnoop.Extensions;
 using SpaceSnoop.Services;
 using System.Diagnostics;
@@ -43,6 +44,57 @@ public partial class MainForm : Form
 
     protected override void OnFormClosing(FormClosingEventArgs args)
     {
+        var toDelete = GetAllMarkedForDeletion();
+
+        if (toDelete.Count != 0)
+        {
+            var count = toDelete.Count;
+            var totalBytes = toDelete.Sum(item => item.Size);
+            var totalSizeText = new SizeFormatter().Format(totalBytes);
+
+            var text = $"""
+                        Будут перемещены в корзину {count} элементов на общий объём {totalSizeText}.
+                        Продолжить?
+                        """;
+
+            var result = MessageBox.Show(this,
+                text,
+                "Подтверждение удаления",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (result == DialogResult.Yes)
+            {
+                foreach (var (path, _) in toDelete)
+                {
+                    try
+                    {
+                        if (Directory.Exists(path))
+                        {
+                            FileSystem.DeleteDirectory(path,
+                                UIOption.OnlyErrorDialogs,
+                                RecycleOption.SendToRecycleBin);
+                        }
+                        else if (File.Exists(path))
+                        {
+                            FileSystem.DeleteFile(path,
+                                UIOption.OnlyErrorDialogs,
+                                RecycleOption.SendToRecycleBin);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Ошибка удаления {path}: {ex.Message}");
+                    }
+                }
+            }
+            else
+            {
+                args.Cancel = true;
+                return;
+            }
+        }
+
         FinalizeWorker();
         FinalizeSorting();
         FinalizeColorService();
@@ -111,7 +163,17 @@ public partial class MainForm : Form
             return;
         }
 
-        if (args.Node?.Tag is SpaceBase selectedSpace)
+        if (args.Node?.Tag is not SpaceBase selectedSpace)
+        {
+            return;
+        }
+
+        if ((ModifierKeys & Keys.Control) == Keys.Control)
+        {
+            selectedSpace.SwapDelete();
+            _colorService.UpdateNodesColor(_directoriesTreeView.Nodes);
+        }
+        else
         {
             Process.Start("explorer.exe", selectedSpace.AbsolutePath);
         }
@@ -253,5 +315,30 @@ public partial class MainForm : Form
     private void FinalizeSorting()
     {
         _sortService.Dispose();
+    }
+
+    private List<(string Path, long Size)> GetAllMarkedForDeletion()
+    {
+        var list = new List<(string, long)>();
+        TraverseNodes(_directoriesTreeView.Nodes);
+        return list;
+
+        void TraverseNodes(TreeNodeCollection nodes)
+        {
+            foreach (TreeNode node in nodes)
+            {
+                if (node.Tag is SpaceBase { State: SpaceState.Deleted } space)
+                {
+                    list.Add((space.AbsolutePath, space is DirectorySpace directorySpace
+                        ? directorySpace.TotalSize
+                        : space.Size));
+                }
+
+                if (node.Nodes.Count > 0)
+                {
+                    TraverseNodes(node.Nodes);
+                }
+            }
+        }
     }
 }
