@@ -35,7 +35,7 @@ public class DirectorySpace : SpaceBase
     public string TotalSizeText => SizeFormatter.Format(_totalSize);
 
     /// <summary>
-    /// Список подкаталогов.
+    /// Список файлов.
     /// </summary>
     public IReadOnlyList<FileSpace> Files => _files;
 
@@ -48,6 +48,8 @@ public class DirectorySpace : SpaceBase
     /// Максимальный размер среди подкаталогов.
     /// </summary>
     public long MaxTotalSize => _maxTotalSize ??= GetMaxSize();
+
+    private IEnumerable<SpaceBase> All => _subDirectories.AsEnumerable<SpaceBase>().Concat(Files);
 
     /// <summary>
     /// Инициализирует новый экземпляр класса DirectorySpace.
@@ -75,21 +77,6 @@ public class DirectorySpace : SpaceBase
                 Общий размер: {TotalSizeText}
                 Размер файлов в директории: {SizeText}
                 """;
-    }
-
-    public override void SwapDelete()
-    {
-        base.SwapDelete();
-
-        foreach (var space in _subDirectories)
-        {
-            space.SwapDelete();
-        }
-
-        foreach (var space in _files)
-        {
-            space.SwapDelete();
-        }
     }
 
     /// <summary>
@@ -134,6 +121,28 @@ public class DirectorySpace : SpaceBase
         }
 
         Parent = new DirectorySpace(parent.FullName, null, parent.CreationTime, parent.LastAccessTime);
+    }
+
+    protected override void DeleteInner()
+    {
+        foreach (var space in All)
+        {
+            space.Delete();
+        }
+    }
+
+    protected override void RestoreInner()
+    {
+        // TODO: Костыль для восстановления только конкретных фалов, не затрагивая другие
+        if (All.Any(x => x.IsDeleted == false))
+        {
+            return;
+        }
+
+        foreach (var space in All)
+        {
+            space.Restore();
+        }
     }
 
     /// <summary>

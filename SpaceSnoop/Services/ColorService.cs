@@ -66,9 +66,12 @@ public class ColorService(SpaceColorCalculator spaceColorCalculator) : IDisposab
                 color = Color.Gray;
                 break;
 
+            case SpaceState.Error:
+                color = Color.DarkRed;
+                break;
+
             case SpaceState.None:
             case SpaceState.Added:
-            case SpaceState.Modified:
             default:
                 break;
         }

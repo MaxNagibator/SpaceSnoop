@@ -46,6 +46,8 @@ public abstract class SpaceBase(string name, SpaceBase? parent, DateTime creatio
 
     public SpaceState State { get; private set; } = SpaceState.Added;
 
+    public bool IsDeleted => State == SpaceState.Deleted;
+
     /// <summary>
     /// Возвращает строку, представляющую информацию о директории для tooltip.
     /// </summary>
@@ -60,14 +62,60 @@ public abstract class SpaceBase(string name, SpaceBase? parent, DateTime creatio
                 """;
     }
 
-    public virtual void SwapDelete()
+    public void Delete()
     {
-        State = State switch
+        if (State == SpaceState.Deleted)
         {
-            SpaceState.Added => SpaceState.Deleted,
-            SpaceState.Deleted => SpaceState.Added,
-            _ => State,
-        };
+            return;
+        }
+
+        State = SpaceState.Deleted;
+
+        DeleteInner();
+    }
+
+    public void Restore()
+    {
+        if (State != SpaceState.Deleted)
+        {
+            return;
+        }
+
+        State = SpaceState.Added;
+
+        if (Parent is { IsDeleted: true })
+        {
+            Parent.Restore();
+        }
+
+        RestoreInner();
+    }
+
+    public void SwapDelete()
+    {
+        switch (State)
+        {
+            case SpaceState.Added:
+                Delete();
+                break;
+
+            case SpaceState.Deleted:
+                Restore();
+                break;
+
+            case SpaceState.None:
+            case SpaceState.Error:
+            default:
+                break;
+        }
+    }
+
+    protected virtual void RestoreInner()
+    {
+    }
+
+    protected virtual void DeleteInner()
+    {
     }
 
     private string GetAbsolutePath()
