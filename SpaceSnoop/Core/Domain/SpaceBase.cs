@@ -64,7 +64,7 @@ public abstract class SpaceBase(string name, SpaceBase? parent, DateTime creatio
 
     public void Delete()
     {
-        if (State == SpaceState.Deleted)
+        if (State == SpaceState.Deleted || State == SpaceState.Error)
         {
             return;
         }
@@ -76,7 +76,7 @@ public abstract class SpaceBase(string name, SpaceBase? parent, DateTime creatio
 
     public void Restore()
     {
-        if (State != SpaceState.Deleted)
+        if (State != SpaceState.Deleted || State == SpaceState.Error)
         {
             return;
         }
@@ -108,6 +108,11 @@ public abstract class SpaceBase(string name, SpaceBase? parent, DateTime creatio
             default:
                 break;
         }
+    }
+
+    public void Error()
+    {
+        State = SpaceState.Error;
     }
 
     protected virtual void RestoreInner()

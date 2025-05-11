@@ -56,47 +56,47 @@ public class ColorService(SpaceColorCalculator spaceColorCalculator) : IDisposab
         }
     }
 
-    private static Color? TryModifyByState(SpaceBase apace)
-    {
-        Color? color = null;
-
-        switch (apace.State)
-        {
-            case SpaceState.Deleted:
-                color = Color.Gray;
-                break;
-
-            case SpaceState.Error:
-                color = Color.DarkRed;
-                break;
-
-            case SpaceState.None:
-            case SpaceState.Added:
-            default:
-                break;
-        }
-
-        return color;
-    }
-
     private void UpdateSpaceNodeColor(TreeNode node, DirectorySpace parent)
     {
         // TODO: Требуется переосмысление
 
-        if (node.Tag is DirectorySpace directorySpace)
+        if (node.Tag is not SpaceBase space)
         {
-            node.ForeColor = TryModifyByState(directorySpace)
-                             ?? spaceColorCalculator.GetColorBasedOnSize(directorySpace, parent.MaxTotalSize);
-
-            foreach (TreeNode childNode in node.Nodes)
-            {
-                UpdateSpaceNodeColor(childNode, directorySpace);
-            }
+            return;
         }
-        else if (node.Tag is FileSpace fileSpace)
+
+        Color? foreColor = space.State switch
         {
-            node.ForeColor = TryModifyByState(fileSpace)
-                             ?? spaceColorCalculator.GetColorBasedOnSize(fileSpace, parent.Size);
+            SpaceState.Deleted => Color.Gray,
+            SpaceState.Error => Color.Black,
+            _ => null,
+        };
+
+        switch (space)
+        {
+            case DirectorySpace directorySpace:
+                foreColor ??= spaceColorCalculator.GetColorBasedOnSize(directorySpace, parent.MaxTotalSize);
+
+                foreach (TreeNode childNode in node.Nodes)
+                {
+                    UpdateSpaceNodeColor(childNode, directorySpace);
+                }
+
+                break;
+
+            case FileSpace fileSpace:
+                foreColor ??= spaceColorCalculator.GetColorBasedOnSize(fileSpace, parent.Size);
+                break;
+        }
+
+        if (space.State == SpaceState.Error)
+        {
+            node.BackColor = Color.Yellow;
+        }
+
+        if (foreColor != null)
+        {
+            node.ForeColor = foreColor.Value;
         }
     }
 }

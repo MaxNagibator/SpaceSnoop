@@ -7,13 +7,11 @@ public class WorkerService : IDisposable
 {
     private readonly BackgroundWorker _backgroundWorker;
     private readonly DiskSpaceCalculator _diskSpaceCalculator;
-    private readonly ILogger<WorkerService> _logger;
 
-    public WorkerService(DiskSpaceCalculator diskSpaceCalculator, BackgroundWorker backgroundWorker, ILogger<WorkerService> logger)
+    public WorkerService(DiskSpaceCalculator diskSpaceCalculator, BackgroundWorker backgroundWorker)
     {
         _diskSpaceCalculator = diskSpaceCalculator;
         _backgroundWorker = backgroundWorker;
-        _logger = logger;
 
         Initialize();
     }
@@ -47,7 +45,7 @@ public class WorkerService : IDisposable
 
         if (!directory.Exists)
         {
-            _logger.LogError("Расчет для каталога {Directory} невозможен. Директория не найдена.", directory.FullName);
+            //_logger.LogError("Расчет для каталога {Directory} невозможен. Директория не найдена.", directory.FullName);
             return;
         }
 
@@ -70,8 +68,8 @@ public class WorkerService : IDisposable
         {
             if (args.Cancel == false)
             {
-                _logger.LogInformation("Расчет для каталога {Directory} завершен за {ElapsedSeconds:F2} с ({ElapsedMilliseconds} мс).",
-                    directory.FullName, stopwatch.Elapsed.TotalSeconds, stopwatch.ElapsedMilliseconds);
+                // _logger.LogInformation("Расчет для каталога {Directory} завершен за {ElapsedSeconds:F2} с ({ElapsedMilliseconds} мс).",
+                //     directory.FullName, stopwatch.Elapsed.TotalSeconds, stopwatch.ElapsedMilliseconds);
             }
 
             stopwatch.Stop();
@@ -84,11 +82,11 @@ public class WorkerService : IDisposable
 
         if (args.Cancelled)
         {
-            _logger.LogInformation("Сканирование было отменено пользователем.");
+            // _logger.LogInformation("Сканирование было отменено пользователем.");
         }
         else if (args.Error != null)
         {
-            _logger.LogError(args.Error, "Произошла ошибка во время сканирования.");
+            // _logger.LogError(args.Error, "Произошла ошибка во время сканирования.");
         }
         else if (args.Result is DirectorySpace space)
         {

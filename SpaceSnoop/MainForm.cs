@@ -1,4 +1,4 @@
-using Microsoft.VisualBasic.FileIO;
+﻿using Microsoft.VisualBasic.FileIO;
 using SpaceSnoop.Extensions;
 using SpaceSnoop.Services;
 using System.Diagnostics;
