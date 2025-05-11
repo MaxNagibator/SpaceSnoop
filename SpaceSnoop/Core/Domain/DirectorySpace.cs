@@ -49,6 +49,16 @@ public class DirectorySpace : SpaceBase
     /// </summary>
     public long MaxTotalSize => _maxTotalSize ??= GetMaxSize();
 
+    /// <summary>
+    /// Количество всех файлов в директории, включая подкаталоги.
+    /// </summary>
+    public int TotalFileCount => Files.Count + _subDirectories.Sum(x => x.TotalFileCount);
+
+    /// <summary>
+    /// Количество всех подкаталогов (включая вложенные).
+    /// </summary>
+    public int TotalDirectoryCount => _subDirectories.Count + _subDirectories.Sum(x => x.TotalDirectoryCount);
+
     private IEnumerable<SpaceBase> All => _subDirectories.AsEnumerable<SpaceBase>().Concat(Files);
 
     /// <summary>

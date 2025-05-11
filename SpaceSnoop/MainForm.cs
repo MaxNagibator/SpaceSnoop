@@ -7,6 +7,9 @@ namespace SpaceSnoop;
 
 public partial class MainForm : Form
 {
+    private static readonly Color InfoColor = Color.Black;
+    private static readonly Color ErrorColor = Color.Red;
+
     private readonly AdministratorChecker _administratorChecker;
     private readonly ColorService _colorService;
     private readonly WorkerService _workerService;
@@ -158,13 +161,42 @@ public partial class MainForm : Form
         _colorService.UpdateNodesColor(_directoriesTreeView.Nodes);
     }
 
-    private void OnWorkCompleted(object? sender, DirectorySpace? directorySpace)
+    private void OnWorkCompleted(object? sender, WorkerService.Response? response)
     {
-        if (directorySpace != null)
+        if (response != null)
         {
-            var addedParent = _directoriesTreeView.Nodes.AddSpaceNode(directorySpace).FillParentNode(directorySpace);
-            _colorService.UpdateAssignedNodesColor(addedParent);
-            _sortService.SortNodes();
+            var (directorySpace, elapsed, error) = response;
+
+            if (string.IsNullOrEmpty(error) == false)
+            {
+                AppendColoredText($"[{DateTime.Now:HH:mm:ss:ffff}] Ошибка: {error}",
+                    ErrorColor,
+                    FontStyle.Bold);
+            }
+
+            if (directorySpace != null)
+            {
+                var addedParent = _directoriesTreeView.Nodes.AddSpaceNode(directorySpace).FillParentNode(directorySpace);
+                _colorService.UpdateAssignedNodesColor(addedParent);
+                _sortService.SortNodes();
+
+                var text = $"""
+                            [{DateTime.Now:HH:mm:ss:ffff}] Расчет завершён для:
+                            {directorySpace.AbsolutePath}
+                            Общее время: {elapsed.TotalSeconds:F2} с ({elapsed.Milliseconds} мс)
+
+                            Файлов всего: {directorySpace.TotalFileCount:N0}
+                            Подкаталогов всего: {directorySpace.TotalDirectoryCount:N0}
+                            """;
+
+                AppendColoredText(text, InfoColor);
+            }
+        }
+        else
+        {
+            AppendColoredText($"[{DateTime.Now:HH:mm:ss:ffff}] Неожиданный null-ответ",
+                ErrorColor,
+                FontStyle.Italic);
         }
 
         StopProgressBar();
@@ -357,5 +389,27 @@ public partial class MainForm : Form
                 }
             }
         }
+    }
+
+    private void AppendColoredText(string text, Color color, FontStyle style = FontStyle.Regular)
+    {
+        if (_infoTextBox.InvokeRequired)
+        {
+            _infoTextBox.Invoke(() => AppendColoredText(text, color, style));
+            return;
+        }
+
+        _infoTextBox.SelectionStart = _infoTextBox.TextLength;
+        _infoTextBox.SelectionLength = 0;
+
+        _infoTextBox.SelectionColor = color;
+        _infoTextBox.SelectionFont = new(_infoTextBox.Font, style);
+
+        _infoTextBox.AppendText(text + Environment.NewLine);
+
+        _infoTextBox.SelectionColor = _infoTextBox.ForeColor;
+        _infoTextBox.SelectionFont = _infoTextBox.Font;
+
+        _infoTextBox.ScrollToCaret();
     }
 }

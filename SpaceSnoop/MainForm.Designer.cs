@@ -187,7 +187,7 @@
             _controlTabPage.Controls.Add(_useMultithreadingCheckBox);
             _controlTabPage.Location = new Point(4, 24);
             _controlTabPage.Name = "_controlTabPage";
-            _controlTabPage.Padding = new Padding(3, 3, 3, 3);
+            _controlTabPage.Padding = new Padding(3);
             _controlTabPage.Size = new Size(214, 119);
             _controlTabPage.TabIndex = 0;
             _controlTabPage.Text = "Сканирование";
@@ -199,7 +199,7 @@
             _settingsTabPage.Controls.Add(_intensityGroupBox);
             _settingsTabPage.Location = new Point(4, 24);
             _settingsTabPage.Name = "_settingsTabPage";
-            _settingsTabPage.Padding = new Padding(3, 3, 3, 3);
+            _settingsTabPage.Padding = new Padding(3);
             _settingsTabPage.Size = new Size(214, 119);
             _settingsTabPage.TabIndex = 1;
             _settingsTabPage.Text = "Настройки";
@@ -207,8 +207,11 @@
             // 
             // _infoTextBox
             // 
+            _infoTextBox.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
             _infoTextBox.Location = new Point(16, 161);
             _infoTextBox.Name = "_infoTextBox";
+            _infoTextBox.ReadOnly = true;
+            _infoTextBox.ScrollBars = RichTextBoxScrollBars.Vertical;
             _infoTextBox.Size = new Size(214, 302);
             _infoTextBox.TabIndex = 11;
             _infoTextBox.Text = "";
