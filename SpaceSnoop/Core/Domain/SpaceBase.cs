@@ -2,8 +2,6 @@
 
 public abstract class SpaceBase(string name, SpaceBase? parent, DateTime creationDate, DateTime lastAccessTime)
 {
-    protected static readonly SizeFormatter SizeFormatter = new();
-
     /// <summary>
     /// Родительская директория.
     /// </summary>

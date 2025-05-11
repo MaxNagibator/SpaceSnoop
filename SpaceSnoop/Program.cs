@@ -8,9 +8,7 @@ internal static class Program
     [STAThread]
     private static void Main()
     {
-        var administratorChecker = new AdministratorChecker();
-
-        if (administratorChecker.IsRestartRequired())
+        if (AdministratorChecker.IsRestartRequired())
         {
             return;
         }
@@ -26,7 +24,7 @@ internal static class Program
 
         var sortService = new SortService();
 
-        using var form = new MainForm(workerService, colorService, sortService, administratorChecker);
+        using var form = new MainForm(workerService, colorService, sortService);
         Application.Run(form);
     }
 }

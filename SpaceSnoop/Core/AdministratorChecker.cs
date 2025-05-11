@@ -3,7 +3,7 @@ using System.Security.Principal;
 
 namespace SpaceSnoop.Core;
 
-public class AdministratorChecker
+public static class AdministratorChecker
 {
     private const string? WarningMessage =
         """
@@ -12,14 +12,14 @@ public class AdministratorChecker
         Хотите перезапустить от имени администратора?
         """;
 
-    public bool IsCurrentUserAdmin()
+    public static bool IsCurrentUserAdmin()
     {
         using var identity = WindowsIdentity.GetCurrent();
         var principal = new WindowsPrincipal(identity);
         return principal.IsInRole(WindowsBuiltInRole.Administrator);
     }
 
-    public bool IsRestartRequired()
+    public static bool IsRestartRequired()
     {
         if (IsCurrentUserAdmin())
         {
@@ -37,7 +37,7 @@ public class AdministratorChecker
         return true;
     }
 
-    private void RestartAsAdmin()
+    private static void RestartAsAdmin()
     {
         var startInfo = new ProcessStartInfo
         {

@@ -10,7 +10,6 @@ public partial class MainForm : Form
     private static readonly Color InfoColor = Color.Black;
     private static readonly Color ErrorColor = Color.Red;
 
-    private readonly AdministratorChecker _administratorChecker;
     private readonly ColorService _colorService;
     private readonly WorkerService _workerService;
     private readonly SortService _sortService;
@@ -20,11 +19,9 @@ public partial class MainForm : Form
     public MainForm(
         WorkerService workerService,
         ColorService colorService,
-        SortService sortService,
-        AdministratorChecker administratorChecker
+        SortService sortService
     )
     {
-        _administratorChecker = administratorChecker;
         _workerService = workerService;
         _colorService = colorService;
         _sortService = sortService;
@@ -199,6 +196,8 @@ public partial class MainForm : Form
                 FontStyle.Italic);
         }
 
+        _infoTextBox.AppendText(Environment.NewLine);
+
         StopProgressBar();
     }
 
@@ -215,7 +214,7 @@ public partial class MainForm : Form
 
     private void SetDefaultSettings()
     {
-        Text = _administratorChecker.IsCurrentUserAdmin()
+        Text = AdministratorChecker.IsCurrentUserAdmin()
             ? "SpaceSnoop (Запущено от имени администратора)"
             : "SpaceSnoop";
 
@@ -311,11 +310,22 @@ public partial class MainForm : Form
 
         var count = toDelete.Count;
         var totalBytes = toDelete.Sum(item => item.TotalSize);
-        var totalSizeText = new SizeFormatter().Format(totalBytes);
+        var totalSizeText = SizeFormatter.Format(totalBytes);
+        var previewCount = 5;
+
+        var pathsPreview = string.Join(Environment.NewLine, toDelete.Take(previewCount)
+            .Select(x => x.AbsolutePath));
+
+        if (count > previewCount)
+        {
+            pathsPreview += $"{Environment.NewLine}...и ещё {count - previewCount} элемент(ов)";
+        }
 
         var text = $"""
-                    В корзину будут перемещены {count} элементов. 
-                    Общий объём {totalSizeText}.
+                    В корзину будут перемещены {count} элемент(ов). 
+                    Общий объём: {totalSizeText}.
+
+                    {pathsPreview}
 
                     Выполнить удаление?
                     """;
@@ -379,7 +389,7 @@ public partial class MainForm : Form
 
                     if (space is DirectorySpace)
                     {
-                        return;
+                        continue;
                     }
                 }
 

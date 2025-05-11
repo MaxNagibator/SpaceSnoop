@@ -3,10 +3,10 @@
 /// <summary>
 /// Русифицированный форматировщик размера файла.
 /// </summary>
-public class SizeFormatter
+public static class SizeFormatter
 {
     private const decimal SizeUnit = 1024m;
-    private readonly string[] _sizeSuffixes = ["байт", "КБ", "МБ", "ГБ", "ТБ"];
+    private static readonly string[] SizeSuffixes = ["байт", "КБ", "МБ", "ГБ", "ТБ"];
 
     /// <summary>
     /// Форматирует размер в виде строки с суффиксом размера.
@@ -14,7 +14,7 @@ public class SizeFormatter
     /// <param name="size">Размер в байтах.</param>
     /// <param name="decimalPlaces">Количество знаков после запятой.</param>
     /// <returns>Строка с форматированным размером.</returns>
-    public string Format(long size, int decimalPlaces = 1)
+    public static string Format(long size, int decimalPlaces = 1)
     {
         if (size < 0)
         {
@@ -23,13 +23,13 @@ public class SizeFormatter
 
         if (size == 0)
         {
-            return $"0 {_sizeSuffixes[0]}";
+            return $"0 {SizeSuffixes[0]}";
         }
 
         var i = 0;
         decimal value = size;
 
-        while (value >= SizeUnit && i < _sizeSuffixes.Length - 1)
+        while (value >= SizeUnit && i < SizeSuffixes.Length - 1)
         {
             value /= SizeUnit;
             i++;
@@ -37,6 +37,6 @@ public class SizeFormatter
 
         value = Math.Round(value, decimalPlaces);
 
-        return $"{value}{_sizeSuffixes[i]}";
+        return $"{value}{SizeSuffixes[i]}";
     }
 }
