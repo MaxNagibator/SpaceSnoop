@@ -58,18 +58,45 @@ public class ColorService(SpaceColorCalculator spaceColorCalculator) : IDisposab
 
     private void UpdateSpaceNodeColor(TreeNode node, DirectorySpace parent)
     {
-        if (node.Tag is DirectorySpace directorySpace)
-        {
-            node.ForeColor = spaceColorCalculator.GetColorBasedOnSize(directorySpace, parent.MaxTotalSize);
+        // TODO: Требуется переосмысление
 
-            foreach (TreeNode childNode in node.Nodes)
-            {
-                UpdateSpaceNodeColor(childNode, directorySpace);
-            }
-        }
-        else if (node.Tag is FileSpace fileSpace)
+        if (node.Tag is not SpaceBase space)
         {
-            node.ForeColor = spaceColorCalculator.GetColorBasedOnSize(fileSpace, parent.Size);
+            return;
+        }
+
+        Color? foreColor = space.State switch
+        {
+            SpaceState.Deleted => Color.Gray,
+            SpaceState.Error => Color.Black,
+            _ => null,
+        };
+
+        switch (space)
+        {
+            case DirectorySpace directorySpace:
+                foreColor ??= spaceColorCalculator.GetColorBasedOnSize(directorySpace, parent.MaxTotalSize);
+
+                foreach (TreeNode childNode in node.Nodes)
+                {
+                    UpdateSpaceNodeColor(childNode, directorySpace);
+                }
+
+                break;
+
+            case FileSpace fileSpace:
+                foreColor ??= spaceColorCalculator.GetColorBasedOnSize(fileSpace, parent.Size);
+                break;
+        }
+
+        if (space.State == SpaceState.Error)
+        {
+            node.BackColor = Color.Yellow;
+        }
+
+        if (foreColor != null)
+        {
+            node.ForeColor = foreColor.Value;
         }
     }
 }

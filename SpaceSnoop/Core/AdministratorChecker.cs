@@ -3,7 +3,7 @@ using System.Security.Principal;
 
 namespace SpaceSnoop.Core;
 
-public class AdministratorChecker(ILogger<AdministratorChecker> logger)
+public static class AdministratorChecker
 {
     private const string? WarningMessage =
         """
@@ -12,14 +12,14 @@ public class AdministratorChecker(ILogger<AdministratorChecker> logger)
         Хотите перезапустить от имени администратора?
         """;
 
-    public bool IsCurrentUserAdmin()
+    public static bool IsCurrentUserAdmin()
     {
         using var identity = WindowsIdentity.GetCurrent();
         var principal = new WindowsPrincipal(identity);
         return principal.IsInRole(WindowsBuiltInRole.Administrator);
     }
 
-    public bool IsRestartRequired()
+    public static bool IsRestartRequired()
     {
         if (IsCurrentUserAdmin())
         {
@@ -30,7 +30,6 @@ public class AdministratorChecker(ILogger<AdministratorChecker> logger)
 
         if (result != DialogResult.Yes)
         {
-            logger.LogWarning("Приложение запущено не от имени администратора");
             return false;
         }
 
@@ -38,7 +37,7 @@ public class AdministratorChecker(ILogger<AdministratorChecker> logger)
         return true;
     }
 
-    private void RestartAsAdmin()
+    private static void RestartAsAdmin()
     {
         var startInfo = new ProcessStartInfo
         {
@@ -54,7 +53,6 @@ public class AdministratorChecker(ILogger<AdministratorChecker> logger)
         }
         catch (Exception exception)
         {
-            logger.LogCritical(exception, "Не удалось перезапустить приложение от имени администратора");
             MessageBox.Show($"Не удалось перезапустить приложение от имени администратора: {exception.Message}");
         }
 

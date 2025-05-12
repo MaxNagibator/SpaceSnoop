@@ -8,6 +8,7 @@ public class DirectorySpace : SpaceBase
     private readonly List<DirectorySpace> _subDirectories;
     private readonly List<FileSpace> _files;
     private long? _maxTotalSize;
+    private long _totalSize;
 
     /// <summary>
     /// Инициализирует новый экземпляр класса DirectorySpace.
@@ -26,15 +27,15 @@ public class DirectorySpace : SpaceBase
     /// <summary>
     /// Общий размер всех файлов в директории, включая подкаталоги.
     /// </summary>
-    public long TotalSize { get; private set; }
+    public override long TotalSize => _totalSize;
 
     /// <summary>
     /// Общий размер всех файлов в директории в виде строки с суффиксом размера.
     /// </summary>
-    public string TotalSizeText => SizeFormatter.Format(TotalSize);
+    public string TotalSizeText => SizeFormatter.Format(_totalSize);
 
     /// <summary>
-    /// Список подкаталогов.
+    /// Список файлов.
     /// </summary>
     public IReadOnlyList<FileSpace> Files => _files;
 
@@ -47,6 +48,18 @@ public class DirectorySpace : SpaceBase
     /// Максимальный размер среди подкаталогов.
     /// </summary>
     public long MaxTotalSize => _maxTotalSize ??= GetMaxSize();
+
+    /// <summary>
+    /// Количество всех файлов в директории, включая подкаталоги.
+    /// </summary>
+    public int TotalFileCount => Files.Count + _subDirectories.Sum(x => x.TotalFileCount);
+
+    /// <summary>
+    /// Количество всех подкаталогов (включая вложенные).
+    /// </summary>
+    public int TotalDirectoryCount => _subDirectories.Count + _subDirectories.Sum(x => x.TotalDirectoryCount);
+
+    private IEnumerable<SpaceBase> All => _subDirectories.AsEnumerable<SpaceBase>().Concat(Files);
 
     /// <summary>
     /// Инициализирует новый экземпляр класса DirectorySpace.
@@ -82,7 +95,7 @@ public class DirectorySpace : SpaceBase
     /// <param name="subDirectory">Подкаталог, который нужно добавить.</param>
     public void Add(DirectorySpace subDirectory)
     {
-        TotalSize += subDirectory.TotalSize;
+        _totalSize += subDirectory.TotalSize;
         _subDirectories.Add(subDirectory);
         _maxTotalSize = null;
     }
@@ -99,19 +112,8 @@ public class DirectorySpace : SpaceBase
             Size += files[i].Length;
         }
 
-        TotalSize = Size;
+        _totalSize = Size;
         _maxTotalSize = null;
-    }
-
-    /// <summary>
-    /// Возвращает максимальный размер среди подкаталогов.
-    /// </summary>
-    /// <returns>Максимальный размер среди подкаталогов.</returns>
-    private long GetMaxSize()
-    {
-        return _subDirectories.Select(subDirectory => subDirectory.MaxTotalSize)
-            .Prepend(TotalSize)
-            .Max();
     }
 
     public void FixAbsolutePath(DirectoryInfo directory)
@@ -129,5 +131,38 @@ public class DirectorySpace : SpaceBase
         }
 
         Parent = new DirectorySpace(parent.FullName, null, parent.CreationTime, parent.LastAccessTime);
+    }
+
+    protected override void DeleteInner()
+    {
+        foreach (var space in All)
+        {
+            space.Delete();
+        }
+    }
+
+    protected override void RestoreInner()
+    {
+        // TODO: Костыль для восстановления только конкретных фалов, не затрагивая другие
+        if (All.Any(x => x.IsDeleted == false))
+        {
+            return;
+        }
+
+        foreach (var space in All)
+        {
+            space.Restore();
+        }
+    }
+
+    /// <summary>
+    /// Возвращает максимальный размер среди подкаталогов.
+    /// </summary>
+    /// <returns>Максимальный размер среди подкаталогов.</returns>
+    private long GetMaxSize()
+    {
+        return _subDirectories.Select(subDirectory => subDirectory.MaxTotalSize)
+            .Prepend(_totalSize)
+            .Max();
     }
 }

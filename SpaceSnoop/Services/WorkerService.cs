@@ -7,18 +7,16 @@ public class WorkerService : IDisposable
 {
     private readonly BackgroundWorker _backgroundWorker;
     private readonly DiskSpaceCalculator _diskSpaceCalculator;
-    private readonly ILogger<WorkerService> _logger;
 
-    public WorkerService(DiskSpaceCalculator diskSpaceCalculator, BackgroundWorker backgroundWorker, ILogger<WorkerService> logger)
+    public WorkerService(DiskSpaceCalculator diskSpaceCalculator, BackgroundWorker backgroundWorker)
     {
         _diskSpaceCalculator = diskSpaceCalculator;
         _backgroundWorker = backgroundWorker;
-        _logger = logger;
 
         Initialize();
     }
 
-    public event EventHandler<DirectorySpace?>? WorkCompleted;
+    public event EventHandler<Response?>? WorkCompleted;
 
     public void Dispose()
     {
@@ -32,70 +30,69 @@ public class WorkerService : IDisposable
 
     public void StartWorker(string disk, bool isMultithread, CancellationToken cancellationToken)
     {
-        var workerRequest = new WorkerRequest(disk, isMultithread, cancellationToken);
-        _backgroundWorker.RunWorkerAsync(workerRequest);
+        var request = new Request(disk, isMultithread, cancellationToken);
+        _backgroundWorker.RunWorkerAsync(request);
     }
 
     private void OnDoWork(object? sender, DoWorkEventArgs args)
     {
-        if (args.Argument is not WorkerRequest(var disk, var isMultithread, var cancellationToken) || string.IsNullOrWhiteSpace(disk))
+        if (args.Argument is not Request(var disk, var isMultithread, var cancellationToken) || string.IsNullOrWhiteSpace(disk))
         {
             return;
         }
 
-        var directory = new DirectoryInfo(disk);
-
-        if (!directory.Exists)
-        {
-            _logger.LogError("Расчет для каталога {Directory} невозможен. Директория не найдена.", directory.FullName);
-            return;
-        }
+        DirectorySpace? directorySpace = null;
+        string? error = null;
 
         var stopwatch = Stopwatch.StartNew();
-        var directoryInfo = new DirectoryInfo(disk);
+        var directory = new DirectoryInfo(disk);
 
-        try
+        if (directory.Exists)
         {
-            var directorySpace = isMultithread
-                ? _diskSpaceCalculator.CalculateMultithreaded(directoryInfo, cancellationToken)
-                : _diskSpaceCalculator.Calculate(directoryInfo, cancellationToken);
+            var directoryInfo = new DirectoryInfo(disk);
 
-            args.Result = directorySpace;
-        }
-        catch (OperationCanceledException)
-        {
-            args.Cancel = true;
-        }
-        finally
-        {
-            if (args.Cancel == false)
+            try
             {
-                _logger.LogInformation("Расчет для каталога {Directory} завершен за {ElapsedSeconds:F2} с ({ElapsedMilliseconds} мс).",
-                    directory.FullName, stopwatch.Elapsed.TotalSeconds, stopwatch.ElapsedMilliseconds);
+                directorySpace = isMultithread
+                    ? _diskSpaceCalculator.CalculateMultithreaded(directoryInfo, cancellationToken)
+                    : _diskSpaceCalculator.Calculate(directoryInfo, cancellationToken);
             }
-
-            stopwatch.Stop();
+            catch (OperationCanceledException)
+            {
+                args.Cancel = true;
+            }
+            finally
+            {
+                stopwatch.Stop();
+            }
         }
+        else
+        {
+            error = "Директория не найдена";
+        }
+
+        args.Result = new Response(directorySpace, stopwatch.Elapsed, error);
     }
 
     private void OnRunWorkerCompleted(object? sender, RunWorkerCompletedEventArgs args)
     {
-        DirectorySpace? data = null;
+        Response? data = null;
+        string? error = null;
 
         if (args.Cancelled)
         {
-            _logger.LogInformation("Сканирование было отменено пользователем.");
+            error = "Сканирование было отменено пользователем";
         }
         else if (args.Error != null)
         {
-            _logger.LogError(args.Error, "Произошла ошибка во время сканирования.");
+            error = "Произошла ошибка во время сканирования";
         }
-        else if (args.Result is DirectorySpace space)
+        else if (args.Result is Response response)
         {
-            data = space;
+            data = response;
         }
 
-        WorkCompleted?.Invoke(this, data);
+        WorkCompleted?.Invoke(this, data ?? new Response(null, TimeSpan.Zero, error));
     }
 
     private void Initialize()
@@ -105,5 +102,7 @@ public class WorkerService : IDisposable
         _backgroundWorker.WorkerSupportsCancellation = true;
     }
 
-    private record WorkerRequest(string Disk, bool IsMultithread, CancellationToken CancellationToken);
+    public record Response(DirectorySpace? DirectorySpace, TimeSpan Elapsed, string? Error);
+
+    private record Request(string Disk, bool IsMultithread, CancellationToken CancellationToken);
 }

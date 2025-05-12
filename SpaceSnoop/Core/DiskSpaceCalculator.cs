@@ -6,7 +6,7 @@ namespace SpaceSnoop.Core;
 /// <summary>
 /// Калькулятор для вычисления занимаемого дискового пространства директории и ее подкаталогов.
 /// </summary>
-public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator> logger)
+public class DiskSpaceCalculator
 {
     /// <summary>
     /// Вычисляет занимаемое дисковое пространство указанной директории и ее подкаталогов.
@@ -58,12 +58,13 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator> logger)
         }
         catch (OperationCanceledException)
         {
-            logger.LogInformation("Операция вычисления пространства для каталога {Directory} была отменена.", directory.FullName);
+            //logger.LogInformation("Операция вычисления пространства для каталога {Directory} была отменена.", directory.FullName);
             throw;
         }
         catch (Exception exception) when (exception is UnauthorizedAccessException or SecurityException)
         {
-            logger.LogError("Отказано в доступе к каталогу: {Directory}", directory.FullName);
+            //logger.LogError("Отказано в доступе к каталогу: {Directory}", directory.FullName);
+            directorySpace.Error();
         }
 
         return directorySpace;
@@ -75,7 +76,8 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator> logger)
 
         if (cancellationToken.IsCancellationRequested)
         {
-            logger.LogInformation("Операция вычисления пространства для каталога {Directory} была отменена.", directory.FullName);
+            //logger.LogInformation("Операция вычисления пространства для каталога {Directory} была отменена.", directory.FullName);
+            directorySpace.Error();
             cancellationToken.ThrowIfCancellationRequested();
         }
 
@@ -87,7 +89,8 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator> logger)
         }
         catch (Exception exception) when (exception is UnauthorizedAccessException or SecurityException)
         {
-            logger.LogError("Отказано в доступе к директории: {Directory}", directory.FullName);
+            //logger.LogError("Отказано в доступе к директории: {Directory}", directory.FullName);
+            directorySpace.Error();
             return directorySpace;
         }
 
@@ -119,7 +122,11 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator> logger)
                 subDirSpaces.Add(subDir);
             });
 
-            cancellationToken.ThrowIfCancellationRequested();
+            if (cancellationToken.IsCancellationRequested)
+            {
+                directorySpace.Error();
+                cancellationToken.ThrowIfCancellationRequested();
+            }
 
             foreach (var subDirSpace in subDirSpaces)
             {

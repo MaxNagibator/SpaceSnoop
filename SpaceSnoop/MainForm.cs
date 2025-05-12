@@ -1,3 +1,4 @@
+﻿using Microsoft.VisualBasic.FileIO;
 using SpaceSnoop.Extensions;
 using SpaceSnoop.Services;
 using System.Diagnostics;
@@ -6,7 +7,9 @@ namespace SpaceSnoop;
 
 public partial class MainForm : Form
 {
-    private readonly AdministratorChecker _administratorChecker;
+    private static readonly Color InfoColor = Color.Black;
+    private static readonly Color ErrorColor = Color.Red;
+
     private readonly ColorService _colorService;
     private readonly WorkerService _workerService;
     private readonly SortService _sortService;
@@ -16,11 +19,9 @@ public partial class MainForm : Form
     public MainForm(
         WorkerService workerService,
         ColorService colorService,
-        SortService sortService,
-        AdministratorChecker administratorChecker
+        SortService sortService
     )
     {
-        _administratorChecker = administratorChecker;
         _workerService = workerService;
         _colorService = colorService;
         _sortService = sortService;
@@ -43,6 +44,8 @@ public partial class MainForm : Form
 
     protected override void OnFormClosing(FormClosingEventArgs args)
     {
+        PerformDelete();
+
         FinalizeWorker();
         FinalizeSorting();
         FinalizeColorService();
@@ -111,7 +114,17 @@ public partial class MainForm : Form
             return;
         }
 
-        if (args.Node?.Tag is SpaceBase selectedSpace)
+        if (args.Node?.Tag is not SpaceBase selectedSpace)
+        {
+            return;
+        }
+
+        if ((ModifierKeys & Keys.Control) == Keys.Control)
+        {
+            selectedSpace.SwapDelete();
+            _colorService.UpdateNodesColor(_directoriesTreeView.Nodes);
+        }
+        else
         {
             Process.Start("explorer.exe", selectedSpace.AbsolutePath);
         }
@@ -145,14 +158,45 @@ public partial class MainForm : Form
         _colorService.UpdateNodesColor(_directoriesTreeView.Nodes);
     }
 
-    private void OnWorkCompleted(object? sender, DirectorySpace? directorySpace)
+    private void OnWorkCompleted(object? sender, WorkerService.Response? response)
     {
-        if (directorySpace != null)
+        if (response != null)
         {
-            var addedParent = _directoriesTreeView.Nodes.AddSpaceNode(directorySpace).FillParentNode(directorySpace);
-            _colorService.UpdateAssignedNodesColor(addedParent);
-            _sortService.SortNodes();
+            var (directorySpace, elapsed, error) = response;
+
+            if (string.IsNullOrEmpty(error) == false)
+            {
+                AppendColoredText($"[{DateTime.Now:HH:mm:ss:ffff}] Ошибка: {error}",
+                    ErrorColor,
+                    FontStyle.Bold);
+            }
+
+            if (directorySpace != null)
+            {
+                var addedParent = _directoriesTreeView.Nodes.AddSpaceNode(directorySpace).FillParentNode(directorySpace);
+                _colorService.UpdateAssignedNodesColor(addedParent);
+                _sortService.SortNodes();
+
+                var text = $"""
+                            [{DateTime.Now:HH:mm:ss:ffff}] Расчет завершён для:
+                            {directorySpace.AbsolutePath}
+                            Общее время: {elapsed.TotalSeconds:F2} с ({elapsed.Milliseconds} мс)
+
+                            Файлов всего: {directorySpace.TotalFileCount:N0}
+                            Подкаталогов всего: {directorySpace.TotalDirectoryCount:N0}
+                            """;
+
+                AppendColoredText(text, InfoColor);
+            }
         }
+        else
+        {
+            AppendColoredText($"[{DateTime.Now:HH:mm:ss:ffff}] Неожиданный null-ответ",
+                ErrorColor,
+                FontStyle.Italic);
+        }
+
+        _infoTextBox.AppendText(Environment.NewLine);
 
         StopProgressBar();
     }
@@ -170,7 +214,7 @@ public partial class MainForm : Form
 
     private void SetDefaultSettings()
     {
-        Text = _administratorChecker.IsCurrentUserAdmin()
+        Text = AdministratorChecker.IsCurrentUserAdmin()
             ? "SpaceSnoop (Запущено от имени администратора)"
             : "SpaceSnoop";
 
@@ -253,5 +297,129 @@ public partial class MainForm : Form
     private void FinalizeSorting()
     {
         _sortService.Dispose();
+    }
+
+    private void PerformDelete()
+    {
+        var toDelete = GetAllMarkedForDeletion();
+
+        if (toDelete.Count == 0)
+        {
+            return;
+        }
+
+        var count = toDelete.Count;
+        var totalBytes = toDelete.Sum(item => item.TotalSize);
+        var totalSizeText = SizeFormatter.Format(totalBytes);
+        var previewCount = 5;
+
+        var pathsPreview = string.Join(Environment.NewLine, toDelete.Take(previewCount)
+            .Select(x => x.AbsolutePath));
+
+        if (count > previewCount)
+        {
+            pathsPreview += $"{Environment.NewLine}...и ещё {count - previewCount} элемент(ов)";
+        }
+
+        var text = $"""
+                    В корзину будут перемещены {count} элемент(ов). 
+                    Общий объём: {totalSizeText}.
+
+                    {pathsPreview}
+
+                    Выполнить удаление?
+                    """;
+
+        var result = MessageBox.Show(this,
+            text,
+            "Удаление",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question);
+
+        if (result != DialogResult.Yes)
+        {
+            return;
+        }
+
+        var logFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "deleted.txt");
+
+        using var logWriter = new StreamWriter(logFilePath);
+
+        foreach (var path in toDelete.Select(x => x.AbsolutePath))
+        {
+            try
+            {
+                if (Directory.Exists(path))
+                {
+                    FileSystem.DeleteDirectory(path,
+                        UIOption.OnlyErrorDialogs,
+                        RecycleOption.SendToRecycleBin);
+
+                    logWriter.WriteLine(path);
+                }
+                else if (File.Exists(path))
+                {
+                    FileSystem.DeleteFile(path,
+                        UIOption.OnlyErrorDialogs,
+                        RecycleOption.SendToRecycleBin);
+
+                    logWriter.WriteLine(path);
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.WriteLine($"Ошибка удаления {path}: {exception.Message}");
+            }
+        }
+    }
+
+    private List<SpaceBase> GetAllMarkedForDeletion()
+    {
+        var list = new List<SpaceBase>();
+        TraverseNodes(_directoriesTreeView.Nodes);
+        return list;
+
+        void TraverseNodes(TreeNodeCollection nodes)
+        {
+            foreach (TreeNode node in nodes)
+            {
+                if (node.Tag is SpaceBase { State: SpaceState.Deleted } space)
+                {
+                    list.Add(space);
+
+                    if (space is DirectorySpace)
+                    {
+                        continue;
+                    }
+                }
+
+                if (node.Nodes.Count > 0)
+                {
+                    TraverseNodes(node.Nodes);
+                }
+            }
+        }
+    }
+
+    private void AppendColoredText(string text, Color color, FontStyle style = FontStyle.Regular)
+    {
+        if (_infoTextBox.InvokeRequired)
+        {
+            _infoTextBox.Invoke(() => AppendColoredText(text, color, style));
+            return;
+        }
+
+        _infoTextBox.SelectionStart = _infoTextBox.TextLength;
+        _infoTextBox.SelectionLength = 0;
+
+        _infoTextBox.SelectionColor = color;
+        _infoTextBox.SelectionFont = new(_infoTextBox.Font, style);
+
+        _infoTextBox.AppendText(text + Environment.NewLine);
+
+        _infoTextBox.SelectionColor = _infoTextBox.ForeColor;
+        _infoTextBox.SelectionFont = _infoTextBox.Font;
+
+        _infoTextBox.ScrollToCaret();
     }
 }

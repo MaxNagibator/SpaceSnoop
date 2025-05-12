@@ -1,0 +1,55 @@
+name: Release
+
+on:
+  release:
+    types: [ published ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Select tag of release'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-2022
+    defaults:
+      run:
+        working-directory: ./SpaceSnoop
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+          cache: true
+          cache-dependency-path: "**/packages.lock.json"
+
+      - name: Determine release tag
+        id: determine-tag
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $tag = "${{ github.event.inputs.tag }}"
+          } else {
+            $tag = "${{ github.ref_name }}"
+          }
+          echo "TAG=$tag" >> $env:GITHUB_ENV
+
+      - name: Publish
+        run: |
+          dotnet publish --configuration Release --runtime win-x64 -p:PublishSingleFile=true -p:PublishReadyToRun=true --no-self-contained
+          Rename-Item -Path .\bin\Release\net9.0-windows\win-x64\publish\SpaceSnoop.exe -NewName "SpaceSnoop_$env:TAG.exe"
+          Compress-Archive -Path .\bin\Release\net9.0-windows\win-x64\publish\SpaceSnoop_$env:TAG.exe -DestinationPath SpaceSnoop_$env:TAG.zip
+
+      - name: Upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload $env:TAG `
+            .\bin\Release\net9.0-windows\win-x64\publish\SpaceSnoop_$env:TAG.exe `
+            SpaceSnoop_$env:TAG.zip

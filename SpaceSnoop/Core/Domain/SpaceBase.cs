@@ -2,8 +2,6 @@
 
 public abstract class SpaceBase(string name, SpaceBase? parent, DateTime creationDate, DateTime lastAccessTime)
 {
-    protected static readonly SizeFormatter SizeFormatter = new();
-
     /// <summary>
     /// Родительская директория.
     /// </summary>
@@ -30,14 +28,23 @@ public abstract class SpaceBase(string name, SpaceBase? parent, DateTime creatio
     public DateTime LastAccessTime { get; } = lastAccessTime;
 
     /// <summary>
-    /// Размер файлов в директории, исключая подкаталоги.
+    /// Размер.
     /// </summary>
     public long Size { get; protected set; }
+
+    /// <summary>
+    /// Занимаемый размер.
+    /// </summary>
+    public virtual long TotalSize => Size;
 
     /// <summary>
     /// Размер файлов в директории, исключая подкаталоги, в виде строки с суффиксом размера.
     /// </summary>
     public string SizeText => SizeFormatter.Format(Size);
+
+    public SpaceState State { get; private set; } = SpaceState.Added;
+
+    public bool IsDeleted => State == SpaceState.Deleted;
 
     /// <summary>
     /// Возвращает строку, представляющую информацию о директории для tooltip.
@@ -51,6 +58,67 @@ public abstract class SpaceBase(string name, SpaceBase? parent, DateTime creatio
                 Дата создания: {CreationDate} 
                 Последний доступ: {LastAccessTime}
                 """;
+    }
+
+    public void Delete()
+    {
+        if (State == SpaceState.Deleted || State == SpaceState.Error)
+        {
+            return;
+        }
+
+        State = SpaceState.Deleted;
+
+        DeleteInner();
+    }
+
+    public void Restore()
+    {
+        if (State != SpaceState.Deleted || State == SpaceState.Error)
+        {
+            return;
+        }
+
+        State = SpaceState.Added;
+
+        if (Parent is { IsDeleted: true })
+        {
+            Parent.Restore();
+        }
+
+        RestoreInner();
+    }
+
+    public void SwapDelete()
+    {
+        switch (State)
+        {
+            case SpaceState.Added:
+                Delete();
+                break;
+
+            case SpaceState.Deleted:
+                Restore();
+                break;
+
+            case SpaceState.None:
+            case SpaceState.Error:
+            default:
+                break;
+        }
+    }
+
+    public void Error()
+    {
+        State = SpaceState.Error;
+    }
+
+    protected virtual void RestoreInner()
+    {
+    }
+
+    protected virtual void DeleteInner()
+    {
     }
 
     private string GetAbsolutePath()
