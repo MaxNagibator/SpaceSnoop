@@ -121,7 +121,7 @@ public partial class SyncForm : Form
         _selectedSourcePath = selectedPath;
         AddStatusMessage($"Выбрана исходная директория: {selectedPath}");
         ValidateDirectories();
-        SourceDirectoryScanButton_Click(null, EventArgs.Empty);
+        StartSourceDirectoryScanning();
     }
 
     private void TargetDirectoryBrowseButton_Click(object? sender, EventArgs e)
@@ -148,10 +148,10 @@ public partial class SyncForm : Form
         _selectedTargetPath = selectedPath;
         AddStatusMessage($"Выбрана целевая директория: {selectedPath}");
         ValidateDirectories();
-        TargetDirectoryScanButton_Click(null, EventArgs.Empty);
+        StartTargetDirectoryScanning();
     }
 
-    private void SourceDirectoryScanButton_Click(object? sender, EventArgs e)
+    private void StartSourceDirectoryScanning()
     {
         var path = sourceDirectoryComboBox.Text.Trim();
 
@@ -170,7 +170,7 @@ public partial class SyncForm : Form
         AddStatusMessage($"Директория не существует: {path}");
     }
 
-    private void TargetDirectoryScanButton_Click(object? sender, EventArgs e)
+    private void StartTargetDirectoryScanning()
     {
         var path = targetDirectoryComboBox.Text.Trim();
 
@@ -191,7 +191,6 @@ public partial class SyncForm : Form
 
     private void OnSourceWorkCompleted(object? sender, WorkerService.Response? response)
     {
-        sourceDirectoryScanButton.Enabled = true;
 
         if (response != null)
         {
@@ -227,7 +226,6 @@ public partial class SyncForm : Form
 
     private void OnTargetWorkCompleted(object? sender, WorkerService.Response? response)
     {
-        targetDirectoryScanButton.Enabled = true;
 
         if (response != null)
         {
@@ -363,7 +361,6 @@ public partial class SyncForm : Form
     private void StartSourceWorker(string path)
     {
         _sourceWorkerCancellationTokenSource = new();
-        sourceDirectoryScanButton.Enabled = false;
         sourceDirectoryTreeView.Nodes.Clear();
 
         AddStatusMessage($"Начинаем сканирование исходной директории: {path}");
@@ -373,7 +370,6 @@ public partial class SyncForm : Form
     private void StartTargetWorker(string path)
     {
         _targetWorkerCancellationTokenSource = new();
-        targetDirectoryScanButton.Enabled = false;
         targetDirectoryTreeView.Nodes.Clear();
 
         AddStatusMessage($"Начинаем сканирование целевой директории: {path}");
@@ -556,8 +552,8 @@ public partial class SyncForm : Form
 
         CleanupSyncResources();
 
-        SourceDirectoryScanButton_Click(null, EventArgs.Empty);
-        TargetDirectoryScanButton_Click(null, EventArgs.Empty);
+        StartSourceDirectoryScanning();
+        StartTargetDirectoryScanning();
     }
 
     private void HandleConflictResolution(SyncConflictEventArgs e)
