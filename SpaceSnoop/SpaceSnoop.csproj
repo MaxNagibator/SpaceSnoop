@@ -15,4 +15,10 @@
         <SelfContained>false</SelfContained>
     </PropertyGroup>
 
+    <ItemGroup>
+        <Compile Update="SyncForm.cs">
+            <SubType>Form</SubType>
+        </Compile>
+    </ItemGroup>
+
 </Project>

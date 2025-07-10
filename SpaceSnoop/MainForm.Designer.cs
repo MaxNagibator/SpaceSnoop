@@ -41,6 +41,7 @@
             _intensityGroupBox = new GroupBox();
             _intensityBar = new TrackBar();
             _chooseFolderButton = new Button();
+            _syncButton = new Button();
             _mainTabControl = new TabControl();
             _controlTabPage = new TabPage();
             _settingsTabPage = new TabPage();
@@ -56,16 +57,18 @@
             // _hardDiskComboBox
             // 
             _hardDiskComboBox.FormattingEnabled = true;
-            _hardDiskComboBox.Location = new Point(6, 8);
+            _hardDiskComboBox.Location = new Point(11, 17);
+            _hardDiskComboBox.Margin = new Padding(6, 6, 6, 6);
             _hardDiskComboBox.Name = "_hardDiskComboBox";
-            _hardDiskComboBox.Size = new Size(90, 23);
+            _hardDiskComboBox.Size = new Size(164, 40);
             _hardDiskComboBox.TabIndex = 0;
             // 
             // _startButton
             // 
-            _startButton.Location = new Point(101, 37);
+            _startButton.Location = new Point(188, 79);
+            _startButton.Margin = new Padding(6, 6, 6, 6);
             _startButton.Name = "_startButton";
-            _startButton.Size = new Size(107, 23);
+            _startButton.Size = new Size(199, 49);
             _startButton.TabIndex = 1;
             _startButton.Text = "start";
             _startButton.UseVisualStyleBackColor = true;
@@ -73,9 +76,10 @@
             // 
             // _stopButton
             // 
-            _stopButton.Location = new Point(6, 89);
+            _stopButton.Location = new Point(11, 190);
+            _stopButton.Margin = new Padding(6, 6, 6, 6);
             _stopButton.Name = "_stopButton";
-            _stopButton.Size = new Size(202, 23);
+            _stopButton.Size = new Size(375, 49);
             _stopButton.TabIndex = 2;
             _stopButton.Text = "stop";
             _stopButton.UseVisualStyleBackColor = true;
@@ -84,9 +88,10 @@
             // _directoriesTreeView
             // 
             _directoriesTreeView.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-            _directoriesTreeView.Location = new Point(240, 12);
+            _directoriesTreeView.Location = new Point(446, 26);
+            _directoriesTreeView.Margin = new Padding(6, 6, 6, 6);
             _directoriesTreeView.Name = "_directoriesTreeView";
-            _directoriesTreeView.Size = new Size(435, 451);
+            _directoriesTreeView.Size = new Size(804, 958);
             _directoriesTreeView.TabIndex = 3;
             _directoriesTreeView.BeforeExpand += OnDirectoriesTreeViewBeforeExpanded;
             _directoriesTreeView.NodeMouseClick += OnNodeMouseClicked;
@@ -94,27 +99,31 @@
             // _useMultithreadingCheckBox
             // 
             _useMultithreadingCheckBox.AutoSize = true;
-            _useMultithreadingCheckBox.Location = new Point(6, 40);
+            _useMultithreadingCheckBox.Location = new Point(11, 85);
+            _useMultithreadingCheckBox.Margin = new Padding(6, 6, 6, 6);
             _useMultithreadingCheckBox.Name = "_useMultithreadingCheckBox";
-            _useMultithreadingCheckBox.Size = new Size(90, 19);
+            _useMultithreadingCheckBox.Size = new Size(176, 36);
             _useMultithreadingCheckBox.TabIndex = 5;
             _useMultithreadingCheckBox.Text = "MultiThread";
             _useMultithreadingCheckBox.UseVisualStyleBackColor = true;
             // 
             // _calculateProgressBar
             // 
-            _calculateProgressBar.Location = new Point(6, 66);
+            _calculateProgressBar.Location = new Point(11, 141);
+            _calculateProgressBar.Margin = new Padding(6, 6, 6, 6);
             _calculateProgressBar.Name = "_calculateProgressBar";
-            _calculateProgressBar.Size = new Size(202, 17);
+            _calculateProgressBar.Size = new Size(375, 36);
             _calculateProgressBar.TabIndex = 7;
             // 
             // _sortGroupBox
             // 
             _sortGroupBox.Controls.Add(_sortModeComboBox);
             _sortGroupBox.Controls.Add(_invertSortCheckBox);
-            _sortGroupBox.Location = new Point(6, 7);
+            _sortGroupBox.Location = new Point(11, 15);
+            _sortGroupBox.Margin = new Padding(6, 6, 6, 6);
             _sortGroupBox.Name = "_sortGroupBox";
-            _sortGroupBox.Size = new Size(202, 51);
+            _sortGroupBox.Padding = new Padding(6, 6, 6, 6);
+            _sortGroupBox.Size = new Size(375, 109);
             _sortGroupBox.TabIndex = 8;
             _sortGroupBox.TabStop = false;
             _sortGroupBox.Text = "Сортировка";
@@ -122,17 +131,19 @@
             // _sortModeComboBox
             // 
             _sortModeComboBox.FormattingEnabled = true;
-            _sortModeComboBox.Location = new Point(81, 20);
+            _sortModeComboBox.Location = new Point(150, 43);
+            _sortModeComboBox.Margin = new Padding(6, 6, 6, 6);
             _sortModeComboBox.Name = "_sortModeComboBox";
-            _sortModeComboBox.Size = new Size(115, 23);
+            _sortModeComboBox.Size = new Size(210, 40);
             _sortModeComboBox.TabIndex = 0;
             // 
             // _invertSortCheckBox
             // 
             _invertSortCheckBox.AutoSize = true;
-            _invertSortCheckBox.Location = new Point(6, 22);
+            _invertSortCheckBox.Location = new Point(11, 47);
+            _invertSortCheckBox.Margin = new Padding(6, 6, 6, 6);
             _invertSortCheckBox.Name = "_invertSortCheckBox";
-            _invertSortCheckBox.Size = new Size(56, 19);
+            _invertSortCheckBox.Size = new Size(107, 36);
             _invertSortCheckBox.TabIndex = 9;
             _invertSortCheckBox.Text = "Invert";
             _invertSortCheckBox.UseVisualStyleBackColor = true;
@@ -140,41 +151,56 @@
             // _intensityGroupBox
             // 
             _intensityGroupBox.Controls.Add(_intensityBar);
-            _intensityGroupBox.Location = new Point(6, 64);
+            _intensityGroupBox.Location = new Point(11, 137);
+            _intensityGroupBox.Margin = new Padding(6, 6, 6, 6);
             _intensityGroupBox.Name = "_intensityGroupBox";
-            _intensityGroupBox.Size = new Size(202, 49);
+            _intensityGroupBox.Padding = new Padding(6, 6, 6, 6);
+            _intensityGroupBox.Size = new Size(375, 105);
             _intensityGroupBox.TabIndex = 9;
             _intensityGroupBox.TabStop = false;
             _intensityGroupBox.Text = "Интенсивность";
             // 
             // _intensityBar
             // 
-            _intensityBar.Location = new Point(6, 21);
-            _intensityBar.Margin = new Padding(2, 1, 2, 1);
+            _intensityBar.Location = new Point(11, 45);
+            _intensityBar.Margin = new Padding(4, 2, 4, 2);
             _intensityBar.Name = "_intensityBar";
-            _intensityBar.Size = new Size(188, 45);
+            _intensityBar.Size = new Size(349, 90);
             _intensityBar.TabIndex = 0;
             _intensityBar.TickStyle = TickStyle.TopLeft;
             // 
             // _chooseFolderButton
             // 
-            _chooseFolderButton.Location = new Point(101, 6);
+            _chooseFolderButton.Location = new Point(188, 13);
+            _chooseFolderButton.Margin = new Padding(6, 6, 6, 6);
             _chooseFolderButton.Name = "_chooseFolderButton";
             _chooseFolderButton.RightToLeft = RightToLeft.Yes;
-            _chooseFolderButton.Size = new Size(107, 25);
+            _chooseFolderButton.Size = new Size(199, 53);
             _chooseFolderButton.TabIndex = 8;
             _chooseFolderButton.Text = "выбрать";
             _chooseFolderButton.UseVisualStyleBackColor = true;
             _chooseFolderButton.Click += OnChooseDirectoryClicked;
             // 
+            // _syncButton
+            // 
+            _syncButton.Location = new Point(11, 252);
+            _syncButton.Margin = new Padding(6, 6, 6, 6);
+            _syncButton.Name = "_syncButton";
+            _syncButton.Size = new Size(375, 49);
+            _syncButton.TabIndex = 9;
+            _syncButton.Text = "Синхронизация";
+            _syncButton.UseVisualStyleBackColor = true;
+            _syncButton.Click += OnSyncButtonClicked;
+            // 
             // _mainTabControl
             // 
             _mainTabControl.Controls.Add(_controlTabPage);
             _mainTabControl.Controls.Add(_settingsTabPage);
-            _mainTabControl.Location = new Point(12, 12);
+            _mainTabControl.Location = new Point(22, 26);
+            _mainTabControl.Margin = new Padding(6, 6, 6, 6);
             _mainTabControl.Name = "_mainTabControl";
             _mainTabControl.SelectedIndex = 0;
-            _mainTabControl.Size = new Size(222, 147);
+            _mainTabControl.Size = new Size(412, 365);
             _mainTabControl.TabIndex = 10;
             // 
             // _controlTabPage
@@ -185,10 +211,12 @@
             _controlTabPage.Controls.Add(_chooseFolderButton);
             _controlTabPage.Controls.Add(_hardDiskComboBox);
             _controlTabPage.Controls.Add(_useMultithreadingCheckBox);
-            _controlTabPage.Location = new Point(4, 24);
+            _controlTabPage.Controls.Add(_syncButton);
+            _controlTabPage.Location = new Point(8, 46);
+            _controlTabPage.Margin = new Padding(6, 6, 6, 6);
             _controlTabPage.Name = "_controlTabPage";
-            _controlTabPage.Padding = new Padding(3);
-            _controlTabPage.Size = new Size(214, 119);
+            _controlTabPage.Padding = new Padding(6, 6, 6, 6);
+            _controlTabPage.Size = new Size(396, 311);
             _controlTabPage.TabIndex = 0;
             _controlTabPage.Text = "Сканирование";
             _controlTabPage.UseVisualStyleBackColor = true;
@@ -197,10 +225,11 @@
             // 
             _settingsTabPage.Controls.Add(_sortGroupBox);
             _settingsTabPage.Controls.Add(_intensityGroupBox);
-            _settingsTabPage.Location = new Point(4, 24);
+            _settingsTabPage.Location = new Point(8, 46);
+            _settingsTabPage.Margin = new Padding(6, 6, 6, 6);
             _settingsTabPage.Name = "_settingsTabPage";
-            _settingsTabPage.Padding = new Padding(3);
-            _settingsTabPage.Size = new Size(214, 119);
+            _settingsTabPage.Padding = new Padding(6, 6, 6, 6);
+            _settingsTabPage.Size = new Size(396, 260);
             _settingsTabPage.TabIndex = 1;
             _settingsTabPage.Text = "Настройки";
             _settingsTabPage.UseVisualStyleBackColor = true;
@@ -208,24 +237,26 @@
             // _infoTextBox
             // 
             _infoTextBox.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
-            _infoTextBox.Location = new Point(16, 161);
+            _infoTextBox.Location = new Point(30, 395);
+            _infoTextBox.Margin = new Padding(6, 6, 6, 6);
             _infoTextBox.Name = "_infoTextBox";
             _infoTextBox.ReadOnly = true;
             _infoTextBox.ScrollBars = RichTextBoxScrollBars.Vertical;
-            _infoTextBox.Size = new Size(214, 302);
+            _infoTextBox.Size = new Size(394, 588);
             _infoTextBox.TabIndex = 11;
             _infoTextBox.Text = "";
             // 
             // MainForm
             // 
-            AutoScaleDimensions = new SizeF(7F, 15F);
+            AutoScaleDimensions = new SizeF(13F, 32F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(687, 475);
+            ClientSize = new Size(1276, 1013);
             Controls.Add(_infoTextBox);
             Controls.Add(_mainTabControl);
             Controls.Add(_directoriesTreeView);
             Icon = (Icon)resources.GetObject("$this.Icon");
-            MinimumSize = new Size(459, 299);
+            Margin = new Padding(6, 6, 6, 6);
+            MinimumSize = new Size(830, 557);
             Name = "MainForm";
             Text = "SpaceSnoop";
             Load += OnFormLoaded;
@@ -259,5 +290,6 @@
         private TabPage _settingsTabPage;
         private TrackBar _intensityBar;
         private RichTextBox _infoTextBox;
+        private Button _syncButton;
     }
 }

@@ -201,6 +201,23 @@ public partial class MainForm : Form
         StopProgressBar();
     }
 
+    private void OnSyncButtonClicked(object? sender, EventArgs e)
+    {
+        var diskSpaceCalculator1 = new DiskSpaceCalculator();
+        var backgroundWorker1 = new System.ComponentModel.BackgroundWorker();
+        var sourceWorkerService = new WorkerService(diskSpaceCalculator1, backgroundWorker1);
+
+        var diskSpaceCalculator2 = new DiskSpaceCalculator();
+        var backgroundWorker2 = new System.ComponentModel.BackgroundWorker();
+        var targetWorkerService = new WorkerService(diskSpaceCalculator2, backgroundWorker2);
+
+        using var syncForm = new SyncForm(sourceWorkerService, targetWorkerService);
+        syncForm.ShowDialog(this);
+
+        sourceWorkerService.Dispose();
+        targetWorkerService.Dispose();
+    }
+
     private void StartWorker(string disk)
     {
         _cancellationTokenSource = new();

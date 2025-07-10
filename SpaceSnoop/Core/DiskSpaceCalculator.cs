@@ -16,7 +16,9 @@ public class DiskSpaceCalculator
     /// <returns>Объект <see cref="DirectorySpace" /> с вычисленной информацией о занимаемом дисковом пространстве.</returns>
     public DirectorySpace Calculate(DirectoryInfo directory, CancellationToken cancellationToken = default)
     {
-        return CalculateInner(directory, null, cancellationToken);
+        var directorySpace = CalculateInner(directory, null, cancellationToken);
+        directorySpace.FixAbsolutePath(directory);
+        return directorySpace;
     }
 
     /// <summary>
