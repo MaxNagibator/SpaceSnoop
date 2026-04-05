@@ -42,14 +42,22 @@ jobs:
 
       - name: Publish
         run: |
-          dotnet publish --configuration Release --runtime win-x64 -p:PublishSingleFile=true -p:PublishReadyToRun=true --no-self-contained
-          Rename-Item -Path .\bin\Release\net10.0-windows\win-x64\publish\SpaceSnoop.exe -NewName "SpaceSnoop_$env:TAG.exe"
-          Compress-Archive -Path .\bin\Release\net10.0-windows\win-x64\publish\SpaceSnoop_$env:TAG.exe -DestinationPath SpaceSnoop_$env:TAG.zip
+          dotnet publish --configuration Release --runtime win-x64 --output .\publish\framework-dependent -p:PublishSingleFile=true -p:PublishReadyToRun=true --no-self-contained
+          Rename-Item -Path .\publish\framework-dependent\SpaceSnoop.exe -NewName "SpaceSnoop_$env:TAG.exe"
+          Compress-Archive -Path .\publish\framework-dependent\SpaceSnoop_$env:TAG.exe -DestinationPath SpaceSnoop_$env:TAG.zip
+
+      - name: Publish portable
+        run: |
+          dotnet publish --configuration Release --runtime win-x64 --output .\publish\portable -p:PublishSingleFile=true -p:PublishReadyToRun=true -p:IncludeNativeLibrariesForSelfExtract=true --self-contained
+          Rename-Item -Path .\publish\portable\SpaceSnoop.exe -NewName "SpaceSnoop_${env:TAG}_portable.exe"
+          Compress-Archive -Path .\publish\portable\SpaceSnoop_${env:TAG}_portable.exe -DestinationPath SpaceSnoop_${env:TAG}_portable.zip
 
       - name: Upload
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release upload $env:TAG `
-            .\bin\Release\net10.0-windows\win-x64\publish\SpaceSnoop_$env:TAG.exe `
-            SpaceSnoop_$env:TAG.zip
+            .\publish\framework-dependent\SpaceSnoop_$env:TAG.exe `
+            SpaceSnoop_$env:TAG.zip `
+            .\publish\portable\SpaceSnoop_${env:TAG}_portable.exe `
+            SpaceSnoop_${env:TAG}_portable.zip
