@@ -152,6 +152,21 @@ public partial class MainForm : Form
         StartScanning(selectedPath);
     }
 
+    private void OnSyncFormButtonClicked(object sender, EventArgs e)
+    {
+        string? initialPath = null;
+
+        var selectedNode = _directoriesTreeView.SelectedNode;
+
+        if (selectedNode?.Tag is DirectorySpace selectedDir)
+        {
+            initialPath = selectedDir.AbsolutePath;
+        }
+
+        using var syncForm = new SyncForm(initialPath);
+        syncForm.ShowDialog(this);
+    }
+
     private void OnIntensityChanged(object? sender, int intensity)
     {
         _intensityGroupBox.Text = $"Интенсивность: {intensity}";
@@ -164,7 +179,7 @@ public partial class MainForm : Form
         {
             var (directorySpace, elapsed, error) = response;
 
-            if (string.IsNullOrEmpty(error) == false)
+            if (!string.IsNullOrEmpty(error))
             {
                 AppendColoredText($"[{DateTime.Now:HH:mm:ss:ffff}] Ошибка: {error}",
                     ErrorColor,
@@ -247,7 +262,7 @@ public partial class MainForm : Form
             var node = _directoriesTreeView.Nodes[i];
 
             if (node.Tag is not SpaceBase space
-                || space.AbsolutePath.EndsWith(path, StringComparison.CurrentCultureIgnoreCase) == false)
+                || !space.AbsolutePath.EndsWith(path, StringComparison.CurrentCultureIgnoreCase))
             {
                 continue;
             }
