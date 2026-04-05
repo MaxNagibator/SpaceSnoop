@@ -108,6 +108,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.prepare.outputs.version }}
+          name: SpaceSnoop v${{ needs.prepare.outputs.version }}
           files: |
             SpaceSnoop/publish/framework-dependent/SpaceSnoop-v${{ needs.prepare.outputs.version }}.exe
             SpaceSnoop/SpaceSnoop-v${{ needs.prepare.outputs.version }}.zip
