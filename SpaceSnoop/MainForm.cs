@@ -229,9 +229,19 @@ public partial class MainForm : Form
 
     private void SetDefaultSettings()
     {
+        var version = Application.ProductVersion;
+        var plusIndex = version.IndexOf('+', StringComparison.Ordinal);
+
+        if (plusIndex > 0)
+        {
+            version = version[..plusIndex];
+        }
+
+        var title = $"SpaceSnoop v{version}";
+
         Text = AdministratorChecker.IsCurrentUserAdmin()
-            ? "SpaceSnoop (Запущено от имени администратора)"
-            : "SpaceSnoop";
+            ? $"{title} (Запущено от имени администратора)"
+            : title;
 
         _hardDiskComboBox.SelectedIndex = 0;
 
