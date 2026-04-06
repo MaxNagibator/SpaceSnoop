@@ -208,19 +208,31 @@
             // _infoTextBox
             // 
             _infoTextBox.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
-            _infoTextBox.Location = new Point(16, 161);
+            _infoTextBox.Location = new Point(16, 190);
             _infoTextBox.Name = "_infoTextBox";
             _infoTextBox.ReadOnly = true;
             _infoTextBox.ScrollBars = RichTextBoxScrollBars.Vertical;
-            _infoTextBox.Size = new Size(214, 302);
+            _infoTextBox.Size = new Size(214, 273);
             _infoTextBox.TabIndex = 11;
             _infoTextBox.Text = "";
-            // 
+            //
+            // _syncFormButton
+            //
+            _syncFormButton = new Button();
+            _syncFormButton.Location = new Point(16, 161);
+            _syncFormButton.Name = "_syncFormButton";
+            _syncFormButton.Size = new Size(214, 25);
+            _syncFormButton.TabIndex = 12;
+            _syncFormButton.Text = "Синхронизация...";
+            _syncFormButton.UseVisualStyleBackColor = true;
+            _syncFormButton.Click += OnSyncFormButtonClicked;
+            //
             // MainForm
-            // 
+            //
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(687, 475);
+            Controls.Add(_syncFormButton);
             Controls.Add(_infoTextBox);
             Controls.Add(_mainTabControl);
             Controls.Add(_directoriesTreeView);
@@ -259,5 +271,6 @@
         private TabPage _settingsTabPage;
         private TrackBar _intensityBar;
         private RichTextBox _infoTextBox;
+        private Button _syncFormButton;
     }
 }

@@ -1,55 +1,117 @@
 name: Release
 
 on:
-  release:
-    types: [ published ]
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Select tag of release'
-        required: true
-        type: string
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - master
 
 permissions:
   contents: write
 
 jobs:
-  release:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.VERSION }}
+      should_release: ${{ steps.decide.outputs.should_release }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Extract version
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(grep -oP '(?<=<Version>).*(?=</Version>)' Directory.Build.props)
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create tag if needed
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        shell: bash
+        run: |
+          if ! git ls-remote --tags origin "refs/tags/v${{ steps.version.outputs.VERSION }}" | grep -q .; then
+            git tag "v${{ steps.version.outputs.VERSION }}"
+            git push origin "v${{ steps.version.outputs.VERSION }}"
+          fi
+
+      - name: Decide if release is needed
+        id: decide
+        shell: bash
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          elif ! gh release view "v${{ steps.version.outputs.VERSION }}" >/dev/null 2>&1; then
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  build:
+    needs: prepare
+    if: needs.prepare.outputs.should_release == 'true'
     runs-on: windows-2022
     defaults:
       run:
         working-directory: ./SpaceSnoop
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Setup dotnet
+      - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '10.0.x'
           cache: true
           cache-dependency-path: "**/packages.lock.json"
 
-      - name: Determine release tag
-        id: determine-tag
-        run: |
-          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-            $tag = "${{ github.event.inputs.tag }}"
-          } else {
-            $tag = "${{ github.ref_name }}"
-          }
-          echo "TAG=$tag" >> $env:GITHUB_ENV
-
       - name: Publish
-        run: |
-          dotnet publish --configuration Release --runtime win-x64 -p:PublishSingleFile=true -p:PublishReadyToRun=true --no-self-contained
-          Rename-Item -Path .\bin\Release\net9.0-windows\win-x64\publish\SpaceSnoop.exe -NewName "SpaceSnoop_$env:TAG.exe"
-          Compress-Archive -Path .\bin\Release\net9.0-windows\win-x64\publish\SpaceSnoop_$env:TAG.exe -DestinationPath SpaceSnoop_$env:TAG.zip
+        run: >
+          dotnet publish
+          --configuration Release
+          --runtime win-x64
+          --output .\publish\framework-dependent
+          -p:PublishSingleFile=true
+          -p:PublishReadyToRun=true
+          -p:Version=${{ needs.prepare.outputs.version }}
+          --no-self-contained
 
-      - name: Upload
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Publish portable
+        run: >
+          dotnet publish
+          --configuration Release
+          --runtime win-x64
+          --output .\publish\portable
+          -p:PublishSingleFile=true
+          -p:PublishReadyToRun=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:Version=${{ needs.prepare.outputs.version }}
+          --self-contained
+
+      - name: Package artifacts
+        shell: pwsh
         run: |
-          gh release upload $env:TAG `
-            .\bin\Release\net9.0-windows\win-x64\publish\SpaceSnoop_$env:TAG.exe `
-            SpaceSnoop_$env:TAG.zip
+          $version = "${{ needs.prepare.outputs.version }}"
+          Rename-Item -Path .\publish\framework-dependent\SpaceSnoop.exe -NewName "SpaceSnoop-v$version.exe"
+          Rename-Item -Path .\publish\portable\SpaceSnoop.exe -NewName "SpaceSnoop-v$version-portable.exe"
+          Compress-Archive -Path .\publish\framework-dependent\SpaceSnoop-v$version.exe -DestinationPath SpaceSnoop-v$version.zip
+          Compress-Archive -Path .\publish\portable\SpaceSnoop-v$version-portable.exe -DestinationPath SpaceSnoop-v$version-portable.zip
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.prepare.outputs.version }}
+          name: SpaceSnoop v${{ needs.prepare.outputs.version }}
+          files: |
+            SpaceSnoop/publish/framework-dependent/SpaceSnoop-v${{ needs.prepare.outputs.version }}.exe
+            SpaceSnoop/SpaceSnoop-v${{ needs.prepare.outputs.version }}.zip
+            SpaceSnoop/publish/portable/SpaceSnoop-v${{ needs.prepare.outputs.version }}-portable.exe
+            SpaceSnoop/SpaceSnoop-v${{ needs.prepare.outputs.version }}-portable.zip
+          generate_release_notes: true

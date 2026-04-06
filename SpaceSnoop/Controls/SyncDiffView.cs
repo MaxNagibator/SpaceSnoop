@@ -1,0 +1,786 @@
+using System.ComponentModel;
+
+namespace SpaceSnoop.Controls;
+
+public sealed class SyncDiffView : UserControl
+{
+    private static readonly Color LeftOnlyColor = Color.Green;
+    private static readonly Color RightOnlyColor = Color.DodgerBlue;
+    private static readonly Color ModifiedColor = Color.DarkOrange;
+    private static readonly Color ConflictColor = Color.Red;
+    private static readonly Color IdenticalColor = Color.Gray;
+    private static readonly Color AbsentColor = Color.FromArgb(200, 200, 200);
+    private static readonly Color DirBackColor = Color.FromArgb(245, 245, 250);
+    private static readonly Color ActionColBackColor = Color.FromArgb(248, 248, 248);
+    private static readonly Color SeparatorColor = Color.FromArgb(220, 220, 220);
+    private static readonly Color HoverColor = Color.FromArgb(230, 240, 255);
+
+    private static readonly Dictionary<SyncAction, (string Symbol, Color Color)> ActionStyles = new()
+    {
+        [SyncAction.CopyToRight] = ("\u2192", Color.Green),
+        [SyncAction.CopyToLeft] = ("\u2190", Color.DodgerBlue),
+        [SyncAction.Skip] = ("\u2298", Color.Gray),
+        [SyncAction.DeleteLeft] = ("\u2297", Color.Red),
+        [SyncAction.DeleteRight] = ("\u2297", Color.Red),
+        [SyncAction.None] = ("\u26A1", Color.Red),
+    };
+
+    private static readonly SyncAction[] ActionCycle =
+    [
+        SyncAction.CopyToRight,
+        SyncAction.CopyToLeft,
+        SyncAction.Skip,
+        SyncAction.DeleteLeft,
+        SyncAction.DeleteRight,
+    ];
+
+    private readonly VScrollBar _scrollBar;
+    private readonly Font _boldFont;
+    private readonly Font _actionFont;
+    private readonly Font _strikeoutFont;
+
+    private readonly StringFormat _leftAlign = new()
+    {
+        Alignment = StringAlignment.Near,
+        LineAlignment = StringAlignment.Center,
+        Trimming = StringTrimming.EllipsisCharacter,
+        FormatFlags = StringFormatFlags.NoWrap,
+    };
+
+    private readonly StringFormat _rightAlign = new()
+    {
+        Alignment = StringAlignment.Far,
+        LineAlignment = StringAlignment.Center,
+        Trimming = StringTrimming.EllipsisCharacter,
+        FormatFlags = StringFormatFlags.NoWrap,
+    };
+
+    private readonly StringFormat _centerAlign = new()
+    {
+        Alignment = StringAlignment.Center,
+        LineAlignment = StringAlignment.Center,
+    };
+
+    private readonly HashSet<DirectoryComparison> _expanded = [];
+    private ContextMenuStrip? _contextMenu;
+    private DirectoryComparison? _root;
+    private int _rowHeight = 22;
+    private int _indentWidth = 20;
+    private int _actionColumnWidth = 40;
+    private int _iconWidth = 16;
+    private int _sizeColumnWidth = 80;
+    private int _padding = 4;
+    private List<RowData> _rows = [];
+    private int _hoverRow = -1;
+    private bool _showIdentical;
+    private bool _showSizes = true;
+    private bool _showAbsentAsEmpty;
+
+    public SyncDiffView()
+    {
+        DoubleBuffered = true;
+        SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+
+        ScaleForDpi();
+
+        _boldFont = new(Font, FontStyle.Bold);
+        _actionFont = new("Segoe UI", 10f, FontStyle.Bold);
+        _strikeoutFont = new(Font, FontStyle.Strikeout);
+
+        _scrollBar = new()
+            { Dock = DockStyle.Right };
+
+        _scrollBar.Scroll += (_, _) => Invalidate();
+        Controls.Add(_scrollBar);
+    }
+
+    public event EventHandler? ActionChanged;
+
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public bool ShowIdentical
+    {
+        get => _showIdentical;
+        set
+        {
+            _showIdentical = value;
+            Rebuild();
+        }
+    }
+
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public bool ShowSizes
+    {
+        get => _showSizes;
+        set
+        {
+            _showSizes = value;
+            Invalidate();
+        }
+    }
+
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public bool ShowAbsentAsEmpty
+    {
+        get => _showAbsentAsEmpty;
+        set
+        {
+            _showAbsentAsEmpty = value;
+            Invalidate();
+        }
+    }
+
+    public void SetData(ComparisonResult? result)
+    {
+        _expanded.Clear();
+        _root = result?.Root;
+
+        if (result != null)
+        {
+            ExpandAll(result.Root);
+        }
+
+        Rebuild();
+    }
+
+    public void RefreshView()
+    {
+        Rebuild();
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+
+        var g = e.Graphics;
+        var scrollOffset = _scrollBar.Value;
+        var drawWidth = ClientSize.Width - (_scrollBar.Visible ? _scrollBar.Width : 0);
+        var sideWidth = (drawWidth - _actionColumnWidth) / 2;
+        var actionX = sideWidth;
+
+        using (var headerBrush = new SolidBrush(Color.FromArgb(250, 250, 250)))
+        {
+            g.FillRectangle(headerBrush, 0, 0, drawWidth, _rowHeight);
+        }
+
+        using (var headerFont = new Font(Font, FontStyle.Bold))
+        {
+            var headerRect = new Rectangle(_padding, 0, sideWidth - _padding * 2, _rowHeight);
+            g.DrawString("Левая", headerFont, Brushes.DimGray, headerRect, _leftAlign);
+
+            headerRect = new(actionX + _actionColumnWidth + _padding, 0, sideWidth - _padding * 2, _rowHeight);
+            g.DrawString("Правая", headerFont, Brushes.DimGray, headerRect, _leftAlign);
+        }
+
+        using var sepPen = new Pen(SeparatorColor);
+        g.DrawLine(sepPen, 0, _rowHeight, drawWidth, _rowHeight);
+
+        using (var actionBg = new SolidBrush(ActionColBackColor))
+        {
+            g.FillRectangle(actionBg, actionX, _rowHeight, _actionColumnWidth, ClientSize.Height - _rowHeight);
+        }
+
+        g.DrawLine(sepPen, actionX, 0, actionX, ClientSize.Height);
+        g.DrawLine(sepPen, actionX + _actionColumnWidth, 0, actionX + _actionColumnWidth, ClientSize.Height);
+
+        var startRow = Math.Max(0, (scrollOffset - _rowHeight) / _rowHeight);
+        var endRow = Math.Min(_rows.Count, (scrollOffset + ClientSize.Height) / _rowHeight + 1);
+
+        for (var i = startRow; i < endRow; i++)
+        {
+            var y = _rowHeight + i * _rowHeight - scrollOffset;
+
+            if (y + _rowHeight < _rowHeight || y > ClientSize.Height)
+            {
+                continue;
+            }
+
+            var row = _rows[i];
+
+            if (i == _hoverRow)
+            {
+                using var hoverBrush = new SolidBrush(HoverColor);
+                g.FillRectangle(hoverBrush, 0, y, sideWidth, _rowHeight);
+                g.FillRectangle(hoverBrush, actionX + _actionColumnWidth, y, sideWidth, _rowHeight);
+            }
+
+            if (row.Directory != null)
+            {
+                DrawDirectoryRow(g, row, y, sideWidth, actionX, drawWidth);
+            }
+            else if (row.File != null)
+            {
+                DrawFileRow(g, row, y, sideWidth, actionX, drawWidth);
+            }
+
+            g.DrawLine(sepPen, 0, y + _rowHeight, drawWidth, y + _rowHeight);
+        }
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+
+        var newHover = GetRowAtY(e.Y);
+
+        if (newHover == _hoverRow)
+        {
+            return;
+        }
+
+        _hoverRow = newHover;
+        Invalidate();
+    }
+
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        base.OnMouseLeave(e);
+
+        if (_hoverRow == -1)
+        {
+            return;
+        }
+
+        _hoverRow = -1;
+        Invalidate();
+    }
+
+    protected override void OnMouseClick(MouseEventArgs e)
+    {
+        base.OnMouseClick(e);
+
+        var rowIndex = GetRowAtY(e.Y);
+
+        if (rowIndex < 0 || rowIndex >= _rows.Count)
+        {
+            return;
+        }
+
+        var row = _rows[rowIndex];
+
+        if (e.Button == MouseButtons.Left)
+        {
+            HandleLeftClick(row, e.X);
+        }
+        else if (e.Button == MouseButtons.Right)
+        {
+            HandleRightClick(row, e.Location);
+        }
+    }
+
+    private void HandleLeftClick(RowData row, int x)
+    {
+        if (row.Directory != null)
+        {
+            if (row.IsExpanded)
+            {
+                _expanded.Remove(row.Directory);
+            }
+            else
+            {
+                _expanded.Add(row.Directory);
+            }
+
+            Rebuild();
+            return;
+        }
+
+        if (row.File == null || row.File.Status == ComparisonStatus.Identical)
+        {
+            return;
+        }
+
+        var drawWidth = ClientSize.Width - (_scrollBar.Visible ? _scrollBar.Width : 0);
+        var actionX = (drawWidth - _actionColumnWidth) / 2;
+
+        if (x < actionX || x >= actionX + _actionColumnWidth)
+        {
+            return;
+        }
+
+        CycleAction(row.File);
+        Invalidate();
+        ActionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void HandleRightClick(RowData row, Point location)
+    {
+        if (row.File != null && row.File.Status != ComparisonStatus.Identical)
+        {
+            ShowContextMenu(row.File, location);
+        }
+        else if (row.Directory != null && row.Directory.Status != ComparisonStatus.Identical)
+        {
+            ShowDirectoryContextMenu(row.Directory, location);
+        }
+    }
+
+    protected override void OnMouseWheel(MouseEventArgs e)
+    {
+        base.OnMouseWheel(e);
+
+        if (!_scrollBar.Visible)
+        {
+            return;
+        }
+
+        var delta = e.Delta > 0 ? -_rowHeight * 3 : _rowHeight * 3;
+        var newValue = Math.Clamp(_scrollBar.Value + delta, _scrollBar.Minimum, Math.Max(0, _scrollBar.Maximum - _scrollBar.LargeChange));
+        _scrollBar.Value = newValue;
+        Invalidate();
+    }
+
+    protected override void OnResize(EventArgs e)
+    {
+        base.OnResize(e);
+        UpdateScrollBar();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _boldFont.Dispose();
+            _actionFont.Dispose();
+            _strikeoutFont.Dispose();
+            _leftAlign.Dispose();
+            _rightAlign.Dispose();
+            _centerAlign.Dispose();
+            _contextMenu?.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
+
+    private static void CycleAction(FileComparison file)
+    {
+        var currentIndex = Array.IndexOf(ActionCycle, file.Action);
+        file.Action = currentIndex < 0
+            ? ActionCycle[0]
+            : ActionCycle[(currentIndex + 1) % ActionCycle.Length];
+    }
+
+    private static long CalcDirectorySize(DirectoryComparison dir, bool isLeft)
+    {
+        long total = 0;
+
+        foreach (var file in dir.Files)
+        {
+            var size = isLeft ? file.LeftSize : file.RightSize;
+
+            if (size.HasValue)
+            {
+                total += size.Value;
+            }
+        }
+
+        foreach (var sub in dir.SubDirectories)
+        {
+            total += CalcDirectorySize(sub, isLeft);
+        }
+
+        return total;
+    }
+
+    private static Color GetStatusColor(ComparisonStatus status)
+    {
+        return status switch
+        {
+            ComparisonStatus.LeftOnly => LeftOnlyColor,
+            ComparisonStatus.RightOnly => RightOnlyColor,
+            ComparisonStatus.Modified => ModifiedColor,
+            ComparisonStatus.Conflict => ConflictColor,
+            ComparisonStatus.Identical => IdenticalColor,
+            _ => Color.Black,
+        };
+    }
+
+    private void ScaleForDpi()
+    {
+        var scale = DeviceDpi / 96f;
+        _rowHeight = (int)(22 * scale);
+        _indentWidth = (int)(20 * scale);
+        _actionColumnWidth = (int)(40 * scale);
+        _iconWidth = (int)(16 * scale);
+        _sizeColumnWidth = (int)(80 * scale);
+        _padding = (int)(4 * scale);
+    }
+
+    private void Rebuild()
+    {
+        _rows = [];
+
+        if (_root != null)
+        {
+            FlattenDirectory(_root, 0);
+        }
+
+        UpdateScrollBar();
+        Invalidate();
+    }
+
+    private void FlattenDirectory(DirectoryComparison dir, int indent)
+    {
+        foreach (var sub in dir.SubDirectories)
+        {
+            if (!_showIdentical && sub.Status == ComparisonStatus.Identical)
+            {
+                continue;
+            }
+
+            var isExpanded = _expanded.Contains(sub);
+            _rows.Add(new(sub, indent, isExpanded));
+
+            if (isExpanded)
+            {
+                FlattenDirectory(sub, indent + 1);
+            }
+        }
+
+        foreach (var file in dir.Files)
+        {
+            if (!_showIdentical && file.Status == ComparisonStatus.Identical)
+            {
+                continue;
+            }
+
+            _rows.Add(new(file, indent));
+        }
+    }
+
+    private void ExpandAll(DirectoryComparison dir)
+    {
+        _expanded.Add(dir);
+
+        foreach (var sub in dir.SubDirectories)
+        {
+            ExpandAll(sub);
+        }
+    }
+
+    private void UpdateScrollBar()
+    {
+        var totalHeight = _rows.Count * _rowHeight;
+        var visibleHeight = ClientSize.Height;
+
+        if (totalHeight <= visibleHeight)
+        {
+            _scrollBar.Visible = false;
+            _scrollBar.Value = 0;
+        }
+        else
+        {
+            _scrollBar.Visible = true;
+            _scrollBar.Minimum = 0;
+            _scrollBar.Maximum = totalHeight;
+            _scrollBar.LargeChange = Math.Max(1, visibleHeight);
+            _scrollBar.SmallChange = _rowHeight;
+
+            if (_scrollBar.Value > totalHeight - visibleHeight)
+            {
+                _scrollBar.Value = Math.Max(0, totalHeight - visibleHeight);
+            }
+        }
+    }
+
+    private void DrawDirectoryRow(Graphics g, RowData row, int y, int sideWidth, int actionX, int drawWidth)
+    {
+        var dir = row.Directory!;
+
+        using (var dirBg = new SolidBrush(DirBackColor))
+        {
+            g.FillRectangle(dirBg, 0, y, sideWidth, _rowHeight);
+            g.FillRectangle(dirBg, actionX + _actionColumnWidth, y, sideWidth, _rowHeight);
+        }
+
+        var indent = row.Indent * _indentWidth;
+        var expandIcon = row.IsExpanded ? "\u25BC" : "\u25B6";
+        var statusColor = GetStatusColor(dir.Status);
+        var sizeReserve = _showSizes ? _sizeColumnWidth + _padding : _padding;
+
+        var leftIndent = indent + _padding;
+        var leftAbsent = dir.Status == ComparisonStatus.RightOnly;
+
+        if (!leftAbsent || !_showAbsentAsEmpty)
+        {
+            using var brush = new SolidBrush(Color.Gray);
+            g.DrawString(expandIcon, Font, brush, leftIndent, y + (_rowHeight - Font.Height) / 2f);
+        }
+
+        leftIndent += _iconWidth;
+
+        if (leftAbsent)
+        {
+            if (!_showAbsentAsEmpty)
+            {
+                var leftRect = new Rectangle(leftIndent, y, sideWidth - leftIndent - _padding, _rowHeight);
+
+                using var brush = new SolidBrush(AbsentColor);
+                g.DrawString(dir.Name, _strikeoutFont, brush, leftRect, _leftAlign);
+            }
+        }
+        else
+        {
+            var leftRect = new Rectangle(leftIndent, y, sideWidth - leftIndent - sizeReserve, _rowHeight);
+
+            using var brush = new SolidBrush(statusColor);
+            g.DrawString(dir.Name, _boldFont, brush, leftRect, _leftAlign);
+
+            if (_showSizes)
+            {
+                var leftSize = CalcDirectorySize(dir, true);
+                var sizeRect = new Rectangle(sideWidth - _sizeColumnWidth - _padding, y, _sizeColumnWidth, _rowHeight);
+
+                using var sizeBrush = new SolidBrush(Color.FromArgb(140, 140, 140));
+                g.DrawString(SizeFormatter.Format(leftSize), Font, sizeBrush, sizeRect, _rightAlign);
+            }
+        }
+
+        var rightIndent = actionX + _actionColumnWidth + indent + _padding;
+        var rightAbsent = dir.Status == ComparisonStatus.LeftOnly;
+
+        if (!rightAbsent || !_showAbsentAsEmpty)
+        {
+            using var brush = new SolidBrush(Color.Gray);
+            g.DrawString(expandIcon, Font, brush, rightIndent, y + (_rowHeight - Font.Height) / 2f);
+        }
+
+        rightIndent += _iconWidth;
+
+        if (rightAbsent)
+        {
+            if (_showAbsentAsEmpty)
+            {
+                return;
+            }
+
+            var rightRect = new Rectangle(rightIndent, y, drawWidth - rightIndent - _padding, _rowHeight);
+
+            using var brush = new SolidBrush(AbsentColor);
+            g.DrawString(dir.Name, _strikeoutFont, brush, rightRect, _leftAlign);
+        }
+        else
+        {
+            var rightEnd = drawWidth - _padding;
+            var rightRect = new Rectangle(rightIndent, y, rightEnd - rightIndent - (sizeReserve - _padding), _rowHeight);
+
+            using var brush = new SolidBrush(statusColor);
+            g.DrawString(dir.Name, _boldFont, brush, rightRect, _leftAlign);
+
+            if (!_showSizes)
+            {
+                return;
+            }
+
+            var rightSize = CalcDirectorySize(dir, false);
+            var sizeRect = new Rectangle(rightEnd - _sizeColumnWidth - _padding, y, _sizeColumnWidth, _rowHeight);
+
+            using var sizeBrush = new SolidBrush(Color.FromArgb(140, 140, 140));
+            g.DrawString(SizeFormatter.Format(rightSize), Font, sizeBrush, sizeRect, _rightAlign);
+        }
+    }
+
+    private void DrawFileRow(Graphics g, RowData row, int y, int sideWidth, int actionX, int drawWidth)
+    {
+        var file = row.File!;
+        var statusColor = GetStatusColor(file.Status);
+        var indent = row.Indent * _indentWidth + _iconWidth + _padding;
+        var sizeReserve = _showSizes ? _sizeColumnWidth + _padding : _padding;
+
+        if (file.Status == ComparisonStatus.RightOnly)
+        {
+            if (!_showAbsentAsEmpty)
+            {
+                var leftRect = new Rectangle(indent, y, sideWidth - indent - _padding, _rowHeight);
+
+                using var brush = new SolidBrush(AbsentColor);
+                g.DrawString(file.Name, _strikeoutFont, brush, leftRect, _leftAlign);
+            }
+        }
+        else
+        {
+            var nameRect = new Rectangle(indent, y, sideWidth - indent - sizeReserve, _rowHeight);
+
+            using (var brush = new SolidBrush(statusColor))
+            {
+                g.DrawString(file.Name, Font, brush, nameRect, _leftAlign);
+            }
+
+            if (_showSizes && file.LeftSize.HasValue)
+            {
+                var sizeRect = new Rectangle(sideWidth - _sizeColumnWidth - _padding, y, _sizeColumnWidth, _rowHeight);
+
+                using var brush = new SolidBrush(Color.FromArgb(140, 140, 140));
+                g.DrawString(SizeFormatter.Format(file.LeftSize.Value), Font, brush, sizeRect, _rightAlign);
+            }
+        }
+
+        var actionRect = new Rectangle(actionX, y, _actionColumnWidth, _rowHeight);
+
+        if (file.Status == ComparisonStatus.Identical)
+        {
+            using var brush = new SolidBrush(Color.DarkGray);
+            g.DrawString("=", Font, brush, actionRect, _centerAlign);
+        }
+        else if (ActionStyles.TryGetValue(file.Action, out var style))
+        {
+            using var brush = new SolidBrush(style.Color);
+            g.DrawString(style.Symbol, _actionFont, brush, actionRect, _centerAlign);
+        }
+
+        var rightIndent = actionX + _actionColumnWidth + row.Indent * _indentWidth + _iconWidth + _padding;
+
+        if (file.Status == ComparisonStatus.LeftOnly)
+        {
+            if (_showAbsentAsEmpty)
+            {
+                return;
+            }
+
+            var rightRect = new Rectangle(rightIndent, y, drawWidth - rightIndent - _padding, _rowHeight);
+
+            using var brush = new SolidBrush(AbsentColor);
+            g.DrawString(file.Name, _strikeoutFont, brush, rightRect, _leftAlign);
+        }
+        else
+        {
+            var rightEnd = drawWidth - _padding;
+            var nameRect = new Rectangle(rightIndent, y, rightEnd - rightIndent - sizeReserve, _rowHeight);
+
+            using (var brush = new SolidBrush(statusColor))
+            {
+                g.DrawString(file.Name, Font, brush, nameRect, _leftAlign);
+            }
+
+            if (!_showSizes || !file.RightSize.HasValue)
+            {
+                return;
+            }
+
+            {
+                var sizeRect = new Rectangle(rightEnd - _sizeColumnWidth - _padding, y, _sizeColumnWidth, _rowHeight);
+
+                using var brush = new SolidBrush(Color.FromArgb(140, 140, 140));
+                g.DrawString(SizeFormatter.Format(file.RightSize.Value), Font, brush, sizeRect, _rightAlign);
+            }
+        }
+    }
+
+    private void ShowContextMenu(FileComparison file, Point location)
+    {
+        _contextMenu?.Dispose();
+        var menu = new ContextMenuStrip();
+        _contextMenu = menu;
+
+        menu.Items.Add("Копировать \u2192", null, (_, _) =>
+        {
+            file.Action = SyncAction.CopyToRight;
+            Invalidate();
+            ActionChanged?.Invoke(this, EventArgs.Empty);
+        });
+
+        menu.Items.Add("\u2190 Копировать", null, (_, _) =>
+        {
+            file.Action = SyncAction.CopyToLeft;
+            Invalidate();
+            ActionChanged?.Invoke(this, EventArgs.Empty);
+        });
+
+        menu.Items.Add("Пропустить", null, (_, _) =>
+        {
+            file.Action = SyncAction.Skip;
+            Invalidate();
+            ActionChanged?.Invoke(this, EventArgs.Empty);
+        });
+
+        if (file.Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly)
+        {
+            var deleteSide = file.Status == ComparisonStatus.LeftOnly
+                ? SyncAction.DeleteLeft
+                : SyncAction.DeleteRight;
+
+            menu.Items.Add("Удалить", null, (_, _) =>
+            {
+                file.Action = deleteSide;
+                Invalidate();
+                ActionChanged?.Invoke(this, EventArgs.Empty);
+            });
+        }
+
+        menu.Show(this, location);
+    }
+
+    private void ShowDirectoryContextMenu(DirectoryComparison dir, Point location)
+    {
+        _contextMenu?.Dispose();
+        var menu = new ContextMenuStrip();
+        _contextMenu = menu;
+
+        menu.Items.Add($"Папка «{dir.Name}»:") .Enabled = false;
+        menu.Items.Add(new ToolStripSeparator());
+
+        menu.Items.Add("Всё копировать \u2192", null, (_, _) => ApplyActionToDirectory(dir, SyncAction.CopyToRight));
+        menu.Items.Add("\u2190 Всё копировать", null, (_, _) => ApplyActionToDirectory(dir, SyncAction.CopyToLeft));
+        menu.Items.Add("Всё пропустить", null, (_, _) => ApplyActionToDirectory(dir, SyncAction.Skip));
+
+        if (dir.Status is ComparisonStatus.LeftOnly)
+        {
+            menu.Items.Add("Всё удалить слева", null, (_, _) => ApplyActionToDirectory(dir, SyncAction.DeleteLeft));
+        }
+        else if (dir.Status is ComparisonStatus.RightOnly)
+        {
+            menu.Items.Add("Всё удалить справа", null, (_, _) => ApplyActionToDirectory(dir, SyncAction.DeleteRight));
+        }
+
+        menu.Show(this, location);
+    }
+
+    private void ApplyActionToDirectory(DirectoryComparison dir, SyncAction action)
+    {
+        ApplyActionRecursive(dir, action);
+        Invalidate();
+        ActionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private static void ApplyActionRecursive(DirectoryComparison dir, SyncAction action)
+    {
+        foreach (var file in dir.Files)
+        {
+            if (file.Status != ComparisonStatus.Identical)
+            {
+                file.Action = action;
+            }
+        }
+
+        foreach (var sub in dir.SubDirectories)
+        {
+            ApplyActionRecursive(sub, action);
+        }
+    }
+
+    private int GetRowAtY(int y)
+    {
+        var scrollOffset = _scrollBar.Value;
+        return (y - _rowHeight + scrollOffset) / _rowHeight;
+    }
+
+    private sealed record RowData
+    {
+        public RowData(DirectoryComparison dir, int indent, bool isExpanded)
+        {
+            Directory = dir;
+            Indent = indent;
+            IsExpanded = isExpanded;
+        }
+
+        public RowData(FileComparison file, int indent)
+        {
+            File = file;
+            Indent = indent;
+        }
+
+        public DirectoryComparison? Directory { get; }
+        public FileComparison? File { get; }
+        public int Indent { get; }
+        public bool IsExpanded { get; }
+    }
+}

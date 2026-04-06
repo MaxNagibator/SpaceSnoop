@@ -1,4 +1,4 @@
-name: .NET Core Desktop
+﻿name: .NET Core Desktop
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
 jobs:
 
   build:
+    if: github.repository == 'MaxNagibator/SpaceSnoop'
 
     strategy:
       matrix:
@@ -28,7 +29,7 @@ jobs:
     - name: Install .NET Core
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 9.0.x
+        dotnet-version: 10.0.x
 
     - name: Setup MSBuild.exe
       uses: microsoft/setup-msbuild@v2
@@ -41,4 +42,4 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: windows-forms-app
-        path: bin/Release/net9.0-windows/win-x64/publish/
+        path: bin/Release/net10.0-windows/win-x64/publish/
