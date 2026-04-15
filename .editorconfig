@@ -13,7 +13,7 @@ charset = utf-8-bom
 end_of_line = crlf
 insert_final_newline = true
 
-[*.{yml,json}]
+[*.{yml,json,props,csproj}]
 indent_size = 2
 indent_style = space
 tab_width = 2
@@ -331,3 +331,9 @@ dotnet_diagnostic.ca2000.severity = suggestion
 
 #CA1724: Имена типов не должны совпадать с пространствами имен
 dotnet_diagnostic.ca1724.severity = none
+
+# T0000: Do not use 'Get' prefix (SonarAnalyzer.CSharp.Styling)
+dotnet_diagnostic.T0000.severity = none
+
+# T0043: Do not use primary constructors (SonarAnalyzer.CSharp.Styling)
+dotnet_diagnostic.T0043.severity = none
