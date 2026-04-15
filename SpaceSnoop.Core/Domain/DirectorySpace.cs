@@ -116,6 +116,50 @@ public class DirectorySpace : SpaceBase
         _maxTotalSize = null;
     }
 
+    /// <summary>
+    /// Удаляет дочерний элемент из этой директории и вычитает его размер из TotalSize
+    /// вверх по цепочке Parent. Пропагация останавливается на синтетическом родителе,
+    /// созданном FixAbsolutePath (он не содержит этого узла в своих коллекциях).
+    /// </summary>
+    /// <param name="child">Дочерний элемент, который нужно удалить.</param>
+    public void Remove(SpaceBase child)
+    {
+        bool removed;
+
+        switch (child)
+        {
+            case DirectorySpace subDir:
+                removed = _subDirectories.Remove(subDir);
+                break;
+
+            case FileSpace file:
+                removed = _files.Remove(file);
+
+                if (removed)
+                {
+                    Size -= file.Size;
+                }
+
+                break;
+
+            default:
+                return;
+        }
+
+        if (!removed)
+        {
+            return;
+        }
+
+        _totalSize -= child.TotalSize;
+        _maxTotalSize = null;
+
+        if (Parent is DirectorySpace parentDir && parentDir.ContainsChild(this))
+        {
+            parentDir.PropagateRemoval(child.TotalSize);
+        }
+    }
+
     public void FixAbsolutePath(DirectoryInfo directory)
     {
         if (directory.FullName == directory.Root.FullName)
@@ -125,12 +169,25 @@ public class DirectorySpace : SpaceBase
 
         var parent = Directory.GetParent(directory.FullName);
 
-        if (parent == null)
+        if (parent is null)
         {
             return;
         }
 
         Parent = new DirectorySpace(parent.FullName, null, parent.CreationTime, parent.LastAccessTime);
+    }
+
+    /// <summary>
+    /// Проверяет, является ли указанный элемент прямым дочерним в этой директории.
+    /// </summary>
+    internal bool ContainsChild(SpaceBase child)
+    {
+        return child switch
+        {
+            DirectorySpace subDir => _subDirectories.Contains(subDir),
+            FileSpace file => _files.Contains(file),
+            _ => false,
+        };
     }
 
     protected override void DeleteInner()
@@ -144,7 +201,7 @@ public class DirectorySpace : SpaceBase
     protected override void RestoreInner()
     {
         // TODO: Костыль для восстановления только конкретных фалов, не затрагивая другие
-        if (All.Any(x => x.IsDeleted == false))
+        if (All.Any(x => !x.IsDeleted))
         {
             return;
         }
@@ -156,12 +213,26 @@ public class DirectorySpace : SpaceBase
     }
 
     /// <summary>
+    /// Вычитает размер из TotalSize и продолжает пропагацию вверх по реальным предкам.
+    /// </summary>
+    private void PropagateRemoval(long size)
+    {
+        _totalSize -= size;
+        _maxTotalSize = null;
+
+        if (Parent is DirectorySpace parentDir && parentDir.ContainsChild(this))
+        {
+            parentDir.PropagateRemoval(size);
+        }
+    }
+
+    /// <summary>
     /// Возвращает максимальный размер среди подкаталогов.
     /// </summary>
     /// <returns>Максимальный размер среди подкаталогов.</returns>
     private long GetMaxSize()
     {
-        return _subDirectories.Select(subDirectory => subDirectory.MaxTotalSize)
+        return _subDirectories.Select(x => x.MaxTotalSize)
             .Prepend(_totalSize)
             .Max();
     }

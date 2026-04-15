@@ -11,6 +11,6 @@ public sealed class ExclusionFilter(string commaSeparatedPatterns)
 
     public bool IsExcluded(string name)
     {
-        return _patterns.Any(pattern => FileSystemName.MatchesSimpleExpression(pattern, name));
+        return _patterns.Any(x => FileSystemName.MatchesSimpleExpression(x, name));
     }
 }

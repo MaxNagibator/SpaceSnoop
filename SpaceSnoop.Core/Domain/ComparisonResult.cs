@@ -34,15 +34,15 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
         return HasPendingResolutionRecursive(Root);
     }
 
-    private static bool HasPendingResolutionRecursive(DirectoryComparison dir)
-    {
-        return dir.Files.Any(file => file.Status != ComparisonStatus.Identical && file.Action == SyncAction.None)
-               || dir.SubDirectories.Any(HasPendingResolutionRecursive);
-    }
-
     public int ResolveAllConflicts(SyncAction action)
     {
         return ResolveAllConflictsRecursive(Root, action);
+    }
+
+    private static bool HasPendingResolutionRecursive(DirectoryComparison dir)
+    {
+        return dir.Files.Any(x => x.Status != ComparisonStatus.Identical && x.Action == SyncAction.None)
+               || dir.SubDirectories.Any(HasPendingResolutionRecursive);
     }
 
     private static int ResolveAllConflictsRecursive(DirectoryComparison dir, SyncAction action)
@@ -62,7 +62,7 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
             count++;
         }
 
-        count += dir.SubDirectories.Sum(sub => ResolveAllConflictsRecursive(sub, action));
+        count += dir.SubDirectories.Sum(x => ResolveAllConflictsRecursive(x, action));
 
         return count;
     }
@@ -148,7 +148,7 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
 
     private static bool HasUnresolvedConflictsRecursive(DirectoryComparison dir)
     {
-        return dir.Files.Any(file => file.Status == ComparisonStatus.Conflict && file.Action == SyncAction.None)
+        return dir.Files.Any(x => x.Status == ComparisonStatus.Conflict && x.Action == SyncAction.None)
                || dir.SubDirectories.Any(HasUnresolvedConflictsRecursive);
     }
 }

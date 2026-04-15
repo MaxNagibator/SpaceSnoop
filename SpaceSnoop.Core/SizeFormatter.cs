@@ -27,7 +27,7 @@ public static class SizeFormatter
         }
 
         var i = 0;
-        decimal value = size;
+        var value = (decimal)size;
 
         while (value >= SizeUnit && i < SizeSuffixes.Length - 1)
         {

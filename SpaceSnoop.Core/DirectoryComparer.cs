@@ -4,12 +4,12 @@ namespace SpaceSnoop.Core;
 
 public sealed class DirectoryComparer(ExclusionFilter exclusionFilter)
 {
-    public ComparisonResult Compare(string leftPath, string rightPath, CancellationToken cancellationToken)
+    public ComparisonResult Compare(string leftPath, string rightPath, CancellationToken cancel)
     {
         var leftDir = new DirectoryInfo(leftPath);
         var rightDir = new DirectoryInfo(rightPath);
 
-        var root = CompareDirectories(leftDir, rightDir, "", cancellationToken);
+        var root = CompareDirectories(leftDir, rightDir, "", cancel);
 
         return new(leftPath, rightPath, root);
     }
@@ -29,8 +29,8 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter)
             return ComparisonStatus.LeftOnly;
         }
 
-        var hasNonIdentical = comparison.Files.Any(f => f.Status != ComparisonStatus.Identical)
-                              || comparison.SubDirectories.Any(d => d.Status != ComparisonStatus.Identical);
+        var hasNonIdentical = comparison.Files.Any(x => x.Status != ComparisonStatus.Identical)
+                              || comparison.SubDirectories.Any(x => x.Status != ComparisonStatus.Identical);
 
         return hasNonIdentical ? ComparisonStatus.Modified : ComparisonStatus.Identical;
     }
@@ -39,15 +39,15 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter)
         DirectoryInfo? leftDir,
         DirectoryInfo? rightDir,
         string relativePath,
-        CancellationToken cancellationToken)
+        CancellationToken cancel)
     {
-        cancellationToken.ThrowIfCancellationRequested();
+        cancel.ThrowIfCancellationRequested();
 
         var name = leftDir?.Name ?? rightDir!.Name;
         var comparison = new DirectoryComparison(name, relativePath);
 
         CompareFiles(comparison, leftDir, rightDir, relativePath);
-        CompareSubDirectories(comparison, leftDir, rightDir, relativePath, cancellationToken);
+        CompareSubDirectories(comparison, leftDir, rightDir, relativePath, cancel);
 
         comparison.Status = DetermineDirectoryStatus(comparison, leftDir, rightDir);
 
@@ -112,7 +112,7 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter)
         DirectoryInfo? leftDir,
         DirectoryInfo? rightDir,
         string relativePath,
-        CancellationToken cancellationToken)
+        CancellationToken cancel)
     {
         var leftDirs = GetFilteredDirectories(leftDir);
         var rightDirs = GetFilteredDirectories(rightDir);
@@ -129,7 +129,7 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter)
             leftDirs.TryGetValue(dirName, out var leftSub);
             rightDirs.TryGetValue(dirName, out var rightSub);
 
-            var subComparison = CompareDirectories(leftSub, rightSub, dirRelativePath, cancellationToken);
+            var subComparison = CompareDirectories(leftSub, rightSub, dirRelativePath, cancel);
             comparison.SubDirectories.Add(subComparison);
         }
     }
@@ -145,13 +145,14 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter)
 
         try
         {
-            foreach (var file in dir.EnumerateFiles().Where(f => !exclusionFilter.IsExcluded(f.Name)))
+            foreach (var file in dir.EnumerateFiles().Where(x => !exclusionFilter.IsExcluded(x.Name)))
             {
                 result[file.Name] = file;
             }
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or SecurityException or IOException)
         {
+            // Недоступный каталог пропускаем: возвращаем то, что успели собрать.
         }
 
         return result;
@@ -168,13 +169,14 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter)
 
         try
         {
-            foreach (var sub in dir.EnumerateDirectories().Where(d => !exclusionFilter.IsExcluded(d.Name)))
+            foreach (var sub in dir.EnumerateDirectories().Where(x => !exclusionFilter.IsExcluded(x.Name)))
             {
                 result[sub.Name] = sub;
             }
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or SecurityException or IOException)
         {
+            // Недоступный каталог пропускаем: возвращаем то, что успели собрать.
         }
 
         return result;

@@ -4,9 +4,9 @@ namespace SpaceSnoop.Core;
 
 public static class FileHasher
 {
-    public static string ComputeHash(string filePath, CancellationToken cancellationToken)
+    public static string ComputeHash(string filePath, CancellationToken cancel)
     {
-        cancellationToken.ThrowIfCancellationRequested();
+        cancel.ThrowIfCancellationRequested();
 
         using var stream = File.OpenRead(filePath);
         var hashBytes = SHA256.HashData(stream);

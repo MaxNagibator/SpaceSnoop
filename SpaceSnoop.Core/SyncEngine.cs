@@ -5,10 +5,10 @@ namespace SpaceSnoop.Core;
 // TODO: Добавить логгер и сделать не статическим
 public sealed class SyncEngine
 {
-    public SyncReport Execute(ComparisonResult comparisonResult, CancellationToken cancellationToken)
+    public SyncReport Execute(ComparisonResult comparisonResult, CancellationToken cancel)
     {
         var report = new SyncReport();
-        ExecuteRecursive(comparisonResult.Root, comparisonResult.LeftPath, comparisonResult.RightPath, report, cancellationToken);
+        ExecuteRecursive(comparisonResult.Root, comparisonResult.LeftPath, comparisonResult.RightPath, report, cancel);
         return report;
     }
 
@@ -17,11 +17,11 @@ public sealed class SyncEngine
         string leftBase,
         string rightBase,
         SyncReport report,
-        CancellationToken cancellationToken)
+        CancellationToken cancel)
     {
         foreach (var file in dir.Files)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            cancel.ThrowIfCancellationRequested();
 
             if (file.Action is SyncAction.None or SyncAction.Skip)
             {
@@ -41,7 +41,7 @@ public sealed class SyncEngine
 
         foreach (var sub in dir.SubDirectories)
         {
-            ExecuteRecursive(sub, leftBase, rightBase, report, cancellationToken);
+            ExecuteRecursive(sub, leftBase, rightBase, report, cancel);
         }
     }
 
@@ -84,7 +84,7 @@ public sealed class SyncEngine
     {
         var directory = Path.GetDirectoryName(filePath);
 
-        if (directory != null)
+        if (directory is not null)
         {
             Directory.CreateDirectory(directory);
         }

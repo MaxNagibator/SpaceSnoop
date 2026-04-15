@@ -54,8 +54,8 @@ public abstract class SpaceBase(string name, SpaceBase? parent, DateTime creatio
     {
         return $"""
                 Название: {Name}
-                Путь: {AbsolutePath} 
-                Дата создания: {CreationDate} 
+                Путь: {AbsolutePath}
+                Дата создания: {CreationDate}
                 Последний доступ: {LastAccessTime}
                 """;
     }
@@ -126,7 +126,7 @@ public abstract class SpaceBase(string name, SpaceBase? parent, DateTime creatio
         var segments = new List<string>();
         var current = this;
 
-        while (current != null)
+        while (current is not null)
         {
             segments.Add(current.Name);
             current = current.Parent;
