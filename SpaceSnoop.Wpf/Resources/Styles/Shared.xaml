@@ -1,0 +1,106 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks">
+
+    <Style x:Key="Caption"
+           TargetType="TextBlock">
+        <Setter Property="FontFamily"
+                Value="{DynamicResource Font.Sans}" />
+        <Setter Property="FontSize"
+                Value="{DynamicResource Font.Size.XS}" />
+        <Setter Property="FontWeight"
+                Value="SemiBold" />
+        <Setter Property="Foreground"
+                Value="{DynamicResource Fg.Muted}" />
+        <Setter Property="TextWrapping"
+                Value="NoWrap" />
+        <Setter Property="VerticalAlignment"
+                Value="Center" />
+    </Style>
+
+    <Style x:Key="StatValue"
+           TargetType="TextBlock">
+        <Setter Property="FontFamily"
+                Value="{DynamicResource Font.Mono}" />
+        <Setter Property="FontSize"
+                Value="{DynamicResource Font.Size.M}" />
+        <Setter Property="FontWeight"
+                Value="SemiBold" />
+        <Setter Property="Foreground"
+                Value="{DynamicResource Fg.Primary}" />
+        <Setter Property="VerticalAlignment"
+                Value="Center" />
+        <Setter Property="TextWrapping"
+                Value="NoWrap" />
+    </Style>
+
+    <Style x:Key="NodeIcon"
+           TargetType="iconPacks:PackIconLucide">
+        <Setter Property="Width"
+                Value="14" />
+        <Setter Property="Height"
+                Value="14" />
+        <Setter Property="VerticalAlignment"
+                Value="Center" />
+        <Setter Property="Margin"
+                Value="0,0,8,0" />
+        <Setter Property="Kind"
+                Value="File" />
+        <Setter Property="Foreground"
+                Value="{DynamicResource Fg.Muted}" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsDirectory}"
+                         Value="True">
+                <Setter Property="Kind"
+                        Value="Folder" />
+                <Setter Property="Foreground"
+                        Value="{DynamicResource Accent.Primary}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Color x:Key="Heat.Color0">#4FD165</Color>
+    <Color x:Key="Heat.Color1">#C6D14F</Color>
+    <Color x:Key="Heat.Color2">#D1A64F</Color>
+    <Color x:Key="Heat.Color3">#D14F4F</Color>
+
+    <LinearGradientBrush x:Key="HeatSpectrum"
+                         StartPoint="0,0"
+                         EndPoint="1,0">
+        <GradientStop Offset="0"
+                      Color="{StaticResource Heat.Color0}" />
+        <GradientStop Offset="0.45"
+                      Color="{StaticResource Heat.Color1}" />
+        <GradientStop Offset="0.72"
+                      Color="{StaticResource Heat.Color2}" />
+        <GradientStop Offset="1"
+                      Color="{StaticResource Heat.Color3}" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="HeatSpectrumVertical"
+                         StartPoint="0,0"
+                         EndPoint="0,1">
+        <GradientStop Offset="0"
+                      Color="{StaticResource Heat.Color3}" />
+        <GradientStop Offset="0.28"
+                      Color="{StaticResource Heat.Color2}" />
+        <GradientStop Offset="0.55"
+                      Color="{StaticResource Heat.Color1}" />
+        <GradientStop Offset="1"
+                      Color="{StaticResource Heat.Color0}" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="DiffSpectrumVertical"
+                         StartPoint="0,0"
+                         EndPoint="0,1">
+        <GradientStop Offset="0"
+                      Color="#6EBF8E" />
+        <GradientStop Offset="0.34"
+                      Color="#7BA8E0" />
+        <GradientStop Offset="0.67"
+                      Color="#E0B055" />
+        <GradientStop Offset="1"
+                      Color="#E07878" />
+    </LinearGradientBrush>
+
+</ResourceDictionary>

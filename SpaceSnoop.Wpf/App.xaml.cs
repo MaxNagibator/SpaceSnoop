@@ -1,0 +1,167 @@
+﻿using KeepShell.Services;
+using Microsoft.Extensions.DependencyInjection;
+using Serilog;
+using SpaceSnoop.Wpf.Views;
+using System.IO;
+
+namespace SpaceSnoop.Wpf;
+
+public partial class App : Application
+{
+    private ServiceProvider? _services;
+    private KeepShellLogging? _logging;
+
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        base.OnStartup(e);
+
+        _logging = KeepShellLogging.Bootstrap(new()
+        {
+            FileNamePrefix = AppInfo.LogFilePrefix,
+        });
+
+        AttachExceptionHandlers();
+
+        StyledMessageBox.DefaultTitle = AppInfo.Name;
+
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+        StartupSplash? splash = null;
+
+        try
+        {
+            var settingsPath = Path.Combine(AppContext.BaseDirectory, TomlSettingsFile.PrimaryFileName);
+            ISettingsStore settings = new SettingsStore(settingsPath);
+            AppThemes.Register();
+            var themeKey = settings.GetStringValue(SettingsKeys.Theme);
+            ThemeManager.Apply(string.IsNullOrWhiteSpace(themeKey) ? AppThemes.LightKey : themeKey);
+            FontScaleManager.Initialize(settings.GetDouble(SettingsKeys.FontScale, FontScaleManager.DefaultScale));
+
+            ViewLocator.InstallIntoApplication();
+
+            Log.Information(AppInfo.SessionStartMarker + "...");
+
+            if (TryRestartAsAdministrator(settings))
+            {
+                Shutdown();
+                return;
+            }
+
+            splash = new(AppInfo.Name, AppInfo.Version, $"Запуск {AppInfo.Name}", 2, _logging.CreateLogger<StartupSplash>());
+
+            using (splash.StartSpan("Подготовка сервисов..."))
+            {
+                _services = ConfigureServices(settings, _logging);
+            }
+
+            using (splash.StartSpan("Открытие главного окна..."))
+            {
+                var window = _services.GetRequiredService<MainWindow>();
+                MainWindow = window;
+                window.Show();
+
+                ShutdownMode = ShutdownMode.OnMainWindowClose;
+            }
+
+            splash.Dispose();
+            splash = null;
+        }
+        catch (Exception ex)
+        {
+            splash?.Dispose();
+            Log.Fatal(ex, $"{AppInfo.Name}.Wpf не смог запуститься");
+            StyledMessageBox.Show(ex.ToString(), $"{AppInfo.Name} — ошибка запуска", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown(1);
+        }
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        _services?.GetService<ISettingsStore>()?.Flush();
+
+        _services?.Dispose();
+        _logging?.Dispose();
+        base.OnExit(e);
+    }
+
+    private static bool TryRestartAsAdministrator(ISettingsStore settings)
+    {
+        if (AdminElevation.IsElevated)
+        {
+            Log.Information("Приложение запущено от имени администратора");
+            return false;
+        }
+
+        Log.Information("Приложение запущено без прав администратора");
+
+        if (!settings.GetBool(SettingsKeys.WarnIfNotAdmin, AppDefaults.WarnIfNotAdminDefault))
+        {
+            Log.Information("Предупреждение о запуске без прав администратора отключено в настройках");
+            return false;
+        }
+
+        var result = StyledMessageBox.Show("""
+                                           Программа запущена не от имени администратора, из-за чего могут отображаться не все директории.
+                                           Рекомендуется запустить её от имени администратора.
+
+                                           Перезапустить от имени администратора?
+                                           """,
+            "Предупреждение",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        return result == MessageBoxResult.Yes && AdminElevation.TryRestartAsAdmin();
+    }
+
+    private static ServiceProvider ConfigureServices(ISettingsStore settings, KeepShellLogging logging)
+    {
+        var services = new ServiceCollection();
+
+        services.AddSingleton(settings);
+        services.AddKeepShellLogging(logging);
+
+        services.AddSingleton<DiskSpaceCalculator>();
+
+        services.AddKeepShell();
+        services.AddSingleton<ShellPreferences>();
+        services.AddSingleton<OperationPreferences>();
+        services.AddSingleton<ThemeViewModel>();
+
+        services.AddSingleton(new ErrorReportOptions
+        {
+            IssueRepo = AppInfo.RepoSlug,
+            LogFileGlobs = [AppInfo.LogFileGlob],
+            SessionStartMarker = AppInfo.SessionStartMarker,
+        });
+
+        services.AddSingleton<ErrorReportService>();
+
+        services.AddSingleton<ScanInspectorViewModel>();
+        services.AddSingleton<ScanNodeFactory>();
+        services.AddSingleton<DeleteProgressDialogFactory>();
+
+        services.AddSingleton<ScanViewModel>();
+        services.AddSingleton<SyncViewModel>();
+        services.AddSingleton<LogsViewModel>();
+        services.AddSingleton<AboutViewModel>();
+        services.AddSingleton<SettingsViewModel>();
+
+        services.AddSingleton<ShellViewModel>();
+        services.AddSingleton<MainWindow>();
+
+        return services.BuildServiceProvider();
+    }
+
+    private void AttachExceptionHandlers()
+    {
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+            Log.Fatal(args.ExceptionObject as Exception, "Необработанное исключение домена");
+
+        DispatcherUnhandledException += (_, args) =>
+        {
+            Log.Error(args.Exception, "Необработанное исключение UI-потока");
+            StyledMessageBox.Show(args.Exception.Message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            args.Handled = true;
+        };
+    }
+}
