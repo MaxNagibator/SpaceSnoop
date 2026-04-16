@@ -35,7 +35,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\SpaceSnoop\SpaceSnoop.csproj" />
+        <ProjectReference Include="..\SpaceSnoop.Core\SpaceSnoop.Core.csproj" />
     </ItemGroup>
 
 </Project>

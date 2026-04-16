@@ -1,4 +1,4 @@
-using SpaceSnoop.Core;
+﻿using SpaceSnoop.Core;
 using SpaceSnoop.Core.Domain;
 
 namespace SpaceSnoop.Tests;
@@ -123,7 +123,7 @@ public class SyncEngineTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(File.Exists(Path.Combine(_rightDir, "a.txt")), Is.False);
-            Assert.That(report.SuccessCount, Is.EqualTo(0));
+            Assert.That(report.SuccessCount, Is.Zero);
         }
     }
 
