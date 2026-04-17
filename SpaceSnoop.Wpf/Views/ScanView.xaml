@@ -1,0 +1,719 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.ScanView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
+             xmlns:conv="clr-namespace:SpaceSnoop.Wpf.Converters"
+             xmlns:controls="clr-namespace:SpaceSnoop.Wpf.Views.Controls"
+             xmlns:behaviors="clr-namespace:SpaceSnoop.Wpf.Views.Behaviors"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
+             xmlns:bootstrap="clr-namespace:SpaceSnoop.Wpf.Bootstrap"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:ScanViewModel}"
+             d:DesignHeight="640"
+             d:DesignWidth="980">
+
+    <UserControl.Resources>
+        <conv:FractionToWidthConverter x:Key="FractionToWidth" />
+        <conv:HeatBrushConverter x:Key="HeatBrush" />
+
+        <ContextMenu x:Key="ScanNodeMenu">
+            <ContextMenu.Resources>
+                <Style x:Key="MenuGlyph"
+                       TargetType="iconPacks:PackIconLucide">
+                    <Setter Property="Width"
+                            Value="14" />
+                    <Setter Property="Height"
+                            Value="14" />
+                    <Setter Property="VerticalAlignment"
+                            Value="Center" />
+                    <Setter Property="Margin"
+                            Value="0,0,9,0" />
+                </Style>
+            </ContextMenu.Resources>
+
+            <MenuItem
+                Command="{Binding PlacementTarget.DataContext.OpenInExplorerCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                <MenuItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                                  Kind="{x:Static iconPacks:PackIconLucideKind.ExternalLink}"
+                                                  Foreground="{DynamicResource State.Info}" />
+                        <TextBlock Text="Открыть в проводнике"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </MenuItem.Header>
+            </MenuItem>
+
+            <Separator />
+
+            <MenuItem
+                Command="{Binding PlacementTarget.DataContext.MarkDeletedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                ToolTip="Пометить узел и всё вложенное на удаление">
+                <MenuItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                                  Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                                  Foreground="{DynamicResource State.Error}" />
+                        <TextBlock Text="Пометить на удаление"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </MenuItem.Header>
+            </MenuItem>
+            <MenuItem
+                Command="{Binding PlacementTarget.DataContext.UnmarkDeletedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                ToolTip="Снять пометку с узла и всего вложенного">
+                <MenuItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                                  Kind="{x:Static iconPacks:PackIconLucideKind.RotateCcw}"
+                                                  Foreground="{DynamicResource State.Success}" />
+                        <TextBlock Text="Снять пометку на удаление"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </MenuItem.Header>
+            </MenuItem>
+
+            <Separator
+                Visibility="{Binding PlacementTarget.DataContext.IsDirectory, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}" />
+            <MenuItem
+                Command="{Binding PlacementTarget.DataContext.MarkContentsDeletedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                ToolTip="Пометить на удаление всё вложенное; сама папка останется"
+                Visibility="{Binding PlacementTarget.DataContext.IsDirectory, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+                <MenuItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                                  Kind="{x:Static iconPacks:PackIconLucideKind.FolderX}"
+                                                  Foreground="{DynamicResource State.Error}" />
+                        <TextBlock Text="Пометить содержимое на удаление"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </MenuItem.Header>
+            </MenuItem>
+            <MenuItem
+                Command="{Binding PlacementTarget.DataContext.UnmarkContentsCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                ToolTip="Снять пометку со всего содержимого папки"
+                Visibility="{Binding PlacementTarget.DataContext.IsDirectory, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+                <MenuItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                                  Kind="{x:Static iconPacks:PackIconLucideKind.RotateCcw}"
+                                                  Foreground="{DynamicResource State.Success}" />
+                        <TextBlock Text="Снять пометку с содержимого"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </MenuItem.Header>
+            </MenuItem>
+        </ContextMenu>
+
+        <Style x:Key="SummaryStrip"
+               TargetType="Border"
+               BasedOn="{StaticResource Card.Inset}">
+            <Setter Property="Padding"
+                    Value="0" />
+            <Setter Property="Visibility"
+                    Value="Collapsed" />
+            <Setter Property="Opacity"
+                    Value="0" />
+            <Setter Property="RenderTransform">
+                <Setter.Value>
+                    <TranslateTransform Y="8" />
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasResult}"
+                             Value="True">
+                    <Setter Property="Visibility"
+                            Value="Visible" />
+                    <DataTrigger.EnterActions>
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                 To="1"
+                                                 Duration="0:0:0.24" />
+                                <DoubleAnimation Storyboard.TargetProperty="RenderTransform.(TranslateTransform.Y)"
+                                                 To="0"
+                                                 Duration="0:0:0.30">
+                                    <DoubleAnimation.EasingFunction>
+                                        <CubicEase EasingMode="EaseOut" />
+                                    </DoubleAnimation.EasingFunction>
+                                </DoubleAnimation>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </DataTrigger.EnterActions>
+                </DataTrigger>
+
+                <DataTrigger Binding="{Binding IsScanning}"
+                             Value="True">
+                    <Setter Property="Visibility"
+                            Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Style="{StaticResource Card.Inset}"
+                Padding="14,10"
+                Margin="0,0,0,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.HardDrive}"
+                                              Width="16"
+                                              Height="16"
+                                              VerticalAlignment="Center"
+                                              Margin="2,0,10,0"
+                                              Foreground="{DynamicResource Fg.Secondary}" />
+                    <ComboBox ItemsSource="{Binding Drives}"
+                              SelectedItem="{Binding SelectedDrive}"
+                              Style="{StaticResource ComboBox.Toolbar}"
+                              MinWidth="230"
+                              Margin="0,0,8,0"
+                              ToolTip="Диск или каталог для анализа" />
+
+                    <Button Style="{StaticResource Button.Secondary}"
+                            Command="{Binding BrowseCommand}"
+                            Margin="0,0,14,0"
+                            ToolTip="Выбрать каталог">
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderOpen}"
+                                                      Width="15"
+                                                      Height="15"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,6,0" />
+                            <TextBlock Text="Обзор" />
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource Button.Primary}"
+                            Command="{Binding StartCommand}"
+                            Margin="0,0,6,0">
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Play}"
+                                                      Width="15"
+                                                      Height="15"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,6,0" />
+                            <TextBlock Text="Сканировать" />
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource Button.Ghost}"
+                            Command="{Binding StopCommand}"
+                            ToolTip="Остановить сканирование (ESC)">
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Square}"
+                                                      Width="13"
+                                                      Height="13"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,6,0" />
+                            <TextBlock Text="Стоп" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <Button Style="{StaticResource Button.Destructive}"
+                            Command="{Binding DeleteMarkedCommand}"
+                            ToolTip="Переместить помеченные элементы в корзину">
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                                      Width="14"
+                                                      Height="14"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,6,0" />
+                            <TextBlock Text="Удалить" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="1"
+                Style="{StaticResource Card.Inset}"
+                Padding="15,12"
+                Margin="0,0,0,12"
+                Visibility="{Binding IsScanning, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+            <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <Ellipse x:Name="ScanPulse"
+                                 Width="8"
+                                 Height="8"
+                                 VerticalAlignment="Center"
+                                 Margin="0,0,9,0"
+                                 Fill="{DynamicResource Accent.Primary}">
+                            <Ellipse.Triggers>
+                                <EventTrigger RoutedEvent="Ellipse.Loaded">
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                             From="1"
+                                                             To="0.25"
+                                                             Duration="0:0:0.75"
+                                                             AutoReverse="True"
+                                                             RepeatBehavior="Forever" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </EventTrigger>
+                            </Ellipse.Triggers>
+                        </Ellipse>
+                        <TextBlock Text="СКАНИРОВАНИЕ"
+                                   Style="{StaticResource Caption}"
+                                   Foreground="{DynamicResource Accent.Primary}" />
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="1"
+                               behaviors:PathTrimmer.FullPath="{Binding ScanCurrentPath}"
+                               VerticalAlignment="Center"
+                               Margin="14,0,14,0"
+                               TextWrapping="NoWrap"
+                               FontFamily="{DynamicResource Font.Mono}"
+                               FontSize="{DynamicResource Font.Size.S}"
+                               Foreground="{DynamicResource Fg.Secondary}"
+                               ToolTip="{Binding ScanCurrentPath}" />
+
+                    <TextBlock Grid.Column="2"
+                               Text="{Binding ScanElapsedText}"
+                               Style="{StaticResource StatValue}"
+                               Foreground="{DynamicResource Accent.Primary}" />
+                </Grid>
+
+                <Grid Margin="0,11,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ProgressBar Grid.Column="0"
+                                 Height="6"
+                                 VerticalAlignment="Center"
+                                 Minimum="0"
+                                 Maximum="1"
+                                 Value="{Binding ProgressValue, Mode=OneWay}"
+                                 IsIndeterminate="{Binding IsIndeterminate}" />
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding ScanPercentText}"
+                               MinWidth="40"
+                               Margin="10,0,0,0"
+                               TextAlignment="Right"
+                               VerticalAlignment="Center"
+                               FontFamily="{DynamicResource Font.Mono}"
+                               FontSize="{DynamicResource Font.Size.S}"
+                               FontWeight="Medium"
+                               Foreground="{DynamicResource Accent.Primary}"
+                               Visibility="{Binding ScanHasDeterminateProgress, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+                </Grid>
+
+                <StackPanel Orientation="Horizontal"
+                            Margin="0,11,0,0"
+                            VerticalAlignment="Center">
+                    <TextBlock Text="КАТАЛОГОВ"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ScanDirCountText}"
+                               Style="{StaticResource StatValue}"
+                               Margin="0,0,18,0" />
+
+                    <TextBlock Text="ФАЙЛОВ"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ScanFileCountText}"
+                               Style="{StaticResource StatValue}"
+                               Margin="0,0,18,0" />
+
+                    <TextBlock Text="ОБЪЁМ"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ScanBytesText}"
+                               Style="{StaticResource StatValue}"
+                               Foreground="{DynamicResource Accent.Primary}"
+                               Margin="0,0,18,0" />
+
+                    <TextBlock Text="СКОРОСТЬ"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ScanThroughputText}"
+                               Style="{StaticResource StatValue}"
+                               Margin="0,0,18,0" />
+
+                    <TextBlock Text="ВЕТКИ"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0"
+                               Visibility="{Binding ScanHasBranches, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+                    <TextBlock Text="{Binding ScanTopLevelText}"
+                               Style="{StaticResource StatValue}"
+                               Visibility="{Binding ScanHasBranches, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!--  Плашка отмены: появляется когда сканирование прервано пользователем  -->
+        <Border Grid.Row="2"
+                Style="{StaticResource Card.Inset}"
+                Padding="14,10"
+                Margin="0,0,0,12"
+                BorderBrush="{DynamicResource State.Warning}"
+                BorderThickness="0,0,0,2"
+                Visibility="{Binding ScanWasCancelled, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+            <StackPanel Orientation="Horizontal"
+                        VerticalAlignment="Center">
+                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.OctagonAlert}"
+                                          Width="15"
+                                          Height="15"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,9,0"
+                                          Foreground="{DynamicResource State.Warning}" />
+                <TextBlock Text="Сканирование отменено — результаты не построены"
+                           VerticalAlignment="Center"
+                           FontSize="{DynamicResource Font.Size.S}"
+                           Foreground="{DynamicResource Fg.Secondary}" />
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="3"
+                Style="{StaticResource SummaryStrip}"
+                Margin="0,0,0,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="4" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0"
+                        Background="{StaticResource HeatSpectrumVertical}"
+                        CornerRadius="10,0,0,10" />
+
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="14,7,0,7">
+                    <TextBlock Text="ОБЪЁМ"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ResultSizeText}"
+                               Style="{StaticResource StatValue}"
+                               Foreground="{DynamicResource Accent.Primary}"
+                               Margin="0,0,20,0" />
+
+                    <TextBlock Text="ФАЙЛОВ"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ResultFileCountText}"
+                               Style="{StaticResource StatValue}"
+                               Margin="0,0,20,0" />
+
+                    <TextBlock Text="КАТАЛОГОВ"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ResultDirCountText}"
+                               Style="{StaticResource StatValue}"
+                               Margin="0,0,20,0" />
+
+                    <TextBlock Text="ВРЕМЯ"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ResultElapsedText}"
+                               Style="{StaticResource StatValue}" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="2"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="20,0,14,0">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Flame}"
+                                              Width="13"
+                                              Height="13"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,7,0"
+                                              Foreground="{DynamicResource Accent.Primary}" />
+                    <TextBlock Text="ПОДСВЕТКА"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,9,0" />
+                    <Border Width="60"
+                            Height="8"
+                            VerticalAlignment="Center"
+                            CornerRadius="{DynamicResource Radius.Pill}"
+                            Background="{StaticResource HeatSpectrum}" />
+                    <Slider Width="116"
+                            Minimum="{x:Static bootstrap:AppDefaults.IntensityMin}"
+                            Maximum="{x:Static bootstrap:AppDefaults.IntensityMax}"
+                            Value="{Binding Intensity}"
+                            TickFrequency="1"
+                            IsSnapToTickEnabled="True"
+                            VerticalAlignment="Center"
+                            Margin="9,0,9,0"
+                            ToolTip="Чувствительность тепловой подсветки" />
+                    <TextBlock Text="{Binding Intensity, StringFormat=0}"
+                               FontFamily="{DynamicResource Font.Mono}"
+                               FontSize="{DynamicResource Font.Size.M}"
+                               FontWeight="Medium"
+                               Foreground="{DynamicResource Accent.Primary}"
+                               VerticalAlignment="Center"
+                               MinWidth="18"
+                               TextAlignment="Right" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"
+                                  MinWidth="340" />
+                <ColumnDefinition x:Name="SplitterColumn"
+                                  Width="6" />
+                <ColumnDefinition x:Name="InspectorColumn"
+                                  Width="380"
+                                  MinWidth="280" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0"
+                    Style="{StaticResource Card}"
+                    Padding="6">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0"
+                          Height="{DynamicResource Control.Height.Default}"
+                          Margin="10,6,12,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="СТРУКТУРА КАТАЛОГА"
+                                   Style="{StaticResource Caption}" />
+
+                        <StackPanel Grid.Column="1"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center"
+                                    Margin="20,0,0,0"
+                                    Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ArrowDownUp}"
+                                                      Width="13"
+                                                      Height="13"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,7,0"
+                                                      Foreground="{DynamicResource Fg.Muted}" />
+                            <TextBlock Text="СОРТИРОВКА"
+                                       Style="{StaticResource Caption}"
+                                       Margin="0,0,9,0" />
+                            <ComboBox ItemsSource="{Binding SortOptions}"
+                                      SelectedItem="{Binding SelectedSortOption}"
+                                      DisplayMemberPath="Name"
+                                      Style="{StaticResource ComboBox.Toolbar}"
+                                      MinWidth="210"
+                                      Margin="0,0,6,0"
+                                      ToolTip="Поле сортировки строк дерева" />
+                            <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
+                                          IsChecked="{Binding InvertSort}"
+                                          MinWidth="34"
+                                          Padding="0"
+                                          ToolTip="Направление: отмечено — по убыванию, снято — по возрастанию"
+                                          AutomationProperties.Name="Направление сортировки">
+                                <iconPacks:PackIconLucide Width="15"
+                                                          Height="15"
+                                                          VerticalAlignment="Center">
+                                    <iconPacks:PackIconLucide.Style>
+                                        <Style TargetType="iconPacks:PackIconLucide">
+                                            <Setter Property="Kind"
+                                                    Value="ArrowUpNarrowWide" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding InvertSort}"
+                                                             Value="True">
+                                                    <Setter Property="Kind"
+                                                            Value="ArrowDownWideNarrow" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </iconPacks:PackIconLucide.Style>
+                                </iconPacks:PackIconLucide>
+                            </ToggleButton>
+                        </StackPanel>
+
+                        <TextBlock Grid.Column="2"
+                                   Text="ДОЛЯ · РАЗМЕР"
+                                   Style="{StaticResource Caption}" />
+                    </Grid>
+
+                    <Border Grid.Row="0"
+                            VerticalAlignment="Bottom"
+                            Height="1"
+                            Background="{DynamicResource Border.Subtle}" />
+
+                    <TreeView Grid.Row="1"
+                              ItemsSource="{Binding Roots}"
+                              Background="Transparent"
+                              BorderThickness="0"
+                              Margin="0,4,0,0"
+                              Foreground="{DynamicResource Fg.Primary}"
+                              PreviewMouseRightButtonDown="OnTreeRightButtonDown"
+                              SelectedItemChanged="OnTreeSelectedItemChanged"
+                              Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Visible}"
+                              VirtualizingStackPanel.IsVirtualizing="True"
+                              VirtualizingStackPanel.VirtualizationMode="Recycling">
+                        <TreeView.ItemContainerStyle>
+                            <Style TargetType="TreeViewItem"
+                                   BasedOn="{StaticResource TreeViewItem.Default}">
+                                <Setter Property="IsExpanded"
+                                        Value="{Binding IsExpanded, Mode=TwoWay}" />
+                                <Setter Property="Padding"
+                                        Value="2,2" />
+                                <Setter Property="ContextMenu"
+                                        Value="{StaticResource ScanNodeMenu}" />
+                            </Style>
+                        </TreeView.ItemContainerStyle>
+                        <TreeView.ItemTemplate>
+                            <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                                <Grid ToolTip="{Binding Tooltip}"
+                                      MinWidth="420"
+                                      Background="Transparent">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto"
+                                                          MinWidth="46" />
+                                        <ColumnDefinition Width="172" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0"
+                                                Orientation="Horizontal"
+                                                VerticalAlignment="Center">
+                                        <iconPacks:PackIconLucide Style="{StaticResource NodeIcon}" />
+                                        <TextBlock Text="{Binding Name}"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsMarkedDeleted}"
+                                                                     Value="True">
+                                                            <Setter Property="TextDecorations"
+                                                                    Value="Strikethrough" />
+                                                            <Setter Property="Foreground"
+                                                                    Value="{DynamicResource State.Error}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </StackPanel>
+
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding ShareText}"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,12,0"
+                                               FontFamily="{DynamicResource Font.Mono}"
+                                               FontSize="{DynamicResource Font.Size.Caption}"
+                                               Foreground="{DynamicResource Fg.Muted}" />
+
+                                    <Border x:Name="ScanBarTrack"
+                                            Grid.Column="2"
+                                            Height="17"
+                                            Background="{DynamicResource Bg.SurfaceMute}"
+                                            CornerRadius="{DynamicResource Radius.S}"
+                                            VerticalAlignment="Center">
+                                        <Grid>
+                                            <Rectangle HorizontalAlignment="Left"
+                                                       Height="17"
+                                                       RadiusX="5"
+                                                       RadiusY="5">
+                                                <Rectangle.Width>
+                                                    <MultiBinding Converter="{StaticResource FractionToWidth}">
+                                                        <Binding Path="Fraction" />
+                                                        <Binding Path="ActualWidth"
+                                                                 ElementName="ScanBarTrack" />
+                                                    </MultiBinding>
+                                                </Rectangle.Width>
+                                                <Rectangle.Fill>
+                                                    <MultiBinding Converter="{StaticResource HeatBrush}">
+                                                        <Binding Path="Fraction" />
+                                                        <Binding Path="DataContext.Intensity"
+                                                                 RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                                                    </MultiBinding>
+                                                </Rectangle.Fill>
+                                            </Rectangle>
+                                            <Border HorizontalAlignment="Right"
+                                                    VerticalAlignment="Center"
+                                                    Margin="0,0,5,0"
+                                                    Padding="3,0"
+                                                    Background="{DynamicResource Bg.Surface}"
+                                                    Opacity="0.75"
+                                                    CornerRadius="{DynamicResource Radius.S}">
+                                                <TextBlock Text="{Binding SizeText}"
+                                                           FontFamily="{DynamicResource Font.Mono}"
+                                                           FontSize="{DynamicResource Font.Size.Caption}"
+                                                           Foreground="{DynamicResource Fg.Primary}" />
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+                            </HierarchicalDataTemplate>
+                        </TreeView.ItemTemplate>
+                    </TreeView>
+
+                    <keepshell:EmptyState Grid.Row="1"
+                                          Icon="HardDrive"
+                                          IconSize="40"
+                                          Heading="Готовы к обзору диска"
+                                          Description="Выберите диск или каталог и запустите сканирование — построим карту занятого места с тепловой подсветкой самых тяжёлых веток."
+                                          DescriptionMaxWidth="440"
+                                          ActionText="Выбрать каталог"
+                                          ActionCommand="{Binding BrowseCommand}"
+                                          VerticalAlignment="Center"
+                                          HorizontalAlignment="Center"
+                                          Visibility="{Binding HasResult, Converter={StaticResource InverseBoolToVisibility}, FallbackValue=Collapsed}" />
+                </Grid>
+            </Border>
+
+            <GridSplitter Grid.Column="1"
+                          x:Name="InspectorSplitter"
+                          Width="6"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch"
+                          ResizeBehavior="PreviousAndNext"
+                          ResizeDirection="Columns"
+                          Background="{DynamicResource Border.Subtle}"
+                          ShowsPreview="False"
+                          DragCompleted="OnInspectorSplitterDragCompleted"
+                          ToolTip="Перетащите, чтобы изменить ширину панели"
+                          Visibility="{Binding Inspector.IsInspectorCollapsed, Converter={StaticResource InverseBoolToVisibility}}" />
+
+            <controls:ScanInspectorPanel Grid.Column="2"
+                                         DataContext="{Binding Inspector}" />
+        </Grid>
+    </Grid>
+</UserControl>
