@@ -1,0 +1,328 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
+             xmlns:keepshell="clr-namespace:KeepShell.Bootstrap;assembly=KeepShell"
+             xmlns:bootstrap="clr-namespace:SpaceSnoop.Wpf.Bootstrap"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
+             d:DesignHeight="700"
+             d:DesignWidth="900">
+
+    <UserControl.Resources>
+        <Style x:Key="Setting.Label"
+               TargetType="TextBlock">
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Primary}" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+        </Style>
+
+        <Style x:Key="Setting.SectionTitle"
+               TargetType="TextBlock">
+            <Setter Property="FontWeight"
+                    Value="{DynamicResource Font.Weight.SemiBold}" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Primary}" />
+        </Style>
+
+        <Style x:Key="Setting.Hint"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource TextBlock.Subtle}">
+            <Setter Property="TextWrapping"
+                    Value="Wrap" />
+            <Setter Property="Margin"
+                    Value="0,6,0,0" />
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  Padding="0,0,12,0">
+        <StackPanel>
+
+            <Border Style="{StaticResource Card.Inset}"
+                    Margin="0,0,0,10">
+                <StackPanel>
+                    <TextBlock Text="Внешний вид"
+                               Style="{StaticResource Setting.SectionTitle}" />
+
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="240" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Тема оформления"
+                                       Style="{StaticResource Setting.Label}" />
+                            <TextBlock Text="Светлая, тёмная или Tarkov."
+                                       Style="{StaticResource Setting.Hint}"
+                                       Margin="0,2,0,0" />
+                        </StackPanel>
+                        <ComboBox Grid.Column="1"
+                                  Style="{StaticResource ComboBox.Form}"
+                                  ItemsSource="{Binding ThemeOptions}"
+                                  SelectedItem="{Binding SelectedThemeOption}"
+                                  DisplayMemberPath="Label"
+                                  VerticalAlignment="Center" />
+                    </Grid>
+
+                    <Grid Margin="0,16,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="240" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Системный фон окна"
+                                       Style="{StaticResource Setting.Label}" />
+                            <TextBlock
+                                Text="DWM-подложка: Mica (приглушённая по обоям), Acrylic (полупрозрачное размытие) или Mica Alt. Требует Windows 11 22H2+; на старых системах — без эффекта."
+                                Style="{StaticResource Setting.Hint}"
+                                Margin="0,2,0,0" />
+                        </StackPanel>
+                        <ComboBox Grid.Column="1"
+                                  Style="{StaticResource ComboBox.Form}"
+                                  ItemsSource="{Binding BackdropOptions}"
+                                  SelectedItem="{Binding SelectedBackdropOption}"
+                                  DisplayMemberPath="Label"
+                                  VerticalAlignment="Center" />
+                    </Grid>
+
+                    <StackPanel Margin="0,16,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Масштаб шрифта"
+                                       Style="{StaticResource Setting.Label}" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding Shell.FontScale, StringFormat={}{0:P0}}"
+                                       Style="{StaticResource TextBlock.Mono}"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                        <Slider Minimum="{x:Static keepshell:FontScaleManager.MinScale}"
+                                Maximum="{x:Static keepshell:FontScaleManager.MaxScale}"
+                                Value="{Binding Shell.FontScale, Mode=TwoWay}"
+                                TickFrequency="0.1"
+                                IsSnapToTickEnabled="True"
+                                Margin="0,6,0,0" />
+                        <TextBlock Style="{StaticResource Setting.Hint}"
+                                   Text="Увеличивает размер текста по всему приложению. 100% — стандартный размер." />
+                    </StackPanel>
+
+                    <CheckBox Content="Показывать заголовок страницы"
+                              IsChecked="{Binding Shell.ShowPageHeader, Mode=TwoWay}"
+                              Margin="0,14,0,0"
+                              VerticalAlignment="Center" />
+                    <TextBlock Style="{StaticResource Setting.Hint}"
+                               Text="Скрывает плашку с названием раздела и кратким описанием над содержимым каждой страницы." />
+
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card.Inset}"
+                    Margin="0,0,0,10">
+                <StackPanel>
+                    <TextBlock Text="Сканирование"
+                               Style="{StaticResource Setting.SectionTitle}" />
+
+                    <CheckBox Content="Многопоточный обход"
+                              IsChecked="{Binding Scan.UseMultithreading, Mode=TwoWay}"
+                              Margin="0,14,0,0"
+                              VerticalAlignment="Center" />
+                    <TextBlock Style="{StaticResource Setting.Hint}"
+                               Text="Параллельный обход каталогов — быстрее, но выше расход памяти." />
+
+                    <StackPanel Margin="0,16,0,0"
+                                IsEnabled="{Binding Scan.UseMultithreading}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Число параллельных потоков"
+                                       Style="{StaticResource Setting.Label}" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding Scan.MaxParallelism, StringFormat=N0}"
+                                       Style="{StaticResource TextBlock.Mono}"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                        <Slider Minimum="1"
+                                Maximum="{Binding Scan.ProcessorCount}"
+                                Value="{Binding Scan.MaxParallelism, Mode=TwoWay}"
+                                TickFrequency="1"
+                                IsSnapToTickEnabled="True"
+                                Margin="0,6,0,0" />
+                        <TextBlock Style="{StaticResource Setting.Hint}"
+                                   Text="{Binding Scan.ParallelismHint}" />
+                    </StackPanel>
+
+                    <StackPanel Margin="0,16,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Интенсивность тепловой подсветки"
+                                       Style="{StaticResource Setting.Label}" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding Scan.Intensity, StringFormat=N0}"
+                                       Style="{StaticResource TextBlock.Mono}"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                        <Slider Minimum="{x:Static bootstrap:AppDefaults.IntensityMin}"
+                                Maximum="{x:Static bootstrap:AppDefaults.IntensityMax}"
+                                Value="{Binding Scan.Intensity, Mode=TwoWay}"
+                                TickFrequency="1"
+                                IsSnapToTickEnabled="True"
+                                Margin="0,6,0,0" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card.Inset}"
+                    Margin="0,0,0,10">
+                <StackPanel>
+                    <TextBlock Text="Удаление"
+                               Style="{StaticResource Setting.SectionTitle}" />
+
+                    <CheckBox Content="Спрашивать подтверждение перед удалением"
+                              IsChecked="{Binding Operations.ConfirmBeforeDelete, Mode=TwoWay}"
+                              Margin="0,14,0,0"
+                              VerticalAlignment="Center" />
+                    <TextBlock Style="{StaticResource Setting.Hint}"
+                               Text="Перед переносом помеченных элементов показывать диалог со списком и объёмом." />
+
+                    <Grid Margin="0,16,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="240" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Куда удалять помеченные элементы"
+                                       Style="{StaticResource Setting.Label}" />
+                            <TextBlock Text="«Безвозвратно» минует корзину — отменить нельзя."
+                                       Style="{StaticResource Setting.Hint}"
+                                       Margin="0,2,0,0" />
+                        </StackPanel>
+                        <ComboBox Grid.Column="1"
+                                  Style="{StaticResource ComboBox.Form}"
+                                  ItemsSource="{Binding DeleteModeOptions}"
+                                  SelectedItem="{Binding SelectedDeleteModeOption}"
+                                  DisplayMemberPath="Label"
+                                  VerticalAlignment="Center" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card.Inset}"
+                    Margin="0,0,0,10">
+                <StackPanel>
+                    <TextBlock Text="Исключения по умолчанию"
+                               Style="{StaticResource Setting.SectionTitle}" />
+                    <TextBlock Style="{StaticResource Setting.Hint}"
+                               Text="Glob-паттерны через запятую (напр. bin,obj,*.tmp). Подставляются в «Синхронизацию» при пустом поле исключений." />
+                    <TextBox Style="{StaticResource TextBox.Form}"
+                             Text="{Binding Operations.DefaultExclusions, UpdateSourceTrigger=PropertyChanged}"
+                             FontFamily="{DynamicResource Font.Mono}"
+                             Margin="0,10,0,0" />
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card.Inset}"
+                    Margin="0,0,0,10">
+                <StackPanel>
+                    <TextBlock Text="Запуск"
+                               Style="{StaticResource Setting.SectionTitle}" />
+
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="240" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Стартовая страница"
+                                       Style="{StaticResource Setting.Label}" />
+                            <TextBlock Text="Что открывать при запуске приложения."
+                                       Style="{StaticResource Setting.Hint}"
+                                       Margin="0,2,0,0" />
+                        </StackPanel>
+                        <ComboBox Grid.Column="1"
+                                  Style="{StaticResource ComboBox.Form}"
+                                  ItemsSource="{Binding StartupOptions}"
+                                  SelectedItem="{Binding SelectedStartupOption}"
+                                  DisplayMemberPath="Label"
+                                  VerticalAlignment="Center" />
+                    </Grid>
+
+                    <CheckBox Content="Запускать со свёрнутым навигационным рейлом"
+                              IsChecked="{Binding Shell.NavCollapsed, Mode=TwoWay}"
+                              Margin="0,14,0,0"
+                              VerticalAlignment="Center" />
+
+                    <CheckBox Content="Предупреждать о запуске без прав администратора"
+                              IsChecked="{Binding Shell.WarnIfNotAdministrator, Mode=TwoWay}"
+                              Margin="0,14,0,0"
+                              VerticalAlignment="Center" />
+                    <TextBlock Style="{StaticResource Setting.Hint}"
+                               Text="При запуске без повышения прав показывать предложение перезапуститься от имени администратора. Без прав часть директорий может быть недоступна." />
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card.Inset}"
+                    Margin="0,0,0,2">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Файл настроек"
+                                   Style="{StaticResource Setting.SectionTitle}" />
+                        <TextBlock Text="{Binding SettingsFilePath}"
+                                   Style="{StaticResource TextBlock.Mono}"
+                                   Margin="0,8,0,0"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Style="{StaticResource Setting.Hint}"
+                                   Text="Формат TOML. Можно править вручную, но удобнее через эту форму. Изменения сохраняются автоматически." />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1"
+                                Orientation="Vertical"
+                                Margin="12,0,0,0"
+                                VerticalAlignment="Center">
+                        <Button Style="{StaticResource Button.Icon}"
+                                Command="{Binding CopySettingsPathCommand}"
+                                Margin="0,0,0,4"
+                                AutomationProperties.Name="Скопировать путь"
+                                ToolTip="Скопировать путь в буфер обмена">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Clipboard}"
+                                                      Width="16"
+                                                      Height="16"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center" />
+                        </Button>
+                        <Button Style="{StaticResource Button.Icon}"
+                                Command="{Binding OpenSettingsFileCommand}"
+                                AutomationProperties.Name="Показать в проводнике"
+                                ToolTip="Показать файл в проводнике">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ExternalLink}"
+                                                      Width="16"
+                                                      Height="16"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
