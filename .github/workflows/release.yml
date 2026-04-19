@@ -1,4 +1,4 @@
-name: Release
+﻿name: Release
 
 on:
   push:
@@ -57,9 +57,18 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.should_release == 'true'
     runs-on: windows-2022
-    defaults:
-      run:
-        working-directory: ./SpaceSnoop
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - edition: SpaceSnoop
+            project: SpaceSnoop.Wpf/SpaceSnoop.Wpf.csproj
+            binary: SpaceSnoop.Wpf.exe
+            asset: SpaceSnoop
+          - edition: Classic
+            project: SpaceSnoop/SpaceSnoop.csproj
+            binary: SpaceSnoop.exe
+            asset: SpaceSnoop-Classic
 
     steps:
       - name: Checkout
@@ -72,9 +81,9 @@ jobs:
           cache: true
           cache-dependency-path: "**/packages.lock.json"
 
-      - name: Publish
+      - name: Publish (framework-dependent)
         run: >
-          dotnet publish
+          dotnet publish ${{ matrix.project }}
           --configuration Release
           --runtime win-x64
           --output .\publish\framework-dependent
@@ -83,9 +92,9 @@ jobs:
           -p:Version=${{ needs.prepare.outputs.version }}
           --no-self-contained
 
-      - name: Publish portable
+      - name: Publish (portable / self-contained)
         run: >
-          dotnet publish
+          dotnet publish ${{ matrix.project }}
           --configuration Release
           --runtime win-x64
           --output .\publish\portable
@@ -98,20 +107,54 @@ jobs:
       - name: Package artifacts
         shell: pwsh
         run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $asset = "${{ matrix.asset }}"
+          $binary = "${{ matrix.binary }}"
           $version = "${{ needs.prepare.outputs.version }}"
-          Rename-Item -Path .\publish\framework-dependent\SpaceSnoop.exe -NewName "SpaceSnoop-v$version.exe"
-          Rename-Item -Path .\publish\portable\SpaceSnoop.exe -NewName "SpaceSnoop-v$version-portable.exe"
-          Compress-Archive -Path .\publish\framework-dependent\SpaceSnoop-v$version.exe -DestinationPath SpaceSnoop-v$version.zip
-          Compress-Archive -Path .\publish\portable\SpaceSnoop-v$version-portable.exe -DestinationPath SpaceSnoop-v$version-portable.zip
+
+          Move-Item ".\publish\framework-dependent\$binary" ".\dist\$asset-v$version.exe"
+          Compress-Archive -Path ".\dist\$asset-v$version.exe" -DestinationPath ".\dist\$asset-v$version.zip"
+
+          Move-Item ".\publish\portable\$binary" ".\publish\portable\$asset-v$version-portable.exe"
+          Compress-Archive -Path ".\publish\portable\$asset-v$version-portable.exe" -DestinationPath ".\dist\$asset-v$version-portable.zip"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: dist/*
+          retention-days: 1
+
+  publish:
+    needs: [prepare, build]
+    if: needs.prepare.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout release body template
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/release-body.md
+          sparse-checkout-cone-mode: false
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Render release body
+        shell: bash
+        run: |
+          sed -e "s|__VERSION__|${{ needs.prepare.outputs.version }}|g" \
+              -e "s|__REPO__|${{ github.server_url }}/${{ github.repository }}|g" \
+              .github/release-body.md > release-body.rendered.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.prepare.outputs.version }}
           name: SpaceSnoop v${{ needs.prepare.outputs.version }}
-          files: |
-            SpaceSnoop/publish/framework-dependent/SpaceSnoop-v${{ needs.prepare.outputs.version }}.exe
-            SpaceSnoop/SpaceSnoop-v${{ needs.prepare.outputs.version }}.zip
-            SpaceSnoop/publish/portable/SpaceSnoop-v${{ needs.prepare.outputs.version }}-portable.exe
-            SpaceSnoop/SpaceSnoop-v${{ needs.prepare.outputs.version }}-portable.zip
           generate_release_notes: true
+          files: dist/*
+          body_path: release-body.rendered.md
