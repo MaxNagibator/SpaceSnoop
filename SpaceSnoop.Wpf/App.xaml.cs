@@ -121,6 +121,7 @@ public partial class App : Application
         services.AddKeepShellLogging(logging);
 
         services.AddSingleton<DiskSpaceCalculator>();
+        services.AddSingleton<DockerService>();
 
         services.AddKeepShell();
         services.AddSingleton<ShellPreferences>();
@@ -142,6 +143,7 @@ public partial class App : Application
 
         services.AddSingleton<ScanViewModel>();
         services.AddSingleton<SyncViewModel>();
+        services.AddSingleton<DockerViewModel>();
         services.AddSingleton<LogsViewModel>();
         services.AddSingleton<AboutViewModel>();
         services.AddSingleton<SettingsViewModel>();

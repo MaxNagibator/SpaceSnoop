@@ -90,4 +90,28 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 1501, Level = LogLevel.Warning, Message = "Не удалось скопировать текст в буфер обмена")]
     public static partial void ClipboardTextCopyFailed(this ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 1600, Level = LogLevel.Information, Message = "Docker: снимок получен, категорий — {Count}")]
+    public static partial void DockerSnapshotLoaded(this ILogger logger, int count);
+
+    [LoggerMessage(EventId = 1601, Level = LogLevel.Warning, Message = "Docker недоступен: {Reason}")]
+    public static partial void DockerUnavailable(this ILogger logger, string reason);
+
+    [LoggerMessage(EventId = 1602, Level = LogLevel.Information, Message = "Docker: очистка начата ({Target})")]
+    public static partial void DockerCleanupStarted(this ILogger logger, string target);
+
+    [LoggerMessage(EventId = 1603, Level = LogLevel.Information, Message = "Docker: очистка завершена ({Target}): {Summary}")]
+    public static partial void DockerCleanupFinished(this ILogger logger, string target, string summary);
+
+    [LoggerMessage(EventId = 1604, Level = LogLevel.Error, Message = "Docker: ошибка очистки ({Target})")]
+    public static partial void DockerCleanupFailed(this ILogger logger, Exception exception, string target);
+
+    [LoggerMessage(EventId = 1605, Level = LogLevel.Information, Message = "Docker: сжатие диска начато")]
+    public static partial void DockerCompactStarted(this ILogger logger);
+
+    [LoggerMessage(EventId = 1606, Level = LogLevel.Information, Message = "Docker: сжатие диска завершено")]
+    public static partial void DockerCompactFinished(this ILogger logger);
+
+    [LoggerMessage(EventId = 1607, Level = LogLevel.Error, Message = "Docker: ошибка сжатия диска")]
+    public static partial void DockerCompactFailed(this ILogger logger, Exception exception);
 }

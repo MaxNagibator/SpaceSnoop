@@ -24,6 +24,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         ThemeViewModel theme,
         ScanViewModel scan,
         SyncViewModel sync,
+        DockerViewModel docker,
         LogsViewModel logs,
         AboutViewModel about,
         SettingsViewModel settingsPage,
@@ -38,11 +39,13 @@ public sealed partial class ShellViewModel : ShellViewModelBase
 
         var scanItem = new NavigationItem("Сканирование", PackIconLucideKind.HardDrive, scan);
         var syncItem = new NavigationItem("Синхронизация", PackIconLucideKind.FolderSync, sync);
+        var dockerItem = new NavigationItem("Docker", PackIconLucideKind.Container, docker);
         var logsItem = new NavigationItem("Логи", PackIconLucideKind.ScrollText, logs);
         var aboutItem = new NavigationItem("О программе", PackIconLucideKind.Info, about);
 
         Sections.Add(scanItem);
         Sections.Add(syncItem);
+        Sections.Add(dockerItem);
         Sections.Add(logsItem);
         Sections.Add(aboutItem);
 
@@ -50,6 +53,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         {
             [SectionKey.Scan] = scanItem,
             [SectionKey.Sync] = syncItem,
+            [SectionKey.Docker] = dockerItem,
             [SectionKey.Logs] = logsItem,
             [SectionKey.About] = aboutItem,
         };
