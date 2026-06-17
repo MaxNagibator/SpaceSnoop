@@ -1,0 +1,149 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Docker.DockerGroupsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:DockerViewModel}"
+             Visibility="{Binding IsAvailable, Converter={StaticResource BoolToVisibility}}">
+    <UserControl.Resources>
+        <Style x:Key="Docker.SectionTitle"
+               TargetType="TextBlock">
+            <Setter Property="FontWeight"
+                    Value="{DynamicResource Font.Weight.SemiBold}" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Primary}" />
+        </Style>
+
+        <DataTemplate x:Key="Docker.ObjectRow"
+                      DataType="{x:Type vm:DockerObjectViewModel}">
+            <Border Padding="0,7"
+                    BorderBrush="{DynamicResource Border.Subtle}"
+                    BorderThickness="0,1,0,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="110" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <iconPacks:PackIconLucide Grid.Column="0"
+                                              Kind="{Binding IconKind}"
+                                              Width="15"
+                                              Height="15"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,10,0"
+                                              Foreground="{DynamicResource Fg.Muted}" />
+                    <StackPanel Grid.Column="1"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Name}"
+                                   Foreground="{DynamicResource Fg.Primary}"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding Name}" />
+                        <TextBlock Text="{Binding Detail}"
+                                   Style="{StaticResource TextBlock.Subtle}"
+                                   Foreground="{DynamicResource Fg.Muted}"
+                                   FontSize="{DynamicResource Font.Size.S}"
+                                   TextTrimming="CharacterEllipsis"
+                                   Margin="0,1,0,0" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="2"
+                               Text="{Binding Size}"
+                               Style="{StaticResource TextBlock.Mono}"
+                               TextAlignment="Right"
+                               VerticalAlignment="Center" />
+                    <Button Grid.Column="3"
+                            Style="{StaticResource Button.Icon}"
+                            Margin="10,0,0,0"
+                            Command="{Binding DataContext.RemoveObjectCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            CommandParameter="{Binding}"
+                            IsEnabled="{Binding DataContext.CanRun, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            AutomationProperties.Name="Удалить объект"
+                            ToolTip="Удалить безвозвратно">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                                  Width="15"
+                                                  Height="15"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"
+                                                  Foreground="{DynamicResource State.Error}" />
+                    </Button>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Border Style="{StaticResource Card}"
+            Margin="0,0,0,10">
+        <StackPanel>
+            <TextBlock Text="Крупнейшие объекты"
+                       Style="{StaticResource Docker.SectionTitle}" />
+            <TextBlock
+                Text="Образы, контейнеры и тома по типам. В каждой группе видны 3 крупнейших, остальное разворачивается. Удаление безвозвратно."
+                Style="{StaticResource TextBlock.Subtle}"
+                Foreground="{DynamicResource Fg.Muted}"
+                TextWrapping="Wrap"
+                Margin="0,4,0,0" />
+
+            <ItemsControl ItemsSource="{Binding Groups}"
+                          Margin="0,8,0,0">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:DockerGroupViewModel}">
+                        <StackPanel Margin="0,8,0,0">
+                            <Grid Margin="0,4,0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <iconPacks:PackIconLucide Grid.Column="0"
+                                                          Kind="{Binding IconKind}"
+                                                          Width="16"
+                                                          Height="16"
+                                                          VerticalAlignment="Center"
+                                                          Margin="0,0,8,0"
+                                                          Foreground="{DynamicResource Accent.Primary}" />
+                                <TextBlock Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           Style="{StaticResource Docker.SectionTitle}">
+                                    <Run Text="{Binding Title, Mode=OneWay}" />
+                                    <Run Text="{Binding Count, Mode=OneWay, StringFormat=' ({0})'}"
+                                         Foreground="{DynamicResource Fg.Muted}" />
+                                </TextBlock>
+                                <TextBlock Grid.Column="2"
+                                           Text="{Binding TotalSize}"
+                                           Style="{StaticResource TextBlock.Mono}"
+                                           Foreground="{DynamicResource Accent.Primary}"
+                                           VerticalAlignment="Center" />
+                            </Grid>
+
+                            <ItemsControl ItemsSource="{Binding Preview}"
+                                          ItemTemplate="{StaticResource Docker.ObjectRow}" />
+
+                            <ItemsControl ItemsSource="{Binding Rest}"
+                                          ItemTemplate="{StaticResource Docker.ObjectRow}"
+                                          Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisibility}}" />
+
+                            <Button Style="{StaticResource Button.Ghost}"
+                                    HorizontalAlignment="Left"
+                                    Margin="0,6,0,0"
+                                    Command="{Binding ToggleCommand}"
+                                    Visibility="{Binding HasRest, Converter={StaticResource BoolToVisibility}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <iconPacks:PackIconLucide Kind="{Binding ToggleIconKind}"
+                                                              Width="14"
+                                                              Height="14"
+                                                              VerticalAlignment="Center"
+                                                              Margin="0,0,6,0" />
+                                    <TextBlock Text="{Binding ToggleLabel}"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </Border>
+</UserControl>
