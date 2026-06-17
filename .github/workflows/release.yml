@@ -131,11 +131,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout release body template
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          sparse-checkout: .github/release-body.md
-          sparse-checkout-cone-mode: false
+          fetch-depth: 0
 
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
@@ -146,15 +145,26 @@ jobs:
       - name: Render release body
         shell: bash
         run: |
-          sed -e "s|__VERSION__|${{ needs.prepare.outputs.version }}|g" \
-              -e "s|__REPO__|${{ github.server_url }}/${{ github.repository }}|g" \
-              .github/release-body.md > release-body.rendered.md
+          VERSION="${{ needs.prepare.outputs.version }}"
+          REPO="${{ github.server_url }}/${{ github.repository }}"
+          PREV=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
+
+          {
+            sed -e "s|__VERSION__|$VERSION|g" -e "s|__REPO__|$REPO|g" .github/release-body.md
+            echo
+            echo "## Изменения"
+            echo
+            git log --no-merges --pretty='- %s' "${PREV:+$PREV..}HEAD" | grep -v '^- Версия ' || true
+            if [ -n "$PREV" ]; then
+              echo
+              echo "**Полный список:** $REPO/compare/$PREV...v$VERSION"
+            fi
+          } > release-body.rendered.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.prepare.outputs.version }}
           name: SpaceSnoop v${{ needs.prepare.outputs.version }}
-          generate_release_notes: true
           files: dist/*
           body_path: release-body.rendered.md
