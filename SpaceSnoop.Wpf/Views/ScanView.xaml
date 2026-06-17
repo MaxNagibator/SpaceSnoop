@@ -18,7 +18,6 @@
     <UserControl.Resources>
         <conv:FractionToWidthConverter x:Key="FractionToWidth" />
         <conv:HeatBrushConverter x:Key="HeatBrush" />
-        <conv:MinTileSizeToVisibilityConverter x:Key="MinTileSizeToVisibility" />
 
         <ContextMenu x:Key="ScanNodeMenu">
             <ContextMenu.Resources>
@@ -765,106 +764,12 @@
                                 CornerRadius="{DynamicResource Radius.S}"
                                 ClipToBounds="True">
                             <Grid>
-                                <ItemsControl x:Name="TreemapItems"
-                                              ItemsSource="{Binding TreemapTiles}"
-                                              PreviewMouseLeftButtonDown="OnTreemapMouseDown"
-                                              PreviewMouseRightButtonDown="OnTreemapRightButtonDown"
-                                              Visibility="{Binding HasTreemapTiles, Converter={StaticResource BoolToVisibility}}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <controls:TreemapPanel />
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemContainerStyle>
-                                        <Style TargetType="ContentPresenter">
-                                            <Setter Property="controls:TreemapPanel.Weight"
-                                                    Value="{Binding Weight}" />
-                                        </Style>
-                                    </ItemsControl.ItemContainerStyle>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border x:Name="TileRoot"
-                                                    Margin="1.5"
-                                                    CornerRadius="3"
-                                                    BorderThickness="1.5"
-                                                    ClipToBounds="True"
-                                                    ToolTip="{Binding Tooltip}"
-                                                    ContextMenu="{StaticResource ScanNodeMenu}">
-                                                <Border.Background>
-                                                    <MultiBinding Converter="{StaticResource HeatBrush}">
-                                                        <Binding Path="Fraction" />
-                                                        <Binding Path="DataContext.Intensity"
-                                                                 RelativeSource="{RelativeSource AncestorType=UserControl}" />
-                                                    </MultiBinding>
-                                                </Border.Background>
-                                                <Border.Style>
-                                                    <Style TargetType="Border">
-                                                        <Setter Property="BorderBrush"
-                                                                Value="Transparent" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding IsSelected}"
-                                                                         Value="True">
-                                                                <Setter Property="BorderBrush"
-                                                                        Value="{DynamicResource Fg.Primary}" />
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding IsMarkedDeleted}"
-                                                                         Value="True">
-                                                                <Setter Property="Opacity"
-                                                                        Value="0.5" />
-                                                                <Setter Property="BorderBrush"
-                                                                        Value="{DynamicResource State.Error}" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Border.Style>
-                                                <StackPanel VerticalAlignment="Top"
-                                                            HorizontalAlignment="Left"
-                                                            Margin="5,4">
-                                                    <StackPanel.Visibility>
-                                                        <MultiBinding
-                                                            Converter="{StaticResource MinTileSizeToVisibility}"
-                                                            ConverterParameter="46,32">
-                                                            <Binding Path="ActualWidth"
-                                                                     ElementName="TileRoot" />
-                                                            <Binding Path="ActualHeight"
-                                                                     ElementName="TileRoot" />
-                                                        </MultiBinding>
-                                                    </StackPanel.Visibility>
-                                                    <StackPanel Orientation="Horizontal">
-                                                        <iconPacks:PackIconLucide Style="{StaticResource NodeIcon}"
-                                                                Width="12"
-                                                                Height="12"
-                                                                Margin="0,0,5,0"
-                                                                Foreground="#1A1A1A" />
-                                                        <TextBlock Text="{Binding Name}"
-                                                                   Foreground="#1A1A1A"
-                                                                   FontWeight="SemiBold"
-                                                                   FontSize="{DynamicResource Font.Size.S}"
-                                                                   TextTrimming="CharacterEllipsis">
-                                                            <TextBlock.Style>
-                                                                <Style TargetType="TextBlock">
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger
-                                                                            Binding="{Binding IsMarkedDeleted}"
-                                                                            Value="True">
-                                                                            <Setter Property="TextDecorations"
-                                                                                    Value="Strikethrough" />
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </TextBlock.Style>
-                                                        </TextBlock>
-                                                    </StackPanel>
-                                                    <TextBlock Text="{Binding SizeText}"
-                                                               Margin="0,1,0,0"
-                                                               Foreground="#2A2A2A"
-                                                               FontFamily="{DynamicResource Font.Mono}"
-                                                               FontSize="{DynamicResource Font.Size.Caption}" />
-                                                </StackPanel>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                <controls:TreemapView ItemsSource="{Binding TreemapTiles}"
+                                                      Intensity="{Binding Intensity}"
+                                                      SelectedItem="{Binding SelectedNode, Mode=TwoWay}"
+                                                      DrillCommand="{Binding DrillIntoCommand}"
+                                                      NodeContextMenu="{StaticResource ScanNodeMenu}"
+                                                      Visibility="{Binding HasTreemapTiles, Converter={StaticResource BoolToVisibility}}" />
 
                                 <StackPanel VerticalAlignment="Center"
                                             HorizontalAlignment="Center"
