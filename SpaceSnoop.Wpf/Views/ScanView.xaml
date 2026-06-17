@@ -18,6 +18,7 @@
     <UserControl.Resources>
         <conv:FractionToWidthConverter x:Key="FractionToWidth" />
         <conv:HeatBrushConverter x:Key="HeatBrush" />
+        <conv:MinTileSizeToVisibilityConverter x:Key="MinTileSizeToVisibility" />
 
         <ContextMenu x:Key="ScanNodeMenu">
             <ContextMenu.Resources>
@@ -782,7 +783,8 @@
                                     </ItemsControl.ItemContainerStyle>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Margin="1.5"
+                                            <Border x:Name="TileRoot"
+                                                    Margin="1.5"
                                                     CornerRadius="3"
                                                     BorderThickness="1.5"
                                                     ClipToBounds="True"
@@ -818,6 +820,16 @@
                                                 <StackPanel VerticalAlignment="Top"
                                                             HorizontalAlignment="Left"
                                                             Margin="5,4">
+                                                    <StackPanel.Visibility>
+                                                        <MultiBinding
+                                                            Converter="{StaticResource MinTileSizeToVisibility}"
+                                                            ConverterParameter="46,32">
+                                                            <Binding Path="ActualWidth"
+                                                                     ElementName="TileRoot" />
+                                                            <Binding Path="ActualHeight"
+                                                                     ElementName="TileRoot" />
+                                                        </MultiBinding>
+                                                    </StackPanel.Visibility>
                                                     <StackPanel Orientation="Horizontal">
                                                         <iconPacks:PackIconLucide Style="{StaticResource NodeIcon}"
                                                                 Width="12"
