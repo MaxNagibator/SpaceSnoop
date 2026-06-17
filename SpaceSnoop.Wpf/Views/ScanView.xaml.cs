@@ -78,6 +78,44 @@ public partial class ScanView : UserControl, IView<ScanViewModel>
         }
     }
 
+    private void OnTreemapMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (DataContext is not ScanViewModel vm || FindNode(e.OriginalSource as DependencyObject) is not { } node)
+        {
+            return;
+        }
+
+        vm.SelectedNode = node;
+
+        if (e.ClickCount == 2 && node is { IsDirectory: true, HasChildren: true })
+        {
+            vm.DrillIntoCommand.Execute(node);
+        }
+    }
+
+    private void OnTreemapRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (DataContext is ScanViewModel vm && FindNode(e.OriginalSource as DependencyObject) is { } node)
+        {
+            vm.SelectedNode = node;
+        }
+    }
+
+    private static ScanNodeViewModel? FindNode(DependencyObject? source)
+    {
+        while (source is not null)
+        {
+            if (source is FrameworkElement { DataContext: ScanNodeViewModel node })
+            {
+                return node;
+            }
+
+            source = VisualTreeHelper.GetParent(source);
+        }
+
+        return null;
+    }
+
     private static T? FindAncestor<T>(DependencyObject? current)
         where T : DependencyObject
     {

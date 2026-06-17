@@ -18,6 +18,9 @@ public sealed partial class ScanNodeViewModel : ObservableObject
     [ObservableProperty]
     private bool _isMarkedDeleted;
 
+    [ObservableProperty]
+    private bool _isSelected;
+
     internal ScanNodeViewModel(SpaceBase space, double siblingMax, double parentTotal, ScanSortState sort, ILogger logger, ScanNodeFactory factory)
     {
         Space = space;
@@ -70,6 +73,8 @@ public sealed partial class ScanNodeViewModel : ObservableObject
     public double Share => Space is null || field <= 0
         ? 0
         : Math.Clamp(Space.TotalSize / field, 0, 1);
+
+    public double Weight => Space?.TotalSize ?? 0;
 
     public string ShareText => $"{Share * 100:0}%";
 

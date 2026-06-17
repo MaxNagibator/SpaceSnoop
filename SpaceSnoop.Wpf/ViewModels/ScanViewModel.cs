@@ -22,9 +22,11 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     private readonly DispatcherTimer _progressTimer;
 
     private readonly ScanSortState _sortState = new();
+    private readonly List<ScanNodeViewModel> _treemapPath = [];
 
     private CancellationTokenSource? _cts;
     private bool _suppressPersist;
+    private ScanNodeViewModel? _highlighted;
 
     private ScanProgress? _progress;
     private Stopwatch? _scanStopwatch;
@@ -61,7 +63,26 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     private string? _statusCaption;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TreeVisible))]
+    [NotifyPropertyChangedFor(nameof(TreemapVisible))]
     private bool _hasResult;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TreeVisible))]
+    [NotifyPropertyChangedFor(nameof(TreemapVisible))]
+    private bool _showTreemap = AppDefaults.ScanTreemapDefault;
+
+    [ObservableProperty]
+    private ScanNodeViewModel? _treemapRoot;
+
+    [ObservableProperty]
+    private bool _hasTreemapTiles;
+
+    [ObservableProperty]
+    private bool _treemapTruncated;
+
+    [ObservableProperty]
+    private string _treemapTruncatedText = string.Empty;
 
     [ObservableProperty]
     private string _resultPath = string.Empty;
@@ -149,6 +170,10 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
     public ObservableCollection<ScanNodeViewModel> Roots { get; } = [];
 
+    public RangeObservableCollection<ScanNodeViewModel> TreemapTiles { get; } = [];
+
+    public RangeObservableCollection<TreemapCrumb> TreemapBreadcrumbs { get; } = [];
+
     public ScanInspectorViewModel Inspector { get; }
 
     public ObservableCollection<ScanSortOption> SortOptions { get; } =
@@ -171,6 +196,10 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     public string PageDescription => "Анализ занятого места по дискам и каталогам.";
 
     public bool IsBusy => IsScanning;
+
+    public bool TreeVisible => HasResult && !ShowTreemap;
+
+    public bool TreemapVisible => HasResult && ShowTreemap;
 
     public bool IsIndeterminate => !_progressFraction.HasValue;
 
@@ -314,14 +343,163 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
     partial void OnSelectedNodeChanged(ScanNodeViewModel? value)
     {
+        _highlighted?.IsSelected = false;
+        _highlighted = value;
+
         if (value is null)
         {
             Inspector.Clear();
         }
         else
         {
+            value.IsSelected = true;
             Inspector.Show(value, _rootTotalSize);
         }
+    }
+
+    partial void OnShowTreemapChanged(bool value)
+    {
+        Persist(() => _settings.SetBool(SettingsKeys.ScanTreemap, value));
+
+        if (value && TreemapRoot is null && Roots.Count > 0)
+        {
+            SetTreemapRoot(Roots[0]);
+        }
+    }
+
+    [RelayCommand]
+    private void DrillInto(ScanNodeViewModel? node)
+    {
+        if (node is null || !node.IsDirectory || !node.HasChildren)
+        {
+            return;
+        }
+
+        _treemapPath.Add(node);
+        TreemapRoot = node;
+        RebuildBreadcrumbs();
+        RebuildTiles();
+        SelectedNode = node;
+    }
+
+    [RelayCommand]
+    private void DrillToCrumb(ScanNodeViewModel? node)
+    {
+        if (node is null)
+        {
+            return;
+        }
+
+        var index = _treemapPath.IndexOf(node);
+
+        if (index < 0)
+        {
+            return;
+        }
+
+        _treemapPath.RemoveRange(index + 1, _treemapPath.Count - index - 1);
+        TreemapRoot = node;
+        RebuildBreadcrumbs();
+        RebuildTiles();
+    }
+
+    private void SetTreemapRoot(ScanNodeViewModel root)
+    {
+        _treemapPath.Clear();
+        _treemapPath.Add(root);
+        TreemapRoot = root;
+        RebuildBreadcrumbs();
+        RebuildTiles();
+    }
+
+    private void RebuildBreadcrumbs()
+    {
+        var crumbs = new TreemapCrumb[_treemapPath.Count];
+
+        for (var i = 0; i < _treemapPath.Count; i++)
+        {
+            crumbs[i] = new(_treemapPath[i], i > 0);
+        }
+
+        TreemapBreadcrumbs.ReplaceAll(crumbs);
+    }
+
+    private void RebuildTiles()
+    {
+        if (TreemapRoot is null)
+        {
+            TreemapTiles.ReplaceAll([]);
+            HasTreemapTiles = false;
+            TreemapTruncated = false;
+            TreemapTruncatedText = string.Empty;
+            return;
+        }
+
+        TreemapRoot.EnsureLoaded();
+
+        var children = TreemapRoot.Children
+            .Where(static c => c.Space is not null && c.Weight > 0)
+            .OrderByDescending(static c => c.Weight)
+            .ToList();
+
+        var shown = children.Take(AppDefaults.TreemapTileLimit).ToList();
+        TreemapTiles.ReplaceAll(shown);
+        HasTreemapTiles = shown.Count > 0;
+
+        var hidden = children.Count - shown.Count;
+        TreemapTruncated = hidden > 0;
+        TreemapTruncatedText = hidden > 0
+            ? $"Показаны крупнейшие {shown.Count} из {children.Count}"
+            : string.Empty;
+    }
+
+    private void RefreshTreemapAfterDeletion(HashSet<SpaceBase> deletedSet)
+    {
+        if (_treemapPath.Count == 0)
+        {
+            return;
+        }
+
+        var cut = -1;
+
+        for (var i = 0; i < _treemapPath.Count; i++)
+        {
+            var space = _treemapPath[i].Space;
+
+            if (space is null || deletedSet.Contains(space))
+            {
+                cut = i;
+                break;
+            }
+        }
+
+        if (cut == 0)
+        {
+            var fallback = Roots.FirstOrDefault();
+
+            if (fallback is null)
+            {
+                _treemapPath.Clear();
+                TreemapRoot = null;
+                TreemapBreadcrumbs.ReplaceAll([]);
+                RebuildTiles();
+            }
+            else
+            {
+                SetTreemapRoot(fallback);
+            }
+
+            return;
+        }
+
+        if (cut > 0)
+        {
+            _treemapPath.RemoveRange(cut, _treemapPath.Count - cut);
+            TreemapRoot = _treemapPath[^1];
+            RebuildBreadcrumbs();
+        }
+
+        RebuildTiles();
     }
 
     private void ResortRoots()
@@ -347,6 +525,8 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         InvertSort = invertSort;
         SelectedSortOption = SortOptions.FirstOrDefault(option => option.Field == sortField)
                              ?? SortOptions.First(option => option.Field == AppDefaults.ScanSortModeDefault);
+
+        ShowTreemap = _settings.GetBool(SettingsKeys.ScanTreemap);
 
         var lastDrive = _settings.GetStringValue(SettingsKeys.ScanLastDrive);
 
@@ -471,6 +651,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
             node.IsExpanded = true;
 
             Roots.Insert(0, node);
+            SetTreemapRoot(node);
 
             ResultPath = result.AbsolutePath;
             ResultSizeText = result.TotalSizeText;
@@ -668,6 +849,8 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         {
             HasResult = false;
         }
+
+        RefreshTreemapAfterDeletion(deletedSet);
     }
 
     private List<SpaceBase> CollectMarked()
@@ -707,3 +890,5 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         }
     }
 }
+
+public sealed record TreemapCrumb(ScanNodeViewModel Node, bool ShowSeparator);
