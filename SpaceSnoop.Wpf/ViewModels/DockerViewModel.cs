@@ -1,5 +1,4 @@
 ﻿using KeepShell.Services;
-using SpaceSnoop.Wpf.Bootstrap;
 using System.Collections.ObjectModel;
 
 namespace SpaceSnoop.Wpf.ViewModels;
@@ -27,12 +26,9 @@ public sealed partial class DockerViewModel(
     [ObservableProperty]
     private string? _statusText;
 
-    [ObservableProperty]
-    private string? _objectsNote;
-
     public ObservableCollection<DockerUsage> Buckets { get; } = [];
 
-    public ObservableCollection<DockerObjectViewModel> Objects { get; } = [];
+    public ObservableCollection<DockerGroupViewModel> Groups { get; } = [];
 
     public bool CanRun => !IsBusy && IsAvailable;
 
@@ -77,8 +73,7 @@ public sealed partial class DockerViewModel(
             IsAvailable = snapshot.Available;
             UnavailableReason = snapshot.Error;
 
-            Objects.Clear();
-            ObjectsNote = null;
+            Groups.Clear();
 
             if (snapshot.Available)
             {
@@ -107,21 +102,19 @@ public sealed partial class DockerViewModel(
     private async Task LoadObjectsAsync()
     {
         var inventory = await docker.GetInventoryAsync();
-        var biggest = inventory
-            .OrderByDescending(o => o.SizeBytes)
-            .Take(AppDefaults.DockerTopObjectsLimit)
+
+        var groups = inventory
+            .GroupBy(o => o.Kind)
+            .Select(g => new DockerGroupViewModel(g.Key, g.ToList()))
+            .OrderByDescending(g => g.TotalBytes)
             .ToList();
 
-        foreach (var item in biggest)
+        foreach (var group in groups)
         {
-            Objects.Add(new(item));
+            Groups.Add(group);
         }
 
-        ObjectsNote = inventory.Count > biggest.Count
-            ? $"Показаны {biggest.Count} самых больших из {inventory.Count} объектов."
-            : null;
-
-        logger.DockerInventoryLoaded(inventory.Count, biggest.Count);
+        logger.DockerInventoryLoaded(inventory.Count, groups.Count);
     }
 
     [RelayCommand]

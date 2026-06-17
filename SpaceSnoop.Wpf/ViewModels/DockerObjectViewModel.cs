@@ -14,11 +14,16 @@ public sealed class DockerObjectViewModel(DockerObject model)
 
     public bool InUse => model.InUse;
 
-    public PackIconLucideKind IconKind => model.Kind switch
+    public PackIconLucideKind IconKind => IconFor(model.Kind);
+
+    public static PackIconLucideKind IconFor(DockerObjectKind kind)
     {
-        DockerObjectKind.Image => PackIconLucideKind.Layers,
-        DockerObjectKind.Container => PackIconLucideKind.Box,
-        DockerObjectKind.Volume => PackIconLucideKind.Database,
-        _ => PackIconLucideKind.File,
-    };
+        return kind switch
+        {
+            DockerObjectKind.Image => PackIconLucideKind.Layers,
+            DockerObjectKind.Container => PackIconLucideKind.Box,
+            DockerObjectKind.Volume => PackIconLucideKind.Database,
+            _ => PackIconLucideKind.File,
+        };
+    }
 }

@@ -20,6 +20,4 @@ public static class AppDefaults
 
     public const bool SyncShowSizesDefault = true;
     public const double SyncIndentStep = 16;
-
-    public const int DockerTopObjectsLimit = 50;
 }

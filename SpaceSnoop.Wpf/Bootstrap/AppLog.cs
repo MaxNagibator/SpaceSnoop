@@ -115,8 +115,8 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1607, Level = LogLevel.Error, Message = "Docker: ошибка сжатия диска")]
     public static partial void DockerCompactFailed(this ILogger logger, Exception exception);
 
-    [LoggerMessage(EventId = 1608, Level = LogLevel.Information, Message = "Docker: инвентарь получен, объектов — {Count} (показано {Shown})")]
-    public static partial void DockerInventoryLoaded(this ILogger logger, int count, int shown);
+    [LoggerMessage(EventId = 1608, Level = LogLevel.Information, Message = "Docker: инвентарь получен, объектов — {Count}, групп — {Groups}")]
+    public static partial void DockerInventoryLoaded(this ILogger logger, int count, int groups);
 
     [LoggerMessage(EventId = 1609, Level = LogLevel.Information, Message = "Docker: объект удалён ({Kind} {Name})")]
     public static partial void DockerObjectRemoved(this ILogger logger, string kind, string name);
