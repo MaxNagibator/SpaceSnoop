@@ -187,6 +187,86 @@
                 </StackPanel>
             </Border>
 
+            <Border Style="{StaticResource Card}"
+                    Margin="0,0,0,10"
+                    Visibility="{Binding IsAvailable, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Text="Крупнейшие объекты"
+                               Style="{StaticResource Docker.SectionTitle}" />
+                    <TextBlock Text="Конкретные образы, контейнеры и тома по убыванию размера. Удаление безвозвратно."
+                               Style="{StaticResource TextBlock.Subtle}"
+                               Foreground="{DynamicResource Fg.Muted}"
+                               TextWrapping="Wrap"
+                               Margin="0,4,0,0" />
+
+                    <ItemsControl ItemsSource="{Binding Objects}"
+                                  Margin="0,12,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="0,8"
+                                        BorderBrush="{DynamicResource Border.Subtle}"
+                                        BorderThickness="0,1,0,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="110" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <iconPacks:PackIconLucide Grid.Column="0"
+                                                                  Kind="{Binding IconKind}"
+                                                                  Width="16"
+                                                                  Height="16"
+                                                                  VerticalAlignment="Center"
+                                                                  Margin="0,0,10,0"
+                                                                  Foreground="{DynamicResource Fg.Muted}" />
+                                        <StackPanel Grid.Column="1"
+                                                    VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}"
+                                                       Foreground="{DynamicResource Fg.Primary}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding Name}" />
+                                            <TextBlock Text="{Binding Detail}"
+                                                       Style="{StaticResource TextBlock.Subtle}"
+                                                       Foreground="{DynamicResource Fg.Muted}"
+                                                       FontSize="{DynamicResource Font.Size.S}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Margin="0,1,0,0" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2"
+                                                   Text="{Binding Size}"
+                                                   Style="{StaticResource TextBlock.Mono}"
+                                                   TextAlignment="Right"
+                                                   VerticalAlignment="Center" />
+                                        <Button Grid.Column="3"
+                                                Style="{StaticResource Button.Icon}"
+                                                Margin="10,0,0,0"
+                                                Command="{Binding DataContext.RemoveObjectCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                CommandParameter="{Binding}"
+                                                IsEnabled="{Binding DataContext.CanRun, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                AutomationProperties.Name="Удалить объект"
+                                                ToolTip="Удалить безвозвратно">
+                                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                                                      Width="15"
+                                                                      Height="15"
+                                                                      HorizontalAlignment="Center"
+                                                                      VerticalAlignment="Center"
+                                                                      Foreground="{DynamicResource State.Error}" />
+                                        </Button>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock Text="{Binding ObjectsNote}"
+                               Style="{StaticResource TextBlock.Subtle}"
+                               Foreground="{DynamicResource Fg.Muted}"
+                               Margin="0,12,0,0"
+                               Visibility="{Binding ObjectsNote, Converter={StaticResource NullToVisibility}}" />
+                </StackPanel>
+            </Border>
+
             <Border Style="{StaticResource Card.Inset}"
                     Margin="0,0,0,2">
                 <StackPanel>

@@ -1,4 +1,5 @@
 ﻿using KeepShell.Services;
+using SpaceSnoop.Wpf.Bootstrap;
 using System.Collections.ObjectModel;
 
 namespace SpaceSnoop.Wpf.ViewModels;
@@ -26,7 +27,12 @@ public sealed partial class DockerViewModel(
     [ObservableProperty]
     private string? _statusText;
 
+    [ObservableProperty]
+    private string? _objectsNote;
+
     public ObservableCollection<DockerUsage> Buckets { get; } = [];
+
+    public ObservableCollection<DockerObjectViewModel> Objects { get; } = [];
 
     public bool CanRun => !IsBusy && IsAvailable;
 
@@ -71,12 +77,17 @@ public sealed partial class DockerViewModel(
             IsAvailable = snapshot.Available;
             UnavailableReason = snapshot.Error;
 
+            Objects.Clear();
+            ObjectsNote = null;
+
             if (snapshot.Available)
             {
                 foreach (var bucket in snapshot.Buckets)
                 {
                     Buckets.Add(bucket);
                 }
+
+                await LoadObjectsAsync();
 
                 logger.DockerSnapshotLoaded(snapshot.Buckets.Count);
                 StatusText = $"Обновлено: категорий — {snapshot.Buckets.Count}.";
@@ -91,6 +102,73 @@ public sealed partial class DockerViewModel(
         {
             IsBusy = false;
         }
+    }
+
+    private async Task LoadObjectsAsync()
+    {
+        var inventory = await docker.GetInventoryAsync();
+        var biggest = inventory
+            .OrderByDescending(o => o.SizeBytes)
+            .Take(AppDefaults.DockerTopObjectsLimit)
+            .ToList();
+
+        foreach (var item in biggest)
+        {
+            Objects.Add(new(item));
+        }
+
+        ObjectsNote = inventory.Count > biggest.Count
+            ? $"Показаны {biggest.Count} самых больших из {inventory.Count} объектов."
+            : null;
+
+        logger.DockerInventoryLoaded(inventory.Count, biggest.Count);
+    }
+
+    [RelayCommand]
+    private async Task RemoveObject(DockerObjectViewModel? row)
+    {
+        if (row is null || !CanRun)
+        {
+            return;
+        }
+
+        var target = row.Model;
+        var kind = target.Kind switch
+        {
+            DockerObjectKind.Image => "образ",
+            DockerObjectKind.Container => "контейнер",
+            DockerObjectKind.Volume => "том",
+            _ => "объект",
+        };
+
+        var warning = target.Kind == DockerObjectKind.Volume
+            ? " В томе могут лежать данные (БД и т.п.) — они пропадут БЕЗВОЗВРАТНО."
+            : target.InUse
+                ? " Объект используется — Docker может отказать в удалении."
+                : string.Empty;
+
+        if (!dialogs.Confirm($"Удалить {kind}", $"Удалить {kind} «{target.Name}» ({target.Size})?{warning}"))
+        {
+            return;
+        }
+
+        IsBusy = true;
+        StatusText = $"Удаляю {kind} «{target.Name}»…";
+        try
+        {
+            await docker.RemoveAsync(target);
+            logger.DockerObjectRemoved(target.Kind.ToString(), target.Name);
+        }
+        catch (Exception ex)
+        {
+            logger.DockerObjectRemoveFailed(ex, target.Kind.ToString(), target.Name);
+            dialogs.Error($"Удалить {kind}", ex.Message);
+            IsBusy = false;
+            return;
+        }
+
+        IsBusy = false;
+        await RefreshAsync();
     }
 
     [RelayCommand]

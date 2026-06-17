@@ -15,6 +15,26 @@ public sealed class DockerService
             : DockerSnapshot.Ok(DockerUsage.Parse(run.StdOut));
     }
 
+    public async Task<IReadOnlyList<DockerObject>> GetInventoryAsync(CancellationToken cancel = default)
+    {
+        var run = await RunAsync("docker", "system df -v --format \"{{json .}}\"", cancel: cancel);
+        return run.Failed ? [] : DockerInventory.Parse(run.StdOut);
+    }
+
+    public async Task<string> RemoveAsync(DockerObject target, CancellationToken cancel = default)
+    {
+        var args = target.Kind switch
+        {
+            DockerObjectKind.Image => $"image rm {target.Id}",
+            DockerObjectKind.Container => $"container rm {target.Id}",
+            DockerObjectKind.Volume => $"volume rm {target.Id}",
+            _ => throw new ArgumentOutOfRangeException(nameof(target), target.Kind, null),
+        };
+
+        var run = await RunAsync("docker", args, cancel: cancel);
+        return run.Failed ? throw new InvalidOperationException(DescribeFailure(run)) : run.StdOut.Trim();
+    }
+
     public async Task<string> PruneAsync(DockerCleanupTarget target, CancellationToken cancel = default)
     {
         var args = target switch
