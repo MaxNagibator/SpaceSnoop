@@ -1,4 +1,4 @@
-﻿using SpaceSnoop.Wpf.Views.Controls;
+﻿using SpaceSnoop.Wpf.Views.Scan;
 
 namespace SpaceSnoop.Wpf.Tests;
 

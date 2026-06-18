@@ -1,4 +1,4 @@
-﻿namespace SpaceSnoop.Wpf.Views.Controls;
+﻿namespace SpaceSnoop.Wpf.Views.Scan;
 
 public partial class ScanToolbar : UserControl
 {

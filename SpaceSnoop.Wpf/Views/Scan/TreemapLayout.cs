@@ -1,6 +1,6 @@
 ﻿using System.Diagnostics;
 
-namespace SpaceSnoop.Wpf.Views.Controls;
+namespace SpaceSnoop.Wpf.Views.Scan;
 
 public readonly record struct LayoutRect(double X, double Y, double Width, double Height);
 

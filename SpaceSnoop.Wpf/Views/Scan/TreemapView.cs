@@ -10,7 +10,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 
-namespace SpaceSnoop.Wpf.Views.Controls;
+namespace SpaceSnoop.Wpf.Views.Scan;
 
 public sealed class TreemapView : FrameworkElement
 {

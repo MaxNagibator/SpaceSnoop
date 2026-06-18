@@ -1,7 +1,7 @@
 ﻿using System.Windows.Input;
 using System.Windows.Media;
 
-namespace SpaceSnoop.Wpf.Views.Controls;
+namespace SpaceSnoop.Wpf.Views.Scan;
 
 public partial class ScanStructurePanel : UserControl
 {
