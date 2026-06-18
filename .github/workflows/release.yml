@@ -147,10 +147,11 @@ jobs:
         run: |
           VERSION="${{ needs.prepare.outputs.version }}"
           REPO="${{ github.server_url }}/${{ github.repository }}"
+          SLUG="${{ github.repository }}"
           PREV=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
 
           {
-            sed -e "s|__VERSION__|$VERSION|g" -e "s|__REPO__|$REPO|g" .github/release-body.md
+            sed -e "s|__VERSION__|$VERSION|g" -e "s|__REPO__|$REPO|g" -e "s|__SLUG__|$SLUG|g" .github/release-body.md
             echo
             echo "## Изменения"
             echo
