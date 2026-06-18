@@ -1,0 +1,241 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Sync.SyncLedgerStrip"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
+             xmlns:conv="clr-namespace:SpaceSnoop.Wpf.Converters"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:SyncViewModel}"
+             d:DesignWidth="1040">
+
+    <UserControl.Resources>
+        <conv:FractionToWidthConverter x:Key="FractionToWidth" />
+
+        <Style x:Key="TallyValue"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource StatValue}" />
+
+        <Style x:Key="LedgerStrip"
+               TargetType="Border"
+               BasedOn="{StaticResource Card.Inset}">
+            <Setter Property="Padding"
+                    Value="0" />
+            <Setter Property="Visibility"
+                    Value="Collapsed" />
+            <Setter Property="Opacity"
+                    Value="0" />
+            <Setter Property="RenderTransform">
+                <Setter.Value>
+                    <TranslateTransform Y="8" />
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasResult}"
+                             Value="True">
+                    <Setter Property="Visibility"
+                            Value="Visible" />
+                    <DataTrigger.EnterActions>
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                 To="1"
+                                                 Duration="0:0:0.24" />
+                                <DoubleAnimation Storyboard.TargetProperty="RenderTransform.(TranslateTransform.Y)"
+                                                 To="0"
+                                                 Duration="0:0:0.30">
+                                    <DoubleAnimation.EasingFunction>
+                                        <CubicEase EasingMode="EaseOut" />
+                                    </DoubleAnimation.EasingFunction>
+                                </DoubleAnimation>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </DataTrigger.EnterActions>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="CompositionSegment"
+               TargetType="Rectangle">
+            <Setter Property="Height"
+                    Value="8" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+        </Style>
+    </UserControl.Resources>
+
+    <Border Style="{StaticResource LedgerStrip}"
+            Margin="0,0,0,10">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="4" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0"
+                    Background="{StaticResource DiffSpectrumVertical}"
+                    CornerRadius="10,0,0,10" />
+
+            <WrapPanel Grid.Column="1"
+                       Orientation="Horizontal"
+                       VerticalAlignment="Center"
+                       Margin="14,8,0,8">
+                <StackPanel Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="0,0,20,0">
+                    <Ellipse Width="8"
+                             Height="8"
+                             VerticalAlignment="Center"
+                             Margin="0,0,7,0"
+                             Fill="{DynamicResource State.Success}" />
+                    <TextBlock Text="ТОЛЬКО СЛЕВА"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding LeftOnlyCount}"
+                               Style="{StaticResource TallyValue}" />
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="0,0,20,0">
+                    <Ellipse Width="8"
+                             Height="8"
+                             VerticalAlignment="Center"
+                             Margin="0,0,7,0"
+                             Fill="{DynamicResource State.Info}" />
+                    <TextBlock Text="ТОЛЬКО СПРАВА"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding RightOnlyCount}"
+                               Style="{StaticResource TallyValue}" />
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="0,0,20,0">
+                    <Ellipse Width="8"
+                             Height="8"
+                             VerticalAlignment="Center"
+                             Margin="0,0,7,0"
+                             Fill="{DynamicResource State.Warning}" />
+                    <TextBlock Text="ИЗМЕНЕНЫ"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ModifiedCount}"
+                               Style="{StaticResource TallyValue}" />
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="0,0,20,0">
+                    <Ellipse Width="8"
+                             Height="8"
+                             VerticalAlignment="Center"
+                             Margin="0,0,7,0"
+                             Fill="{DynamicResource State.Error}" />
+                    <TextBlock Text="КОНФЛИКТЫ"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ConflictCount}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock"
+                                   BasedOn="{StaticResource TallyValue}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasConflicts}"
+                                                 Value="True">
+                                        <Setter Property="Foreground"
+                                                Value="{DynamicResource State.Error}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <Ellipse Width="8"
+                             Height="8"
+                             VerticalAlignment="Center"
+                             Margin="0,0,7,0"
+                             Fill="{DynamicResource Border.Strong}" />
+                    <TextBlock Text="ОДИНАКОВЫХ"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding IdenticalCount}"
+                               Style="{StaticResource TallyValue}"
+                               Foreground="{DynamicResource Fg.Muted}" />
+                </StackPanel>
+            </WrapPanel>
+
+            <StackPanel Grid.Column="2"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        Margin="20,0,14,0">
+                <TextBlock Text="СОСТАВ"
+                           Style="{StaticResource Caption}"
+                           Margin="0,0,10,0" />
+                <Border x:Name="SyncCompositionTrack"
+                        Width="184"
+                        Height="8"
+                        CornerRadius="{DynamicResource Radius.Pill}"
+                        ClipToBounds="True"
+                        Background="{DynamicResource Bg.SurfaceMute}">
+                    <StackPanel Orientation="Horizontal">
+                        <Rectangle Style="{StaticResource CompositionSegment}"
+                                   Fill="{DynamicResource State.Success}">
+                            <Rectangle.Width>
+                                <MultiBinding Converter="{StaticResource FractionToWidth}">
+                                    <Binding Path="LeftOnlyFraction" />
+                                    <Binding Path="ActualWidth"
+                                             ElementName="SyncCompositionTrack" />
+                                </MultiBinding>
+                            </Rectangle.Width>
+                        </Rectangle>
+                        <Rectangle Style="{StaticResource CompositionSegment}"
+                                   Fill="{DynamicResource State.Info}">
+                            <Rectangle.Width>
+                                <MultiBinding Converter="{StaticResource FractionToWidth}">
+                                    <Binding Path="RightOnlyFraction" />
+                                    <Binding Path="ActualWidth"
+                                             ElementName="SyncCompositionTrack" />
+                                </MultiBinding>
+                            </Rectangle.Width>
+                        </Rectangle>
+                        <Rectangle Style="{StaticResource CompositionSegment}"
+                                   Fill="{DynamicResource State.Warning}">
+                            <Rectangle.Width>
+                                <MultiBinding Converter="{StaticResource FractionToWidth}">
+                                    <Binding Path="ModifiedFraction" />
+                                    <Binding Path="ActualWidth"
+                                             ElementName="SyncCompositionTrack" />
+                                </MultiBinding>
+                            </Rectangle.Width>
+                        </Rectangle>
+                        <Rectangle Style="{StaticResource CompositionSegment}"
+                                   Fill="{DynamicResource State.Error}">
+                            <Rectangle.Width>
+                                <MultiBinding Converter="{StaticResource FractionToWidth}">
+                                    <Binding Path="ConflictFraction" />
+                                    <Binding Path="ActualWidth"
+                                             ElementName="SyncCompositionTrack" />
+                                </MultiBinding>
+                            </Rectangle.Width>
+                        </Rectangle>
+                        <Rectangle Style="{StaticResource CompositionSegment}"
+                                   Fill="{DynamicResource Border.Strong}">
+                            <Rectangle.Width>
+                                <MultiBinding Converter="{StaticResource FractionToWidth}">
+                                    <Binding Path="IdenticalFraction" />
+                                    <Binding Path="ActualWidth"
+                                             ElementName="SyncCompositionTrack" />
+                                </MultiBinding>
+                            </Rectangle.Width>
+                        </Rectangle>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>
