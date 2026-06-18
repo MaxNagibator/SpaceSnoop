@@ -80,6 +80,7 @@ public sealed class TreemapView : FrameworkElement
 
     public TreemapView()
     {
+        AddVisualChild(_menuHost);
         _toolTip.PlacementTarget = this;
         _toolTip.CustomPopupPlacementCallback = PlaceTooltip;
         Loaded += (_, _) => FontScaleManager.Changed += OnFontScaleChanged;
@@ -136,6 +137,8 @@ public sealed class TreemapView : FrameworkElement
         get => (Style?)GetValue(TooltipStyleProperty);
         set => SetValue(TooltipStyleProperty, value);
     }
+
+    protected override int VisualChildrenCount => 1;
 
     protected override void OnRender(DrawingContext context)
     {
@@ -219,6 +222,11 @@ public sealed class TreemapView : FrameworkElement
     {
         base.OnRenderSizeChanged(sizeInfo);
         InvalidateVisual();
+    }
+
+    protected override Visual GetVisualChild(int index)
+    {
+        return index == 0 ? _menuHost : throw new ArgumentOutOfRangeException(nameof(index));
     }
 
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
