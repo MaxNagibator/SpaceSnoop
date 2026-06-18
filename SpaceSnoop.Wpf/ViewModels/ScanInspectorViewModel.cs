@@ -115,7 +115,7 @@ public sealed partial class ScanInspectorViewModel : ObservableObject
         Title = node.Name;
         Path = node.AbsolutePath;
         IsDirectory = node.IsDirectory;
-        KindText = node.IsDirectory ? "Каталог" : "Файл";
+        KindText = node.KindText;
 
         var total = space?.TotalSize ?? 0;
         TotalSizeText = SizeFormatter.Format(total);

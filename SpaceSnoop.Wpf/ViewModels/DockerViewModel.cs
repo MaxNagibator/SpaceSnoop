@@ -93,6 +93,15 @@ public sealed partial class DockerViewModel(
                 StatusText = "Docker недоступен.";
             }
         }
+        catch (Exception ex)
+        {
+            logger.DockerUnavailable(ex.Message);
+            IsAvailable = false;
+            UnavailableReason = ex.Message;
+            Buckets.Clear();
+            Groups.Clear();
+            StatusText = "Docker недоступен.";
+        }
         finally
         {
             IsBusy = false;
@@ -225,6 +234,7 @@ public sealed partial class DockerViewModel(
             dialogs.Info("Сжатие диска Docker", result);
             StatusText = "Готово. Запустите Docker заново.";
             Buckets.Clear();
+            Groups.Clear();
             _loadedOnce = false;
         }
         catch (Exception ex)

@@ -130,10 +130,7 @@ public sealed partial class ScanNodeViewModel : ObservableObject
 
         _loaded = true;
 
-        var items = dir.SubDirectories
-            .Cast<SpaceBase>()
-            .Concat(dir.Files)
-            .ToList();
+        var items = EnumerateChildren(dir).ToList();
 
         var localMax = items.Count > 0 ? items.Max(static x => x.TotalSize) : 0;
 

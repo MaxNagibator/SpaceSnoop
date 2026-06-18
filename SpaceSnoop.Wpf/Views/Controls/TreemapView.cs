@@ -77,14 +77,15 @@ public sealed class TreemapView : FrameworkElement
     private Path? _beak;
     private Point _cursor;
     private bool _nudge;
+    private bool _isLoaded;
 
     public TreemapView()
     {
         AddVisualChild(_menuHost);
         _toolTip.PlacementTarget = this;
         _toolTip.CustomPopupPlacementCallback = PlaceTooltip;
-        Loaded += (_, _) => FontScaleManager.Changed += OnFontScaleChanged;
-        Unloaded += (_, _) => FontScaleManager.Changed -= OnFontScaleChanged;
+        Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
     }
 
     private enum TooltipSide
@@ -296,6 +297,31 @@ public sealed class TreemapView : FrameworkElement
         _toolTip.IsOpen = false;
     }
 
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        if (_isLoaded)
+        {
+            return;
+        }
+
+        _isLoaded = true;
+        HookItems();
+        FontScaleManager.Changed += OnFontScaleChanged;
+        InvalidateVisual();
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (!_isLoaded)
+        {
+            return;
+        }
+
+        _isLoaded = false;
+        UnhookItems();
+        FontScaleManager.Changed -= OnFontScaleChanged;
+    }
+
     private void OnFontScaleChanged(object? sender, double scale)
     {
         InvalidateVisual();
@@ -329,12 +355,18 @@ public sealed class TreemapView : FrameworkElement
             oldCollection.CollectionChanged -= view.OnCollectionChanged;
         }
 
-        if (e.NewValue is INotifyCollectionChanged newCollection)
+        view.ClearItemSubscriptions();
+
+        if (view._isLoaded)
         {
-            newCollection.CollectionChanged += view.OnCollectionChanged;
+            if (e.NewValue is INotifyCollectionChanged newCollection)
+            {
+                newCollection.CollectionChanged += view.OnCollectionChanged;
+            }
+
+            view.Resubscribe();
         }
 
-        view.Resubscribe();
         view.InvalidateVisual();
     }
 
@@ -544,7 +576,27 @@ public sealed class TreemapView : FrameworkElement
         return [new(TopLeftFor(side, c, w, h, t, g), PopupPrimaryAxis.None)];
     }
 
-    private void Resubscribe()
+    private void HookItems()
+    {
+        if (ItemsSource is INotifyCollectionChanged collection)
+        {
+            collection.CollectionChanged += OnCollectionChanged;
+        }
+
+        Resubscribe();
+    }
+
+    private void UnhookItems()
+    {
+        if (ItemsSource is INotifyCollectionChanged collection)
+        {
+            collection.CollectionChanged -= OnCollectionChanged;
+        }
+
+        ClearItemSubscriptions();
+    }
+
+    private void ClearItemSubscriptions()
     {
         foreach (var item in _subscribed)
         {
@@ -552,6 +604,11 @@ public sealed class TreemapView : FrameworkElement
         }
 
         _subscribed.Clear();
+    }
+
+    private void Resubscribe()
+    {
+        ClearItemSubscriptions();
 
         if (ItemsSource is null)
         {

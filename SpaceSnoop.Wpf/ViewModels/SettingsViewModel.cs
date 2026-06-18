@@ -5,7 +5,10 @@ namespace SpaceSnoop.Wpf.ViewModels;
 
 public sealed record EnumOption<T>(T Value, string Label) where T : struct, Enum
 {
-    public override string ToString() => Label;
+    public override string ToString()
+    {
+        return Label;
+    }
 }
 
 public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
@@ -17,7 +20,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         ThemeViewModel theme,
         ShellPreferences shell,
         OperationPreferences operations,
-        ScanViewModel scan,
+        ScanPreferences scan,
         ISettingsStore settings,
         ILogger<SettingsViewModel> logger)
     {
@@ -37,7 +40,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
 
     public OperationPreferences Operations { get; }
 
-    public ScanViewModel Scan { get; }
+    public ScanPreferences Scan { get; }
 
     public string PageTitle => "Настройки";
 

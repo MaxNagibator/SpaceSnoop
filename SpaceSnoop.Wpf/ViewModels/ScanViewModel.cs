@@ -1,6 +1,7 @@
 ﻿using KeepShell.Services;
 using Microsoft.Win32;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Windows.Input;
@@ -38,16 +39,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     private string _selectedDrive = string.Empty;
 
     [ObservableProperty]
-    private bool _useMultithreading = AppDefaults.ScanMultithreadingDefault;
-
-    [ObservableProperty]
-    private int _maxParallelism = Environment.ProcessorCount;
-
-    [ObservableProperty]
-    private double _intensity = AppDefaults.IntensityDefault;
-
-    [ObservableProperty]
-    private ScanSortOption _selectedSortOption = null!;
+    private ScanSortOption? _selectedSortOption;
 
     [ObservableProperty]
     private bool _invertSort = AppDefaults.ScanSortInvertDefault;
@@ -140,6 +132,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         IDialogService dialogs,
         ISettingsStore settings,
         OperationPreferences operations,
+        ScanPreferences preferences,
         ScanInspectorViewModel inspector,
         ScanNodeFactory nodeFactory,
         DeleteProgressDialogFactory deleteDialogFactory,
@@ -154,6 +147,9 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         _logger = logger;
 
         Inspector = inspector;
+        Preferences = preferences;
+        Preferences.PropertyChanged += OnPreferencesChanged;
+        Inspector.Intensity = Preferences.Intensity;
 
         _progressTimer = new() { Interval = ProgressPollInterval };
         _progressTimer.Tick += OnProgressTick;
@@ -184,12 +180,13 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         new("По времени последнего доступа", ScanSortField.LastAccessTime),
     ];
 
-    public int ProcessorCount { get; } = Environment.ProcessorCount;
+    public ScanPreferences Preferences { get; }
 
-    public string ParallelismHint =>
-        $"Сколько каталогов обходить одновременно. "
-        + $"Максимум и значение по умолчанию — число логических процессоров ({ProcessorCount}). "
-        + $"Меньше потоков — ниже нагрузка и расход памяти.";
+    public double Intensity
+    {
+        get => Preferences.Intensity;
+        set => Preferences.Intensity = value;
+    }
 
     public string PageTitle => "Сканирование";
 
@@ -212,6 +209,17 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     private void OnProgressTick(object? sender, EventArgs e)
     {
         UpdateLiveProgress();
+    }
+
+    private void OnPreferencesChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(ScanPreferences.Intensity))
+        {
+            return;
+        }
+
+        Inspector.Intensity = Preferences.Intensity;
+        OnPropertyChanged(nameof(Intensity));
     }
 
     private static long? EstimateTotalBytes(DirectoryInfo directory)
@@ -299,22 +307,6 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     private static string NormalizePath(string path)
     {
         return path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-    }
-
-    partial void OnUseMultithreadingChanged(bool value)
-    {
-        Persist(() => _settings.SetBool(SettingsKeys.ScanMultithreading, value));
-    }
-
-    partial void OnMaxParallelismChanged(int value)
-    {
-        Persist(() => _settings.SetInt(SettingsKeys.ScanParallelism, value));
-    }
-
-    partial void OnIntensityChanged(double value)
-    {
-        Inspector.Intensity = value;
-        Persist(() => _settings.SetDouble(SettingsKeys.ScanIntensity, value));
     }
 
     partial void OnSelectedDriveChanged(string value)
@@ -514,10 +506,6 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     {
         _suppressPersist = true;
 
-        UseMultithreading = _settings.GetBool(SettingsKeys.ScanMultithreading, AppDefaults.ScanMultithreadingDefault);
-        MaxParallelism = Math.Clamp(_settings.GetInt(SettingsKeys.ScanParallelism, ProcessorCount), 1, ProcessorCount);
-        Intensity = _settings.GetDouble(SettingsKeys.ScanIntensity, AppDefaults.IntensityDefault);
-
         var sortField = _settings.GetEnum(SettingsKeys.ScanSortMode, AppDefaults.ScanSortModeDefault);
         var invertSort = _settings.GetBool(SettingsKeys.ScanSortInvert, AppDefaults.ScanSortInvertDefault);
         _sortState.Field = sortField;
@@ -632,12 +620,12 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
         var progress = _progress;
 
-        _logger.ScanStarted(path, UseMultithreading, MaxParallelism);
+        _logger.ScanStarted(path, Preferences.UseMultithreading, Preferences.MaxParallelism);
 
         try
         {
-            var result = await Task.Run(() => UseMultithreading
-                    ? _calculator.CalculateMultithreaded(directory, MaxParallelism, progress, token)
+            var result = await Task.Run(() => Preferences.UseMultithreading
+                    ? _calculator.CalculateMultithreaded(directory, Preferences.MaxParallelism, progress, token)
                     : _calculator.Calculate(directory, progress, token),
                 token);
 

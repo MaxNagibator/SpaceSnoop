@@ -170,9 +170,15 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         return stats;
     }
 
-    private void BuildDirSizeCache(DirectoryComparison dir)
+    private static Dictionary<DirectoryComparison, (long Left, long Right)> BuildDirSizeCache(DirectoryComparison root)
     {
-        _dirSizeCache ??= [];
+        var cache = new Dictionary<DirectoryComparison, (long Left, long Right)>();
+        Accumulate(root, cache);
+        return cache;
+    }
+
+    private static (long Left, long Right) Accumulate(DirectoryComparison dir, Dictionary<DirectoryComparison, (long Left, long Right)> cache)
+    {
         long left = 0;
         long right = 0;
 
@@ -191,13 +197,13 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         foreach (var sub in dir.SubDirectories)
         {
-            BuildDirSizeCache(sub);
-            var subSizes = _dirSizeCache[sub];
-            left += subSizes.Left;
-            right += subSizes.Right;
+            var (subLeft, subRight) = Accumulate(sub, cache);
+            left += subLeft;
+            right += subRight;
         }
 
-        _dirSizeCache[dir] = (left, right);
+        cache[dir] = (left, right);
+        return (left, right);
     }
 
     private void HashModifiedFiles(DirectoryComparison dir, string leftBase, string rightBase, CancellationToken token)
@@ -295,24 +301,26 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         _logger.CompareStarted(left, right);
 
-        var result = await RunAsync("Сравнение...", token =>
+        var mode = CurrentMode;
+
+        var prepared = await RunAsync("Сравнение...", token =>
         {
             var comparer = new DirectoryComparer(filter);
-            return comparer.Compare(left, right, token);
+            var compared = comparer.Compare(left, right, token);
+            compared.ApplyMode(mode);
+            return new ComparePreparation(compared, BuildDirSizeCache(compared.Root));
         });
 
         stopwatch.Stop();
 
-        if (result is null)
+        if (prepared is null)
         {
             return;
         }
 
-        _result = result;
-        _dirSizeCache = null;
+        _result = prepared.Result;
+        _dirSizeCache = prepared.Sizes;
         _collapsed.Clear();
-        _result.ApplyMode(CurrentMode);
-        BuildDirSizeCache(_result.Root);
         RebuildRows();
         UpdateSummary();
         SummaryText = $"Сравнение завершено за {stopwatch.Elapsed.TotalSeconds:F2} с";
@@ -339,21 +347,20 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         _logger.HashStarted();
 
-        var done = await RunAsync("Вычисление хешей...", token =>
+        var sizes = await RunAsync("Вычисление хешей...", token =>
         {
             HashModifiedFiles(result.Root, result.LeftPath, result.RightPath, token);
-            return result;
+            return BuildDirSizeCache(result.Root);
         });
 
         stopwatch.Stop();
 
-        if (done is null)
+        if (sizes is null)
         {
             return;
         }
 
-        _dirSizeCache = null;
-        BuildDirSizeCache(_result.Root);
+        _dirSizeCache = sizes;
         RebuildRows();
         UpdateSummary();
         SummaryText = $"Хеши вычислены за {stopwatch.Elapsed.TotalSeconds:F2} с";
@@ -680,4 +687,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         _settings.SetValue(key, value);
     }
+
+    private sealed record ComparePreparation(ComparisonResult Result, Dictionary<DirectoryComparison, (long Left, long Right)> Sizes);
 }

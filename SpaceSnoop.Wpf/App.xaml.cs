@@ -126,6 +126,7 @@ public partial class App : Application
         services.AddKeepShell();
         services.AddSingleton<ShellPreferences>();
         services.AddSingleton<OperationPreferences>();
+        services.AddSingleton<ScanPreferences>();
         services.AddSingleton<ThemeViewModel>();
 
         services.AddSingleton(new ErrorReportOptions
@@ -162,7 +163,11 @@ public partial class App : Application
         DispatcherUnhandledException += (_, args) =>
         {
             Log.Error(args.Exception, "Необработанное исключение UI-потока");
-            StyledMessageBox.Show(args.Exception.Message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            StyledMessageBox.Show($"Произошла непредвиденная ошибка, она записана в журнал.{Environment.NewLine}{Environment.NewLine}{args.Exception.Message}",
+                "Ошибка",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+
             args.Handled = true;
         };
     }

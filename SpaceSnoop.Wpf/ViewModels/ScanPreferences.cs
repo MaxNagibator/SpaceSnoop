@@ -1,0 +1,58 @@
+﻿namespace SpaceSnoop.Wpf.ViewModels;
+
+public sealed partial class ScanPreferences : ObservableObject
+{
+    private readonly ISettingsStore _settings;
+    private readonly bool _suppressPersist;
+
+    [ObservableProperty]
+    private bool _useMultithreading = AppDefaults.ScanMultithreadingDefault;
+
+    [ObservableProperty]
+    private int _maxParallelism = Environment.ProcessorCount;
+
+    [ObservableProperty]
+    private double _intensity = AppDefaults.IntensityDefault;
+
+    public ScanPreferences(ISettingsStore settings)
+    {
+        _settings = settings;
+
+        _suppressPersist = true;
+        UseMultithreading = _settings.GetBool(SettingsKeys.ScanMultithreading, AppDefaults.ScanMultithreadingDefault);
+        MaxParallelism = Math.Clamp(_settings.GetInt(SettingsKeys.ScanParallelism, ProcessorCount), 1, ProcessorCount);
+        Intensity = _settings.GetDouble(SettingsKeys.ScanIntensity, AppDefaults.IntensityDefault);
+        _suppressPersist = false;
+    }
+
+    public int ProcessorCount { get; } = Environment.ProcessorCount;
+
+    public string ParallelismHint =>
+        $"Сколько каталогов обходить одновременно. "
+        + $"Максимум и значение по умолчанию — число логических процессоров ({ProcessorCount}). "
+        + $"Меньше потоков — ниже нагрузка и расход памяти.";
+
+    partial void OnUseMultithreadingChanged(bool value)
+    {
+        if (!_suppressPersist)
+        {
+            _settings.SetBool(SettingsKeys.ScanMultithreading, value);
+        }
+    }
+
+    partial void OnMaxParallelismChanged(int value)
+    {
+        if (!_suppressPersist)
+        {
+            _settings.SetInt(SettingsKeys.ScanParallelism, value);
+        }
+    }
+
+    partial void OnIntensityChanged(double value)
+    {
+        if (!_suppressPersist)
+        {
+            _settings.SetDouble(SettingsKeys.ScanIntensity, value);
+        }
+    }
+}

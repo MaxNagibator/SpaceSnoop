@@ -10,32 +10,36 @@ public partial class ScanView : UserControl, IView<ScanViewModel>
     private const double MinPanelWidth = ScanInspectorViewModel.MinInspectorWidth;
 
     private ScanViewModel? _vm;
+    private bool _hooked;
 
     public ScanView()
     {
         InitializeComponent();
 
         Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
         DataContextChanged += OnDataContextChanged;
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        Hook();
         ApplyInspectorLayout();
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        Unhook();
     }
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
-        if (_vm is not null)
-        {
-            _vm.Inspector.PropertyChanged -= OnInspectorPropertyChanged;
-        }
-
+        Unhook();
         _vm = e.NewValue as ScanViewModel;
 
-        if (_vm is not null)
+        if (IsLoaded)
         {
-            _vm.Inspector.PropertyChanged += OnInspectorPropertyChanged;
+            Hook();
             ApplyInspectorLayout();
         }
     }
@@ -58,6 +62,28 @@ public partial class ScanView : UserControl, IView<ScanViewModel>
         _vm.Inspector.SetInspectorWidth(InspectorColumn.ActualWidth);
 
         ApplyInspectorLayout();
+    }
+
+    private void Hook()
+    {
+        if (_hooked || _vm is null)
+        {
+            return;
+        }
+
+        _vm.Inspector.PropertyChanged += OnInspectorPropertyChanged;
+        _hooked = true;
+    }
+
+    private void Unhook()
+    {
+        if (!_hooked || _vm is null)
+        {
+            return;
+        }
+
+        _vm.Inspector.PropertyChanged -= OnInspectorPropertyChanged;
+        _hooked = false;
     }
 
     private void ApplyInspectorLayout()
