@@ -1,0 +1,81 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Settings.SettingsScanCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
+             xmlns:bootstrap="clr-namespace:SpaceSnoop.Wpf.Bootstrap"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
+             d:DesignWidth="900">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Views/Settings/SettingsResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Border Style="{StaticResource Card.Inset}"
+            Margin="0,0,0,10">
+        <StackPanel>
+            <TextBlock Text="Сканирование"
+                       Style="{StaticResource Setting.SectionTitle}" />
+
+            <CheckBox Content="Многопоточный обход"
+                      IsChecked="{Binding Scan.UseMultithreading, Mode=TwoWay}"
+                      Margin="0,14,0,0"
+                      VerticalAlignment="Center" />
+            <TextBlock Style="{StaticResource Setting.Hint}"
+                       Text="Параллельный обход каталогов — быстрее, но выше расход памяти." />
+
+            <StackPanel Margin="0,16,0,0"
+                        IsEnabled="{Binding Scan.UseMultithreading}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="Число параллельных потоков"
+                               Style="{StaticResource Setting.Label}" />
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding Scan.MaxParallelism, StringFormat=N0}"
+                               Style="{StaticResource TextBlock.Mono}"
+                               VerticalAlignment="Center" />
+                </Grid>
+                <Slider Minimum="1"
+                        Maximum="{Binding Scan.ProcessorCount}"
+                        Value="{Binding Scan.MaxParallelism, Mode=TwoWay}"
+                        TickFrequency="1"
+                        IsSnapToTickEnabled="True"
+                        Margin="0,6,0,0" />
+                <TextBlock Style="{StaticResource Setting.Hint}"
+                           Text="{Binding Scan.ParallelismHint}" />
+            </StackPanel>
+
+            <StackPanel Margin="0,16,0,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="Интенсивность тепловой подсветки"
+                               Style="{StaticResource Setting.Label}" />
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding Scan.Intensity, StringFormat=N0}"
+                               Style="{StaticResource TextBlock.Mono}"
+                               VerticalAlignment="Center" />
+                </Grid>
+                <Slider Minimum="{x:Static bootstrap:AppDefaults.IntensityMin}"
+                        Maximum="{x:Static bootstrap:AppDefaults.IntensityMax}"
+                        Value="{Binding Scan.Intensity, Mode=TwoWay}"
+                        TickFrequency="1"
+                        IsSnapToTickEnabled="True"
+                        Margin="0,6,0,0" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>
