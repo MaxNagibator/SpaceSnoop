@@ -1,0 +1,69 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks">
+
+    <Style x:Key="About.SectionTitle"
+           TargetType="TextBlock">
+        <Setter Property="FontWeight"
+                Value="{DynamicResource Font.Weight.SemiBold}" />
+        <Setter Property="Foreground"
+                Value="{DynamicResource Fg.Primary}" />
+    </Style>
+
+    <Style x:Key="About.FeatureIcon"
+           TargetType="iconPacks:PackIconLucide">
+        <Setter Property="Width"
+                Value="22" />
+        <Setter Property="Height"
+                Value="22" />
+        <Setter Property="Foreground"
+                Value="{DynamicResource Accent.Primary}" />
+        <Setter Property="VerticalAlignment"
+                Value="Center" />
+    </Style>
+
+    <Style x:Key="About.FeatureCard"
+           TargetType="Border"
+           BasedOn="{StaticResource Card.Inset}">
+        <Setter Property="Margin"
+                Value="0,0,10,0" />
+        <Setter Property="Padding"
+                Value="14" />
+    </Style>
+
+    <Style x:Key="About.MetaIcon"
+           TargetType="iconPacks:PackIconLucide">
+        <Setter Property="Width"
+                Value="16" />
+        <Setter Property="Height"
+                Value="16" />
+        <Setter Property="Foreground"
+                Value="{DynamicResource Fg.Muted}" />
+        <Setter Property="VerticalAlignment"
+                Value="Center" />
+        <Setter Property="Margin"
+                Value="0,0,10,0" />
+    </Style>
+
+    <Style x:Key="About.MetaLabel"
+           TargetType="TextBlock">
+        <Setter Property="Foreground"
+                Value="{DynamicResource Fg.Secondary}" />
+        <Setter Property="VerticalAlignment"
+                Value="Center" />
+    </Style>
+
+    <Style x:Key="About.MetaValue"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource TextBlock.Mono}">
+        <Setter Property="HorizontalAlignment"
+                Value="Right" />
+        <Setter Property="TextAlignment"
+                Value="Right" />
+        <Setter Property="VerticalAlignment"
+                Value="Center" />
+        <Setter Property="TextWrapping"
+                Value="Wrap" />
+    </Style>
+
+</ResourceDictionary>

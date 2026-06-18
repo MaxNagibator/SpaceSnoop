@@ -1,0 +1,79 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.About.AboutFeaturesCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:AboutViewModel}"
+             d:DesignWidth="900">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Views/About/AboutResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Border Style="{StaticResource Card.Inset}"
+            Margin="0,0,0,10">
+        <StackPanel>
+            <TextBlock Text="Что умеет шнырь"
+                       Style="{StaticResource About.SectionTitle}" />
+
+            <UniformGrid Columns="3"
+                         Margin="0,14,0,-10">
+                <Border Style="{StaticResource About.FeatureCard}">
+                    <StackPanel>
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.HardDrive}"
+                                                  Style="{StaticResource About.FeatureIcon}"
+                                                  HorizontalAlignment="Left" />
+                        <TextBlock Text="Сканирование"
+                                   Style="{StaticResource About.SectionTitle}"
+                                   Margin="0,10,0,0" />
+                        <TextBlock
+                            Text="Дерево занятого места, где жирные папки краснеют от стыда по доле размера, или карта-treemap — те же тяжёлые ветки плитками по площади. Помечаешь хлам — и он улетает в корзину, без членовредительства."
+                            Style="{StaticResource TextBlock.Subtle}"
+                            TextWrapping="Wrap"
+                            Margin="0,6,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource About.FeatureCard}">
+                    <StackPanel>
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ArrowRightLeft}"
+                                                  Style="{StaticResource About.FeatureIcon}"
+                                                  HorizontalAlignment="Left" />
+                        <TextBlock Text="Синхронизация"
+                                   Style="{StaticResource About.SectionTitle}"
+                                   Margin="0,10,0,0" />
+                        <TextBlock
+                            Text="Сводит две папки лицом к лицу: цветом видно, кто где лишний, изменённые сверяются по хешу, а перенос — в любую из трёх сторон."
+                            Style="{StaticResource TextBlock.Subtle}"
+                            TextWrapping="Wrap"
+                            Margin="0,6,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource About.FeatureCard}"
+                        Margin="0,0,0,0">
+                    <StackPanel>
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ScrollText}"
+                                                  Style="{StaticResource About.FeatureIcon}"
+                                                  HorizontalAlignment="Left" />
+                        <TextBlock Text="Логи"
+                                   Style="{StaticResource About.SectionTitle}"
+                                   Margin="0,10,0,0" />
+                        <TextBlock
+                            Text="Живой поток событий с фильтрами по уровню, источнику и подстроке. Что-то пошло не так — собери отчёт об ошибке одной кнопкой."
+                            Style="{StaticResource TextBlock.Subtle}"
+                            TextWrapping="Wrap"
+                            Margin="0,6,0,0" />
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+        </StackPanel>
+    </Border>
+</UserControl>

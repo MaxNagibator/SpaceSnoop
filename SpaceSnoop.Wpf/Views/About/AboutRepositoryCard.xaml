@@ -1,0 +1,53 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.About.AboutRepositoryCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:AboutViewModel}"
+             d:DesignWidth="900">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Views/About/AboutResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Border Style="{StaticResource Card.Inset}"
+            Margin="0,0,0,2">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0"
+                        VerticalAlignment="Center">
+                <TextBlock Text="Опенсорс, всё по-честному — заходи, шныряй, контрибьють"
+                           Style="{StaticResource About.MetaLabel}" />
+                <TextBlock Text="{Binding RepoSlug}"
+                           Style="{StaticResource TextBlock.Mono}"
+                           Foreground="{DynamicResource Fg.Muted}"
+                           Margin="0,2,0,0" />
+            </StackPanel>
+            <Button Grid.Column="1"
+                    Style="{StaticResource Button.Link}"
+                    Command="{Binding OpenRepositoryCommand}"
+                    VerticalAlignment="Center"
+                    ToolTip="Открыть репозиторий на GitHub">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Открыть на GitHub"
+                               VerticalAlignment="Center" />
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ExternalLink}"
+                                              Width="14"
+                                              Height="14"
+                                              VerticalAlignment="Center"
+                                              Margin="6,0,0,0" />
+                </StackPanel>
+            </Button>
+        </Grid>
+    </Border>
+</UserControl>

@@ -1,0 +1,152 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.About.AboutEnvironmentCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:AboutViewModel}"
+             d:DesignWidth="900">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Views/About/AboutResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Border Style="{StaticResource Card.Inset}"
+            Margin="0,0,0,10">
+        <StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           Text="Под капотом"
+                           Style="{StaticResource About.SectionTitle}"
+                           VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Button.Icon}"
+                        Command="{Binding CopyDiagnosticsCommand}"
+                        AutomationProperties.Name="Скопировать сведения"
+                        ToolTip="Скопировать сведения об окружении в буфер обмена">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Clipboard}"
+                                              Width="16"
+                                              Height="16"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                </Button>
+            </Grid>
+
+            <Grid Margin="0,12,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0"
+                            Grid.Column="0"
+                            Orientation="Horizontal"
+                            Margin="0,0,0,10">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Tag}"
+                                              Style="{StaticResource About.MetaIcon}" />
+                    <TextBlock Text="Версия"
+                               Style="{StaticResource About.MetaLabel}" />
+                </StackPanel>
+                <TextBlock Grid.Row="0"
+                           Grid.Column="1"
+                           Text="{Binding Version}"
+                           Style="{StaticResource About.MetaValue}"
+                           Margin="20,0,0,10" />
+
+                <StackPanel Grid.Row="1"
+                            Grid.Column="0"
+                            Orientation="Horizontal"
+                            Margin="0,0,0,10">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Package}"
+                                              Style="{StaticResource About.MetaIcon}" />
+                    <TextBlock Text="Платформа"
+                               Style="{StaticResource About.MetaLabel}" />
+                </StackPanel>
+                <TextBlock Grid.Row="1"
+                           Grid.Column="1"
+                           Text="{Binding DotNetVersion}"
+                           Style="{StaticResource About.MetaValue}"
+                           Margin="20,0,0,10" />
+
+                <StackPanel Grid.Row="2"
+                            Grid.Column="0"
+                            Orientation="Horizontal"
+                            Margin="0,0,0,10">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Monitor}"
+                                              Style="{StaticResource About.MetaIcon}" />
+                    <TextBlock Text="Операционная система"
+                               Style="{StaticResource About.MetaLabel}" />
+                </StackPanel>
+                <TextBlock Grid.Row="2"
+                           Grid.Column="1"
+                           Text="{Binding OperatingSystem}"
+                           Style="{StaticResource About.MetaValue}"
+                           Margin="20,0,0,10" />
+
+                <StackPanel Grid.Row="3"
+                            Grid.Column="0"
+                            Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Cpu}"
+                                              Style="{StaticResource About.MetaIcon}" />
+                    <TextBlock Text="Архитектура процесса"
+                               Style="{StaticResource About.MetaLabel}" />
+                </StackPanel>
+                <TextBlock Grid.Row="3"
+                           Grid.Column="1"
+                           Text="{Binding Architecture}"
+                           Style="{StaticResource About.MetaValue}"
+                           Margin="20,0,0,0" />
+            </Grid>
+
+            <Border Margin="0,14,0,0"
+                    Padding="12,10"
+                    CornerRadius="{DynamicResource Radius.M}"
+                    Background="{DynamicResource Bg.SurfaceMute}"
+                    BorderBrush="{DynamicResource Border.Subtle}"
+                    BorderThickness="1">
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Width="16"
+                                              Height="16"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,10,0">
+                        <iconPacks:PackIconLucide.Style>
+                            <Style TargetType="iconPacks:PackIconLucide">
+                                <Setter Property="Kind"
+                                        Value="Shield" />
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource State.Warning}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsElevated}"
+                                                 Value="True">
+                                        <Setter Property="Kind"
+                                                Value="ShieldCheck" />
+                                        <Setter Property="Foreground"
+                                                Value="{DynamicResource State.Success}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </iconPacks:PackIconLucide.Style>
+                    </iconPacks:PackIconLucide>
+                    <TextBlock Text="{Binding ElevationCaption}"
+                               Style="{StaticResource About.MetaLabel}" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Border>
+</UserControl>
