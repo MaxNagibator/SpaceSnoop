@@ -46,6 +46,9 @@ public sealed class TreemapView : FrameworkElement
     public static readonly DependencyProperty NodeContextMenuProperty =
         DependencyProperty.Register(nameof(NodeContextMenu), typeof(ContextMenu), typeof(TreemapView));
 
+    public static readonly DependencyProperty NodeTooltipTemplateProperty =
+        DependencyProperty.Register(nameof(NodeTooltipTemplate), typeof(DataTemplate), typeof(TreemapView));
+
     private static readonly SolidColorBrush LabelBrush = Frozen(Color.FromRgb(0x1A, 0x1A, 0x1A));
     private static readonly SolidColorBrush SubLabelBrush = Frozen(Color.FromRgb(0x2A, 0x2A, 0x2A));
     private static readonly Geometry FolderIcon = ParseIcon(PackIconLucideKind.Folder);
@@ -53,9 +56,15 @@ public sealed class TreemapView : FrameworkElement
 
     private readonly FrameworkElement _menuHost = new();
     private readonly List<INotifyPropertyChanged> _subscribed = [];
+    private readonly ToolTip _toolTip = new() { Placement = PlacementMode.Mouse };
 
     private (Rect Rect, ScanNodeViewModel Node)[] _tiles = [];
     private ScanNodeViewModel? _hover;
+
+    public TreemapView()
+    {
+        _toolTip.PlacementTarget = this;
+    }
 
     public IEnumerable? ItemsSource
     {
@@ -85,6 +94,12 @@ public sealed class TreemapView : FrameworkElement
     {
         get => (ContextMenu?)GetValue(NodeContextMenuProperty);
         set => SetValue(NodeContextMenuProperty, value);
+    }
+
+    public DataTemplate? NodeTooltipTemplate
+    {
+        get => (DataTemplate?)GetValue(NodeTooltipTemplateProperty);
+        set => SetValue(NodeTooltipTemplateProperty, value);
     }
 
     protected override void OnRender(DrawingContext context)
@@ -198,17 +213,19 @@ public sealed class TreemapView : FrameworkElement
     {
         var node = HitTest(e.GetPosition(this));
 
-        if (!ReferenceEquals(node, _hover))
+        if (ReferenceEquals(node, _hover))
         {
-            _hover = node;
-            ToolTip = node?.Tooltip;
+            return;
         }
+
+        _hover = node;
+        ShowTooltip(node);
     }
 
     protected override void OnMouseLeave(MouseEventArgs e)
     {
         _hover = null;
-        ToolTip = null;
+        _toolTip.IsOpen = false;
     }
 
     private void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -284,6 +301,29 @@ public sealed class TreemapView : FrameworkElement
         var brush = new SolidColorBrush(color);
         brush.Freeze();
         return brush;
+    }
+
+    private void ShowTooltip(ScanNodeViewModel? node)
+    {
+        _toolTip.IsOpen = false;
+
+        if (node is null)
+        {
+            return;
+        }
+
+        if (NodeTooltipTemplate is { } template)
+        {
+            _toolTip.ContentTemplate = template;
+            _toolTip.Content = node;
+        }
+        else
+        {
+            _toolTip.ContentTemplate = null;
+            _toolTip.Content = node.Tooltip;
+        }
+
+        _toolTip.IsOpen = true;
     }
 
     private void Resubscribe()

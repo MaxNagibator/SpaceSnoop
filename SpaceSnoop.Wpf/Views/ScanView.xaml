@@ -19,6 +19,179 @@
         <conv:FractionToWidthConverter x:Key="FractionToWidth" />
         <conv:HeatBrushConverter x:Key="HeatBrush" />
 
+        <DataTemplate x:Key="TreemapTooltip"
+                      DataType="{x:Type vm:ScanNodeViewModel}">
+            <Border Background="{DynamicResource Bg.Surface}"
+                    BorderBrush="{DynamicResource Border.Subtle}"
+                    BorderThickness="1"
+                    CornerRadius="{DynamicResource Radius.S}"
+                    Padding="13,11"
+                    MaxWidth="380">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Width="15"
+                                                  Height="15"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,8,0">
+                            <iconPacks:PackIconLucide.Style>
+                                <Style TargetType="iconPacks:PackIconLucide">
+                                    <Setter Property="Kind"
+                                            Value="File" />
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource Fg.Muted}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsDirectory}"
+                                                     Value="True">
+                                            <Setter Property="Kind"
+                                                    Value="Folder" />
+                                            <Setter Property="Foreground"
+                                                    Value="{DynamicResource Accent.Primary}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </iconPacks:PackIconLucide.Style>
+                        </iconPacks:PackIconLucide>
+                        <TextBlock Text="{Binding Name}"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   MaxWidth="300">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock"
+                                       BasedOn="{StaticResource TextBlock.Heading}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsMarkedDeleted}"
+                                                     Value="True">
+                                            <Setter Property="TextDecorations"
+                                                    Value="Strikethrough" />
+                                            <Setter Property="Foreground"
+                                                    Value="{DynamicResource State.Error}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+
+                    <TextBlock Text="{Binding AbsolutePath}"
+                               Margin="0,9,0,0"
+                               TextWrapping="Wrap"
+                               MaxWidth="354"
+                               FontFamily="{DynamicResource Font.Mono}"
+                               FontSize="{DynamicResource Font.Size.XS}"
+                               Foreground="{DynamicResource Fg.Secondary}" />
+
+                    <Border Style="{StaticResource Card.Inset}"
+                            Padding="11,9"
+                            Margin="0,11,0,0">
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="ОБЪЁМ"
+                                           Style="{StaticResource Caption}" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding SizeText}"
+                                           FontFamily="{DynamicResource Font.Mono}"
+                                           FontSize="{DynamicResource Font.Size.M}"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Accent.Primary}" />
+                            </Grid>
+                            <Grid Margin="0,6,0,0"
+                                  Visibility="{Binding HasOwnSize, Converter={StaticResource BoolToVisibility}}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="СВОИ ФАЙЛЫ"
+                                           Style="{StaticResource Caption}" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding OwnSizeText}"
+                                           FontFamily="{DynamicResource Font.Mono}"
+                                           FontSize="{DynamicResource Font.Size.S}"
+                                           FontWeight="Medium"
+                                           Foreground="{DynamicResource Fg.Primary}" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Grid Margin="0,9,0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="ОТ РОДИТЕЛЯ"
+                                   Style="{StaticResource Caption}" />
+                        <Border x:Name="ShareTrack"
+                                Grid.Column="1"
+                                Height="8"
+                                MinWidth="90"
+                                Margin="10,0,10,0"
+                                Background="{DynamicResource Bg.SurfaceMute}"
+                                CornerRadius="{DynamicResource Radius.S}"
+                                VerticalAlignment="Center">
+                            <Rectangle HorizontalAlignment="Left"
+                                       Height="8"
+                                       RadiusX="4"
+                                       RadiusY="4"
+                                       Fill="{DynamicResource Accent.Primary}">
+                                <Rectangle.Width>
+                                    <MultiBinding Converter="{StaticResource FractionToWidth}">
+                                        <Binding Path="Share" />
+                                        <Binding Path="ActualWidth"
+                                                 ElementName="ShareTrack" />
+                                    </MultiBinding>
+                                </Rectangle.Width>
+                            </Rectangle>
+                        </Border>
+                        <TextBlock Grid.Column="2"
+                                   Text="{Binding ShareText}"
+                                   FontFamily="{DynamicResource Font.Mono}"
+                                   FontSize="{DynamicResource Font.Size.S}"
+                                   FontWeight="Medium"
+                                   MinWidth="40"
+                                   TextAlignment="Right"
+                                   Foreground="{DynamicResource Fg.Primary}"
+                                   VerticalAlignment="Center" />
+                    </Grid>
+
+                    <Grid Margin="0,9,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="СОЗДАН"
+                                   Style="{StaticResource Caption}" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding CreationDateText}"
+                                   TextAlignment="Right"
+                                   FontSize="{DynamicResource Font.Size.S}"
+                                   Foreground="{DynamicResource Fg.Secondary}" />
+                    </Grid>
+                    <Grid Margin="0,4,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="ДОСТУП"
+                                   Style="{StaticResource Caption}" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding LastAccessText}"
+                                   TextAlignment="Right"
+                                   FontSize="{DynamicResource Font.Size.S}"
+                                   Foreground="{DynamicResource Fg.Secondary}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
         <ContextMenu x:Key="ScanNodeMenu">
             <ContextMenu.Resources>
                 <Style x:Key="MenuGlyph"
@@ -769,6 +942,7 @@
                                                       SelectedItem="{Binding SelectedNode, Mode=TwoWay}"
                                                       DrillCommand="{Binding DrillIntoCommand}"
                                                       NodeContextMenu="{StaticResource ScanNodeMenu}"
+                                                      NodeTooltipTemplate="{StaticResource TreemapTooltip}"
                                                       Visibility="{Binding HasTreemapTiles, Converter={StaticResource BoolToVisibility}}" />
 
                                 <StackPanel VerticalAlignment="Center"

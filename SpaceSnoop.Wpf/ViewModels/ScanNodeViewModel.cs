@@ -82,6 +82,16 @@ public sealed partial class ScanNodeViewModel : ObservableObject
 
     public string Tooltip => Space?.GetTooltipText() ?? string.Empty;
 
+    public string KindText => IsDirectory ? "Каталог" : "Файл";
+
+    public bool HasOwnSize => Space is DirectorySpace { Size: > 0 };
+
+    public string OwnSizeText => Space is DirectorySpace dir ? dir.SizeText : string.Empty;
+
+    public string CreationDateText => Space?.CreationDate.ToString("g") ?? string.Empty;
+
+    public string LastAccessText => Space?.LastAccessTime.ToString("g") ?? string.Empty;
+
     public SpaceBase? Space { get; }
 
     public void EnsureLoaded()
