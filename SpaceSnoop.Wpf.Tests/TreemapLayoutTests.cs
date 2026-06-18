@@ -1,6 +1,6 @@
 ﻿using SpaceSnoop.Wpf.Views.Controls;
 
-namespace SpaceSnoop.Tests;
+namespace SpaceSnoop.Wpf.Tests;
 
 [TestFixture]
 public class TreemapLayoutTests
@@ -24,7 +24,7 @@ public class TreemapLayoutTests
     }
 
     [TestCaseSource(nameof(Cases))]
-    public void Squarify_TilesCoverArea(double[] weights, double width, double height)
+    public void Плитки_покрывают_всю_площадь(double[] weights, double width, double height)
     {
         var rects = TreemapLayout.Squarify(weights, width, height);
 
@@ -34,7 +34,7 @@ public class TreemapLayoutTests
     }
 
     [TestCaseSource(nameof(Cases))]
-    public void Squarify_TilesStayInsideBounds(double[] weights, double width, double height)
+    public void Плитки_остаются_внутри_границ(double[] weights, double width, double height)
     {
         var rects = TreemapLayout.Squarify(weights, width, height);
 
@@ -53,7 +53,7 @@ public class TreemapLayoutTests
     }
 
     [Test]
-    public void Squarify_AreaProportionalToWeight()
+    public void Площадь_плитки_пропорциональна_весу()
     {
         double[] weights = [4, 2, 1, 1];
         var rects = TreemapLayout.Squarify(weights, 200, 200);
@@ -74,7 +74,7 @@ public class TreemapLayoutTests
     [TestCase(0, 0)]
     [TestCase(100, 0)]
     [TestCase(0, 100)]
-    public void Squarify_NonPositiveBounds_ReturnsEmptyRects(double width, double height)
+    public void Неположительные_границы_дают_пустые_прямоугольники(double width, double height)
     {
         var rects = TreemapLayout.Squarify([3, 2, 1], width, height);
 
@@ -82,13 +82,13 @@ public class TreemapLayoutTests
     }
 
     [Test]
-    public void Squarify_EmptyWeights_ReturnsEmpty()
+    public void Пустой_список_весов_даёт_пустой_результат()
     {
         Assert.That(TreemapLayout.Squarify([], 100, 100), Is.Empty);
     }
 
     [Test]
-    public void Squarify_AllZeroWeights_ReturnsEmptyRects()
+    public void Все_нулевые_веса_дают_пустые_прямоугольники()
     {
         var rects = TreemapLayout.Squarify([0, 0, 0], 100, 100);
 

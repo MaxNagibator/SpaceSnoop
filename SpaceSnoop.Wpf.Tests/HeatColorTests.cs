@@ -1,13 +1,13 @@
 ﻿using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Converters;
 
-namespace SpaceSnoop.Tests;
+namespace SpaceSnoop.Wpf.Tests;
 
 [TestFixture]
 public class HeatColorTests
 {
     [Test]
-    public void From_ZeroFraction_IsGreenDominant()
+    public void Нулевая_доля_даёт_преобладание_зелёного()
     {
         var color = HeatColor.From(0, AppDefaults.IntensityDefault);
 
@@ -19,7 +19,7 @@ public class HeatColorTests
     }
 
     [Test]
-    public void From_FullFraction_IsRedDominant()
+    public void Полная_доля_даёт_преобладание_красного()
     {
         var color = HeatColor.From(1, AppDefaults.IntensityDefault);
 
@@ -31,7 +31,7 @@ public class HeatColorTests
     }
 
     [Test]
-    public void From_ClampsFractionToUnitRange()
+    public void Доля_зажимается_в_диапазон_от_нуля_до_единицы()
     {
         using (Assert.EnterMultipleScope())
         {
@@ -41,7 +41,7 @@ public class HeatColorTests
     }
 
     [Test]
-    public void From_ClampsIntensityToConfiguredRange()
+    public void Интенсивность_зажимается_в_заданный_диапазон()
     {
         using (Assert.EnterMultipleScope())
         {
@@ -51,7 +51,7 @@ public class HeatColorTests
     }
 
     [Test]
-    public void From_RedChannelIsMonotonicAcrossFraction()
+    public void Красный_канал_монотонно_растёт_с_долей()
     {
         var previous = -1;
 
@@ -64,7 +64,7 @@ public class HeatColorTests
     }
 
     [Test]
-    public void From_IsDeterministic()
+    public void Цвет_вычисляется_детерминированно()
     {
         Assert.That(HeatColor.From(0.42, 8), Is.EqualTo(HeatColor.From(0.42, 8)));
     }

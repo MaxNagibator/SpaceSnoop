@@ -1,7 +1,7 @@
 ﻿using SpaceSnoop.Core.Domain;
 using SpaceSnoop.Wpf.ViewModels;
 
-namespace SpaceSnoop.Tests;
+namespace SpaceSnoop.Wpf.Tests;
 
 [TestFixture]
 public class ScanSortStateTests
@@ -25,7 +25,7 @@ public class ScanSortStateTests
     private string _tempDir = null!;
 
     [Test]
-    public void Compare_DirectoryBeforeFile_RegardlessOfFieldAndInvert([Values(false, true)] bool invert)
+    public void Каталог_всегда_раньше_файла_независимо_от_поля_и_инверсии([Values(false, true)] bool invert)
     {
         var dir = MakeDir("a", 1);
         var file = MakeFile("b.bin", 1_000_000);
@@ -40,7 +40,7 @@ public class ScanSortStateTests
     }
 
     [Test]
-    public void Compare_BySize_AscendingByDefault_InvertFlips()
+    public void По_размеру_сортирует_по_возрастанию_а_инверсия_переворачивает()
     {
         var small = MakeDir("s", 10);
         var big = MakeDir("b", 1000);
@@ -53,7 +53,7 @@ public class ScanSortStateTests
     }
 
     [Test]
-    public void Compare_ByName_UsesCultureOrder()
+    public void По_имени_сортирует_в_культурном_порядке()
     {
         var alpha = MakeDir("alpha", 1);
         var beta = MakeDir("beta", 1);
@@ -64,7 +64,7 @@ public class ScanSortStateTests
     }
 
     [Test]
-    public void Compare_ByCreationDate_AscendingByDefault()
+    public void По_дате_создания_сортирует_по_возрастанию()
     {
         var older = MakeDir("o", 1, new(2020, 1, 1));
         var newer = MakeDir("n", 1, new(2024, 1, 1));
@@ -75,7 +75,7 @@ public class ScanSortStateTests
     }
 
     [Test]
-    public void Compare_Nulls_SortToEnd()
+    public void Пустые_узлы_уходят_в_конец()
     {
         var dir = MakeDir("a", 1);
         var sorter = new ScanSortState();
