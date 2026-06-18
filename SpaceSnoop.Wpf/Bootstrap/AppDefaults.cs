@@ -12,6 +12,8 @@ public static class AppDefaults
     public const bool ScanTreemapDefault = false;
     public const int TopChildrenLimit = 7;
     public const int TreemapTileLimit = 150;
+    public const int TreemapPreviewLimit = 40;
+    public const double TreemapPreviewHeight = 150;
 
     public const bool DeleteConfirmDefault = true;
     public const DeleteMode DeleteModeDefault = DeleteMode.RecycleBin;

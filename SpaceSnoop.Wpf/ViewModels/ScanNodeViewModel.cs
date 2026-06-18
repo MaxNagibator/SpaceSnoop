@@ -94,6 +94,22 @@ public sealed partial class ScanNodeViewModel : ObservableObject
 
     public SpaceBase? Space { get; }
 
+    public bool HasPreviewTiles => IsDirectory && PreviewTiles.Count > 0;
+
+    public IReadOnlyList<ScanNodeViewModel> PreviewTiles
+    {
+        get
+        {
+            EnsureLoaded();
+
+            return Children
+                .Where(static c => c.Weight > 0)
+                .OrderByDescending(static c => c.Weight)
+                .Take(AppDefaults.TreemapPreviewLimit)
+                .ToList();
+        }
+    }
+
     public void EnsureLoaded()
     {
         if (_loaded || Space is not DirectorySpace || _sort is null)

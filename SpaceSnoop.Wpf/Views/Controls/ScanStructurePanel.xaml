@@ -4,6 +4,7 @@
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
              xmlns:conv="clr-namespace:SpaceSnoop.Wpf.Converters"
              xmlns:controls="clr-namespace:SpaceSnoop.Wpf.Views.Controls"
+             xmlns:bootstrap="clr-namespace:SpaceSnoop.Wpf.Bootstrap"
              xmlns:keepshell="https://schemas.keepshell.dev/wpf"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -77,6 +78,15 @@
                                FontFamily="{DynamicResource Font.Mono}"
                                FontSize="{DynamicResource Font.Size.XS}"
                                Foreground="{DynamicResource Fg.Secondary}" />
+
+                    <Border Style="{StaticResource Card.Inset}"
+                            Padding="5"
+                            Margin="0,11,0,0"
+                            Visibility="{Binding HasPreviewTiles, Converter={StaticResource BoolToVisibility}}">
+                        <controls:TreemapView ItemsSource="{Binding PreviewTiles}"
+                                              Height="{x:Static bootstrap:AppDefaults.TreemapPreviewHeight}"
+                                              IsHitTestVisible="False" />
+                    </Border>
 
                     <Border Style="{StaticResource Card.Inset}"
                             Padding="11,9"
