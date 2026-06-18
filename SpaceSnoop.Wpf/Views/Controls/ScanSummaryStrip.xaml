@@ -56,7 +56,8 @@
         </Style>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource SummaryStrip}">
+    <Border Style="{StaticResource SummaryStrip}"
+            Margin="0,0,0,12">
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="4" />

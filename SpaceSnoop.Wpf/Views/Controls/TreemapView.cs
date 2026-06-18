@@ -16,7 +16,7 @@ public sealed class TreemapView : FrameworkElement
 {
     private const double LabelMinWidth = 46;
     private const double LabelMinHeight = 32;
-    private const double Gap = 1.5;
+    private const double Gap = 3;
     private const double CornerRadius = 3;
     private const double Padding = 5;
     private const double IconSize = 12;
@@ -155,7 +155,8 @@ public sealed class TreemapView : FrameworkElement
             weights[i] = nodes[i].Weight;
         }
 
-        var layout = TreemapLayout.Squarify(weights, width, height);
+        var inset = Gap / 2;
+        var layout = TreemapLayout.Squarify(weights, Math.Max(0, width - Gap), Math.Max(0, height - Gap));
         var tiles = new (Rect, ScanNodeViewModel)[nodes.Count];
 
         var selectionPen = ResourcePen("Fg.Primary", 1.5);
@@ -167,10 +168,10 @@ public sealed class TreemapView : FrameworkElement
         for (var i = 0; i < nodes.Count; i++)
         {
             var node = nodes[i];
-            var bounds = new Rect(layout[i].X, layout[i].Y, layout[i].Width, layout[i].Height);
+            var bounds = new Rect(layout[i].X + inset, layout[i].Y + inset, layout[i].Width, layout[i].Height);
             tiles[i] = (bounds, node);
 
-            var tile = Deflate(bounds, Gap);
+            var tile = Deflate(bounds, inset);
 
             if (tile.Width <= 0 || tile.Height <= 0)
             {

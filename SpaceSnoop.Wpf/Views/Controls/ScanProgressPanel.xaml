@@ -10,6 +10,7 @@
              d:DesignWidth="980">
     <Border Style="{StaticResource Card.Inset}"
             Padding="15,12"
+            Margin="0,0,0,12"
             Visibility="{Binding IsScanning, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
         <StackPanel>
             <Grid>

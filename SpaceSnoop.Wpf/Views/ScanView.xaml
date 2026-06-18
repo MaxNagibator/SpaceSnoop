@@ -23,8 +23,7 @@
         <controls:ScanToolbar Grid.Row="0"
                               Margin="0,0,0,12" />
 
-        <controls:ScanProgressPanel Grid.Row="1"
-                                    Margin="0,0,0,12" />
+        <controls:ScanProgressPanel Grid.Row="1" />
 
         <!--  Плашка отмены: появляется когда сканирование прервано пользователем  -->
         <Border Grid.Row="2"
@@ -49,8 +48,7 @@
             </StackPanel>
         </Border>
 
-        <controls:ScanSummaryStrip Grid.Row="3"
-                                   Margin="0,0,0,12" />
+        <controls:ScanSummaryStrip Grid.Row="3" />
 
         <Grid Grid.Row="4">
             <Grid.ColumnDefinitions>
