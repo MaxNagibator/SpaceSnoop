@@ -8,6 +8,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Shapes;
 
 namespace SpaceSnoop.Wpf.Views.Controls;
 
@@ -21,6 +22,8 @@ public sealed class TreemapView : FrameworkElement
     private const double IconSize = 12;
     private const double IconGap = 5;
     private const double MarkerSize = 9;
+    private const double BeakTipOffset = 24;
+    private const double BeakGap = 4;
 
     public static readonly DependencyProperty ItemsSourceProperty =
         DependencyProperty.Register(nameof(ItemsSource),
@@ -50,25 +53,46 @@ public sealed class TreemapView : FrameworkElement
     public static readonly DependencyProperty NodeTooltipTemplateProperty =
         DependencyProperty.Register(nameof(NodeTooltipTemplate), typeof(DataTemplate), typeof(TreemapView));
 
+    public static readonly DependencyProperty TooltipStyleProperty =
+        DependencyProperty.Register(nameof(TooltipStyle), typeof(Style), typeof(TreemapView),
+            new FrameworkPropertyMetadata(null, OnTooltipStyleChanged));
+
     private static readonly SolidColorBrush LabelBrush = Frozen(Color.FromRgb(0x1A, 0x1A, 0x1A));
     private static readonly SolidColorBrush SubLabelBrush = Frozen(Color.FromRgb(0x2A, 0x2A, 0x2A));
     private static readonly SolidColorBrush MarkerBrush = Frozen(Color.FromArgb(0xCC, 0x1A, 0x1A, 0x1A));
     private static readonly Brush CushionBrush = FrozenCushion();
     private static readonly Geometry FolderIcon = ParseIcon(PackIconLucideKind.Folder);
     private static readonly Geometry FileIcon = ParseIcon(PackIconLucideKind.File);
+    private static readonly Geometry BeakUp = FrozenGeometry("M 0,8 L 8,0 L 16,8");
+    private static readonly Geometry BeakDown = FrozenGeometry("M 0,0 L 8,8 L 16,0");
+    private static readonly Geometry BeakLeft = FrozenGeometry("M 8,0 L 0,8 L 8,16");
+    private static readonly Geometry BeakRight = FrozenGeometry("M 0,0 L 8,8 L 0,16");
 
     private readonly FrameworkElement _menuHost = new();
     private readonly List<INotifyPropertyChanged> _subscribed = [];
-    private readonly ToolTip _toolTip = new() { Placement = PlacementMode.Mouse };
+    private readonly ToolTip _toolTip = new() { Placement = PlacementMode.Custom };
 
     private (Rect Rect, ScanNodeViewModel Node)[] _tiles = [];
     private ScanNodeViewModel? _hover;
+    private Path? _beak;
+    private Point _cursor;
+    private bool _nudge;
 
     public TreemapView()
     {
         _toolTip.PlacementTarget = this;
+        _toolTip.CustomPopupPlacementCallback = PlaceTooltip;
         Loaded += (_, _) => FontScaleManager.Changed += OnFontScaleChanged;
         Unloaded += (_, _) => FontScaleManager.Changed -= OnFontScaleChanged;
+    }
+
+    private enum TooltipSide
+    {
+        None = 0,
+        Below = 1,
+        Above = 2,
+        RightOf = 3,
+        LeftOf = 4,
     }
 
     public IEnumerable? ItemsSource
@@ -105,6 +129,12 @@ public sealed class TreemapView : FrameworkElement
     {
         get => (DataTemplate?)GetValue(NodeTooltipTemplateProperty);
         set => SetValue(NodeTooltipTemplateProperty, value);
+    }
+
+    public Style? TooltipStyle
+    {
+        get => (Style?)GetValue(TooltipStyleProperty);
+        set => SetValue(TooltipStyleProperty, value);
     }
 
     protected override void OnRender(DrawingContext context)
@@ -234,15 +264,21 @@ public sealed class TreemapView : FrameworkElement
 
     protected override void OnMouseMove(MouseEventArgs e)
     {
-        var node = HitTest(e.GetPosition(this));
+        var point = e.GetPosition(this);
+        var node = HitTest(point);
+        _cursor = point;
 
-        if (ReferenceEquals(node, _hover))
+        if (!ReferenceEquals(node, _hover))
         {
+            _hover = node;
+            ShowTooltip(node);
             return;
         }
 
-        _hover = node;
-        ShowTooltip(node);
+        if (node is not null && _toolTip.IsOpen)
+        {
+            Reposition();
+        }
     }
 
     protected override void OnMouseLeave(MouseEventArgs e)
@@ -268,6 +304,11 @@ public sealed class TreemapView : FrameworkElement
         {
             InvalidateVisual();
         }
+    }
+
+    private static void OnTooltipStyleChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        ((TreemapView)d)._toolTip.Style = (Style?)e.NewValue;
     }
 
     private static void OnItemsSourceChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -312,6 +353,13 @@ public sealed class TreemapView : FrameworkElement
     {
         var data = new PackIconLucide { Kind = kind }.Data;
         var geometry = string.IsNullOrEmpty(data) ? Geometry.Empty : Geometry.Parse(data);
+        geometry.Freeze();
+        return geometry;
+    }
+
+    private static Geometry FrozenGeometry(string data)
+    {
+        var geometry = Geometry.Parse(data);
         geometry.Freeze();
         return geometry;
     }
@@ -368,6 +416,51 @@ public sealed class TreemapView : FrameworkElement
         context.DrawGeometry(MarkerBrush, null, geometry);
     }
 
+    private static Point TopLeftFor(TooltipSide side, Point c, double w, double h, double t, double g)
+    {
+        return side switch
+        {
+            TooltipSide.Above => new(c.X - t, c.Y - g - h),
+            TooltipSide.RightOf => new(c.X + g, c.Y - t),
+            TooltipSide.LeftOf => new(c.X - g - w, c.Y - t),
+            _ => new(c.X - t, c.Y + g),
+        };
+    }
+
+    private static void ApplyBeak(Path beak, TooltipSide side)
+    {
+        switch (side)
+        {
+            case TooltipSide.Above:
+                beak.Data = BeakDown;
+                beak.HorizontalAlignment = HorizontalAlignment.Left;
+                beak.VerticalAlignment = VerticalAlignment.Bottom;
+                beak.Margin = new(16, 0, 0, 1);
+                break;
+
+            case TooltipSide.RightOf:
+                beak.Data = BeakLeft;
+                beak.HorizontalAlignment = HorizontalAlignment.Left;
+                beak.VerticalAlignment = VerticalAlignment.Top;
+                beak.Margin = new(1, 16, 0, 0);
+                break;
+
+            case TooltipSide.LeftOf:
+                beak.Data = BeakRight;
+                beak.HorizontalAlignment = HorizontalAlignment.Right;
+                beak.VerticalAlignment = VerticalAlignment.Top;
+                beak.Margin = new(0, 16, 1, 0);
+                break;
+
+            default:
+                beak.Data = BeakUp;
+                beak.HorizontalAlignment = HorizontalAlignment.Left;
+                beak.VerticalAlignment = VerticalAlignment.Top;
+                beak.Margin = new(16, 1, 0, 0);
+                break;
+        }
+    }
+
     private void ShowTooltip(ScanNodeViewModel? node)
     {
         _toolTip.IsOpen = false;
@@ -389,6 +482,57 @@ public sealed class TreemapView : FrameworkElement
         }
 
         _toolTip.IsOpen = true;
+    }
+
+    private void Reposition()
+    {
+        _nudge = !_nudge;
+        _toolTip.HorizontalOffset = _nudge ? 0 : 0.01;
+    }
+
+    private CustomPopupPlacement[] PlaceTooltip(Size popupSize, Size targetSize, Point offset)
+    {
+        var w = popupSize.Width;
+        var h = popupSize.Height;
+        var t = BeakTipOffset;
+        var g = BeakGap;
+        var c = _cursor;
+
+        var minX = 0.0;
+        var minY = 0.0;
+        var maxX = targetSize.Width;
+        var maxY = targetSize.Height;
+
+        if (Window.GetWindow(this) is { } window)
+        {
+            var origin = TranslatePoint(new(0, 0), window);
+            minX = -origin.X;
+            minY = -origin.Y;
+            maxX = minX + window.ActualWidth;
+            maxY = minY + window.ActualHeight;
+        }
+
+        var side = TooltipSide.Below;
+
+        foreach (var candidate in (ReadOnlySpan<TooltipSide>)[TooltipSide.Below, TooltipSide.Above, TooltipSide.RightOf, TooltipSide.LeftOf])
+        {
+            var p = TopLeftFor(candidate, c, w, h, t, g);
+
+            if (p.X >= minX && p.Y >= minY && p.X + w <= maxX && p.Y + h <= maxY)
+            {
+                side = candidate;
+                break;
+            }
+        }
+
+        _beak ??= _toolTip.Template?.FindName("Beak", _toolTip) as Path;
+
+        if (_beak is not null)
+        {
+            ApplyBeak(_beak, side);
+        }
+
+        return [new(TopLeftFor(side, c, w, h, t, g), PopupPrimaryAxis.None)];
     }
 
     private void Resubscribe()

@@ -190,6 +190,36 @@
             </Border>
         </DataTemplate>
 
+        <Style x:Key="TreemapTooltipBeak"
+               TargetType="ToolTip">
+            <Setter Property="HasDropShadow"
+                    Value="False" />
+            <Setter Property="Background"
+                    Value="Transparent" />
+            <Setter Property="BorderThickness"
+                    Value="0" />
+            <Setter Property="Padding"
+                    Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToolTip">
+                        <Grid>
+                            <ContentPresenter Margin="8" />
+                            <Path x:Name="Beak"
+                                  Data="M 0,8 L 8,0 L 16,8"
+                                  Fill="{DynamicResource Bg.Surface}"
+                                  Stroke="{DynamicResource Border.Subtle}"
+                                  StrokeThickness="1"
+                                  HorizontalAlignment="Left"
+                                  VerticalAlignment="Top"
+                                  Margin="16,1,0,0"
+                                  SnapsToDevicePixels="True" />
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <ContextMenu x:Key="ScanNodeMenu">
             <ContextMenu.Resources>
                 <Style x:Key="MenuGlyph"
@@ -553,6 +583,7 @@
                                               DrillCommand="{Binding DrillIntoCommand}"
                                               NodeContextMenu="{StaticResource ScanNodeMenu}"
                                               NodeTooltipTemplate="{StaticResource TreemapTooltip}"
+                                              TooltipStyle="{StaticResource TreemapTooltipBeak}"
                                               Visibility="{Binding HasTreemapTiles, Converter={StaticResource BoolToVisibility}}" />
 
                         <StackPanel VerticalAlignment="Center"
