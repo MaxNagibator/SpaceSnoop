@@ -20,6 +20,7 @@ public sealed class TreemapView : FrameworkElement
     private const double Padding = 5;
     private const double IconSize = 12;
     private const double IconGap = 5;
+    private const double MarkerSize = 9;
 
     public static readonly DependencyProperty ItemsSourceProperty =
         DependencyProperty.Register(nameof(ItemsSource),
@@ -51,6 +52,8 @@ public sealed class TreemapView : FrameworkElement
 
     private static readonly SolidColorBrush LabelBrush = Frozen(Color.FromRgb(0x1A, 0x1A, 0x1A));
     private static readonly SolidColorBrush SubLabelBrush = Frozen(Color.FromRgb(0x2A, 0x2A, 0x2A));
+    private static readonly SolidColorBrush MarkerBrush = Frozen(Color.FromArgb(0xCC, 0x1A, 0x1A, 0x1A));
+    private static readonly Brush CushionBrush = FrozenCushion();
     private static readonly Geometry FolderIcon = ParseIcon(PackIconLucideKind.Folder);
     private static readonly Geometry FileIcon = ParseIcon(PackIconLucideKind.File);
 
@@ -64,6 +67,8 @@ public sealed class TreemapView : FrameworkElement
     public TreemapView()
     {
         _toolTip.PlacementTarget = this;
+        Loaded += (_, _) => FontScaleManager.Changed += OnFontScaleChanged;
+        Unloaded += (_, _) => FontScaleManager.Changed -= OnFontScaleChanged;
     }
 
     public IEnumerable? ItemsSource
@@ -124,6 +129,7 @@ public sealed class TreemapView : FrameworkElement
         var deletedPen = ResourcePen("State.Error", 1.5);
         var monoFont = TryFindResource("Font.Mono") as FontFamily;
         var intensity = Intensity;
+        var scale = FontScaleManager.Current;
 
         for (var i = 0; i < nodes.Count; i++)
         {
@@ -151,11 +157,28 @@ public sealed class TreemapView : FrameworkElement
                 : node.IsMarkedDeleted ? deletedPen
                 : null;
 
-            context.DrawRoundedRectangle(fill, pen, tile, CornerRadius, CornerRadius);
+            var radius = node.IsDirectory ? CornerRadius : 0;
 
-            if (tile.Width >= LabelMinWidth && tile.Height >= LabelMinHeight)
+            context.DrawRoundedRectangle(fill, null, tile, radius, radius);
+
+            if (node is { IsDirectory: true, IsMarkedDeleted: false })
             {
-                DrawLabel(context, node, tile, monoFont);
+                context.DrawRoundedRectangle(CushionBrush, null, tile, radius, radius);
+            }
+
+            if (pen is not null)
+            {
+                context.DrawRoundedRectangle(null, pen, tile, radius, radius);
+            }
+
+            if (tile.Width >= LabelMinWidth && tile.Height >= LabelMinHeight * scale)
+            {
+                DrawLabel(context, node, tile, monoFont, scale);
+            }
+
+            if (node.IsDirectory)
+            {
+                DrawFolderMarker(context, tile);
             }
         }
 
@@ -226,6 +249,11 @@ public sealed class TreemapView : FrameworkElement
     {
         _hover = null;
         _toolTip.IsOpen = false;
+    }
+
+    private void OnFontScaleChanged(object? sender, double scale)
+    {
+        InvalidateVisual();
     }
 
     private void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -301,6 +329,43 @@ public sealed class TreemapView : FrameworkElement
         var brush = new SolidColorBrush(color);
         brush.Freeze();
         return brush;
+    }
+
+    private static Brush FrozenCushion()
+    {
+        var brush = new LinearGradientBrush
+        {
+            StartPoint = new(0, 0),
+            EndPoint = new(0, 1),
+            GradientStops =
+            {
+                new(Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF), 0),
+                new(Color.FromArgb(0x00, 0xFF, 0xFF, 0xFF), 0.55),
+            },
+        };
+
+        brush.Freeze();
+        return brush;
+    }
+
+    private static void DrawFolderMarker(DrawingContext context, Rect tile)
+    {
+        if (tile.Width < MarkerSize * 1.8 || tile.Height < MarkerSize * 1.8)
+        {
+            return;
+        }
+
+        var geometry = new StreamGeometry();
+
+        using (var sink = geometry.Open())
+        {
+            sink.BeginFigure(new(tile.Right - MarkerSize, tile.Top), true, true);
+            sink.LineTo(new(tile.Right, tile.Top), false, false);
+            sink.LineTo(new(tile.Right, tile.Top + MarkerSize), false, false);
+        }
+
+        geometry.Freeze();
+        context.DrawGeometry(MarkerBrush, null, geometry);
     }
 
     private void ShowTooltip(ScanNodeViewModel? node)
@@ -383,18 +448,18 @@ public sealed class TreemapView : FrameworkElement
         return null;
     }
 
-    private void DrawLabel(DrawingContext context, ScanNodeViewModel node, Rect tile, FontFamily? monoFont)
+    private void DrawLabel(DrawingContext context, ScanNodeViewModel node, Rect tile, FontFamily? monoFont, double scale)
     {
         var x = tile.X + Padding;
         var y = tile.Y + 4;
 
-        var name = Text(node.Name, 12, LabelBrush, FontWeights.SemiBold, tile.Width - 2 * Padding - IconSize - IconGap, node.IsMarkedDeleted, null);
+        var name = Text(node.Name, 12 * scale, LabelBrush, FontWeights.SemiBold, tile.Width - 2 * Padding - IconSize - IconGap, node.IsMarkedDeleted, null);
         var icon = node.IsDirectory ? FolderIcon : FileIcon;
 
         DrawIcon(context, icon, new(x, y + (name.Height - IconSize) / 2, IconSize, IconSize));
         context.DrawText(name, new(x + IconSize + IconGap, y));
 
-        var size = Text(node.SizeText, 11, SubLabelBrush, FontWeights.Normal, tile.Width - 2 * Padding, false, monoFont);
+        var size = Text(node.SizeText, 11 * scale, SubLabelBrush, FontWeights.Normal, tile.Width - 2 * Padding, false, monoFont);
         context.DrawText(size, new(x, y + name.Height + 1));
     }
 
