@@ -1,6 +1,7 @@
 ﻿using KeepShell.Services;
 using MahApps.Metro.IconPacks;
 using Microsoft.Win32;
+using SpaceSnoop.Wpf.Diff;
 using System.Diagnostics;
 using System.IO;
 using System.Windows.Input;
@@ -10,6 +11,8 @@ namespace SpaceSnoop.Wpf.ViewModels;
 // TODO: Шляпа с ILogger
 public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPageStatus
 {
+    private const long MaxDiffBytes = 5 * 1024 * 1024;
+
     private static readonly SyncMode[] ModeOrder = [SyncMode.LeftToRight, SyncMode.RightToLeft, SyncMode.Bidirectional];
     private readonly ISettingsStore _settings;
     private readonly IDialogService _dialogs;
@@ -150,6 +153,40 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         UpdateSummary();
     }
 
+    public async Task CompareContentAsync(FileComparison file)
+    {
+        if (_result is null)
+        {
+            return;
+        }
+
+        var leftPath = Path.Combine(_result.LeftPath, file.RelativePath);
+        var rightPath = Path.Combine(_result.RightPath, file.RelativePath);
+
+        FileDiffResult built;
+
+        try
+        {
+            built = await Task.Run(() => BuildContentDiff(leftPath, rightPath));
+        }
+        catch (InvalidOperationException ex)
+        {
+            _dialogs.Warning("Сравнение содержимого", ex.Message);
+            return;
+        }
+        catch (Exception ex)
+        {
+            _logger.ContentCompareFailed(ex, file.RelativePath);
+            _dialogs.Error("Сравнение содержимого", ex.Message);
+            return;
+        }
+
+        _logger.ContentCompareOpened(file.RelativePath, built.Added, built.Removed);
+
+        var dialog = new FileDiffDialogViewModel(file.Name, leftPath, rightPath, built.Rows, built.Added, built.Removed);
+        await _dialogs.ShowAsync(dialog);
+    }
+
     private static void ApplyActionRecursive(DirectoryComparison dir, SyncAction action)
     {
         foreach (var file in dir.Files)
@@ -212,6 +249,40 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         cache[dir] = (left, right);
         return (left, right);
+    }
+
+    private static FileDiffResult BuildContentDiff(string leftPath, string rightPath)
+    {
+        var left = ReadTextLines(leftPath);
+        var right = ReadTextLines(rightPath);
+        var lines = TextDiff.Compute(left, right);
+        var rows = TextDiff.ToSideBySide(lines);
+        var added = lines.Count(static l => l.Kind == DiffLineKind.Added);
+        var removed = lines.Count(static l => l.Kind == DiffLineKind.Removed);
+        return new(rows, added, removed);
+    }
+
+    private static string[] ReadTextLines(string path)
+    {
+        var info = new FileInfo(path);
+
+        if (!info.Exists)
+        {
+            throw new InvalidOperationException($"Файл не найден: {path}");
+        }
+
+        if (info.Length > MaxDiffBytes)
+        {
+            throw new InvalidOperationException("Файл слишком велик для построчного сравнения (> 5 МБ).");
+        }
+
+        // TODO: бинарь определяем по NUL-байту; кодировку доверяем File.ReadAllLines (BOM → UTF-8)
+        if (Array.IndexOf(File.ReadAllBytes(path), (byte)0) >= 0)
+        {
+            throw new InvalidOperationException("Файл выглядит двоичным — построчное сравнение недоступно.");
+        }
+
+        return File.ReadAllLines(path);
     }
 
     private void HashModifiedFiles(DirectoryComparison dir, string leftBase, string rightBase, CancellationToken token)
@@ -703,4 +774,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     }
 
     private sealed record ComparePreparation(ComparisonResult Result, Dictionary<DirectoryComparison, (long Left, long Right)> Sizes);
+
+    private sealed record FileDiffResult(IReadOnlyList<DiffRow> Rows, int Added, int Removed);
 }

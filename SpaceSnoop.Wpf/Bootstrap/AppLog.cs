@@ -67,6 +67,12 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1207, Level = LogLevel.Error, Message = "Не удалось записать лог синхронизации")]
     public static partial void SyncLogWriteFailed(this ILogger logger, Exception exception);
 
+    [LoggerMessage(EventId = 1208, Level = LogLevel.Information, Message = "Сравнение содержимого: «{Path}» (+{Added} −{Removed})")]
+    public static partial void ContentCompareOpened(this ILogger logger, string path, int added, int removed);
+
+    [LoggerMessage(EventId = 1209, Level = LogLevel.Warning, Message = "Не удалось сравнить содержимое файла {Path}")]
+    public static partial void ContentCompareFailed(this ILogger logger, Exception exception, string path);
+
     [LoggerMessage(EventId = 1300, Level = LogLevel.Warning, Message = "Не удалось положить лог-секцию в буфер обмена")]
     public static partial void ClipboardLogSectionFailed(this ILogger logger, Exception exception);
 

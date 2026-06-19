@@ -155,6 +155,22 @@
             </ContextMenu.Resources>
 
             <MenuItem
+                Command="{Binding PlacementTarget.DataContext.CompareContentCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                Visibility="{Binding PlacementTarget.DataContext.CanCompareContent, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+                <MenuItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                                  Kind="{x:Static iconPacks:PackIconLucideKind.GitCompareArrows}"
+                                                  Foreground="{DynamicResource State.Info}" />
+                        <TextBlock Text="Сравнить содержимое"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </MenuItem.Header>
+            </MenuItem>
+            <Separator
+                Visibility="{Binding PlacementTarget.DataContext.CanCompareContent, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}" />
+
+            <MenuItem
                 Command="{Binding PlacementTarget.DataContext.CopyToRightCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                 Visibility="{Binding PlacementTarget.DataContext.IsFile, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
                 <MenuItem.Header>
@@ -520,6 +536,7 @@
                      BorderThickness="0"
                      Margin="0,4,0,0"
                      Foreground="{DynamicResource Fg.Primary}"
+                     MouseDoubleClick="OnRowDoubleClick"
                      ItemContainerStyle="{StaticResource DiffRow}"
                      HorizontalContentAlignment="Stretch"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"

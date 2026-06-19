@@ -104,6 +104,8 @@ public sealed partial class SyncNodeViewModel : ObservableObject
 
     public bool CanCycle => _file is not null && Status != ComparisonStatus.Identical;
 
+    public bool CanCompareContent => _file is not null && Status is not (ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly);
+
     public bool CanDirDelete => IsDirectory && Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly;
 
     public string DirDeleteHeader => Status == ComparisonStatus.RightOnly ? "Всё удалить справа" : "Всё удалить слева";
@@ -146,6 +148,17 @@ public sealed partial class SyncNodeViewModel : ObservableObject
         {
             _owner.ToggleExpand(_dir);
         }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanCompareContent))]
+    private Task CompareContentAsync()
+    {
+        if (_file is not null)
+        {
+            return _owner.CompareContentAsync(_file);
+        }
+
+        return Task.CompletedTask;
     }
 
     [RelayCommand]
