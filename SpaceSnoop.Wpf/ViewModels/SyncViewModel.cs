@@ -117,6 +117,13 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _ => PackIconLucideKind.ArrowRight,
     };
 
+    public string DirectionHint => CurrentMode switch
+    {
+        SyncMode.RightToLeft => "Направление: справа налево. Клик — сменить, ПКМ — поменять пути местами.",
+        SyncMode.Bidirectional => "Направление: двустороннее. Клик — сменить, ПКМ — поменять пути местами.",
+        _ => "Направление: слева направо. Клик — сменить, ПКМ — поменять пути местами.",
+    };
+
     public string PageTitle => "Синхронизация";
 
     public string PageDescription => "Сравнение и синхронизация двух каталогов.";
@@ -543,10 +550,23 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _cts?.Cancel();
     }
 
+    [RelayCommand]
+    private void CycleMode()
+    {
+        SelectedModeIndex = (SelectedModeIndex + 1) % ModeOrder.Length;
+    }
+
+    [RelayCommand]
+    private void SwapPaths()
+    {
+        (LeftPath, RightPath) = (RightPath, LeftPath);
+    }
+
     partial void OnSelectedModeIndexChanged(int value)
     {
         Persist(SettingsKeys.SyncMode, value.ToString());
         OnPropertyChanged(nameof(DirectionIconKind));
+        OnPropertyChanged(nameof(DirectionHint));
 
         if (_result is null)
         {
