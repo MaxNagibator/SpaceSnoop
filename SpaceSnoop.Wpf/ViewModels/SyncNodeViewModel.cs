@@ -36,6 +36,8 @@ public sealed partial class SyncNodeViewModel : ObservableObject
 
         LeftSizeText = file.LeftSize is { } left ? SizeFormatter.Format(left) : string.Empty;
         RightSizeText = file.RightSize is { } right ? SizeFormatter.Format(right) : string.Empty;
+        LeftModifiedText = FormatModified(file.LeftModified);
+        RightModifiedText = FormatModified(file.RightModified);
     }
 
     public int Indent { get; }
@@ -59,6 +61,10 @@ public sealed partial class SyncNodeViewModel : ObservableObject
     public string LeftSizeText { get; }
 
     public string RightSizeText { get; }
+
+    public string LeftModifiedText { get; } = string.Empty;
+
+    public string RightModifiedText { get; } = string.Empty;
 
     public PackIconLucideKind ExpandIconKind => IsExpanded ? PackIconLucideKind.ChevronDown : PackIconLucideKind.ChevronRight;
 
@@ -116,6 +122,11 @@ public sealed partial class SyncNodeViewModel : ObservableObject
                 _ => "Действие не задано — клик выбирает следующее",
             };
         }
+    }
+
+    private static string FormatModified(DateTime? value)
+    {
+        return value is { } dt ? dt.ToString("yyyy-MM-dd HH:mm") : string.Empty;
     }
 
     [RelayCommand]

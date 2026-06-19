@@ -38,6 +38,7 @@ public static class SettingsKeys
     public const string SyncMode = "wpf.sync.mode";
     public const string SyncShowIdentical = "wpf.sync.show_identical";
     public const string SyncShowSizes = "wpf.sync.show_sizes";
+    public const string SyncShowModified = "wpf.sync.show_modified";
 
     public static string Theme => ThemeManager.SettingsKeyName;
 }

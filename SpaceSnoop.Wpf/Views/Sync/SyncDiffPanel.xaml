@@ -423,6 +423,15 @@
             <Setter Property="MinWidth"
                     Value="56" />
         </Style>
+
+        <Style x:Key="SideModified"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource SideSize}">
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Muted}" />
+            <Setter Property="MinWidth"
+                    Value="0" />
+        </Style>
     </UserControl.Resources>
 
     <Border Style="{StaticResource Card}"
@@ -508,6 +517,7 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <Button Grid.Column="0"
                                         Style="{StaticResource ChevronToggle}"
@@ -545,6 +555,12 @@
                                     </iconPacks:PackIconLucide.Style>
                                 </iconPacks:PackIconLucide>
                                 <TextBlock Grid.Column="4"
+                                           Text="{Binding LeftModifiedText}"
+                                           Style="{StaticResource SideModified}"
+                                           Margin="8,0,0,0"
+                                           ToolTip="Последнее изменение"
+                                           Visibility="{Binding DataContext.ShowModified, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}" />
+                                <TextBlock Grid.Column="5"
                                            Text="{Binding LeftSizeText}"
                                            Style="{StaticResource SideSize}"
                                            Margin="8,0,6,0"
@@ -572,6 +588,7 @@
                                     <ColumnDefinition Width="14" />
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
@@ -611,6 +628,12 @@
                                     </iconPacks:PackIconLucide.Style>
                                 </iconPacks:PackIconLucide>
                                 <TextBlock Grid.Column="4"
+                                           Text="{Binding RightModifiedText}"
+                                           Style="{StaticResource SideModified}"
+                                           Margin="8,0,0,0"
+                                           ToolTip="Последнее изменение"
+                                           Visibility="{Binding DataContext.ShowModified, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}" />
+                                <TextBlock Grid.Column="5"
                                            Text="{Binding RightSizeText}"
                                            Style="{StaticResource SideSize}"
                                            Margin="8,0,6,0"

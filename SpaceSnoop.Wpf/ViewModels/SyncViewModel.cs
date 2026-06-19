@@ -46,6 +46,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private bool _showSizes = AppDefaults.SyncShowSizesDefault;
 
     [ObservableProperty]
+    private bool _showModified = AppDefaults.SyncShowModifiedDefault;
+
+    [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CompareCommand))]
     [NotifyCanExecuteChangedFor(nameof(HashCommand))]
     [NotifyCanExecuteChangedFor(nameof(SyncCommand))]
@@ -500,6 +503,11 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         Persist(SettingsKeys.SyncShowSizes, value ? "true" : "false");
     }
 
+    partial void OnShowModifiedChanged(bool value)
+    {
+        Persist(SettingsKeys.SyncShowModified, value ? "true" : "false");
+    }
+
     partial void OnLeftPathChanged(string value)
     {
         Persist(SettingsKeys.SyncLeft, value);
@@ -679,6 +687,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         SelectedModeIndex = Math.Clamp(_settings.GetInt(SettingsKeys.SyncMode), 0, ModeOrder.Length - 1);
         ShowIdentical = _settings.GetBool(SettingsKeys.SyncShowIdentical);
         ShowSizes = _settings.GetBool(SettingsKeys.SyncShowSizes, AppDefaults.SyncShowSizesDefault);
+        ShowModified = _settings.GetBool(SettingsKeys.SyncShowModified);
 
         _suppressPersist = false;
     }
