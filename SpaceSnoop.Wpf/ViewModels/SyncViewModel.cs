@@ -183,7 +183,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         _logger.ContentCompareOpened(file.RelativePath, built.Added, built.Removed);
 
-        var dialog = new FileDiffDialogViewModel(file.Name, leftPath, rightPath, built.Rows, built.Added, built.Removed);
+        var dialog = new FileDiffDialogViewModel(_settings, file.Name, leftPath, rightPath, built.Lines, built.Added, built.Removed);
         await _dialogs.ShowAsync(dialog);
     }
 
@@ -256,10 +256,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         var left = ReadTextLines(leftPath);
         var right = ReadTextLines(rightPath);
         var lines = TextDiff.Compute(left, right);
-        var rows = TextDiff.ToSideBySide(lines);
         var added = lines.Count(static l => l.Kind == DiffLineKind.Added);
         var removed = lines.Count(static l => l.Kind == DiffLineKind.Removed);
-        return new(rows, added, removed);
+        return new(lines, added, removed);
     }
 
     private static string[] ReadTextLines(string path)
@@ -775,5 +774,5 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     private sealed record ComparePreparation(ComparisonResult Result, Dictionary<DirectoryComparison, (long Left, long Right)> Sizes);
 
-    private sealed record FileDiffResult(IReadOnlyList<DiffRow> Rows, int Added, int Removed);
+    private sealed record FileDiffResult(IReadOnlyList<DiffLine> Lines, int Added, int Removed);
 }

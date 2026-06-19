@@ -1,4 +1,5 @@
 ﻿using SpaceSnoop.Wpf.Diff;
+using System.Globalization;
 
 namespace SpaceSnoop.Wpf.Tests;
 
@@ -86,5 +87,49 @@ public class TextDiffTests
             Assert.That(rows[2].LeftKind, Is.EqualTo(DiffLineKind.None));
             Assert.That(rows.All(static r => r.RightKind == DiffLineKind.Added));
         }
+    }
+
+    private static IReadOnlyList<DiffLine> SingleChangeDiff()
+    {
+        var left = Enumerable.Range(0, 30).Select(static i => i.ToString(CultureInfo.InvariantCulture)).ToArray();
+        var right = (string[])left.Clone();
+        right[0] = "X";
+        return TextDiff.Compute(left, right);
+    }
+
+    [Test]
+    public void Collapse_сворачивает_длинный_неизменный_блок_сохраняя_контекст()
+    {
+        var lines = SingleChangeDiff();
+
+        var segments = TextDiff.Collapse(lines, 3, new HashSet<int>());
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(segments.Any(static s => s.IsGap), "длинный неизменный хвост должен схлопнуться");
+            Assert.That(segments.Where(static s => !s.IsGap).Where(s => lines[s.Start].Kind == DiffLineKind.Context).Sum(static s => s.Count), Is.EqualTo(3), "вокруг изменения остаётся ровно context строк");
+            Assert.That(segments.Sum(static s => s.Count), Is.EqualTo(lines.Count), "сегменты покрывают все строки без потерь");
+        }
+    }
+
+    [Test]
+    public void Collapse_не_трогает_короткий_неизменный_блок()
+    {
+        var lines = TextDiff.Compute(["A", "b", "c", "D"], ["A2", "b", "c", "D2"]);
+
+        var segments = TextDiff.Collapse(lines, 3, new HashSet<int>());
+
+        Assert.That(segments.Any(static s => s.IsGap), Is.False);
+    }
+
+    [Test]
+    public void Collapse_разворачивает_сегмент_по_ключу()
+    {
+        var lines = SingleChangeDiff();
+        var gap = TextDiff.Collapse(lines, 3, new HashSet<int>()).First(static s => s.IsGap);
+
+        var expanded = TextDiff.Collapse(lines, 3, new HashSet<int> { gap.Start });
+
+        Assert.That(expanded.Any(static s => s.IsGap), Is.False);
     }
 }

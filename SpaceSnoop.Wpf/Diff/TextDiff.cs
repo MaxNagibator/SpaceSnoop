@@ -38,6 +38,40 @@ public static class TextDiff
         return result;
     }
 
+    public static IReadOnlyList<DiffSegment> Collapse(IReadOnlyList<DiffLine> lines, int context, IReadOnlySet<int> expanded)
+    {
+        var segments = new List<DiffSegment>();
+        var n = lines.Count;
+        var i = 0;
+
+        while (i < n)
+        {
+            if (lines[i].Kind != DiffLineKind.Context)
+            {
+                var changeStart = i;
+
+                while (i < n && lines[i].Kind != DiffLineKind.Context)
+                {
+                    i++;
+                }
+
+                segments.Add(new(false, changeStart, i - changeStart));
+                continue;
+            }
+
+            var runStart = i;
+
+            while (i < n && lines[i].Kind == DiffLineKind.Context)
+            {
+                i++;
+            }
+
+            AddContextRun(segments, runStart, i, n, context, expanded);
+        }
+
+        return segments;
+    }
+
     public static IReadOnlyList<DiffRow> ToSideBySide(IReadOnlyList<DiffLine> lines)
     {
         var rows = new List<DiffRow>(lines.Count);
@@ -86,6 +120,33 @@ public static class TextDiff
 
         Flush();
         return rows;
+    }
+
+    private static void AddContextRun(List<DiffSegment> segments, int start, int end, int total, int context, IReadOnlySet<int> expanded)
+    {
+        var length = end - start;
+        var keepPrefix = start == 0 ? 0 : context;
+        var keepSuffix = end == total ? 0 : context;
+        var gapStart = start + keepPrefix;
+        var gapCount = length - keepPrefix - keepSuffix;
+
+        if (gapCount < 2 || expanded.Contains(gapStart))
+        {
+            segments.Add(new(false, start, length));
+            return;
+        }
+
+        if (keepPrefix > 0)
+        {
+            segments.Add(new(false, start, keepPrefix));
+        }
+
+        segments.Add(new(true, gapStart, gapCount));
+
+        if (keepSuffix > 0)
+        {
+            segments.Add(new(false, end - keepSuffix, keepSuffix));
+        }
     }
 
     private static void DiffMiddle(IReadOnlyList<string> left, IReadOnlyList<string> right, int leftStart, int leftEnd, int rightEnd, List<DiffLine> output)

@@ -25,4 +25,7 @@ public static class AppDefaults
     public const bool SyncShowSizesDefault = true;
     public const bool SyncShowModifiedDefault = false;
     public const double SyncIndentStep = 16;
+
+    public const bool SyncDiffCollapseDefault = true;
+    public const int DiffContextLines = 3;
 }
