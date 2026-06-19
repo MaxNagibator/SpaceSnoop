@@ -189,6 +189,35 @@
                     </Button>
                 </StackPanel>
 
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
+                            Margin="16,0,0,0">
+                    <ComboBox ItemsSource="{Binding Modes}"
+                              SelectedIndex="{Binding SelectedModeIndex}"
+                              Style="{StaticResource ComboBox.Toolbar}"
+                              MinWidth="172"
+                              VerticalAlignment="Center"
+                              Margin="0,0,16,0"
+                              ToolTip="Направление синхронизации" />
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Funnel}"
+                                              Width="13"
+                                              Height="13"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,6,0"
+                                              Foreground="{DynamicResource Fg.Muted}" />
+                    <TextBlock Text="Исключения"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0"
+                               Style="{StaticResource TextBlock.Subtle}" />
+                    <TextBox Text="{Binding Exclusions, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource TextBox.Toolbar}"
+                             Width="200"
+                             VerticalAlignment="Center"
+                             ToolTip="Глоб-шаблоны через запятую, напр. bin,obj,*.tmp" />
+                </StackPanel>
+
                 <StackPanel Grid.Column="2"
                             Orientation="Horizontal"
                             VerticalAlignment="Center">
@@ -240,96 +269,6 @@
                             </Button>
                         </StackPanel>
                     </Border>
-                </StackPanel>
-            </Grid>
-
-            <Grid Margin="0,10,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-
-                <StackPanel Grid.Column="0"
-                            Orientation="Horizontal"
-                            VerticalAlignment="Center">
-                    <ComboBox ItemsSource="{Binding Modes}"
-                              SelectedIndex="{Binding SelectedModeIndex}"
-                              Style="{StaticResource ComboBox.Toolbar}"
-                              MinWidth="172"
-                              VerticalAlignment="Center"
-                              Margin="0,0,16,0"
-                              ToolTip="Направление синхронизации" />
-                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Funnel}"
-                                              Width="13"
-                                              Height="13"
-                                              VerticalAlignment="Center"
-                                              Margin="0,0,6,0"
-                                              Foreground="{DynamicResource Fg.Muted}" />
-                    <TextBlock Text="Исключения"
-                               VerticalAlignment="Center"
-                               Margin="0,0,8,0"
-                               Style="{StaticResource TextBlock.Subtle}" />
-                    <TextBox Text="{Binding Exclusions, UpdateSourceTrigger=PropertyChanged}"
-                             Style="{StaticResource TextBox.Toolbar}"
-                             Width="200"
-                             VerticalAlignment="Center"
-                             ToolTip="Глоб-шаблоны через запятую, напр. bin,obj,*.tmp" />
-                </StackPanel>
-
-                <StackPanel Grid.Column="2"
-                            Orientation="Horizontal"
-                            VerticalAlignment="Center">
-                    <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
-                                  IsChecked="{Binding ShowIdentical}"
-                                  MinWidth="0"
-                                  Padding="9,0"
-                                  Margin="0,0,8,0"
-                                  ToolTip="Показывать одинаковые файлы"
-                                  AutomationProperties.Name="Показывать одинаковые файлы">
-                        <StackPanel Orientation="Horizontal">
-                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Equal}"
-                                                      Width="14"
-                                                      Height="14"
-                                                      VerticalAlignment="Center"
-                                                      Margin="0,0,6,0" />
-                            <TextBlock Text="Одинаковые"
-                                       VerticalAlignment="Center" />
-                        </StackPanel>
-                    </ToggleButton>
-                    <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
-                                  IsChecked="{Binding ShowSizes}"
-                                  MinWidth="0"
-                                  Padding="9,0"
-                                  Margin="0,0,8,0"
-                                  ToolTip="Показывать размеры файлов"
-                                  AutomationProperties.Name="Показывать размеры файлов">
-                        <StackPanel Orientation="Horizontal">
-                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Ruler}"
-                                                      Width="14"
-                                                      Height="14"
-                                                      VerticalAlignment="Center"
-                                                      Margin="0,0,6,0" />
-                            <TextBlock Text="Размеры"
-                                       VerticalAlignment="Center" />
-                        </StackPanel>
-                    </ToggleButton>
-                    <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
-                                  IsChecked="{Binding ShowModified}"
-                                  MinWidth="0"
-                                  Padding="9,0"
-                                  ToolTip="Показывать время последнего изменения файла"
-                                  AutomationProperties.Name="Показывать время последнего изменения файла">
-                        <StackPanel Orientation="Horizontal">
-                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Clock}"
-                                                      Width="14"
-                                                      Height="14"
-                                                      VerticalAlignment="Center"
-                                                      Margin="0,0,6,0" />
-                            <TextBlock Text="Изменён"
-                                       VerticalAlignment="Center" />
-                        </StackPanel>
-                    </ToggleButton>
                 </StackPanel>
             </Grid>
         </StackPanel>
