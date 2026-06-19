@@ -337,3 +337,6 @@ dotnet_diagnostic.T0000.severity = none
 
 # T0043: Do not use primary constructors (SonarAnalyzer.CSharp.Styling)
 dotnet_diagnostic.T0043.severity = none
+
+# T0046: Move ILogger extension to ILoggerExtensions class (SonarAnalyzer.CSharp.Styling) — conflicts with the AppLog/CoreLog log-catalog pattern
+dotnet_diagnostic.T0046.severity = none

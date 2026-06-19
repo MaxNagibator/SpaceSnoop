@@ -1,48 +1,15 @@
+﻿using Microsoft.Extensions.Logging;
 using Microsoft.VisualBasic.FileIO;
 
 namespace SpaceSnoop.Core;
 
-// TODO: Добавить логгер и сделать не статическим
-public sealed class SyncEngine
+public sealed class SyncEngine(ILogger<SyncEngine> logger)
 {
     public SyncReport Execute(ComparisonResult comparisonResult, CancellationToken cancel)
     {
         var report = new SyncReport();
         ExecuteRecursive(comparisonResult.Root, comparisonResult.LeftPath, comparisonResult.RightPath, report, cancel);
         return report;
-    }
-
-    private static void ExecuteRecursive(
-        DirectoryComparison dir,
-        string leftBase,
-        string rightBase,
-        SyncReport report,
-        CancellationToken cancel)
-    {
-        foreach (var file in dir.Files)
-        {
-            cancel.ThrowIfCancellationRequested();
-
-            if (file.Action is SyncAction.None or SyncAction.Skip)
-            {
-                continue;
-            }
-
-            try
-            {
-                ExecuteFileAction(file, leftBase, rightBase);
-                report.SuccessCount++;
-            }
-            catch (Exception ex)
-            {
-                report.Errors.Add(new(file.RelativePath, file.Action, ex.Message));
-            }
-        }
-
-        foreach (var sub in dir.SubDirectories)
-        {
-            ExecuteRecursive(sub, leftBase, rightBase, report, cancel);
-        }
     }
 
     private static void ExecuteFileAction(FileComparison file, string leftBase, string rightBase)
@@ -87,6 +54,41 @@ public sealed class SyncEngine
         if (directory is not null)
         {
             Directory.CreateDirectory(directory);
+        }
+    }
+
+    private void ExecuteRecursive(
+        DirectoryComparison dir,
+        string leftBase,
+        string rightBase,
+        SyncReport report,
+        CancellationToken cancel)
+    {
+        foreach (var file in dir.Files)
+        {
+            cancel.ThrowIfCancellationRequested();
+
+            if (file.Action is SyncAction.None or SyncAction.Skip)
+            {
+                continue;
+            }
+
+            try
+            {
+                ExecuteFileAction(file, leftBase, rightBase);
+                report.SuccessCount++;
+                logger.SyncFileApplied(file.Action, file.RelativePath);
+            }
+            catch (Exception ex)
+            {
+                report.Errors.Add(new(file.RelativePath, file.Action, ex.Message));
+                logger.SyncFileFailed(ex, file.Action, file.RelativePath);
+            }
+        }
+
+        foreach (var sub in dir.SubDirectories)
+        {
+            ExecuteRecursive(sub, leftBase, rightBase, report, cancel);
         }
     }
 }

@@ -1,3 +1,4 @@
+﻿using Microsoft.Extensions.Logging.Abstractions;
 using System.ComponentModel;
 using System.Diagnostics;
 
@@ -73,7 +74,7 @@ public sealed class SyncWorkerService : IDisposable
 
                 try
                 {
-                    var comparer = new DirectoryComparer(filter);
+                    var comparer = new DirectoryComparer(filter, NullLogger<DirectoryComparer>.Instance);
                     var result = comparer.Compare(leftPath, rightPath, token);
                     stopwatch.Stop();
                     args.Result = new CompareResponse(result, stopwatch.Elapsed, null);
@@ -118,7 +119,7 @@ public sealed class SyncWorkerService : IDisposable
 
                 try
                 {
-                    var engine = new SyncEngine();
+                    var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
                     var report = engine.Execute(comparisonResult, token);
                     stopwatch.Stop();
                     args.Result = new SyncResponse(report, stopwatch.Elapsed, null);

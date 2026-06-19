@@ -7,6 +7,7 @@ using System.Windows.Input;
 
 namespace SpaceSnoop.Wpf.ViewModels;
 
+// TODO: Шляпа с ILogger
 public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPageStatus
 {
     private static readonly SyncMode[] ModeOrder = [SyncMode.LeftToRight, SyncMode.RightToLeft, SyncMode.Bidirectional];
@@ -14,6 +15,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private readonly IDialogService _dialogs;
     private readonly OperationPreferences _operations;
     private readonly ILogger<SyncViewModel> _logger;
+    private readonly ILogger<SyncEngine> _engineLogger;
+    private readonly ILogger<DirectoryComparer> _comparerLogger;
     private readonly HashSet<DirectoryComparison> _collapsed = [];
 
     private ComparisonResult? _result;
@@ -62,12 +65,14 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     [NotifyCanExecuteChangedFor(nameof(ResolveAllSkipCommand))]
     private bool _hasPending;
 
-    public SyncViewModel(ISettingsStore settings, IDialogService dialogs, OperationPreferences operations, ILogger<SyncViewModel> logger)
+    public SyncViewModel(ISettingsStore settings, IDialogService dialogs, OperationPreferences operations, ILogger<SyncViewModel> logger, ILogger<SyncEngine> engineLogger, ILogger<DirectoryComparer> comparerLogger)
     {
         _settings = settings;
         _dialogs = dialogs;
         _operations = operations;
         _logger = logger;
+        _engineLogger = engineLogger;
+        _comparerLogger = comparerLogger;
         LoadSettings();
     }
 
@@ -305,7 +310,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         var prepared = await RunAsync("Сравнение...", token =>
         {
-            var comparer = new DirectoryComparer(filter);
+            var comparer = new DirectoryComparer(filter, _comparerLogger);
             var compared = comparer.Compare(left, right, token);
             compared.ApplyMode(mode);
             return new ComparePreparation(compared, BuildDirSizeCache(compared.Root));
@@ -400,7 +405,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         var report = await RunAsync("Синхронизация...", token =>
         {
-            var engine = new SyncEngine();
+            var engine = new SyncEngine(_engineLogger);
             return engine.Execute(result, token);
         });
 

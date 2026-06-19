@@ -1,8 +1,9 @@
+﻿using Microsoft.Extensions.Logging;
 using System.Security;
 
 namespace SpaceSnoop.Core;
 
-public sealed class DirectoryComparer(ExclusionFilter exclusionFilter)
+public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<DirectoryComparer> logger)
 {
     public ComparisonResult Compare(string leftPath, string rightPath, CancellationToken cancel)
     {
@@ -152,7 +153,7 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter)
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or SecurityException or IOException)
         {
-            // Недоступный каталог пропускаем: возвращаем то, что успели собрать.
+            logger.CompareDirectorySkipped(ex, dir.FullName);
         }
 
         return result;
@@ -176,7 +177,7 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter)
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or SecurityException or IOException)
         {
-            // Недоступный каталог пропускаем: возвращаем то, что успели собрать.
+            logger.CompareDirectorySkipped(ex, dir.FullName);
         }
 
         return result;
