@@ -432,6 +432,34 @@
             <Setter Property="MinWidth"
                     Value="0" />
         </Style>
+
+        <Style x:Key="SideModifiedLeft"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource SideModified}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding LeftIsNewer}"
+                             Value="True">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource Accent.Primary}" />
+                    <Setter Property="FontWeight"
+                            Value="SemiBold" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SideModifiedRight"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource SideModified}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding RightIsNewer}"
+                             Value="True">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource Accent.Primary}" />
+                    <Setter Property="FontWeight"
+                            Value="SemiBold" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
 
     <Border Style="{StaticResource Card}"
@@ -556,7 +584,7 @@
                                 </iconPacks:PackIconLucide>
                                 <TextBlock Grid.Column="4"
                                            Text="{Binding LeftModifiedText}"
-                                           Style="{StaticResource SideModified}"
+                                           Style="{StaticResource SideModifiedLeft}"
                                            Margin="8,0,0,0"
                                            ToolTip="Последнее изменение"
                                            Visibility="{Binding DataContext.ShowModified, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}" />
@@ -629,7 +657,7 @@
                                 </iconPacks:PackIconLucide>
                                 <TextBlock Grid.Column="4"
                                            Text="{Binding RightModifiedText}"
-                                           Style="{StaticResource SideModified}"
+                                           Style="{StaticResource SideModifiedRight}"
                                            Margin="8,0,0,0"
                                            ToolTip="Последнее изменение"
                                            Visibility="{Binding DataContext.ShowModified, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}" />

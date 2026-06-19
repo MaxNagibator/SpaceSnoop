@@ -38,6 +38,12 @@ public sealed partial class SyncNodeViewModel : ObservableObject
         RightSizeText = file.RightSize is { } right ? SizeFormatter.Format(right) : string.Empty;
         LeftModifiedText = FormatModified(file.LeftModified);
         RightModifiedText = FormatModified(file.RightModified);
+
+        if (file is { LeftModified: { } leftTime, RightModified: { } rightTime })
+        {
+            LeftIsNewer = leftTime > rightTime;
+            RightIsNewer = rightTime > leftTime;
+        }
     }
 
     public int Indent { get; }
@@ -65,6 +71,10 @@ public sealed partial class SyncNodeViewModel : ObservableObject
     public string LeftModifiedText { get; } = string.Empty;
 
     public string RightModifiedText { get; } = string.Empty;
+
+    public bool LeftIsNewer { get; }
+
+    public bool RightIsNewer { get; }
 
     public PackIconLucideKind ExpandIconKind => IsExpanded ? PackIconLucideKind.ChevronDown : PackIconLucideKind.ChevronRight;
 
