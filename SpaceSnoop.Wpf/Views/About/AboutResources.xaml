@@ -26,7 +26,7 @@
            TargetType="Border"
            BasedOn="{StaticResource Card.Inset}">
         <Setter Property="Margin"
-                Value="0,0,10,0" />
+                Value="0,0,10,10" />
         <Setter Property="Padding"
                 Value="14" />
     </Style>

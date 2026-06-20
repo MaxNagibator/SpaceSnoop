@@ -23,8 +23,8 @@
             <TextBlock Text="Что умеет шнырь"
                        Style="{StaticResource About.SectionTitle}" />
 
-            <UniformGrid Columns="3"
-                         Margin="0,14,0,-10">
+            <UniformGrid Columns="2"
+                         Margin="0,14,-10,0">
                 <Border Style="{StaticResource About.FeatureCard}">
                     <StackPanel>
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.HardDrive}"
@@ -57,8 +57,23 @@
                     </StackPanel>
                 </Border>
 
-                <Border Style="{StaticResource About.FeatureCard}"
-                        Margin="0,0,0,0">
+                <Border Style="{StaticResource About.FeatureCard}">
+                    <StackPanel>
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Container}"
+                                                  Style="{StaticResource About.FeatureIcon}"
+                                                  HorizontalAlignment="Left" />
+                        <TextBlock Text="Docker"
+                                   Style="{StaticResource About.SectionTitle}"
+                                   Margin="0,10,0,0" />
+                        <TextBlock
+                            Text="Показывает, сколько диска отъел Docker — образы, контейнеры, тома, кэш сборки — и чистит лишнее: прунит мусор, сносит объекты по одному, жмёт VHDX. Безвозвратно, мимо корзины."
+                            Style="{StaticResource TextBlock.Subtle}"
+                            TextWrapping="Wrap"
+                            Margin="0,6,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource About.FeatureCard}">
                     <StackPanel>
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ScrollText}"
                                                   Style="{StaticResource About.FeatureIcon}"
