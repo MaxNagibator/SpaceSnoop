@@ -510,7 +510,8 @@
                 <TextBlock Grid.Column="1"
                            Text="ДЕЙСТВИЕ"
                            Style="{StaticResource Caption}"
-                           HorizontalAlignment="Center" />
+                           HorizontalAlignment="Center"
+                           ToolTip="Кружок по центру строки задаёт действие синхронизации — клик циклически переключает копирование / пропуск / удаление." />
 
                 <Grid Grid.Column="2"
                       Margin="8,0,0,0">

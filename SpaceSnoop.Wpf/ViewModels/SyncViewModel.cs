@@ -210,6 +210,35 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
     }
 
+    private static (int Copies, int Deletes) CountPlannedActions(DirectoryComparison dir)
+    {
+        var copies = 0;
+        var deletes = 0;
+
+        foreach (var file in dir.Files)
+        {
+            switch (file.Action)
+            {
+                case SyncAction.CopyToRight or SyncAction.CopyToLeft:
+                    copies++;
+                    break;
+
+                case SyncAction.DeleteLeft or SyncAction.DeleteRight:
+                    deletes++;
+                    break;
+            }
+        }
+
+        foreach (var sub in dir.SubDirectories)
+        {
+            var (subCopies, subDeletes) = CountPlannedActions(sub);
+            copies += subCopies;
+            deletes += subDeletes;
+        }
+
+        return (copies, deletes);
+    }
+
     private static Dictionary<ComparisonStatus, int> NewZeroStats()
     {
         var stats = new Dictionary<ComparisonStatus, int>();
@@ -473,7 +502,22 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             return;
         }
 
-        if (!_dialogs.Confirm("Подтверждение", "Начать синхронизацию?"))
+        var (copies, deletes) = CountPlannedActions(_result.Root);
+        var parts = new List<string>();
+
+        if (copies > 0)
+        {
+            parts.Add($"скопировать — {copies}");
+        }
+
+        if (deletes > 0)
+        {
+            parts.Add($"удалить (в корзину) — {deletes}");
+        }
+
+        var summary = parts.Count > 0 ? string.Join(", ", parts) : "изменений нет";
+
+        if (!_dialogs.Confirm("Синхронизация", $"Будет выполнено: {summary}. Начать?"))
         {
             return;
         }
