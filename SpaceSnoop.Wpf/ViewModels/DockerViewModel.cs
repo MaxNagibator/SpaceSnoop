@@ -1,5 +1,6 @@
 ﻿using KeepShell.Services;
 using System.Collections.ObjectModel;
+using System.Windows.Input;
 
 namespace SpaceSnoop.Wpf.ViewModels;
 
@@ -7,7 +8,7 @@ public sealed partial class DockerViewModel(
     DockerService docker,
     IDialogService dialogs,
     ILogger<DockerViewModel> logger)
-    : ObservableObject, IPageHeader
+    : ObservableObject, IPageHeader, IPageRefresh
 {
     private bool _loadedOnce;
 
@@ -40,6 +41,10 @@ public sealed partial class DockerViewModel(
     public string PageTitle => "Docker";
 
     public string PageDescription => "Сколько места занял Docker и как его вернуть. Очистка безвозвратна — мимо корзины.";
+
+    public string? RefreshTooltip => "Опросить Docker заново";
+
+    ICommand IPageRefresh.RefreshCommand => RefreshCommand;
 
     public async Task EnsureLoadedAsync()
     {
