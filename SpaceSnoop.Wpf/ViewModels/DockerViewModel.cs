@@ -26,6 +26,9 @@ public sealed partial class DockerViewModel(
     [ObservableProperty]
     private string? _statusText;
 
+    [ObservableProperty]
+    private bool _pruneAllVolumes;
+
     public ObservableCollection<DockerUsage> Buckets { get; } = [];
 
     public ObservableCollection<DockerGroupViewModel> Groups { get; } = [];
@@ -208,9 +211,11 @@ public sealed partial class DockerViewModel(
     [RelayCommand]
     private Task PruneVolumes()
     {
+        var scope = PruneAllVolumes ? "ВСЕ неиспользуемые тома (включая именованные)" : "неиспользуемые анонимные тома";
         return RunCleanupAsync(DockerCleanupTarget.UnusedVolumes,
             "Удалить неиспользуемые тома",
-            "⚠ Удалить неиспользуемые тома? В них лежат данные (БД и т.п.) — они пропадут БЕЗВОЗВРАТНО. Продолжить?");
+            $"⚠ Удалить {scope}? В них лежат данные (БД и т.п.) — они пропадут БЕЗВОЗВРАТНО. Продолжить?",
+            PruneAllVolumes);
     }
 
     [RelayCommand]
@@ -248,7 +253,7 @@ public sealed partial class DockerViewModel(
         }
     }
 
-    private async Task RunCleanupAsync(DockerCleanupTarget target, string title, string confirm)
+    private async Task RunCleanupAsync(DockerCleanupTarget target, string title, string confirm, bool allUnused = false)
     {
         if (!CanRun || !dialogs.Confirm(title, confirm))
         {
@@ -260,7 +265,7 @@ public sealed partial class DockerViewModel(
         try
         {
             logger.DockerCleanupStarted(target.ToString());
-            var result = await docker.PruneAsync(target);
+            var result = await docker.PruneAsync(target, allUnused);
             logger.DockerCleanupFinished(target.ToString(), Summarize(result));
             dialogs.Info(title, string.IsNullOrWhiteSpace(result) ? "Готово. Освобождать было нечего." : result);
         }

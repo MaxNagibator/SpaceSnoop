@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+﻿using Microsoft.Win32;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 
@@ -35,7 +36,7 @@ public sealed class DockerService
         return run.Failed ? throw new InvalidOperationException(DescribeFailure(run)) : run.StdOut.Trim();
     }
 
-    public async Task<string> PruneAsync(DockerCleanupTarget target, CancellationToken cancel = default)
+    public async Task<string> PruneAsync(DockerCleanupTarget target, bool allUnused = false, CancellationToken cancel = default)
     {
         var args = target switch
         {
@@ -43,8 +44,7 @@ public sealed class DockerService
             DockerCleanupTarget.DanglingImages => "image prune -f",
             DockerCleanupTarget.UnusedImages => "image prune -a -f",
             DockerCleanupTarget.StoppedContainers => "container prune -f",
-            // TODO: volume prune -a (все неиспользуемые тома) под opt-in
-            DockerCleanupTarget.UnusedVolumes => "volume prune -f",
+            DockerCleanupTarget.UnusedVolumes => allUnused ? "volume prune -a -f" : "volume prune -f",
             _ => throw new ArgumentOutOfRangeException(nameof(target), target, null),
         };
 
@@ -55,7 +55,6 @@ public sealed class DockerService
 
     public async Task<string> CompactAsync(CancellationToken cancel = default)
     {
-        // TODO: агрессивный compact (diskpart/Optimize-VHD)
         var log = new StringBuilder();
 
         var shutdown = await RunAsync("wsl", "--shutdown", cancel: cancel);
@@ -75,7 +74,55 @@ public sealed class DockerService
                 : $"{distro}: sparse включён, место возвращено системе.");
         }
 
+        // TODO: агрессивный compact diskpart'ом (attach readonly → compact vdisk). Нужны права админа,
+        //           освобождает лишь зануленные блоки — поверх sparse даёт немного. Optimize-VHD пропущен (тянет Hyper-V).
+        foreach (var vhdx in LocateDockerVhdx())
+        {
+            log.AppendLine(await CompactVhdxAsync(vhdx, cancel));
+        }
+
         return log.ToString().Trim();
+    }
+
+    private static IReadOnlyList<string> LocateDockerVhdx()
+    {
+        using var lxss = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Lxss");
+        if (lxss is null)
+        {
+            return [];
+        }
+
+        var result = new List<string>();
+
+        foreach (var name in lxss.GetSubKeyNames())
+        {
+            using var sub = lxss.OpenSubKey(name);
+
+            if (sub?.GetValue("DistributionName") is not string distro
+                || sub.GetValue("BasePath") is not string basePath
+                || !distro.StartsWith("docker-desktop", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var vhdx = Path.Combine(basePath, "ext4.vhdx");
+            if (File.Exists(vhdx))
+            {
+                result.Add(vhdx);
+            }
+        }
+
+        return result;
+    }
+
+    private static async Task<string> CompactVhdxAsync(string vhdx, CancellationToken cancel)
+    {
+        var script = $"select vdisk file=\"{vhdx}\"\r\nattach vdisk readonly\r\ncompact vdisk\r\ndetach vdisk\r\nexit\r\n";
+        var run = await RunAsync("diskpart", string.Empty, stdin: script, cancel: cancel);
+
+        return run.Failed
+            ? $"{Path.GetFileName(vhdx)}: diskpart compact не удалось — {DescribeFailure(run)} (нужны права администратора)."
+            : $"{Path.GetFileName(vhdx)}: образ диска скомпактизирован diskpart'ом.";
     }
 
     private static async Task<IReadOnlyList<string>> ListDockerDistrosAsync(CancellationToken cancel)
@@ -97,12 +144,14 @@ public sealed class DockerService
         string fileName,
         string arguments,
         Encoding? outputEncoding = null,
-        CancellationToken cancel = default)
+        CancellationToken cancel = default,
+        string? stdin = null)
     {
         var psi = new ProcessStartInfo(fileName, arguments)
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            RedirectStandardInput = stdin is not null,
             UseShellExecute = false,
             CreateNoWindow = true,
             StandardOutputEncoding = outputEncoding,
@@ -113,6 +162,12 @@ public sealed class DockerService
         {
             using var process = new Process { StartInfo = psi };
             process.Start();
+
+            if (stdin is not null)
+            {
+                await process.StandardInput.WriteAsync(stdin);
+                process.StandardInput.Close();
+            }
 
             var stdOut = process.StandardOutput.ReadToEndAsync(cancel);
             var stdErr = process.StandardError.ReadToEndAsync(cancel);
