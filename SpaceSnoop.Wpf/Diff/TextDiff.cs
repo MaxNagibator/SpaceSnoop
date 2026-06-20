@@ -2,7 +2,7 @@
 
 public static class TextDiff
 {
-    private const long MaxCells = 4_000_000;
+    private const long MaxTraceCells = 4_000_000;
 
     public static IReadOnlyList<DiffLine> Compute(IReadOnlyList<string> left, IReadOnlyList<string> right)
     {
@@ -154,67 +154,109 @@ public static class TextDiff
         var n = leftEnd - leftStart;
         var m = rightEnd - leftStart;
 
-        // TODO: LCS-таблица O(n*m); при огромной середине деградируем в блочную замену
-        //           (память O(строк), не O(n*m)). Апгрейд — Myers/DiffPlex, если станет мало.
-        if (n == 0 || m == 0 || (long)n * m > MaxCells)
+        if (n > 0 && m > 0 && TryMyers(left, right, leftStart, n, m, output))
         {
-            for (var i = leftStart; i < leftEnd; i++)
-            {
-                output.Add(new(DiffLineKind.Removed, left[i], i + 1, 0));
-            }
-
-            for (var j = leftStart; j < rightEnd; j++)
-            {
-                output.Add(new(DiffLineKind.Added, right[j], 0, j + 1));
-            }
-
             return;
         }
 
-        var dp = new int[n + 1, m + 1];
-
-        for (var i = n - 1; i >= 0; i--)
+        for (var i = leftStart; i < leftEnd; i++)
         {
-            for (var j = m - 1; j >= 0; j--)
+            output.Add(new(DiffLineKind.Removed, left[i], i + 1, 0));
+        }
+
+        for (var j = leftStart; j < rightEnd; j++)
+        {
+            output.Add(new(DiffLineKind.Added, right[j], 0, j + 1));
+        }
+    }
+
+    // TODO: Myers O(ND); потолок теперь по числу правок, не по размеру — снимок V на правку, память ≤ ~16 МБ
+    //           (MaxTraceCells). Слишком много правок в огромной середине → false → блочная замена. Апгрейд — линейный Hirschberg.
+    private static bool TryMyers(IReadOnlyList<string> left, IReadOnlyList<string> right, int leftStart, int n, int m, List<DiffLine> output)
+    {
+        var max = n + m;
+        var offset = max;
+        var maxD = (int)Math.Min(max, MaxTraceCells / (2L * max + 1));
+        var v = new int[2 * max + 1];
+        var trace = new List<int[]>();
+
+        var foundD = -1;
+
+        for (var d = 0; d <= max && foundD < 0; d++)
+        {
+            if (d > maxD)
             {
-                dp[i, j] = left[leftStart + i] == right[leftStart + j]
-                    ? dp[i + 1, j + 1] + 1
-                    : Math.Max(dp[i + 1, j], dp[i, j + 1]);
+                return false;
+            }
+
+            trace.Add((int[])v.Clone());
+
+            for (var k = -d; k <= d; k += 2)
+            {
+                var x = k == -d || k != d && v[offset + k - 1] < v[offset + k + 1]
+                    ? v[offset + k + 1]
+                    : v[offset + k - 1] + 1;
+
+                var y = x - k;
+
+                while (x < n && y < m && left[leftStart + x] == right[leftStart + y])
+                {
+                    x++;
+                    y++;
+                }
+
+                v[offset + k] = x;
+
+                if (x >= n && y >= m)
+                {
+                    foundD = d;
+                    break;
+                }
             }
         }
 
-        int a = 0, b = 0;
+        var edits = new List<DiffLine>();
+        int px = n, py = m;
 
-        while (a < n && b < m)
+        for (var d = foundD; d > 0; d--)
         {
-            if (left[leftStart + a] == right[leftStart + b])
+            var prev = trace[d];
+            var k = px - py;
+            var prevK = k == -d || k != d && prev[offset + k - 1] < prev[offset + k + 1]
+                ? k + 1
+                : k - 1;
+
+            var prevX = prev[offset + prevK];
+            var prevY = prevX - prevK;
+
+            while (px > prevX && py > prevY)
             {
-                output.Add(new(DiffLineKind.Context, left[leftStart + a], leftStart + a + 1, leftStart + b + 1));
-                a++;
-                b++;
+                px--;
+                py--;
+                edits.Add(new(DiffLineKind.Context, left[leftStart + px], leftStart + px + 1, leftStart + py + 1));
             }
-            else if (dp[a + 1, b] >= dp[a, b + 1])
+
+            if (px == prevX)
             {
-                output.Add(new(DiffLineKind.Removed, left[leftStart + a], leftStart + a + 1, 0));
-                a++;
+                py--;
+                edits.Add(new(DiffLineKind.Added, right[leftStart + py], 0, leftStart + py + 1));
             }
             else
             {
-                output.Add(new(DiffLineKind.Added, right[leftStart + b], 0, leftStart + b + 1));
-                b++;
+                px--;
+                edits.Add(new(DiffLineKind.Removed, left[leftStart + px], leftStart + px + 1, 0));
             }
         }
 
-        while (a < n)
+        while (px > 0 && py > 0)
         {
-            output.Add(new(DiffLineKind.Removed, left[leftStart + a], leftStart + a + 1, 0));
-            a++;
+            px--;
+            py--;
+            edits.Add(new(DiffLineKind.Context, left[leftStart + px], leftStart + px + 1, leftStart + py + 1));
         }
 
-        while (b < m)
-        {
-            output.Add(new(DiffLineKind.Added, right[leftStart + b], 0, leftStart + b + 1));
-            b++;
-        }
+        edits.Reverse();
+        output.AddRange(edits);
+        return true;
     }
 }

@@ -89,6 +89,41 @@ public class TextDiffTests
         }
     }
 
+    [Test]
+    public void Myers_сохраняет_внутренний_общий_фрагмент()
+    {
+        var diff = TextDiff.Compute(["1", "2", "3", "4"], ["1", "9", "3", "8"]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diff.Any(static l => l.Kind == DiffLineKind.Context && l.Text == "3"), "общая строка «3» в середине должна остаться контекстом");
+            Assert.That(diff.Count(static l => l.Kind == DiffLineKind.Removed), Is.EqualTo(2));
+            Assert.That(diff.Count(static l => l.Kind == DiffLineKind.Added), Is.EqualTo(2));
+        }
+    }
+
+    [Test]
+    public void Myers_разреженные_правки_в_большом_файле_не_деградируют_в_блочную_замену()
+    {
+        var left = Enumerable.Range(0, 3000).Select(static i => i.ToString(CultureInfo.InvariantCulture)).ToArray();
+        var right = (string[])left.Clone();
+        var changes = 0;
+
+        for (var i = 100; i <= 2900; i += 50)
+        {
+            right[i] = "X" + i.ToString(CultureInfo.InvariantCulture);
+            changes++;
+        }
+
+        var diff = TextDiff.Compute(left, right);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diff.Count(static l => l.Kind == DiffLineKind.Removed), Is.EqualTo(changes), "правок мало — блочная замена дала бы тысячи удалений");
+            Assert.That(diff.Count(static l => l.Kind == DiffLineKind.Added), Is.EqualTo(changes));
+        }
+    }
+
     private static IReadOnlyList<DiffLine> SingleChangeDiff()
     {
         var left = Enumerable.Range(0, 30).Select(static i => i.ToString(CultureInfo.InvariantCulture)).ToArray();
