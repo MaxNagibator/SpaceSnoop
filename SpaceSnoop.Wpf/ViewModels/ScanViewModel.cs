@@ -49,6 +49,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     [NotifyCanExecuteChangedFor(nameof(StartCommand))]
     [NotifyCanExecuteChangedFor(nameof(BrowseCommand))]
     [NotifyCanExecuteChangedFor(nameof(StopCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DeleteMarkedCommand))]
     private bool _isScanning;
 
     [ObservableProperty]
@@ -127,6 +128,11 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     [ObservableProperty]
     private bool _scanWasCancelled;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasMarked))]
+    [NotifyCanExecuteChangedFor(nameof(DeleteMarkedCommand))]
+    private int _markedCount;
+
     public ScanViewModel(
         DiskSpaceCalculator calculator,
         IDialogService dialogs,
@@ -150,6 +156,8 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         Preferences = preferences;
         Preferences.PropertyChanged += OnPreferencesChanged;
         Inspector.Intensity = Preferences.Intensity;
+
+        _nodeFactory.MarksChanged += RecountMarked;
 
         _progressTimer = new() { Interval = ProgressPollInterval };
         _progressTimer.Tick += OnProgressTick;
@@ -194,6 +202,8 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
     public bool IsBusy => IsScanning;
 
+    public bool HasMarked => MarkedCount > 0;
+
     public bool TreeVisible => HasResult && !ShowTreemap;
 
     public bool TreemapVisible => HasResult && ShowTreemap;
@@ -205,6 +215,11 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     public double ProgressMax => 1;
 
     public ICommand CancelCommand => StopCommand;
+
+    private void RecountMarked()
+    {
+        MarkedCount = CollectMarked().Count;
+    }
 
     private void OnProgressTick(object? sender, EventArgs e)
     {
@@ -647,6 +662,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
             ResultDirCountText = result.TotalDirectoryCount.ToString("N0");
             ResultElapsedText = FormatElapsed(_scanStopwatch.Elapsed);
             HasResult = true;
+            RecountMarked();
 
             _logger.ScanCompleted(result.AbsolutePath,
                 result.TotalSizeText,
@@ -742,7 +758,12 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         OnPropertyChanged(nameof(ProgressValue));
     }
 
-    [RelayCommand]
+    private bool CanDeleteMarked()
+    {
+        return !IsScanning && MarkedCount > 0;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanDeleteMarked))]
     private async Task DeleteMarkedAsync()
     {
         var marked = CollectMarked();
@@ -839,6 +860,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         }
 
         RefreshTreemapAfterDeletion(deletedSet);
+        RecountMarked();
     }
 
     private List<SpaceBase> CollectMarked()

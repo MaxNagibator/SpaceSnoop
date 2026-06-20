@@ -228,7 +228,7 @@ public sealed partial class ScanNodeViewModel : ObservableObject
         }
 
         Space.Delete();
-        RefreshMarkRecursive();
+        ApplyMarkChange();
     }
 
     [RelayCommand]
@@ -240,7 +240,7 @@ public sealed partial class ScanNodeViewModel : ObservableObject
         }
 
         RestoreRecursive(Space);
-        RefreshMarkRecursive();
+        ApplyMarkChange();
     }
 
     [RelayCommand]
@@ -256,7 +256,7 @@ public sealed partial class ScanNodeViewModel : ObservableObject
             child.Delete();
         }
 
-        RefreshMarkRecursive();
+        ApplyMarkChange();
     }
 
     [RelayCommand]
@@ -272,7 +272,13 @@ public sealed partial class ScanNodeViewModel : ObservableObject
             RestoreRecursive(child);
         }
 
+        ApplyMarkChange();
+    }
+
+    private void ApplyMarkChange()
+    {
         RefreshMarkRecursive();
+        _factory?.RaiseMarksChanged();
     }
 
     private void RefreshMarkRecursive()
