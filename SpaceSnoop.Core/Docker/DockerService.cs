@@ -63,19 +63,19 @@ public sealed class DockerService
         var distros = await ListDockerDistrosAsync(cancel);
         if (distros.Count == 0)
         {
-            return log.Append("Дистрибутивы docker-desktop не найдены — нечего сжимать.").ToString();
+            return log.Append("Дистрибутивы docker-desktop не найдены – нечего сжимать.").ToString();
         }
 
         foreach (var distro in distros)
         {
             var sparse = await RunAsync("wsl", $"--manage {distro} --set-sparse true", cancel: cancel);
             log.AppendLine(sparse.Failed
-                ? $"{distro}: не удалось включить sparse — {DescribeFailure(sparse)}"
+                ? $"{distro}: не удалось включить sparse – {DescribeFailure(sparse)}"
                 : $"{distro}: sparse включён, место возвращено системе.");
         }
 
         // TODO: агрессивный compact diskpart'ом (attach readonly → compact vdisk). Нужны права админа,
-        //           освобождает лишь зануленные блоки — поверх sparse даёт немного. Optimize-VHD пропущен (тянет Hyper-V).
+        //           освобождает лишь зануленные блоки – поверх sparse даёт немного. Optimize-VHD пропущен (тянет Hyper-V).
         foreach (var vhdx in LocateDockerVhdx())
         {
             log.AppendLine(await CompactVhdxAsync(vhdx, cancel));
@@ -121,7 +121,7 @@ public sealed class DockerService
         var run = await RunAsync("diskpart", string.Empty, stdin: script, cancel: cancel);
 
         return run.Failed
-            ? $"{Path.GetFileName(vhdx)}: diskpart compact не удалось — {DescribeFailure(run)} (нужны права администратора)."
+            ? $"{Path.GetFileName(vhdx)}: diskpart compact не удалось – {DescribeFailure(run)} (нужны права администратора)."
             : $"{Path.GetFileName(vhdx)}: образ диска скомпактизирован diskpart'ом.";
     }
 

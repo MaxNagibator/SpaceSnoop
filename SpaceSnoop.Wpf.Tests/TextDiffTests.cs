@@ -119,7 +119,7 @@ public class TextDiffTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(diff.Count(static l => l.Kind == DiffLineKind.Removed), Is.EqualTo(changes), "правок мало — блочная замена дала бы тысячи удалений");
+            Assert.That(diff.Count(static l => l.Kind == DiffLineKind.Removed), Is.EqualTo(changes), "правок мало – блочная замена дала бы тысячи удалений");
             Assert.That(diff.Count(static l => l.Kind == DiffLineKind.Added), Is.EqualTo(changes));
         }
     }

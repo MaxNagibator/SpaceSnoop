@@ -40,7 +40,7 @@ public sealed partial class DockerViewModel(
 
     public string PageTitle => "Docker";
 
-    public string PageDescription => "Сколько места занял Docker и как его вернуть. Очистка безвозвратна — мимо корзины.";
+    public string PageDescription => "Сколько места занял Docker и как его вернуть. Очистка безвозвратна – мимо корзины.";
 
     public string? RefreshTooltip => "Опросить Docker заново";
 
@@ -60,7 +60,7 @@ public sealed partial class DockerViewModel(
     private static string Summarize(string output)
     {
         var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return lines.Length > 0 ? lines[^1] : "—";
+        return lines.Length > 0 ? lines[^1] : "–";
     }
 
     [RelayCommand]
@@ -93,7 +93,7 @@ public sealed partial class DockerViewModel(
                 await LoadObjectsAsync();
 
                 logger.DockerSnapshotLoaded(snapshot.Buckets.Count);
-                StatusText = $"Обновлено: категорий — {snapshot.Buckets.Count}.";
+                StatusText = $"Обновлено: категорий – {snapshot.Buckets.Count}.";
             }
             else
             {
@@ -152,9 +152,9 @@ public sealed partial class DockerViewModel(
         };
 
         var warning = target.Kind == DockerObjectKind.Volume
-            ? " В томе могут лежать данные (БД и т.п.) — они пропадут БЕЗВОЗВРАТНО."
+            ? " В томе могут лежать данные (БД и т.п.) – они пропадут БЕЗВОЗВРАТНО."
             : target.InUse
-                ? " Объект используется — Docker может отказать в удалении."
+                ? " Объект используется – Docker может отказать в удалении."
                 : string.Empty;
 
         if (!dialogs.Confirm($"Удалить {kind}", $"Удалить {kind} «{target.Name}» ({target.Size})?{warning}"))
@@ -219,7 +219,7 @@ public sealed partial class DockerViewModel(
         var scope = PruneAllVolumes ? "ВСЕ неиспользуемые тома (включая именованные)" : "неиспользуемые анонимные тома";
         return RunCleanupAsync(DockerCleanupTarget.UnusedVolumes,
             "Удалить неиспользуемые тома",
-            $"⚠ Удалить {scope}? В них лежат данные (БД и т.п.) — они пропадут БЕЗВОЗВРАТНО. Продолжить?",
+            $"⚠ Удалить {scope}? В них лежат данные (БД и т.п.) – они пропадут БЕЗВОЗВРАТНО. Продолжить?",
             PruneAllVolumes);
     }
 

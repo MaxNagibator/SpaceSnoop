@@ -26,7 +26,7 @@ public static class AppInfo
 
         if (string.IsNullOrWhiteSpace(informational))
         {
-            return assembly.GetName().Version?.ToString() ?? "—";
+            return assembly.GetName().Version?.ToString() ?? "–";
         }
 
         var plusIndex = informational.IndexOf('+');

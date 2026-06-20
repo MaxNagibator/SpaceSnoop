@@ -265,8 +265,8 @@
                                     Padding="9,2"
                                     MinHeight="26"
                                     Foreground="{DynamicResource State.Success}"
-                                    ToolTip="Все спорные — слева направо"
-                                    AutomationProperties.Name="Все спорные — слева направо">
+                                    ToolTip="Все спорные – слева направо"
+                                    AutomationProperties.Name="Все спорные – слева направо">
                                 <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ArrowRight}"
                                                           Width="14"
                                                           Height="14" />
@@ -276,8 +276,8 @@
                                     Padding="9,2"
                                     MinHeight="26"
                                     Foreground="{DynamicResource State.Info}"
-                                    ToolTip="Все спорные — справа налево"
-                                    AutomationProperties.Name="Все спорные — справа налево">
+                                    ToolTip="Все спорные – справа налево"
+                                    AutomationProperties.Name="Все спорные – справа налево">
                                 <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ArrowLeft}"
                                                           Width="14"
                                                           Height="14" />

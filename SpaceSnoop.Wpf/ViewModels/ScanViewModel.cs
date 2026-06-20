@@ -81,16 +81,16 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     private string _resultPath = string.Empty;
 
     [ObservableProperty]
-    private string _resultSizeText = "—";
+    private string _resultSizeText = "–";
 
     [ObservableProperty]
-    private string _resultFileCountText = "—";
+    private string _resultFileCountText = "–";
 
     [ObservableProperty]
-    private string _resultDirCountText = "—";
+    private string _resultDirCountText = "–";
 
     [ObservableProperty]
-    private string _resultElapsedText = "—";
+    private string _resultElapsedText = "–";
 
     [ObservableProperty]
     private string _scanCurrentPath = string.Empty;
@@ -108,7 +108,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     private string _scanElapsedText = "0,0 с";
 
     [ObservableProperty]
-    private string _scanThroughputText = "—";
+    private string _scanThroughputText = "–";
 
     [ObservableProperty]
     private string _scanTopLevelText = string.Empty;
@@ -706,7 +706,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         ScanFileCountText = "0";
         ScanBytesText = SizeFormatter.Format(0);
         ScanElapsedText = FormatElapsed(TimeSpan.Zero);
-        ScanThroughputText = "—";
+        ScanThroughputText = "–";
         ScanTopLevelText = string.Empty;
         ScanPercentText = string.Empty;
         ScanHasBranches = false;

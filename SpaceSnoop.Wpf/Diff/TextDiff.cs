@@ -170,8 +170,8 @@ public static class TextDiff
         }
     }
 
-    // TODO: Myers O(ND); потолок теперь по числу правок, не по размеру — снимок V на правку, память ≤ ~16 МБ
-    //           (MaxTraceCells). Слишком много правок в огромной середине → false → блочная замена. Апгрейд — линейный Hirschberg.
+    // TODO: Myers O(ND); потолок теперь по числу правок, не по размеру – снимок V на правку, память ≤ ~16 МБ
+    //           (MaxTraceCells). Слишком много правок в огромной середине → false → блочная замена. Апгрейд – линейный Hirschberg.
     private static bool TryMyers(IReadOnlyList<string> left, IReadOnlyList<string> right, int leftStart, int n, int m, List<DiffLine> output)
     {
         var max = n + m;

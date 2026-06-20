@@ -28,7 +28,7 @@
                       Margin="0,14,0,0"
                       VerticalAlignment="Center" />
             <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="Параллельный обход каталогов — быстрее, но выше расход памяти." />
+                       Text="Параллельный обход каталогов – быстрее, но выше расход памяти." />
 
             <StackPanel Margin="0,16,0,0"
                         IsEnabled="{Binding Scan.UseMultithreading}">

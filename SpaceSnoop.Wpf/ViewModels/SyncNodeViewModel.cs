@@ -131,7 +131,7 @@ public sealed partial class SyncNodeViewModel : ObservableObject
                 SyncAction.Skip => "Пропустить",
                 SyncAction.DeleteLeft => "Удалить слева",
                 SyncAction.DeleteRight => "Удалить справа",
-                _ => "Действие не задано — клик выбирает следующее",
+                _ => "Действие не задано – клик выбирает следующее",
             };
         }
     }

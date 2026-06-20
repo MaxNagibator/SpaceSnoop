@@ -346,7 +346,7 @@
                                   Margin="16,0,0,0"
                                   MinWidth="0"
                                   Padding="9,0"
-                                  ToolTip="Карта занятого места (treemap). Повторное нажатие — назад к дереву."
+                                  ToolTip="Карта занятого места (treemap). Повторное нажатие – назад к дереву."
                                   AutomationProperties.Name="Показать карту занятого места"
                                   Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
                         <StackPanel Orientation="Horizontal">
@@ -386,7 +386,7 @@
                                   IsChecked="{Binding InvertSort}"
                                   MinWidth="34"
                                   Padding="0"
-                                  ToolTip="Направление: отмечено — по убыванию, снято — по возрастанию"
+                                  ToolTip="Направление: отмечено – по убыванию, снято – по возрастанию"
                                   AutomationProperties.Name="Направление сортировки">
                         <iconPacks:PackIconLucide Width="15"
                                                   Height="15"
@@ -618,7 +618,7 @@
                                   Icon="HardDrive"
                                   IconSize="40"
                                   Heading="Готовы к обзору диска"
-                                  Description="Выберите диск или каталог и запустите сканирование — построим карту занятого места с тепловой подсветкой самых тяжёлых веток."
+                                  Description="Выберите диск или каталог и запустите сканирование – построим карту занятого места с тепловой подсветкой самых тяжёлых веток."
                                   DescriptionMaxWidth="440"
                                   ActionText="Выбрать каталог"
                                   ActionCommand="{Binding BrowseCommand}"

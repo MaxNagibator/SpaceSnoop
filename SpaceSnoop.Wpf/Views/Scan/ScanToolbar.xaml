@@ -90,7 +90,7 @@
                         VerticalAlignment="Center">
                 <Button Style="{StaticResource Button.Destructive}"
                         Command="{Binding DeleteMarkedCommand}"
-                        ToolTip="Переместить помеченные элементы в корзину (пометка — ПКМ по узлу)">
+                        ToolTip="Переместить помеченные элементы в корзину (пометка – ПКМ по узлу)">
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
                                                   Width="14"

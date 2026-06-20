@@ -40,7 +40,7 @@
         <StackPanel>
             <TextBlock Text="Очистка"
                        Style="{StaticResource Docker.SectionTitle}" />
-            <TextBlock Text="Операции Docker безвозвратны — мимо корзины. Перед каждой спросим подтверждение."
+            <TextBlock Text="Операции Docker безвозвратны – мимо корзины. Перед каждой спросим подтверждение."
                        Style="{StaticResource TextBlock.Subtle}"
                        Foreground="{DynamicResource Fg.Muted}"
                        TextWrapping="Wrap"
@@ -88,7 +88,7 @@
                 </Button>
             </WrapPanel>
 
-            <TextBlock Text="Агрессивно — безвозвратно"
+            <TextBlock Text="Агрессивно – безвозвратно"
                        Style="{StaticResource Docker.ColumnHeader}"
                        Foreground="{DynamicResource State.Warning}"
                        Margin="0,10,0,6" />
@@ -109,7 +109,7 @@
                         Command="{Binding PruneVolumesCommand}"
                         IsEnabled="{Binding CanRun}"
                         Margin="0,0,8,8"
-                        ToolTip="docker volume prune — в томах лежат данные!">
+                        ToolTip="docker volume prune – в томах лежат данные!">
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Database}"
                                                   Style="{StaticResource Docker.ActionButtonContent}" />
@@ -122,7 +122,7 @@
                           IsEnabled="{Binding CanRun}"
                           VerticalAlignment="Center"
                           Margin="0,0,8,8"
-                          ToolTip="docker volume prune -a — снесёт и именованные тома, не только анонимные" />
+                          ToolTip="docker volume prune -a – снесёт и именованные тома, не только анонимные" />
             </WrapPanel>
 
             <Separator Margin="0,10"
@@ -135,7 +135,7 @@
                        Style="{StaticResource TextBlock.Subtle}"
                        Foreground="{DynamicResource Fg.Muted}"
                        Margin="0,0,0,8"
-                       Text="После очистки образ диска Docker (VHDX) сам не сжимается. Эта кнопка остановит WSL и вернёт освободившееся место системе — потом запустите Docker заново." />
+                       Text="После очистки образ диска Docker (VHDX) сам не сжимается. Эта кнопка остановит WSL и вернёт освободившееся место системе – потом запустите Docker заново." />
             <Button Style="{StaticResource Button.Primary}"
                     Command="{Binding CompactCommand}"
                     IsEnabled="{Binding CanRun}"

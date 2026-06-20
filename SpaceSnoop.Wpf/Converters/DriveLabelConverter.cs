@@ -33,7 +33,7 @@ public sealed class DriveLabelConverter : IValueConverter
             }
 
             var used = drive.TotalSize - drive.TotalFreeSpace;
-            return $"{path}  —  занято {SizeFormatter.Format(used)} из {SizeFormatter.Format(drive.TotalSize)}";
+            return $"{path}  –  занято {SizeFormatter.Format(used)} из {SizeFormatter.Format(drive.TotalSize)}";
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or SecurityException)
         {

@@ -119,9 +119,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public string DirectionHint => CurrentMode switch
     {
-        SyncMode.RightToLeft => "Направление: справа налево. Клик — сменить, ПКМ — поменять пути местами.",
-        SyncMode.Bidirectional => "Направление: двустороннее. Клик — сменить, ПКМ — поменять пути местами.",
-        _ => "Направление: слева направо. Клик — сменить, ПКМ — поменять пути местами.",
+        SyncMode.RightToLeft => "Направление: справа налево. Клик – сменить, ПКМ – поменять пути местами.",
+        SyncMode.Bidirectional => "Направление: двустороннее. Клик – сменить, ПКМ – поменять пути местами.",
+        _ => "Направление: слева направо. Клик – сменить, ПКМ – поменять пути местами.",
     };
 
     public string PageTitle => "Синхронизация";
@@ -314,7 +314,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         // TODO: бинарь определяем по NUL-байту; кодировку доверяем File.ReadAllLines (BOM → UTF-8)
         if (Array.IndexOf(File.ReadAllBytes(path), (byte)0) >= 0)
         {
-            throw new InvalidOperationException("Файл выглядит двоичным — построчное сравнение недоступно.");
+            throw new InvalidOperationException("Файл выглядит двоичным – построчное сравнение недоступно.");
         }
 
         return File.ReadAllLines(path);
@@ -507,12 +507,12 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         if (copies > 0)
         {
-            parts.Add($"скопировать — {copies}");
+            parts.Add($"скопировать – {copies}");
         }
 
         if (deletes > 0)
         {
-            parts.Add($"удалить (в корзину) — {deletes}");
+            parts.Add($"удалить (в корзину) – {deletes}");
         }
 
         var summary = parts.Count > 0 ? string.Join(", ", parts) : "изменений нет";

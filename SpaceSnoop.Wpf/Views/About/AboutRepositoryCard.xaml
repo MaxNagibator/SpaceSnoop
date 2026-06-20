@@ -26,7 +26,7 @@
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0"
                         VerticalAlignment="Center">
-                <TextBlock Text="Опенсорс, всё по-честному — заходи, шныряй, контрибьють"
+                <TextBlock Text="Опенсорс, всё по-честному – заходи, шныряй, контрибьють"
                            Style="{StaticResource About.MetaLabel}" />
                 <TextBlock Text="{Binding RepoSlug}"
                            Style="{StaticResource TextBlock.Mono}"

@@ -7,7 +7,7 @@ internal static partial class AppLog
     public static partial void ScanStarted(this ILogger logger, string path, bool multithreaded, int parallelism);
 
     [LoggerMessage(EventId = 1001, Level = LogLevel.Information,
-        Message = "Сканирование завершено: {Path} — {SizeText}, файлов: {Files}, каталогов: {Directories}, за {ElapsedMs} мс")]
+        Message = "Сканирование завершено: {Path} – {SizeText}, файлов: {Files}, каталогов: {Directories}, за {ElapsedMs} мс")]
     public static partial void ScanCompleted(this ILogger logger, string path, string sizeText, int files, int directories, long elapsedMs);
 
     [LoggerMessage(EventId = 1002, Level = LogLevel.Information, Message = "Сканирование отменено: {Path}")]
@@ -24,7 +24,7 @@ internal static partial class AppLog
     public static partial void DeletionRequested(this ILogger logger, int count, bool permanent);
 
     [LoggerMessage(EventId = 1006, Level = LogLevel.Debug,
-        Message = "Результат удаления применён к дереву: убрано узлов — {Count}")]
+        Message = "Результат удаления применён к дереву: убрано узлов – {Count}")]
     public static partial void DeletionResultApplied(this ILogger logger, int count);
 
     [LoggerMessage(EventId = 1100, Level = LogLevel.Information,
@@ -97,7 +97,7 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1501, Level = LogLevel.Warning, Message = "Не удалось скопировать текст в буфер обмена")]
     public static partial void ClipboardTextCopyFailed(this ILogger logger, Exception exception);
 
-    [LoggerMessage(EventId = 1600, Level = LogLevel.Information, Message = "Docker: снимок получен, категорий — {Count}")]
+    [LoggerMessage(EventId = 1600, Level = LogLevel.Information, Message = "Docker: снимок получен, категорий – {Count}")]
     public static partial void DockerSnapshotLoaded(this ILogger logger, int count);
 
     [LoggerMessage(EventId = 1601, Level = LogLevel.Warning, Message = "Docker недоступен: {Reason}")]
@@ -121,7 +121,7 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1607, Level = LogLevel.Error, Message = "Docker: ошибка сжатия диска")]
     public static partial void DockerCompactFailed(this ILogger logger, Exception exception);
 
-    [LoggerMessage(EventId = 1608, Level = LogLevel.Information, Message = "Docker: инвентарь получен, объектов — {Count}, групп — {Groups}")]
+    [LoggerMessage(EventId = 1608, Level = LogLevel.Information, Message = "Docker: инвентарь получен, объектов – {Count}, групп – {Groups}")]
     public static partial void DockerInventoryLoaded(this ILogger logger, int count, int groups);
 
     [LoggerMessage(EventId = 1609, Level = LogLevel.Information, Message = "Docker: объект удалён ({Kind} {Name})")]

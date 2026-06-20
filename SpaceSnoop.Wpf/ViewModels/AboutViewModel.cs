@@ -14,13 +14,13 @@ public sealed partial class AboutViewModel(ErrorReportService errorReports, ILog
 
     public string RepoSlug => AppInfo.RepoSlug;
 
-    public string Tagline => "Шнырь по твоим накопителям — покажет, где залёг весь хлам";
+    public string Tagline => "Шнырь по твоим накопителям – покажет, где залёг весь хлам";
 
     public string Description =>
         "Исследуй бескрайние просторы своих накопителей и почувствуй себя археологом: SpaceSnoop "
         + "откопает древние артефакты среди данных и покажет занятое место деревом, где жирные папки "
         + "краснеют от стыда под тепловой подсветкой. А ещё сведёт две папки лицом к лицу и "
-        + "синхронизирует их. Дай накопителям дышать полной грудью — убери весь хлам!";
+        + "синхронизирует их. Дай накопителям дышать полной грудью – убери весь хлам!";
 
     public string DotNetVersion => RuntimeInformation.FrameworkDescription;
 
@@ -31,8 +31,8 @@ public sealed partial class AboutViewModel(ErrorReportService errorReports, ILog
     public bool IsElevated { get; } = AdminElevation.IsElevated;
 
     public string ElevationCaption => IsElevated
-        ? "Админ на борту — шныряем где угодно"
-        : "Обычный режим — за пару дверей не пустят, запусти от админа для полного шныряния";
+        ? "Админ на борту – шныряем где угодно"
+        : "Обычный режим – за пару дверей не пустят, запусти от админа для полного шныряния";
 
     public string PageTitle => "О программе";
 

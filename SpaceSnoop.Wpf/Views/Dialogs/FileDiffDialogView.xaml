@@ -14,7 +14,7 @@
              MinHeight="560">
 
     <UserControl.Resources>
-        <!-- TODO: фиксированные тинты — в теме нет subtle-фон токенов для +/−; апгрейд на токены KeepShell, если появятся -->
+        <!-- TODO: фиксированные тинты – в теме нет subtle-фон токенов для +/−; апгрейд на токены KeepShell, если появятся -->
         <SolidColorBrush x:Key="Diff.AddedBg"
                          Color="#3327C93F" />
         <SolidColorBrush x:Key="Diff.RemovedBg"

@@ -29,8 +29,8 @@ public sealed partial class ScanPreferences : ObservableObject
 
     public string ParallelismHint =>
         $"Сколько каталогов обходить одновременно. "
-        + $"Максимум и значение по умолчанию — число логических процессоров ({ProcessorCount}). "
-        + $"Меньше потоков — ниже нагрузка и расход памяти.";
+        + $"Максимум и значение по умолчанию – число логических процессоров ({ProcessorCount}). "
+        + $"Меньше потоков – ниже нагрузка и расход памяти.";
 
     partial void OnUseMultithreadingChanged(bool value)
     {

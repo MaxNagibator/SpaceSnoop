@@ -54,7 +54,7 @@ public sealed class ScanProgress
     }
 
     /// <summary>
-    /// Задаёт число подкаталогов верхнего уровня — знаменатель детерминированного прогресса.
+    /// Задаёт число подкаталогов верхнего уровня – знаменатель детерминированного прогресса.
     /// Вызывается один раз, когда корневой каталог перечислил непосредственные подкаталоги.
     /// </summary>
     /// <param name="total">Число подкаталогов первого уровня.</param>
@@ -71,7 +71,7 @@ public sealed class ScanProgress
 
     /// <summary>
     /// Снимает текущий срез прогресса. Поля читаются независимо, поэтому могут быть слегка
-    /// рассогласованы между собой — для индикатора прогресса это допустимо.
+    /// рассогласованы между собой – для индикатора прогресса это допустимо.
     /// </summary>
     public ScanProgressSnapshot CreateSnapshot()
     {
@@ -90,7 +90,7 @@ public sealed class ScanProgress
 /// <param name="DirectoriesScanned">Каталогов пройдено.</param>
 /// <param name="FilesScanned">Файлов учтено.</param>
 /// <param name="BytesScanned">Объём учтённых файлов в байтах.</param>
-/// <param name="TopLevelTotal">Число подкаталогов верхнего уровня (0 — ещё не известно).</param>
+/// <param name="TopLevelTotal">Число подкаталогов верхнего уровня (0 – ещё не известно).</param>
 /// <param name="TopLevelCompleted">Сколько подкаталогов верхнего уровня уже завершено.</param>
 /// <param name="CurrentPath">Последний каталог, в который вошёл обход.</param>
 public readonly record struct ScanProgressSnapshot(

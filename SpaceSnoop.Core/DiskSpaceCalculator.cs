@@ -169,7 +169,7 @@ public class DiskSpaceCalculator
         ConcurrentBag<DirectorySpace> subDirSpaces = [];
         var availableDegreeOfParallelism = Math.Max(1, counter.Inc());
 
-        // Корень определяется по отсутствию родителя — на нём знаем число «веток» верхнего уровня.
+        // Корень определяется по отсутствию родителя – на нём знаем число «веток» верхнего уровня.
         var isRoot = directorySpace.Parent is null;
 
         if (isRoot)

@@ -37,7 +37,7 @@
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="Куда удалять помеченные элементы"
                                Style="{StaticResource Setting.Label}" />
-                    <TextBlock Text="«Безвозвратно» минует корзину — отменить нельзя."
+                    <TextBlock Text="«Безвозвратно» минует корзину – отменить нельзя."
                                Style="{StaticResource Setting.Hint}"
                                Margin="0,2,0,0" />
                 </StackPanel>
