@@ -164,13 +164,14 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
         foreach (var drive in DriveInfo.GetDrives())
         {
-            Drives.Add(drive.Name);
+            AddDrive(drive.Name);
         }
 
         LoadSettings();
+        LoadDriveLabels();
     }
 
-    public ObservableCollection<string> Drives { get; } = [];
+    public ObservableCollection<DriveItem> Drives { get; } = [];
 
     public ObservableCollection<ScanNodeViewModel> Roots { get; } = [];
 
@@ -322,6 +323,27 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     private static string NormalizePath(string path)
     {
         return path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    }
+
+    private DriveItem AddDrive(string path)
+    {
+        var item = new DriveItem(path);
+        Drives.Add(item);
+        return item;
+    }
+
+    private bool HasDrive(string path)
+    {
+        return Drives.Any(drive => string.Equals(drive.Path, path, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void LoadDriveLabels()
+    {
+        _ = Task.WhenAll(Drives.Select(drive => drive.LoadLabelAsync()))
+            .ContinueWith(task => _logger.DriveSizesFailed(task.Exception!),
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted,
+                TaskScheduler.Default);
     }
 
     partial void OnSelectedDriveChanged(string value)
@@ -535,16 +557,16 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
         if (!string.IsNullOrWhiteSpace(lastDrive))
         {
-            if (!Drives.Contains(lastDrive))
+            if (!HasDrive(lastDrive))
             {
-                Drives.Add(lastDrive);
+                AddDrive(lastDrive);
             }
 
             SelectedDrive = lastDrive;
         }
         else
         {
-            SelectedDrive = Drives.Count > 0 ? Drives[0] : string.Empty;
+            SelectedDrive = Drives.Count > 0 ? Drives[0].Path : string.Empty;
         }
 
         _suppressPersist = false;
@@ -584,9 +606,10 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
         var path = dialog.FolderName;
 
-        if (!Drives.Contains(path))
+        if (!HasDrive(path))
         {
-            Drives.Add(path);
+            AddDrive(path);
+            LoadDriveLabels();
         }
 
         SelectedDrive = path;

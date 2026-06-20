@@ -27,6 +27,10 @@ internal static partial class AppLog
         Message = "Результат удаления применён к дереву: убрано узлов – {Count}")]
     public static partial void DeletionResultApplied(this ILogger logger, int count);
 
+    [LoggerMessage(EventId = 1007, Level = LogLevel.Warning,
+        Message = "Не удалось подгрузить заполненность дисков")]
+    public static partial void DriveSizesFailed(this ILogger logger, Exception exception);
+
     [LoggerMessage(EventId = 1100, Level = LogLevel.Information,
         Message = "Старт удаления: {Count} элемент(ов), {BytesText} (безвозвратно: {Permanent})")]
     public static partial void DeletionStarted(this ILogger logger, int count, string bytesText, bool permanent);

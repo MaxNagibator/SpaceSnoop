@@ -2,16 +2,12 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
-             xmlns:conv="clr-namespace:SpaceSnoop.Wpf.Converters"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:ScanViewModel}"
              d:DesignWidth="980">
-    <UserControl.Resources>
-        <conv:DriveLabelConverter x:Key="DriveLabel" />
-    </UserControl.Resources>
     <Border Style="{StaticResource Card.Inset}"
             Padding="14,10">
         <Grid>
@@ -31,14 +27,15 @@
                                           Margin="2,0,10,0"
                                           Foreground="{DynamicResource Fg.Secondary}" />
                 <ComboBox ItemsSource="{Binding Drives}"
-                          SelectedItem="{Binding SelectedDrive}"
+                          SelectedValue="{Binding SelectedDrive}"
+                          SelectedValuePath="Path"
                           Style="{StaticResource ComboBox.Toolbar}"
                           MinWidth="230"
                           Margin="0,0,8,0"
                           ToolTip="Диск или каталог для анализа">
                     <ComboBox.ItemTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding Converter={StaticResource DriveLabel}}"
+                        <DataTemplate DataType="{x:Type vm:DriveItem}">
+                            <TextBlock Text="{Binding Label}"
                                        TextTrimming="CharacterEllipsis" />
                         </DataTemplate>
                     </ComboBox.ItemTemplate>

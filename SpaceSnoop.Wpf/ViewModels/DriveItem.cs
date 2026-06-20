@@ -1,24 +1,39 @@
-﻿using System.Globalization;
 using System.IO;
 using System.Security;
-using System.Windows.Data;
 
-namespace SpaceSnoop.Wpf.Converters;
+namespace SpaceSnoop.Wpf.ViewModels;
 
-public sealed class DriveLabelConverter : IValueConverter
+public sealed partial class DriveItem(string path) : ObservableObject
 {
-    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public string Path { get; } = path;
+
+    [ObservableProperty]
+    private string _label = path;
+
+    private Task? _loading;
+
+    public Task LoadLabelAsync()
     {
-        if (value is not string path || string.IsNullOrWhiteSpace(path))
+        return _loading ??= LoadCoreAsync();
+    }
+
+    private async Task LoadCoreAsync()
+    {
+        Label = await Task.Run(() => BuildLabel(Path));
+    }
+
+    private static string BuildLabel(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
         {
-            return value ?? string.Empty;
+            return path;
         }
 
         try
         {
             var directory = new DirectoryInfo(path);
-            var full = directory.FullName.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            var root = directory.Root.FullName.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var full = directory.FullName.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
+            var root = directory.Root.FullName.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
 
             if (!string.Equals(full, root, StringComparison.OrdinalIgnoreCase))
             {
@@ -39,10 +54,5 @@ public sealed class DriveLabelConverter : IValueConverter
         {
             return path;
         }
-    }
-
-    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
-    {
-        throw new NotSupportedException();
     }
 }
