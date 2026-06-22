@@ -21,17 +21,20 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger)
         {
             case SyncAction.CopyToRight:
                 EnsureDirectoryExists(rightPath);
+                ClearReadOnly(rightPath);
                 File.Copy(leftPath, rightPath, true);
                 break;
 
             case SyncAction.CopyToLeft:
                 EnsureDirectoryExists(leftPath);
+                ClearReadOnly(leftPath);
                 File.Copy(rightPath, leftPath, true);
                 break;
 
             case SyncAction.DeleteLeft:
                 if (File.Exists(leftPath))
                 {
+                    ClearReadOnly(leftPath);
                     FileSystem.DeleteFile(leftPath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
                 }
 
@@ -40,10 +43,26 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger)
             case SyncAction.DeleteRight:
                 if (File.Exists(rightPath))
                 {
+                    ClearReadOnly(rightPath);
                     FileSystem.DeleteFile(rightPath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
                 }
 
                 break;
+        }
+    }
+
+    private static void ClearReadOnly(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        var attributes = File.GetAttributes(path);
+
+        if ((attributes & FileAttributes.ReadOnly) != 0)
+        {
+            File.SetAttributes(path, attributes & ~FileAttributes.ReadOnly);
         }
     }
 

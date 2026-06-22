@@ -195,6 +195,32 @@ public class SyncEngineTests
     }
 
     [Test]
+    public void CopyToRight_OverwritesReadOnlyDestination()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "new content");
+        var destination = Path.Combine(_rightDir, "a.txt");
+        File.WriteAllText(destination, "old content");
+        File.SetAttributes(destination, File.GetAttributes(destination) | FileAttributes.ReadOnly);
+
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("a.txt", "a.txt")
+        {
+            Status = ComparisonStatus.Modified,
+            Action = SyncAction.CopyToRight,
+        });
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
+        var report = engine.Execute(result, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.ReadAllText(destination), Is.EqualTo("new content"));
+            Assert.That(report.Errors, Is.Empty);
+        }
+    }
+
+    [Test]
     public void ErrorOnOneFile_ContinuesWithOthers()
     {
         File.WriteAllText(Path.Combine(_leftDir, "good.txt"), "data");
@@ -245,6 +271,31 @@ public class SyncEngineTests
         {
             Assert.That(File.Exists(filePath), Is.False);
             Assert.That(report.SuccessCount, Is.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public void DeleteLeft_RemovesReadOnlyFile()
+    {
+        var filePath = Path.Combine(_leftDir, "remove.txt");
+        File.WriteAllText(filePath, "delete me");
+        File.SetAttributes(filePath, File.GetAttributes(filePath) | FileAttributes.ReadOnly);
+
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("remove.txt", "remove.txt")
+        {
+            Status = ComparisonStatus.LeftOnly,
+            Action = SyncAction.DeleteLeft,
+        });
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
+        var report = engine.Execute(result, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.Exists(filePath), Is.False);
+            Assert.That(report.Errors, Is.Empty);
         }
     }
 
