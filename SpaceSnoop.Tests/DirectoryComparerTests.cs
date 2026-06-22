@@ -1,3 +1,4 @@
+﻿using Microsoft.Extensions.Logging.Abstractions;
 using SpaceSnoop.Core;
 using SpaceSnoop.Core.Domain;
 
@@ -40,7 +41,7 @@ public class DirectoryComparerTests
         File.SetLastWriteTime(leftPath, timestamp);
         File.SetLastWriteTime(rightPath, timestamp);
 
-        var comparer = new DirectoryComparer(new(""));
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
         var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
 
         Assert.That(result.Root.Files, Has.Count.EqualTo(1));
@@ -52,7 +53,7 @@ public class DirectoryComparerTests
     {
         File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "hello");
 
-        var comparer = new DirectoryComparer(new(""));
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
         var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
 
         Assert.That(result.Root.Files, Has.Count.EqualTo(1));
@@ -64,7 +65,7 @@ public class DirectoryComparerTests
     {
         File.WriteAllText(Path.Combine(_rightDir, "b.txt"), "world");
 
-        var comparer = new DirectoryComparer(new(""));
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
         var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
 
         Assert.That(result.Root.Files, Has.Count.EqualTo(1));
@@ -77,7 +78,7 @@ public class DirectoryComparerTests
         File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "short");
         File.WriteAllText(Path.Combine(_rightDir, "a.txt"), "this is longer content");
 
-        var comparer = new DirectoryComparer(new(""));
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
         var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
 
         Assert.That(result.Root.Files, Has.Count.EqualTo(1));
@@ -91,7 +92,7 @@ public class DirectoryComparerTests
         Directory.CreateDirectory(sub);
         File.WriteAllText(Path.Combine(sub, "file.txt"), "data");
 
-        var comparer = new DirectoryComparer(new(""));
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
         var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
 
         Assert.That(result.Root.SubDirectories, Has.Count.EqualTo(1));
@@ -110,7 +111,7 @@ public class DirectoryComparerTests
         File.WriteAllText(Path.Combine(rightSub, "same.txt"), "same");
         File.WriteAllText(Path.Combine(leftSub, "only-left.txt"), "left");
 
-        var comparer = new DirectoryComparer(new(""));
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
         var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
 
         var sub = result.Root.SubDirectories[0];
@@ -127,7 +128,7 @@ public class DirectoryComparerTests
         File.WriteAllText(Path.Combine(_leftDir, "keep.txt"), "data");
         File.WriteAllText(Path.Combine(_leftDir, "skip.tmp"), "temp");
 
-        var comparer = new DirectoryComparer(new("*.tmp"));
+        var comparer = new DirectoryComparer(new("*.tmp"), NullLogger<DirectoryComparer>.Instance);
         var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
 
         Assert.That(result.Root.Files, Has.Count.EqualTo(1));
@@ -143,7 +144,7 @@ public class DirectoryComparerTests
 
         File.WriteAllText(Path.Combine(_leftDir, "readme.txt"), "hello");
 
-        var comparer = new DirectoryComparer(new(".git"));
+        var comparer = new DirectoryComparer(new(".git"), NullLogger<DirectoryComparer>.Instance);
         var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
 
         using (Assert.EnterMultipleScope())
@@ -159,7 +160,7 @@ public class DirectoryComparerTests
         File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "hello");
         File.WriteAllText(Path.Combine(_rightDir, "a.txt"), "hello world");
 
-        var comparer = new DirectoryComparer(new(""));
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
         var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
 
         var file = result.Root.Files[0];

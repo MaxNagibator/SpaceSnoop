@@ -1,0 +1,23 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.AboutView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
+             xmlns:about="clr-namespace:SpaceSnoop.Wpf.Views.About"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:AboutViewModel}"
+             d:DesignHeight="760"
+             d:DesignWidth="900">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  Padding="0,0,12,0">
+        <StackPanel>
+            <about:AboutHeroCard />
+            <about:AboutFeaturesCard />
+            <about:AboutEnvironmentCard />
+            <about:AboutRepositoryCard />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

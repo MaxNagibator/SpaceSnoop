@@ -1,4 +1,4 @@
-using SpaceSnoop.Core.Domain;
+﻿using SpaceSnoop.Core.Domain;
 
 namespace SpaceSnoop.Tests;
 
@@ -26,7 +26,7 @@ public class ComparisonResultTests
             Assert.That(stats[ComparisonStatus.LeftOnly], Is.EqualTo(1));
             Assert.That(stats[ComparisonStatus.RightOnly], Is.EqualTo(1));
             Assert.That(stats[ComparisonStatus.Modified], Is.EqualTo(1));
-            Assert.That(stats[ComparisonStatus.Conflict], Is.EqualTo(0));
+            Assert.That(stats[ComparisonStatus.Conflict], Is.Zero);
         }
     }
 

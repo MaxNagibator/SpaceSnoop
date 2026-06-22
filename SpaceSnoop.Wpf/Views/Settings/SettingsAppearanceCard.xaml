@@ -1,0 +1,99 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Settings.SettingsAppearanceCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
+             xmlns:keepshell="clr-namespace:KeepShell.Bootstrap;assembly=KeepShell"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
+             d:DesignWidth="900">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Views/Settings/SettingsResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Border Style="{StaticResource Card.Inset}"
+            Margin="0,0,0,10">
+        <StackPanel>
+            <TextBlock Text="Внешний вид"
+                       Style="{StaticResource Setting.SectionTitle}" />
+
+            <Grid Margin="0,14,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="240" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Тема оформления"
+                               Style="{StaticResource Setting.Label}" />
+                    <TextBlock Text="Светлая, тёмная или Tarkov."
+                               Style="{StaticResource Setting.Hint}"
+                               Margin="0,2,0,0" />
+                </StackPanel>
+                <ComboBox Grid.Column="1"
+                          Style="{StaticResource ComboBox.Form}"
+                          ItemsSource="{Binding ThemeOptions}"
+                          SelectedItem="{Binding SelectedThemeOption}"
+                          DisplayMemberPath="Label"
+                          VerticalAlignment="Center" />
+            </Grid>
+
+            <Grid Margin="0,16,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="240" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Системный фон окна"
+                               Style="{StaticResource Setting.Label}" />
+                    <TextBlock
+                        Text="DWM-подложка: Mica (приглушённая по обоям), Acrylic (полупрозрачное размытие) или Mica Alt. Требует Windows 11 22H2+; на старых системах – без эффекта."
+                        Style="{StaticResource Setting.Hint}"
+                        Margin="0,2,0,0" />
+                </StackPanel>
+                <ComboBox Grid.Column="1"
+                          Style="{StaticResource ComboBox.Form}"
+                          ItemsSource="{Binding BackdropOptions}"
+                          SelectedItem="{Binding SelectedBackdropOption}"
+                          DisplayMemberPath="Label"
+                          VerticalAlignment="Center" />
+            </Grid>
+
+            <StackPanel Margin="0,16,0,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="Масштаб шрифта"
+                               Style="{StaticResource Setting.Label}" />
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding Shell.FontScale, StringFormat={}{0:P0}}"
+                               Style="{StaticResource TextBlock.Mono}"
+                               VerticalAlignment="Center" />
+                </Grid>
+                <Slider Minimum="{x:Static keepshell:FontScaleManager.MinScale}"
+                        Maximum="{x:Static keepshell:FontScaleManager.MaxScale}"
+                        Value="{Binding Shell.FontScale, Mode=TwoWay}"
+                        TickFrequency="0.1"
+                        IsSnapToTickEnabled="True"
+                        Margin="0,6,0,0" />
+                <TextBlock Style="{StaticResource Setting.Hint}"
+                           Text="Увеличивает размер текста по всему приложению. 100% – стандартный размер." />
+            </StackPanel>
+
+            <CheckBox Content="Показывать заголовок страницы"
+                      IsChecked="{Binding Shell.ShowPageHeader, Mode=TwoWay}"
+                      Margin="0,14,0,0"
+                      VerticalAlignment="Center" />
+            <TextBlock Style="{StaticResource Setting.Hint}"
+                       Text="Скрывает плашку с названием раздела и кратким описанием над содержимым каждой страницы." />
+        </StackPanel>
+    </Border>
+</UserControl>

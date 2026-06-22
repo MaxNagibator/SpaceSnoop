@@ -1,0 +1,16 @@
+﻿<Application x:Class="SpaceSnoop.Wpf.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/KeepShell;component/Resources/Themes/Light.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/KeepShell;component/Resources/Themes/Tokens.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/KeepShell;component/Resources/Converters.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/KeepShell;component/Resources/Styles/Controls.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Trees.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Shared.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

@@ -1,3 +1,4 @@
+﻿using Microsoft.Extensions.Logging.Abstractions;
 using SpaceSnoop.Core;
 using SpaceSnoop.Core.Domain;
 
@@ -43,7 +44,7 @@ public class SyncEngineTests
         });
 
         var result = new ComparisonResult(_leftDir, _rightDir, root);
-        var engine = new SyncEngine();
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
         var report = engine.Execute(result, CancellationToken.None);
 
         using (Assert.EnterMultipleScope())
@@ -69,7 +70,7 @@ public class SyncEngineTests
         });
 
         var result = new ComparisonResult(_leftDir, _rightDir, root);
-        var engine = new SyncEngine();
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
         var report = engine.Execute(result, CancellationToken.None);
 
         using (Assert.EnterMultipleScope())
@@ -98,7 +99,7 @@ public class SyncEngineTests
         root.SubDirectories.Add(sub);
 
         var result = new ComparisonResult(_leftDir, _rightDir, root);
-        var engine = new SyncEngine();
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
         engine.Execute(result, CancellationToken.None);
 
         Assert.That(File.Exists(Path.Combine(_rightDir, "sub", "file.txt")), Is.True);
@@ -117,13 +118,13 @@ public class SyncEngineTests
         });
 
         var result = new ComparisonResult(_leftDir, _rightDir, root);
-        var engine = new SyncEngine();
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
         var report = engine.Execute(result, CancellationToken.None);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(File.Exists(Path.Combine(_rightDir, "a.txt")), Is.False);
-            Assert.That(report.SuccessCount, Is.EqualTo(0));
+            Assert.That(report.SuccessCount, Is.Zero);
         }
     }
 
@@ -141,7 +142,7 @@ public class SyncEngineTests
         });
 
         var result = new ComparisonResult(_leftDir, _rightDir, root);
-        var engine = new SyncEngine();
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
         engine.Execute(result, CancellationToken.None);
 
         Assert.That(File.ReadAllText(Path.Combine(_rightDir, "a.txt")), Is.EqualTo("new content"));
@@ -166,7 +167,7 @@ public class SyncEngineTests
         });
 
         var result = new ComparisonResult(_leftDir, _rightDir, root);
-        var engine = new SyncEngine();
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
         var report = engine.Execute(result, CancellationToken.None);
 
         using (Assert.EnterMultipleScope())
@@ -191,7 +192,7 @@ public class SyncEngineTests
         });
 
         var result = new ComparisonResult(_leftDir, _rightDir, root);
-        var engine = new SyncEngine();
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
         var report = engine.Execute(result, CancellationToken.None);
 
         using (Assert.EnterMultipleScope())

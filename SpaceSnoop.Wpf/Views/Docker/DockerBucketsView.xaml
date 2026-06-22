@@ -1,0 +1,124 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Docker.DockerBucketsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:DockerViewModel}"
+             Visibility="{Binding IsAvailable, Converter={StaticResource BoolToVisibility}}">
+    <UserControl.Resources>
+        <Style x:Key="Docker.SectionTitle"
+               TargetType="TextBlock">
+            <Setter Property="FontWeight"
+                    Value="{DynamicResource Font.Weight.SemiBold}" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Primary}" />
+        </Style>
+        <Style x:Key="Docker.ColumnHeader"
+               TargetType="TextBlock">
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Muted}" />
+            <Setter Property="FontSize"
+                    Value="{DynamicResource Font.Size.S}" />
+        </Style>
+    </UserControl.Resources>
+
+    <Border Style="{StaticResource Card}"
+            Margin="0,0,0,10">
+        <StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           Text="Что занимает место"
+                           Style="{StaticResource Docker.SectionTitle}"
+                           VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Button.Icon}"
+                        Command="{Binding RefreshCommand}"
+                        IsEnabled="{Binding IsIdle}"
+                        AutomationProperties.Name="Обновить"
+                        ToolTip="Опросить Docker заново">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.RefreshCw}"
+                                              Width="16"
+                                              Height="16"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                </Button>
+            </Grid>
+
+            <Grid Margin="0,14,0,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="120" />
+                    <ColumnDefinition Width="120" />
+                    <ColumnDefinition Width="140" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           Text="Категория"
+                           Style="{StaticResource Docker.ColumnHeader}" />
+                <TextBlock Grid.Column="1"
+                           Text="Объектов"
+                           Style="{StaticResource Docker.ColumnHeader}"
+                           TextAlignment="Right" />
+                <TextBlock Grid.Column="2"
+                           Text="Размер"
+                           Style="{StaticResource Docker.ColumnHeader}"
+                           TextAlignment="Right" />
+                <TextBlock Grid.Column="3"
+                           Text="Можно вернуть"
+                           Style="{StaticResource Docker.ColumnHeader}"
+                           TextAlignment="Right" />
+            </Grid>
+
+            <ItemsControl ItemsSource="{Binding Buckets}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Padding="0,8"
+                                BorderBrush="{DynamicResource Border.Subtle}"
+                                BorderThickness="0,1,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="140" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding Type}"
+                                           Foreground="{DynamicResource Fg.Primary}"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding TotalCount}"
+                                           Style="{StaticResource TextBlock.Mono}"
+                                           TextAlignment="Right"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="2"
+                                           Text="{Binding Size}"
+                                           Style="{StaticResource TextBlock.Mono}"
+                                           TextAlignment="Right"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="3"
+                                           Text="{Binding Reclaimable}"
+                                           Style="{StaticResource TextBlock.Mono}"
+                                           Foreground="{DynamicResource Accent.Primary}"
+                                           TextAlignment="Right"
+                                           VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock Text="{Binding StatusText}"
+                       Style="{StaticResource TextBlock.Subtle}"
+                       Foreground="{DynamicResource Fg.Muted}"
+                       Margin="0,12,0,0"
+                       Visibility="{Binding StatusText, Converter={StaticResource NullToVisibility}}" />
+        </StackPanel>
+    </Border>
+</UserControl>

@@ -1,0 +1,83 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.ScanView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
+             xmlns:controls="clr-namespace:SpaceSnoop.Wpf.Views.Scan"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:ScanViewModel}"
+             d:DesignHeight="640"
+             d:DesignWidth="980">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <controls:ScanToolbar Grid.Row="0"
+                              Margin="0,0,0,12" />
+
+        <controls:ScanProgressPanel Grid.Row="1" />
+
+        <!--  Плашка отмены: появляется когда сканирование прервано пользователем  -->
+        <Border Grid.Row="2"
+                Style="{StaticResource Card.Inset}"
+                Padding="14,10"
+                Margin="0,0,0,12"
+                BorderBrush="{DynamicResource State.Warning}"
+                BorderThickness="0,0,0,2"
+                Visibility="{Binding ScanWasCancelled, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+            <StackPanel Orientation="Horizontal"
+                        VerticalAlignment="Center">
+                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.OctagonAlert}"
+                                          Width="15"
+                                          Height="15"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,9,0"
+                                          Foreground="{DynamicResource State.Warning}" />
+                <TextBlock Text="Сканирование отменено – результаты не построены"
+                           VerticalAlignment="Center"
+                           FontSize="{DynamicResource Font.Size.S}"
+                           Foreground="{DynamicResource Fg.Secondary}" />
+            </StackPanel>
+        </Border>
+
+        <controls:ScanSummaryStrip Grid.Row="3" />
+
+        <Grid Grid.Row="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"
+                                  MinWidth="340" />
+                <ColumnDefinition x:Name="SplitterColumn"
+                                  Width="6" />
+                <ColumnDefinition x:Name="InspectorColumn"
+                                  Width="380"
+                                  MinWidth="280" />
+            </Grid.ColumnDefinitions>
+
+            <controls:ScanStructurePanel Grid.Column="0" />
+
+            <GridSplitter Grid.Column="1"
+                          x:Name="InspectorSplitter"
+                          Width="6"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch"
+                          ResizeBehavior="PreviousAndNext"
+                          ResizeDirection="Columns"
+                          Background="{DynamicResource Border.Subtle}"
+                          ShowsPreview="False"
+                          DragCompleted="OnInspectorSplitterDragCompleted"
+                          ToolTip="Перетащите, чтобы изменить ширину панели"
+                          Visibility="{Binding Inspector.IsInspectorCollapsed, Converter={StaticResource InverseBoolToVisibility}}" />
+
+            <controls:ScanInspectorPanel Grid.Column="2"
+                                         DataContext="{Binding Inspector}" />
+        </Grid>
+    </Grid>
+</UserControl>
