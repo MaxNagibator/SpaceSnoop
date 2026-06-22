@@ -122,7 +122,7 @@ public class DiskSpaceCalculator
         {
             throw;
         }
-        catch (Exception exception) when (exception is UnauthorizedAccessException or SecurityException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException)
         {
             directorySpace.Error();
         }
@@ -143,12 +143,14 @@ public class DiskSpaceCalculator
         progress?.EnterDirectory(directory.FullName);
 
         Span<FileInfo> files;
+        DirectoryInfo[] subDirectories;
 
         try
         {
             files = directory.GetFiles();
+            subDirectories = directory.GetDirectories();
         }
-        catch (Exception exception) when (exception is UnauthorizedAccessException or SecurityException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException)
         {
             directorySpace.Error();
             return directorySpace;
@@ -157,7 +159,7 @@ public class DiskSpaceCalculator
         directorySpace.AddFiles(files);
         progress?.AddFiles(files.Length, directorySpace.Size);
 
-        AddSubDirectories(directorySpace, directory.GetDirectories(), counter, progress, cancel);
+        AddSubDirectories(directorySpace, subDirectories, counter, progress, cancel);
 
         return directorySpace;
     }
