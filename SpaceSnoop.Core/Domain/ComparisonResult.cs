@@ -1,4 +1,4 @@
-namespace SpaceSnoop.Core.Domain;
+﻿namespace SpaceSnoop.Core.Domain;
 
 public sealed class ComparisonResult(string leftPath, string rightPath, DirectoryComparison root)
 {
@@ -37,6 +37,45 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
     public int ResolveAllConflicts(SyncAction action)
     {
         return ResolveAllConflictsRecursive(Root, action);
+    }
+
+    public PlannedActions CountPlannedActions()
+    {
+        var newCopies = 0;
+        var modifiedCopies = 0;
+        var deletes = 0;
+        CountPlannedRecursive(Root, ref newCopies, ref modifiedCopies, ref deletes);
+        return new(newCopies, modifiedCopies, deletes);
+    }
+
+    private static void CountPlannedRecursive(DirectoryComparison dir, ref int newCopies, ref int modifiedCopies, ref int deletes)
+    {
+        foreach (var file in dir.Files)
+        {
+            switch (file.Action)
+            {
+                case SyncAction.CopyToRight or SyncAction.CopyToLeft:
+                    if (file.Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly)
+                    {
+                        newCopies++;
+                    }
+                    else
+                    {
+                        modifiedCopies++;
+                    }
+
+                    break;
+
+                case SyncAction.DeleteLeft or SyncAction.DeleteRight:
+                    deletes++;
+                    break;
+            }
+        }
+
+        foreach (var sub in dir.SubDirectories)
+        {
+            CountPlannedRecursive(sub, ref newCopies, ref modifiedCopies, ref deletes);
+        }
     }
 
     private static bool HasPendingResolutionRecursive(DirectoryComparison dir)
@@ -151,4 +190,11 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
         return dir.Files.Any(x => x.Status == ComparisonStatus.Conflict && x.Action == SyncAction.None)
                || dir.SubDirectories.Any(HasUnresolvedConflictsRecursive);
     }
+}
+
+public sealed record PlannedActions(int NewCopies, int ModifiedCopies, int Deletes)
+{
+    public int Copies => NewCopies + ModifiedCopies;
+
+    public int Total => Copies + Deletes;
 }

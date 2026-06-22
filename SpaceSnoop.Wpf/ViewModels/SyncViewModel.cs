@@ -26,6 +26,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private Dictionary<DirectoryComparison, (long Left, long Right)>? _dirSizeCache;
     private CancellationTokenSource? _cts;
     private bool _suppressPersist;
+    private bool _isIndeterminate = true;
+    private double _progressValue;
+    private double _progressMax = 1;
     private Dictionary<ComparisonStatus, int> _stats = NewZeroStats();
     private int _total;
 
@@ -55,6 +58,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     [ObservableProperty]
     private bool _showModified = AppDefaults.SyncShowModifiedDefault;
+
+    [ObservableProperty]
+    private bool _blankAbsent;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CompareCommand))]
@@ -135,11 +141,23 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public string PageDescription => "Сравнение и синхронизация двух каталогов.";
 
-    public bool IsIndeterminate => true;
+    public bool IsIndeterminate
+    {
+        get => _isIndeterminate;
+        private set => SetProperty(ref _isIndeterminate, value);
+    }
 
-    public double ProgressValue => 0;
+    public double ProgressValue
+    {
+        get => _progressValue;
+        private set => SetProperty(ref _progressValue, value);
+    }
 
-    public double ProgressMax => 1;
+    public double ProgressMax
+    {
+        get => _progressMax;
+        private set => SetProperty(ref _progressMax, value);
+    }
 
     public ICommand CancelCommand => CancelOperationCommand;
 
@@ -147,6 +165,11 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public void NotifyActionsChanged()
     {
+        foreach (var row in Rows)
+        {
+            row.RefreshSubtreeAction();
+        }
+
         UpdateSummary();
     }
 
@@ -215,35 +238,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         {
             ApplyActionRecursive(sub, action);
         }
-    }
-
-    private static (int Copies, int Deletes) CountPlannedActions(DirectoryComparison dir)
-    {
-        var copies = 0;
-        var deletes = 0;
-
-        foreach (var file in dir.Files)
-        {
-            switch (file.Action)
-            {
-                case SyncAction.CopyToRight or SyncAction.CopyToLeft:
-                    copies++;
-                    break;
-
-                case SyncAction.DeleteLeft or SyncAction.DeleteRight:
-                    deletes++;
-                    break;
-            }
-        }
-
-        foreach (var sub in dir.SubDirectories)
-        {
-            var (subCopies, subDeletes) = CountPlannedActions(sub);
-            copies += subCopies;
-            deletes += subDeletes;
-        }
-
-        return (copies, deletes);
     }
 
     private static Dictionary<ComparisonStatus, int> NewZeroStats()
@@ -332,7 +326,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         return !string.IsNullOrWhiteSpace(path) && !Directory.Exists(path.Trim());
     }
 
-    private void HashModifiedFiles(DirectoryComparison dir, string leftBase, string rightBase, CancellationToken token)
+    private void HashModifiedFiles(DirectoryComparison dir, string leftBase, string rightBase, IProgress<OperationProgress> progress, ref int done, CancellationToken token)
     {
         foreach (var file in dir.Files.Where(static f => f.Status == ComparisonStatus.Modified))
         {
@@ -360,11 +354,13 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             {
                 _logger.HashFileFailed(ex, leftPath);
             }
+
+            progress.Report(new(++done, file.RelativePath));
         }
 
         foreach (var sub in dir.SubDirectories)
         {
-            HashModifiedFiles(sub, leftBase, rightBase, token);
+            HashModifiedFiles(sub, leftBase, rightBase, progress, ref done, token);
         }
     }
 
@@ -429,10 +425,10 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         var mode = CurrentMode;
 
-        var prepared = await RunAsync("Сравнение...", token =>
+        var prepared = await RunAsync("Сравнение каталогов:", (token, progress) =>
         {
             var comparer = new DirectoryComparer(filter, _comparerLogger);
-            var compared = comparer.Compare(left, right, token);
+            var compared = comparer.Compare(left, right, token, progress);
             compared.ApplyMode(mode);
             return new ComparePreparation(compared, BuildDirSizeCache(compared.Root));
         });
@@ -446,7 +442,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         _result = prepared.Result;
         _dirSizeCache = prepared.Sizes;
-        _collapsed.Clear();
+        CollapseAllDirectories(_result.Root);
         RebuildRows();
         UpdateSummary();
         SummaryText = $"Сравнение завершено за {stopwatch.Elapsed.TotalSeconds:F2} с";
@@ -473,11 +469,12 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         _logger.HashStarted();
 
-        var sizes = await RunAsync("Вычисление хешей...", token =>
+        var sizes = await RunAsync("Вычисление хешей:", (token, progress) =>
         {
-            HashModifiedFiles(result.Root, result.LeftPath, result.RightPath, token);
+            var done = 0;
+            HashModifiedFiles(result.Root, result.LeftPath, result.RightPath, progress, ref done, token);
             return BuildDirSizeCache(result.Root);
-        });
+        }, ModifiedCount);
 
         stopwatch.Stop();
 
@@ -514,22 +511,47 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             return;
         }
 
-        var (copies, deletes) = CountPlannedActions(_result.Root);
-        var parts = new List<string>();
-
-        if (copies > 0)
+        var planned = _result.CountPlannedActions();
+        var direction = CurrentMode switch
         {
-            parts.Add($"скопировать – {copies}");
+            SyncMode.RightToLeft => "справа налево",
+            SyncMode.Bidirectional => "в обе стороны",
+            _ => "слева направо",
+        };
+
+        var lines = new List<string> { $"Направление: {direction}.", string.Empty };
+
+        if (planned.Copies > 0)
+        {
+            lines.Add($"Скопировать файлов: {planned.Copies:N0}");
+
+            if (planned.ModifiedCopies > 0)
+            {
+                lines.Add($"    – новых: {planned.NewCopies:N0}");
+                lines.Add($"    – изменённых: {planned.ModifiedCopies:N0}");
+            }
         }
 
-        if (deletes > 0)
+        if (planned.Deletes > 0)
         {
-            parts.Add($"удалить (в корзину) – {deletes}");
+            lines.Add($"Удалить в корзину: {planned.Deletes:N0}");
         }
 
-        var summary = parts.Count > 0 ? string.Join(", ", parts) : "изменений нет";
+        if (planned.Total == 0)
+        {
+            lines.Add("Изменений нет.");
+        }
 
-        if (!_dialogs.Confirm("Синхронизация", $"Будет выполнено: {summary}. Начать?"))
+        if (planned.ModifiedCopies > 0)
+        {
+            lines.Add(string.Empty);
+            lines.Add("Изменённые отличаются размером или датой – кнопка «Хеши» сверит содержимым.");
+        }
+
+        lines.Add(string.Empty);
+        lines.Add("Продолжить?");
+
+        if (!_dialogs.Confirm("Синхронизация", string.Join(Environment.NewLine, lines)))
         {
             return;
         }
@@ -539,11 +561,11 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         _logger.SyncStarted(CurrentMode);
 
-        var report = await RunAsync("Синхронизация...", token =>
+        var report = await RunAsync("Синхронизация:", (token, progress) =>
         {
             var engine = new SyncEngine(_engineLogger);
-            return engine.Execute(result, token);
-        });
+            return engine.Execute(result, token, progress);
+        }, planned.Total);
 
         stopwatch.Stop();
 
@@ -555,17 +577,37 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _logger.SyncFinished(report.SuccessCount, report.Errors.Count, (long)stopwatch.Elapsed.TotalMilliseconds);
 
         WriteSyncLog(report);
-        SummaryText = $"Готово за {stopwatch.Elapsed.TotalSeconds:F2} с. Успешно: {report.SuccessCount}, ошибок: {report.Errors.Count}";
+        SummaryText = $"Готово за {stopwatch.Elapsed.TotalSeconds:F2} с. Успешно: {report.SuccessCount:N0}, ошибок: {report.Errors.Count:N0}";
         StatusCaption = SummaryText;
 
         if (report.Errors.Count > 0)
         {
-            var list = string.Join(Environment.NewLine, report.Errors.Select(e => $"  {e.RelativePath}: {e.Message}"));
+            const int MaxShown = 20;
+            var list = string.Join(Environment.NewLine, report.Errors.Take(MaxShown).Select(e => $"  {e.RelativePath}: {e.Message}"));
+
+            if (report.Errors.Count > MaxShown)
+            {
+                list += $"{Environment.NewLine}  …и ещё {report.Errors.Count - MaxShown}";
+            }
+
             _dialogs.Warning("Ошибки", $"Ошибки при синхронизации:{Environment.NewLine}{list}");
         }
         else
         {
-            _dialogs.Info("Синхронизация", $"Готово. Успешно скопировано/удалено: {report.SuccessCount}.");
+            var done = new List<string>();
+
+            if (report.CopiedCount > 0)
+            {
+                done.Add($"скопировано: {report.CopiedCount:N0}");
+            }
+
+            if (report.DeletedCount > 0)
+            {
+                done.Add($"удалено в корзину: {report.DeletedCount:N0}");
+            }
+
+            var detail = done.Count > 0 ? string.Join(", ", done) : "изменений не потребовалось";
+            _dialogs.Info("Синхронизация", $"Готово за {stopwatch.Elapsed.TotalSeconds:F1} с. {char.ToUpperInvariant(detail[0])}{detail[1..]}.");
         }
     }
 
@@ -654,6 +696,16 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         Persist(SettingsKeys.SyncShowModified, value ? "true" : "false");
     }
 
+    partial void OnBlankAbsentChanged(bool value)
+    {
+        Persist(SettingsKeys.SyncBlankAbsent, value ? "true" : "false");
+
+        if (_result is not null)
+        {
+            RebuildRows();
+        }
+    }
+
     partial void OnLeftPathChanged(string value)
     {
         Persist(SettingsKeys.SyncLeft, value);
@@ -684,17 +736,47 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
     }
 
-    private async Task<T?> RunAsync<T>(string caption, Func<CancellationToken, T> work)
+    private async Task<T?> RunAsync<T>(string caption, Func<CancellationToken, IProgress<OperationProgress>, T> work, int total = 0)
         where T : class
     {
         _cts = new();
         var token = _cts.Token;
         IsBusy = true;
-        StatusCaption = caption;
+
+        var determinate = total > 0;
+
+        if (determinate)
+        {
+            ProgressMax = total;
+            ProgressValue = 0;
+            IsIndeterminate = false;
+            StatusCaption = $"{caption} 0 / {total} (0 %)";
+        }
+        else
+        {
+            IsIndeterminate = true;
+            StatusCaption = caption;
+        }
+
+        var progress = new Progress<OperationProgress>(update =>
+        {
+            var tail = string.IsNullOrEmpty(update.Current) ? string.Empty : $" · {update.Current}";
+
+            if (determinate)
+            {
+                ProgressValue = update.Completed;
+                var percent = update.Completed * 100 / total;
+                StatusCaption = $"{caption} {update.Completed} / {total} ({percent} %){tail}";
+            }
+            else
+            {
+                StatusCaption = $"{caption} {update.Completed}{tail}";
+            }
+        });
 
         try
         {
-            return await Task.Run(() => work(token), token);
+            return await Task.Run(() => work(token, progress), token);
         }
         catch (OperationCanceledException)
         {
@@ -713,8 +795,25 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         finally
         {
             IsBusy = false;
+            IsIndeterminate = true;
+            ProgressValue = 0;
             _cts?.Dispose();
             _cts = null;
+        }
+    }
+
+    private void CollapseAllDirectories(DirectoryComparison root)
+    {
+        _collapsed.Clear();
+        AddCollapsed(root);
+
+        void AddCollapsed(DirectoryComparison dir)
+        {
+            foreach (var sub in dir.SubDirectories)
+            {
+                _collapsed.Add(sub);
+                AddCollapsed(sub);
+            }
         }
     }
 
@@ -837,6 +936,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         ShowIdentical = _settings.GetBool(SettingsKeys.SyncShowIdentical);
         ShowSizes = _settings.GetBool(SettingsKeys.SyncShowSizes, AppDefaults.SyncShowSizesDefault);
         ShowModified = _settings.GetBool(SettingsKeys.SyncShowModified);
+        BlankAbsent = _settings.GetBool(SettingsKeys.SyncBlankAbsent);
 
         _suppressPersist = false;
     }

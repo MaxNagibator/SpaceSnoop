@@ -5,12 +5,13 @@ namespace SpaceSnoop.Core;
 
 public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<DirectoryComparer> logger)
 {
-    public ComparisonResult Compare(string leftPath, string rightPath, CancellationToken cancel)
+    public ComparisonResult Compare(string leftPath, string rightPath, CancellationToken cancel, IProgress<OperationProgress>? progress = null)
     {
         var leftDir = new DirectoryInfo(leftPath);
         var rightDir = new DirectoryInfo(rightPath);
 
-        var root = CompareDirectories(leftDir, rightDir, "", cancel);
+        var processed = 0;
+        var root = CompareDirectories(leftDir, rightDir, "", progress, ref processed, cancel);
 
         return new(leftPath, rightPath, root);
     }
@@ -40,17 +41,25 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         DirectoryInfo? leftDir,
         DirectoryInfo? rightDir,
         string relativePath,
+        IProgress<OperationProgress>? progress,
+        ref int processed,
         CancellationToken cancel)
     {
         cancel.ThrowIfCancellationRequested();
 
         var name = leftDir?.Name ?? rightDir!.Name;
-        var comparison = new DirectoryComparison(name, relativePath);
+        var comparison = new DirectoryComparison(name, relativePath)
+        {
+            LeftModified = leftDir is { Exists: true } ? leftDir.LastWriteTime : null,
+            RightModified = rightDir is { Exists: true } ? rightDir.LastWriteTime : null,
+        };
 
         CompareFiles(comparison, leftDir, rightDir, relativePath);
-        CompareSubDirectories(comparison, leftDir, rightDir, relativePath, cancel);
+        CompareSubDirectories(comparison, leftDir, rightDir, relativePath, progress, ref processed, cancel);
 
         comparison.Status = DetermineDirectoryStatus(comparison, leftDir, rightDir);
+
+        progress?.Report(new(++processed, string.IsNullOrEmpty(relativePath) ? name : relativePath));
 
         return comparison;
     }
@@ -113,6 +122,8 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         DirectoryInfo? leftDir,
         DirectoryInfo? rightDir,
         string relativePath,
+        IProgress<OperationProgress>? progress,
+        ref int processed,
         CancellationToken cancel)
     {
         var leftDirs = GetFilteredDirectories(leftDir);
@@ -130,7 +141,7 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
             leftDirs.TryGetValue(dirName, out var leftSub);
             rightDirs.TryGetValue(dirName, out var rightSub);
 
-            var subComparison = CompareDirectories(leftSub, rightSub, dirRelativePath, cancel);
+            var subComparison = CompareDirectories(leftSub, rightSub, dirRelativePath, progress, ref processed, cancel);
             comparison.SubDirectories.Add(subComparison);
         }
     }

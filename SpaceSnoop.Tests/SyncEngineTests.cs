@@ -201,4 +201,26 @@ public class SyncEngineTests
             Assert.That(report.SuccessCount, Is.EqualTo(1));
         }
     }
+
+    [Test]
+    public void Report_SplitsCopiedAndDeleted()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "copy.txt"), "data");
+        File.WriteAllText(Path.Combine(_leftDir, "gone.txt"), "data");
+
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("copy.txt", "copy.txt") { Status = ComparisonStatus.LeftOnly, Action = SyncAction.CopyToRight });
+        root.Files.Add(new("gone.txt", "gone.txt") { Status = ComparisonStatus.LeftOnly, Action = SyncAction.DeleteLeft });
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
+        var report = engine.Execute(result, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.CopiedCount, Is.EqualTo(1));
+            Assert.That(report.DeletedCount, Is.EqualTo(1));
+            Assert.That(report.SuccessCount, Is.EqualTo(2));
+        }
+    }
 }

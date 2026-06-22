@@ -172,59 +172,57 @@
 
             <MenuItem
                 Command="{Binding PlacementTarget.DataContext.CopyToRightCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                Visibility="{Binding PlacementTarget.DataContext.IsFile, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+                Visibility="{Binding PlacementTarget.DataContext.CanCopyRight, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
                 <MenuItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                                   Kind="{x:Static iconPacks:PackIconLucideKind.ArrowRight}"
                                                   Foreground="{DynamicResource State.Success}" />
-                        <TextBlock Text="Копировать →"
+                        <TextBlock Text="Копировать слева направо"
                                    VerticalAlignment="Center" />
                     </StackPanel>
                 </MenuItem.Header>
             </MenuItem>
             <MenuItem
                 Command="{Binding PlacementTarget.DataContext.CopyToLeftCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                Visibility="{Binding PlacementTarget.DataContext.IsFile, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+                Visibility="{Binding PlacementTarget.DataContext.CanCopyLeft, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
                 <MenuItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                                   Kind="{x:Static iconPacks:PackIconLucideKind.ArrowLeft}"
                                                   Foreground="{DynamicResource State.Info}" />
-                        <TextBlock Text="← Копировать"
+                        <TextBlock Text="Копировать справа налево"
                                    VerticalAlignment="Center" />
                     </StackPanel>
                 </MenuItem.Header>
             </MenuItem>
             <MenuItem
                 Command="{Binding PlacementTarget.DataContext.SkipCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                Visibility="{Binding PlacementTarget.DataContext.IsFile, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+                Visibility="{Binding PlacementTarget.DataContext.CanCycle, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
                 <MenuItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                                   Kind="{x:Static iconPacks:PackIconLucideKind.Ban}"
                                                   Foreground="{DynamicResource Fg.Muted}" />
-                        <TextBlock Text="Пропустить"
+                        <TextBlock Text="Пропустить (не трогать)"
                                    VerticalAlignment="Center" />
                     </StackPanel>
                 </MenuItem.Header>
             </MenuItem>
             <MenuItem
                 Command="{Binding PlacementTarget.DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                Visibility="{Binding PlacementTarget.DataContext.IsFile, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+                Visibility="{Binding PlacementTarget.DataContext.CanDeleteFile, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
                 <MenuItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                                   Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
                                                   Foreground="{DynamicResource State.Error}" />
-                        <TextBlock Text="Удалить"
+                        <TextBlock Text="{Binding PlacementTarget.DataContext.FileDeleteHeader, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                    VerticalAlignment="Center" />
                     </StackPanel>
                 </MenuItem.Header>
             </MenuItem>
 
-            <Separator
-                Visibility="{Binding PlacementTarget.DataContext.IsDirectory, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}" />
             <MenuItem
                 Command="{Binding PlacementTarget.DataContext.DirCopyToRightCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                 Visibility="{Binding PlacementTarget.DataContext.IsDirectory, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
@@ -233,7 +231,7 @@
                         <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                                   Kind="{x:Static iconPacks:PackIconLucideKind.ArrowRight}"
                                                   Foreground="{DynamicResource State.Success}" />
-                        <TextBlock Text="Всё копировать →"
+                        <TextBlock Text="Всё содержимое: слева направо"
                                    VerticalAlignment="Center" />
                     </StackPanel>
                 </MenuItem.Header>
@@ -246,7 +244,7 @@
                         <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                                   Kind="{x:Static iconPacks:PackIconLucideKind.ArrowLeft}"
                                                   Foreground="{DynamicResource State.Info}" />
-                        <TextBlock Text="← Всё копировать"
+                        <TextBlock Text="Всё содержимое: справа налево"
                                    VerticalAlignment="Center" />
                     </StackPanel>
                 </MenuItem.Header>
@@ -259,21 +257,23 @@
                         <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                                   Kind="{x:Static iconPacks:PackIconLucideKind.Ban}"
                                                   Foreground="{DynamicResource Fg.Muted}" />
-                        <TextBlock Text="Всё пропустить"
+                        <TextBlock Text="Всё содержимое: пропустить"
                                    VerticalAlignment="Center" />
                     </StackPanel>
                 </MenuItem.Header>
             </MenuItem>
             <MenuItem
                 Command="{Binding PlacementTarget.DataContext.DirDeleteCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                Header="{Binding PlacementTarget.DataContext.DirDeleteHeader, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                 Visibility="{Binding PlacementTarget.DataContext.CanDirDelete, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
-                <MenuItem.Icon>
-                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
-                                              Width="14"
-                                              Height="14"
-                                              Foreground="{DynamicResource State.Error}" />
-                </MenuItem.Icon>
+                <MenuItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                                  Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                                  Foreground="{DynamicResource State.Error}" />
+                        <TextBlock Text="{Binding PlacementTarget.DataContext.DirDeleteHeader, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </MenuItem.Header>
             </MenuItem>
         </ContextMenu>
 
@@ -574,10 +574,12 @@
                                                               Height="12" />
                                 </Button>
                                 <iconPacks:PackIconLucide Grid.Column="1"
-                                                          Style="{StaticResource NodeIcon}" />
+                                                          Style="{StaticResource NodeIcon}"
+                                                          Visibility="{Binding LeftContentVisible, Converter={StaticResource BoolToVisibility}}" />
                                 <TextBlock Grid.Column="2"
                                            Text="{Binding Name}"
-                                           Style="{StaticResource NodeNameLeft}" />
+                                           Style="{StaticResource NodeNameLeft}"
+                                           Visibility="{Binding LeftContentVisible, Converter={StaticResource BoolToVisibility}}" />
                                 <iconPacks:PackIconLucide Grid.Column="3"
                                                           Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
                                                           Width="12"
@@ -621,7 +623,7 @@
                                     HorizontalAlignment="Center"
                                     ToolTip="{Binding ActionHint}"
                                     AutomationProperties.Name="{Binding ActionHint}"
-                                    Visibility="{Binding IsFile, Converter={StaticResource BoolToVisibility}}">
+                                    Visibility="{Binding ShowAction, Converter={StaticResource BoolToVisibility}}">
                                 <iconPacks:PackIconLucide Kind="{Binding ActionIconKind}"
                                                           Width="15"
                                                           Height="15" />
@@ -647,10 +649,12 @@
                                                               Height="12" />
                                 </Button>
                                 <iconPacks:PackIconLucide Grid.Column="1"
-                                                          Style="{StaticResource NodeIcon}" />
+                                                          Style="{StaticResource NodeIcon}"
+                                                          Visibility="{Binding RightContentVisible, Converter={StaticResource BoolToVisibility}}" />
                                 <TextBlock Grid.Column="2"
                                            Text="{Binding Name}"
-                                           Style="{StaticResource NodeNameRight}" />
+                                           Style="{StaticResource NodeNameRight}"
+                                           Visibility="{Binding RightContentVisible, Converter={StaticResource BoolToVisibility}}" />
                                 <iconPacks:PackIconLucide Grid.Column="3"
                                                           Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
                                                           Width="12"
@@ -762,6 +766,7 @@
                                       IsChecked="{Binding ShowModified}"
                                       MinWidth="0"
                                       Padding="9,0"
+                                      Margin="0,0,8,0"
                                       ToolTip="Показывать время последнего изменения файла"
                                       AutomationProperties.Name="Показывать время последнего изменения файла">
                             <StackPanel Orientation="Horizontal">
@@ -771,6 +776,22 @@
                                                           VerticalAlignment="Center"
                                                           Margin="0,0,6,0" />
                                 <TextBlock Text="Изменён"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
+                                      IsChecked="{Binding BlankAbsent}"
+                                      MinWidth="0"
+                                      Padding="9,0"
+                                      ToolTip="Отсутствующую сторону показывать пустой, а не зачёркнутым именем"
+                                      AutomationProperties.Name="Отсутствующую сторону показывать пустой">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.EyeOff}"
+                                                          Width="14"
+                                                          Height="14"
+                                                          VerticalAlignment="Center"
+                                                          Margin="0,0,6,0" />
+                                <TextBlock Text="Пусто"
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </ToggleButton>

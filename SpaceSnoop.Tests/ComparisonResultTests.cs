@@ -117,6 +117,32 @@ public class ComparisonResultTests
     }
 
     [Test]
+    public void CountPlannedActions_SplitsNewAndModifiedAndDeletes()
+    {
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("a.txt", "a.txt") { Status = ComparisonStatus.LeftOnly, Action = SyncAction.CopyToRight });
+        root.Files.Add(new("b.txt", "b.txt") { Status = ComparisonStatus.RightOnly, Action = SyncAction.CopyToLeft });
+        root.Files.Add(new("c.txt", "c.txt") { Status = ComparisonStatus.Modified, Action = SyncAction.CopyToRight });
+        root.Files.Add(new("d.txt", "d.txt") { Status = ComparisonStatus.LeftOnly, Action = SyncAction.DeleteLeft });
+        root.Files.Add(new("e.txt", "e.txt") { Status = ComparisonStatus.Identical, Action = SyncAction.Skip });
+
+        var sub = new DirectoryComparison("sub", "sub");
+        sub.Files.Add(new("f.txt", "sub\\f.txt") { Status = ComparisonStatus.Modified, Action = SyncAction.CopyToLeft });
+        root.SubDirectories.Add(sub);
+
+        var planned = new ComparisonResult("C:\\Left", "C:\\Right", root).CountPlannedActions();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(planned.NewCopies, Is.EqualTo(2));
+            Assert.That(planned.ModifiedCopies, Is.EqualTo(2));
+            Assert.That(planned.Deletes, Is.EqualTo(1));
+            Assert.That(planned.Copies, Is.EqualTo(4));
+            Assert.That(planned.Total, Is.EqualTo(5));
+        }
+    }
+
+    [Test]
     public void HasUnresolvedConflicts_ReturnsTrueWhenConflictsWithNoAction()
     {
         var root = new DirectoryComparison("root", "");

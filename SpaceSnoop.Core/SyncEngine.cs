@@ -5,10 +5,10 @@ namespace SpaceSnoop.Core;
 
 public sealed class SyncEngine(ILogger<SyncEngine> logger)
 {
-    public SyncReport Execute(ComparisonResult comparisonResult, CancellationToken cancel)
+    public SyncReport Execute(ComparisonResult comparisonResult, CancellationToken cancel, IProgress<OperationProgress>? progress = null)
     {
         var report = new SyncReport();
-        ExecuteRecursive(comparisonResult.Root, comparisonResult.LeftPath, comparisonResult.RightPath, report, cancel);
+        ExecuteRecursive(comparisonResult.Root, comparisonResult.LeftPath, comparisonResult.RightPath, report, progress, cancel);
         return report;
     }
 
@@ -62,6 +62,7 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger)
         string leftBase,
         string rightBase,
         SyncReport report,
+        IProgress<OperationProgress>? progress,
         CancellationToken cancel)
     {
         foreach (var file in dir.Files)
@@ -76,7 +77,16 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger)
             try
             {
                 ExecuteFileAction(file, leftBase, rightBase);
-                report.SuccessCount++;
+
+                if (file.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
+                {
+                    report.DeletedCount++;
+                }
+                else
+                {
+                    report.CopiedCount++;
+                }
+
                 logger.SyncFileApplied(file.Action, file.RelativePath);
             }
             catch (Exception ex)
@@ -84,18 +94,22 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger)
                 report.Errors.Add(new(file.RelativePath, file.Action, ex.Message));
                 logger.SyncFileFailed(ex, file.Action, file.RelativePath);
             }
+
+            progress?.Report(new(report.SuccessCount + report.Errors.Count, file.RelativePath));
         }
 
         foreach (var sub in dir.SubDirectories)
         {
-            ExecuteRecursive(sub, leftBase, rightBase, report, cancel);
+            ExecuteRecursive(sub, leftBase, rightBase, report, progress, cancel);
         }
     }
 }
 
 public sealed class SyncReport
 {
-    public int SuccessCount { get; set; }
+    public int CopiedCount { get; set; }
+    public int DeletedCount { get; set; }
+    public int SuccessCount => CopiedCount + DeletedCount;
     public List<SyncError> Errors { get; } = [];
 }
 
