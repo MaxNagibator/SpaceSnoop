@@ -1,4 +1,5 @@
 ﻿using MahApps.Metro.IconPacks;
+using System.Collections.ObjectModel;
 
 namespace SpaceSnoop.Wpf.ViewModels;
 
@@ -31,8 +32,8 @@ public sealed partial class DockerGroupViewModel : ObservableObject
             .Select(i => new DockerObjectViewModel(i))
             .ToList();
 
-        Preview = ordered.Take(PreviewCount).ToList();
-        Rest = ordered.Skip(PreviewCount).ToList();
+        Preview = new(ordered.Take(PreviewCount));
+        Rest = new(ordered.Skip(PreviewCount));
     }
 
     public string Title { get; }
@@ -41,19 +42,43 @@ public sealed partial class DockerGroupViewModel : ObservableObject
 
     public int Count => Preview.Count + Rest.Count;
 
-    public long TotalBytes { get; }
+    public long TotalBytes { get; private set; }
 
-    public string TotalSize { get; }
+    public string TotalSize { get; private set; }
 
-    public IReadOnlyList<DockerObjectViewModel> Preview { get; }
+    public ObservableCollection<DockerObjectViewModel> Preview { get; }
 
-    public IReadOnlyList<DockerObjectViewModel> Rest { get; }
+    public ObservableCollection<DockerObjectViewModel> Rest { get; }
 
     public bool HasRest => Rest.Count > 0;
 
     public string ToggleLabel => IsExpanded ? "Свернуть" : $"Показать ещё {Rest.Count}";
 
     public PackIconLucideKind ToggleIconKind => IsExpanded ? PackIconLucideKind.ChevronUp : PackIconLucideKind.ChevronDown;
+
+    public bool Remove(DockerObjectViewModel row)
+    {
+        if (!Preview.Remove(row) && !Rest.Remove(row))
+        {
+            return false;
+        }
+
+        if (Preview.Count < PreviewCount && Rest.Count > 0)
+        {
+            Preview.Add(Rest[0]);
+            Rest.RemoveAt(0);
+        }
+
+        TotalBytes -= row.Model.SizeBytes;
+        TotalSize = SizeFormatter.Format(TotalBytes);
+
+        OnPropertyChanged(nameof(TotalSize));
+        OnPropertyChanged(nameof(Count));
+        OnPropertyChanged(nameof(HasRest));
+        OnPropertyChanged(nameof(ToggleLabel));
+
+        return true;
+    }
 
     [RelayCommand]
     private void Toggle()

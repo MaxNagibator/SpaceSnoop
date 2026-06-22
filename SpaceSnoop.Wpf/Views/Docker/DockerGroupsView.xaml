@@ -54,21 +54,49 @@
                                Style="{StaticResource TextBlock.Mono}"
                                TextAlignment="Right"
                                VerticalAlignment="Center" />
-                    <Button Grid.Column="3"
-                            Style="{StaticResource Button.Icon}"
-                            Margin="10,0,0,0"
-                            Command="{Binding DataContext.RemoveObjectCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                            CommandParameter="{Binding}"
-                            IsEnabled="{Binding DataContext.CanRun, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                            AutomationProperties.Name="Удалить объект"
-                            ToolTip="Удалить безвозвратно">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
-                                                  Width="15"
-                                                  Height="15"
-                                                  HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center"
-                                                  Foreground="{DynamicResource State.Error}" />
-                    </Button>
+                    <Grid Grid.Column="3"
+                          Margin="10,0,0,0">
+                        <Button Style="{StaticResource Button.Icon}"
+                                Command="{Binding ArmDeleteCommand}"
+                                IsEnabled="{Binding DataContext.CanRun, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                Visibility="{Binding ConfirmingDelete, Converter={StaticResource InverseBoolToVisibility}}"
+                                AutomationProperties.Name="Удалить объект"
+                                ToolTip="Удалить безвозвратно">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                                      Width="15"
+                                                      Height="15"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"
+                                                      Foreground="{DynamicResource State.Error}" />
+                        </Button>
+                        <StackPanel Orientation="Horizontal"
+                                    Visibility="{Binding ConfirmingDelete, Converter={StaticResource BoolToVisibility}}">
+                            <Button Style="{StaticResource Button.Icon}"
+                                    Command="{Binding DataContext.RemoveObjectCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding}"
+                                    IsEnabled="{Binding DataContext.CanRun, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    AutomationProperties.Name="Подтвердить удаление"
+                                    ToolTip="Удалить безвозвратно">
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Check}"
+                                                          Width="15"
+                                                          Height="15"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"
+                                                          Foreground="{DynamicResource State.Success}" />
+                            </Button>
+                            <Button Style="{StaticResource Button.Icon}"
+                                    Command="{Binding CancelDeleteCommand}"
+                                    AutomationProperties.Name="Отменить удаление"
+                                    ToolTip="Отмена">
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.X}"
+                                                          Width="15"
+                                                          Height="15"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"
+                                                          Foreground="{DynamicResource State.Error}" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
                 </Grid>
             </Border>
         </DataTemplate>

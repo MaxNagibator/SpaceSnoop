@@ -2,8 +2,11 @@
 
 namespace SpaceSnoop.Wpf.ViewModels;
 
-public sealed class DockerObjectViewModel(DockerObject model)
+public sealed partial class DockerObjectViewModel(DockerObject model) : ObservableObject
 {
+    [ObservableProperty]
+    private bool _confirmingDelete;
+
     public DockerObject Model => model;
 
     public string Name => model.Name;
@@ -25,5 +28,17 @@ public sealed class DockerObjectViewModel(DockerObject model)
             DockerObjectKind.Volume => PackIconLucideKind.Database,
             _ => PackIconLucideKind.File,
         };
+    }
+
+    [RelayCommand]
+    private void ArmDelete()
+    {
+        ConfirmingDelete = true;
+    }
+
+    [RelayCommand]
+    private void CancelDelete()
+    {
+        ConfirmingDelete = false;
     }
 }

@@ -151,17 +151,7 @@ public sealed partial class DockerViewModel(
             _ => "объект",
         };
 
-        var warning = target.Kind == DockerObjectKind.Volume
-            ? " В томе могут лежать данные (БД и т.п.) – они пропадут БЕЗВОЗВРАТНО."
-            : target.InUse
-                ? " Объект используется – Docker может отказать в удалении."
-                : string.Empty;
-
-        if (!dialogs.Confirm($"Удалить {kind}", $"Удалить {kind} «{target.Name}» ({target.Size})?{warning}"))
-        {
-            return;
-        }
-
+        row.ConfirmingDelete = false;
         IsBusy = true;
         StatusText = $"Удаляю {kind} «{target.Name}»…";
         try
@@ -177,8 +167,44 @@ public sealed partial class DockerViewModel(
             return;
         }
 
+        foreach (var group in Groups)
+        {
+            if (group.Remove(row))
+            {
+                if (group.Count == 0)
+                {
+                    Groups.Remove(group);
+                }
+
+                break;
+            }
+        }
+
         IsBusy = false;
-        await RefreshAsync();
+        StatusText = $"Удалён {kind} «{target.Name}».";
+        await RefreshBucketsAsync();
+    }
+
+    private async Task RefreshBucketsAsync()
+    {
+        try
+        {
+            var snapshot = await docker.GetSnapshotAsync();
+            if (!snapshot.Available)
+            {
+                return;
+            }
+
+            Buckets.Clear();
+            foreach (var bucket in snapshot.Buckets)
+            {
+                Buckets.Add(bucket);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.DockerUnavailable(ex.Message);
+        }
     }
 
     [RelayCommand]
