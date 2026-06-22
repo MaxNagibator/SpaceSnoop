@@ -19,8 +19,19 @@
     <Border Style="{StaticResource Card.Inset}"
             Margin="0,0,0,10">
         <StackPanel>
-            <TextBlock Text="Исключения по умолчанию"
+            <TextBlock Text="Синхронизация"
                        Style="{StaticResource Setting.SectionTitle}" />
+
+            <CheckBox Content="Автодополнение путей"
+                      IsChecked="{Binding Operations.SyncPathSuggest, Mode=TwoWay}"
+                      Margin="0,14,0,0"
+                      VerticalAlignment="Center" />
+            <TextBlock Style="{StaticResource Setting.Hint}"
+                       Text="Подсказывает существующие каталоги при вводе пути; перебор вариантов – стрелками ↑/↓." />
+
+            <TextBlock Text="Исключения по умолчанию"
+                       Style="{StaticResource Setting.Label}"
+                       Margin="0,16,0,0" />
             <TextBlock Style="{StaticResource Setting.Hint}"
                        Text="Glob-паттерны через запятую (напр. bin,obj,*.tmp). Подставляются в «Синхронизацию» при пустом поле исключений." />
             <TextBox Style="{StaticResource TextBox.Form}"

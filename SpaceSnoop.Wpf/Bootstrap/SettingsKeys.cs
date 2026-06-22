@@ -41,6 +41,7 @@ public static class SettingsKeys
     public const string SyncShowModified = "wpf.sync.show_modified";
     public const string SyncDiffUnified = "wpf.sync.diff_unified";
     public const string SyncDiffCollapse = "wpf.sync.diff_collapse";
+    public const string SyncPathSuggest = "wpf.sync.path_suggest";
 
     public static string Theme => ThemeManager.SettingsKeyName;
 }

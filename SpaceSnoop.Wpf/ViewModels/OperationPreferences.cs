@@ -14,6 +14,9 @@ public sealed partial class OperationPreferences : ObservableObject
     [ObservableProperty]
     private string _defaultExclusions = string.Empty;
 
+    [ObservableProperty]
+    private bool _syncPathSuggest = AppDefaults.SyncPathSuggestDefault;
+
     public OperationPreferences(ISettingsStore settings)
     {
         _settings = settings;
@@ -22,6 +25,7 @@ public sealed partial class OperationPreferences : ObservableObject
         ConfirmBeforeDelete = _settings.GetBool(SettingsKeys.DeleteConfirm, AppDefaults.DeleteConfirmDefault);
         DeleteMode = _settings.GetEnum(SettingsKeys.DeleteMode, AppDefaults.DeleteModeDefault);
         DefaultExclusions = _settings.GetStringValue(SettingsKeys.DefaultExclusions) ?? string.Empty;
+        SyncPathSuggest = _settings.GetBool(SettingsKeys.SyncPathSuggest, AppDefaults.SyncPathSuggestDefault);
         _suppressPersist = false;
     }
 
@@ -46,6 +50,14 @@ public sealed partial class OperationPreferences : ObservableObject
         if (!_suppressPersist)
         {
             _settings.SetValue(SettingsKeys.DefaultExclusions, value);
+        }
+    }
+
+    partial void OnSyncPathSuggestChanged(bool value)
+    {
+        if (!_suppressPersist)
+        {
+            _settings.SetBool(SettingsKeys.SyncPathSuggest, value);
         }
     }
 }

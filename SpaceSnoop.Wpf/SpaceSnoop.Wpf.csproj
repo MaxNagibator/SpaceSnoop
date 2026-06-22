@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <Resource Include="icon.ico" />
+    <InternalsVisibleTo Include="SpaceSnoop.Wpf.Tests" />
   </ItemGroup>
 
   <ItemGroup>

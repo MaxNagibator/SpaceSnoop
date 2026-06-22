@@ -16,7 +16,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private static readonly SyncMode[] ModeOrder = [SyncMode.LeftToRight, SyncMode.RightToLeft, SyncMode.Bidirectional];
     private readonly ISettingsStore _settings;
     private readonly IDialogService _dialogs;
-    private readonly OperationPreferences _operations;
     private readonly ILogger<SyncViewModel> _logger;
     private readonly ILogger<SyncEngine> _engineLogger;
     private readonly ILogger<DirectoryComparer> _comparerLogger;
@@ -35,6 +34,12 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     [ObservableProperty]
     private string _rightPath = string.Empty;
+
+    [ObservableProperty]
+    private bool _leftPathInvalid;
+
+    [ObservableProperty]
+    private bool _rightPathInvalid;
 
     [ObservableProperty]
     private string _exclusions = string.Empty;
@@ -75,12 +80,14 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     {
         _settings = settings;
         _dialogs = dialogs;
-        _operations = operations;
+        Operations = operations;
         _logger = logger;
         _engineLogger = engineLogger;
         _comparerLogger = comparerLogger;
         LoadSettings();
     }
+
+    public OperationPreferences Operations { get; }
 
     public RangeObservableCollection<SyncNodeViewModel> Rows { get; } = [];
 
@@ -318,6 +325,11 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
 
         return File.ReadAllLines(path);
+    }
+
+    private static bool PathMissing(string path)
+    {
+        return !string.IsNullOrWhiteSpace(path) && !Directory.Exists(path.Trim());
     }
 
     private void HashModifiedFiles(DirectoryComparison dir, string leftBase, string rightBase, CancellationToken token)
@@ -645,11 +657,13 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     partial void OnLeftPathChanged(string value)
     {
         Persist(SettingsKeys.SyncLeft, value);
+        LeftPathInvalid = PathMissing(value);
     }
 
     partial void OnRightPathChanged(string value)
     {
         Persist(SettingsKeys.SyncRight, value);
+        RightPathInvalid = PathMissing(value);
     }
 
     partial void OnExclusionsChanged(string value)
@@ -816,7 +830,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         LeftPath = _settings.GetStringValue(SettingsKeys.SyncLeft) ?? string.Empty;
         RightPath = _settings.GetStringValue(SettingsKeys.SyncRight) ?? string.Empty;
-        Exclusions = _settings.GetStringValue(SettingsKeys.SyncExclusions) ?? _operations.DefaultExclusions;
+        Exclusions = _settings.GetStringValue(SettingsKeys.SyncExclusions) ?? Operations.DefaultExclusions;
 
         SelectedModeIndex = Math.Clamp(_settings.GetInt(SettingsKeys.SyncMode), 0, ModeOrder.Length - 1);
         ShowIdentical = _settings.GetBool(SettingsKeys.SyncShowIdentical);

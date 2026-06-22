@@ -28,4 +28,6 @@ public static class AppDefaults
 
     public const bool SyncDiffCollapseDefault = true;
     public const int DiffContextLines = 3;
+
+    public const bool SyncPathSuggestDefault = true;
 }
