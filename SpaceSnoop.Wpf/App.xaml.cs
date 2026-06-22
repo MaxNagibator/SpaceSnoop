@@ -17,6 +17,7 @@ public partial class App : Application
 
         _logging = KeepShellLogging.Bootstrap(new()
         {
+            LogsDirectory = Path.Combine(AppStorage.DataDirectory, AppStorage.LogsFolderName),
             FileNamePrefix = AppInfo.LogFilePrefix,
         });
 
@@ -30,7 +31,7 @@ public partial class App : Application
 
         try
         {
-            var settingsPath = Path.Combine(AppContext.BaseDirectory, TomlSettingsFile.PrimaryFileName);
+            var settingsPath = Path.Combine(AppStorage.DataDirectory, TomlSettingsFile.PrimaryFileName);
             ISettingsStore settings = new SettingsStore(settingsPath);
             AppThemes.Register();
             var themeKey = settings.GetStringValue(SettingsKeys.Theme);

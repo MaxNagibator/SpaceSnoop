@@ -95,6 +95,12 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1401, Level = LogLevel.Warning, Message = "Не удалось скопировать путь к файлу настроек")]
     public static partial void CopySettingsPathFailed(this ILogger logger, Exception exception);
 
+    [LoggerMessage(EventId = 1402, Level = LogLevel.Information, Message = "Расположение данных изменено: {Path}")]
+    public static partial void StorageLocationChanged(this ILogger logger, string path);
+
+    [LoggerMessage(EventId = 1403, Level = LogLevel.Error, Message = "Не удалось изменить расположение данных: {Path}")]
+    public static partial void StorageLocationChangeFailed(this ILogger logger, Exception exception, string path);
+
     [LoggerMessage(EventId = 1500, Level = LogLevel.Warning, Message = "Не удалось открыть проводник для {Path}")]
     public static partial void OpenExplorerFailed(this ILogger logger, Exception exception, string path);
 

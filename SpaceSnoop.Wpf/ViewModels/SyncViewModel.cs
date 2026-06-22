@@ -417,7 +417,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     {
         try
         {
-            var logPath = Path.Combine(AppContext.BaseDirectory, AppInfo.SyncLogFileName);
+            var logPath = Path.Combine(AppStorage.DataDirectory, AppInfo.SyncLogFileName);
             using var writer = new StreamWriter(logPath, true);
             writer.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Синхронизация: {report.SuccessCount} успешно, {report.Errors.Count} ошибок");
 

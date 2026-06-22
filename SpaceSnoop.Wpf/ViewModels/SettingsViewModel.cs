@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+﻿using KeepShell.Services;
+using System.ComponentModel;
 using System.Diagnostics;
 
 namespace SpaceSnoop.Wpf.ViewModels;
@@ -47,6 +48,22 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     public string PageDescription => "Параметры приложения. Изменения сохраняются автоматически.";
 
     public string SettingsFilePath => _settings.FilePath;
+
+    public string DataDirectory => AppStorage.DataDirectory;
+
+    public bool StoreInAppData
+    {
+        get => AppStorage.UseAppData;
+        set
+        {
+            if (value != AppStorage.UseAppData)
+            {
+                ChangeStorageLocation(value);
+            }
+
+            OnPropertyChanged();
+        }
+    }
 
     public IReadOnlyList<EnumOption<AppTheme>> ThemeOptions { get; } =
     [
@@ -134,6 +151,60 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         {
             OnPropertyChanged(nameof(SelectedThemeOption));
         }
+    }
+
+    private void ChangeStorageLocation(bool useAppData)
+    {
+        var source = AppStorage.DataDirectory;
+        var destination = AppStorage.DirectoryFor(useAppData);
+        var place = useAppData ? "в папке AppData" : "рядом с программой";
+
+        var choice = StyledMessageBox.Show($"""
+                                            Хранить файлы приложения {place}:
+                                            {destination}
+
+                                            Скопировать туда текущие настройки, логи и журналы?
+                                            После смены приложение будет перезапущено.
+                                            """,
+            "Расположение данных",
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Question);
+
+        if (choice == MessageBoxResult.Cancel)
+        {
+            return;
+        }
+
+        try
+        {
+            if (choice == MessageBoxResult.Yes)
+            {
+                _settings.Flush();
+                AppStorage.Migrate(source, destination);
+            }
+
+            AppStorage.SetUseAppData(useAppData);
+            _logger.StorageLocationChanged(destination);
+        }
+        catch (Exception exception)
+        {
+            _logger.StorageLocationChangeFailed(exception, destination);
+            StyledMessageBox.Show($"Не удалось изменить расположение данных.{Environment.NewLine}{Environment.NewLine}{exception.Message}",
+                "Расположение данных",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+
+            return;
+        }
+
+        var executable = Environment.ProcessPath;
+
+        if (!string.IsNullOrEmpty(executable))
+        {
+            Process.Start(executable);
+        }
+
+        Application.Current.Shutdown();
     }
 
     [RelayCommand]
