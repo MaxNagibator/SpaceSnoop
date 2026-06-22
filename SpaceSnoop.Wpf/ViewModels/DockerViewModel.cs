@@ -12,13 +12,17 @@ public sealed partial class DockerViewModel(
 {
     private bool _loadedOnce;
 
+    private Func<Task>? _pendingCleanupAction;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanRun))]
     [NotifyPropertyChangedFor(nameof(IsIdle))]
+    [NotifyPropertyChangedFor(nameof(CanArmCleanup))]
     private bool _isBusy;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanRun))]
+    [NotifyPropertyChangedFor(nameof(CanArmCleanup))]
     private bool _isAvailable = true;
 
     [ObservableProperty]
@@ -30,11 +34,20 @@ public sealed partial class DockerViewModel(
     [ObservableProperty]
     private bool _pruneAllVolumes;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPendingCleanup))]
+    [NotifyPropertyChangedFor(nameof(CanArmCleanup))]
+    private string? _pendingCleanupMessage;
+
     public ObservableCollection<DockerUsage> Buckets { get; } = [];
 
     public ObservableCollection<DockerGroupViewModel> Groups { get; } = [];
 
     public bool CanRun => !IsBusy && IsAvailable;
+
+    public bool CanArmCleanup => CanRun && !HasPendingCleanup;
+
+    public bool HasPendingCleanup => PendingCleanupMessage is not null;
 
     public bool IsIdle => !IsBusy;
 
@@ -208,58 +221,81 @@ public sealed partial class DockerViewModel(
     }
 
     [RelayCommand]
-    private Task PruneBuildCache()
+    private void PruneBuildCache()
     {
-        return RunCleanupAsync(DockerCleanupTarget.BuildCache,
-            "Очистить кэш сборки",
-            "Удалить весь кэш сборки Docker? Это безопасно, но следующая сборка займёт больше времени.");
+        ArmCleanup("Удалить весь кэш сборки Docker? Это безопасно, но следующая сборка займёт больше времени.",
+            () => RunCleanupAsync(DockerCleanupTarget.BuildCache, "Очистить кэш сборки"));
     }
 
     [RelayCommand]
-    private Task PruneDanglingImages()
+    private void PruneDanglingImages()
     {
-        return RunCleanupAsync(DockerCleanupTarget.DanglingImages,
-            "Удалить «висячие» образы",
-            "Удалить образы без тегов (dangling)? Безвозвратно.");
+        ArmCleanup("Удалить образы без тегов (dangling)? Безвозвратно.",
+            () => RunCleanupAsync(DockerCleanupTarget.DanglingImages, "Удалить «висячие» образы"));
     }
 
     [RelayCommand]
-    private Task PruneStoppedContainers()
+    private void PruneStoppedContainers()
     {
-        return RunCleanupAsync(DockerCleanupTarget.StoppedContainers,
-            "Удалить остановленные контейнеры",
-            "Удалить все остановленные контейнеры? Безвозвратно.");
+        ArmCleanup("Удалить все остановленные контейнеры? Безвозвратно.",
+            () => RunCleanupAsync(DockerCleanupTarget.StoppedContainers, "Удалить остановленные контейнеры"));
     }
 
     [RelayCommand]
-    private Task PruneUnusedImages()
+    private void PruneUnusedImages()
     {
-        return RunCleanupAsync(DockerCleanupTarget.UnusedImages,
-            "Удалить неиспользуемые образы",
-            "Удалить ВСЕ образы, не привязанные к контейнерам? Их придётся скачивать заново. Безвозвратно.");
+        ArmCleanup("Удалить ВСЕ образы, не привязанные к контейнерам? Их придётся скачивать заново. Безвозвратно.",
+            () => RunCleanupAsync(DockerCleanupTarget.UnusedImages, "Удалить неиспользуемые образы"));
     }
 
     [RelayCommand]
-    private Task PruneVolumes()
+    private void PruneVolumes()
     {
         var scope = PruneAllVolumes ? "ВСЕ неиспользуемые тома (включая именованные)" : "неиспользуемые анонимные тома";
-        return RunCleanupAsync(DockerCleanupTarget.UnusedVolumes,
-            "Удалить неиспользуемые тома",
-            $"⚠ Удалить {scope}? В них лежат данные (БД и т.п.) – они пропадут БЕЗВОЗВРАТНО. Продолжить?",
-            PruneAllVolumes);
+        var allUnused = PruneAllVolumes;
+        ArmCleanup($"⚠ Удалить {scope}? В них лежат данные (БД и т.п.) – они пропадут БЕЗВОЗВРАТНО.",
+            () => RunCleanupAsync(DockerCleanupTarget.UnusedVolumes, "Удалить неиспользуемые тома", allUnused));
     }
 
     [RelayCommand]
-    private async Task Compact()
+    private void Compact()
     {
-        if (!CanRun
-            || !dialogs.Confirm("Сжать диск Docker",
-                "WSL и Docker будут остановлены, образ диска (VHDX) сожмётся, место вернётся на диск. "
-                + "После этого запустите Docker заново. Продолжить?"))
+        ArmCleanup("WSL и Docker будут остановлены, образ диска (VHDX) сожмётся, место вернётся на диск. "
+            + "После этого запустите Docker заново.",
+            CompactCoreAsync);
+    }
+
+    private void ArmCleanup(string message, Func<Task> action)
+    {
+        if (!CanRun)
         {
             return;
         }
 
+        _pendingCleanupAction = action;
+        PendingCleanupMessage = message;
+    }
+
+    [RelayCommand]
+    private void CancelCleanup()
+    {
+        _pendingCleanupAction = null;
+        PendingCleanupMessage = null;
+    }
+
+    [RelayCommand]
+    private async Task ConfirmCleanup()
+    {
+        var action = _pendingCleanupAction;
+        CancelCleanup();
+        if (action is not null)
+        {
+            await action();
+        }
+    }
+
+    private async Task CompactCoreAsync()
+    {
         IsBusy = true;
         StatusText = "Сжимаю образ диска Docker…";
         try
@@ -284,9 +320,9 @@ public sealed partial class DockerViewModel(
         }
     }
 
-    private async Task RunCleanupAsync(DockerCleanupTarget target, string title, string confirm, bool allUnused = false)
+    private async Task RunCleanupAsync(DockerCleanupTarget target, string title, bool allUnused = false)
     {
-        if (!CanRun || !dialogs.Confirm(title, confirm))
+        if (!CanRun)
         {
             return;
         }
