@@ -704,8 +704,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
         catch (Exception exception)
         {
-            _dialogs.Error("Ошибка", exception.Message);
-            SummaryText = $"Ошибка: {exception.Message}";
+            var cause = exception.Unwrap();
+            _dialogs.Error("Ошибка", cause.Message);
+            SummaryText = $"Ошибка: {cause.Message}";
             StatusCaption = SummaryText;
             return null;
         }

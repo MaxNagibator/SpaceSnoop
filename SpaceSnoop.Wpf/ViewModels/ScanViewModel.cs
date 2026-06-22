@@ -700,8 +700,9 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         }
         catch (Exception exception)
         {
-            _logger.ScanFailed(exception, path);
-            _dialogs.Error("Ошибка сканирования", exception.Message);
+            var cause = exception.Unwrap();
+            _logger.ScanFailed(cause, path);
+            _dialogs.Error("Ошибка сканирования", cause.Message);
         }
         finally
         {
