@@ -19,6 +19,19 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
         return stats;
     }
 
+    public Dictionary<ComparisonStatus, int> GetDirectoryStatistics()
+    {
+        var stats = new Dictionary<ComparisonStatus, int>();
+
+        foreach (var status in Enum.GetValues<ComparisonStatus>())
+        {
+            stats[status] = 0;
+        }
+
+        CountDirectoriesRecursive(Root, stats);
+        return stats;
+    }
+
     public void ApplyMode(SyncMode mode)
     {
         ApplyModeRecursive(Root, mode);
@@ -44,11 +57,19 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
         var newCopies = 0;
         var modifiedCopies = 0;
         var deletes = 0;
-        CountPlannedRecursive(Root, ref newCopies, ref modifiedCopies, ref deletes);
-        return new(newCopies, modifiedCopies, deletes);
+        var dirCopies = 0;
+        var dirDeletes = 0;
+        CountPlannedRecursive(Root, ref newCopies, ref modifiedCopies, ref deletes, ref dirCopies, ref dirDeletes);
+        return new(newCopies, modifiedCopies, deletes, dirCopies, dirDeletes);
     }
 
-    private static void CountPlannedRecursive(DirectoryComparison dir, ref int newCopies, ref int modifiedCopies, ref int deletes)
+    private static void CountPlannedRecursive(
+        DirectoryComparison dir,
+        ref int newCopies,
+        ref int modifiedCopies,
+        ref int deletes,
+        ref int dirCopies,
+        ref int dirDeletes)
     {
         foreach (var file in dir.Files)
         {
@@ -74,7 +95,18 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
 
         foreach (var sub in dir.SubDirectories)
         {
-            CountPlannedRecursive(sub, ref newCopies, ref modifiedCopies, ref deletes);
+            switch (sub.Action)
+            {
+                case SyncAction.CopyToRight or SyncAction.CopyToLeft:
+                    dirCopies++;
+                    break;
+
+                case SyncAction.DeleteLeft or SyncAction.DeleteRight:
+                    dirDeletes++;
+                    break;
+            }
+
+            CountPlannedRecursive(sub, ref newCopies, ref modifiedCopies, ref deletes, ref dirCopies, ref dirDeletes);
         }
     }
 
@@ -119,6 +151,15 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
         }
     }
 
+    private static void CountDirectoriesRecursive(DirectoryComparison dir, Dictionary<ComparisonStatus, int> stats)
+    {
+        foreach (var sub in dir.SubDirectories)
+        {
+            stats[sub.Status]++;
+            CountDirectoriesRecursive(sub, stats);
+        }
+    }
+
     private static void ApplyModeRecursive(DirectoryComparison dir, SyncMode mode)
     {
         foreach (var file in dir.Files)
@@ -134,8 +175,19 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
 
         foreach (var sub in dir.SubDirectories)
         {
+            sub.Action = ApplyDirMode(sub, mode);
             ApplyModeRecursive(sub, mode);
         }
+    }
+
+    private static SyncAction ApplyDirMode(DirectoryComparison dir, SyncMode mode)
+    {
+        return dir.Status switch
+        {
+            ComparisonStatus.LeftOnly => mode == SyncMode.RightToLeft ? SyncAction.Skip : SyncAction.CopyToRight,
+            ComparisonStatus.RightOnly => mode == SyncMode.LeftToRight ? SyncAction.Skip : SyncAction.CopyToLeft,
+            _ => SyncAction.None,
+        };
     }
 
     private static SyncAction ApplyLeftToRight(FileComparison file)
@@ -192,9 +244,9 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
     }
 }
 
-public sealed record PlannedActions(int NewCopies, int ModifiedCopies, int Deletes)
+public sealed record PlannedActions(int NewCopies, int ModifiedCopies, int Deletes, int DirCopies, int DirDeletes)
 {
     public int Copies => NewCopies + ModifiedCopies;
 
-    public int Total => Copies + Deletes;
+    public int Total => Copies + Deletes + DirCopies + DirDeletes;
 }

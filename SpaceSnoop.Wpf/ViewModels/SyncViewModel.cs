@@ -23,6 +23,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     private ComparisonResult? _result;
 
+    private Dictionary<object, SyncOutcome> _outcomes = [];
     private Dictionary<DirectoryComparison, (long Left, long Right)>? _dirSizeCache;
     private CancellationTokenSource? _cts;
     private bool _suppressPersist;
@@ -30,6 +31,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private double _progressValue;
     private double _progressMax = 1;
     private Dictionary<ComparisonStatus, int> _stats = NewZeroStats();
+    private Dictionary<ComparisonStatus, int> _dirStats = NewZeroStats();
     private int _total;
 
     [ObservableProperty]
@@ -74,6 +76,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private string? _statusCaption;
 
     [ObservableProperty]
+    private string? _progressDetail;
+
+    [ObservableProperty]
     private string _summaryText = "Сравнение не выполнялось.";
 
     [ObservableProperty]
@@ -110,6 +115,14 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     public int ModifiedCount => _stats[ComparisonStatus.Modified];
 
     public int ConflictCount => _stats[ComparisonStatus.Conflict];
+
+    public int IdenticalDirCount => _dirStats[ComparisonStatus.Identical];
+
+    public int LeftOnlyDirCount => _dirStats[ComparisonStatus.LeftOnly];
+
+    public int RightOnlyDirCount => _dirStats[ComparisonStatus.RightOnly];
+
+    public int ModifiedDirCount => _dirStats[ComparisonStatus.Modified];
 
     public double IdenticalFraction => Fraction(ComparisonStatus.Identical);
 
@@ -226,6 +239,11 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     private static void ApplyActionRecursive(DirectoryComparison dir, SyncAction action)
     {
+        if (dir.Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly)
+        {
+            dir.Action = DirActionFor(dir, action);
+        }
+
         foreach (var file in dir.Files)
         {
             if (file.Status != ComparisonStatus.Identical)
@@ -238,6 +256,25 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         {
             ApplyActionRecursive(sub, action);
         }
+    }
+
+    private static SyncAction DirActionFor(DirectoryComparison dir, SyncAction requested)
+    {
+        return dir.Status == ComparisonStatus.LeftOnly
+            ? requested switch
+            {
+                SyncAction.CopyToRight => SyncAction.CopyToRight,
+                SyncAction.DeleteLeft => SyncAction.DeleteLeft,
+                SyncAction.Skip => SyncAction.Skip,
+                _ => dir.Action,
+            }
+            : requested switch
+            {
+                SyncAction.CopyToLeft => SyncAction.CopyToLeft,
+                SyncAction.DeleteRight => SyncAction.DeleteRight,
+                SyncAction.Skip => SyncAction.Skip,
+                _ => dir.Action,
+            };
     }
 
     private static Dictionary<ComparisonStatus, int> NewZeroStats()
@@ -442,6 +479,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         _result = prepared.Result;
         _dirSizeCache = prepared.Sizes;
+        _outcomes = [];
         CollapseAllDirectories(_result.Root);
         RebuildRows();
         UpdateSummary();
@@ -484,6 +522,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
 
         _dirSizeCache = sizes;
+        _outcomes = [];
         RebuildRows();
         UpdateSummary();
         SummaryText = $"Хеши вычислены за {stopwatch.Elapsed.TotalSeconds:F2} с";
@@ -532,9 +571,19 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             }
         }
 
+        if (planned.DirCopies > 0)
+        {
+            lines.Add($"Создать каталогов: {planned.DirCopies:N0}");
+        }
+
         if (planned.Deletes > 0)
         {
-            lines.Add($"Удалить в корзину: {planned.Deletes:N0}");
+            lines.Add($"Удалить файлов в корзину: {planned.Deletes:N0}");
+        }
+
+        if (planned.DirDeletes > 0)
+        {
+            lines.Add($"Удалить каталогов в корзину: {planned.DirDeletes:N0}");
         }
 
         if (planned.Total == 0)
@@ -577,6 +626,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _logger.SyncFinished(report.SuccessCount, report.Errors.Count, (long)stopwatch.Elapsed.TotalMilliseconds);
 
         WriteSyncLog(report);
+        _outcomes = SyncOutcomes.Build(result, report.Errors);
+        RebuildRows();
         SummaryText = $"Готово за {stopwatch.Elapsed.TotalSeconds:F2} с. Успешно: {report.SuccessCount:N0}, ошибок: {report.Errors.Count:N0}";
         StatusCaption = SummaryText;
 
@@ -758,20 +809,27 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             StatusCaption = caption;
         }
 
+        ProgressDetail = StatusCaption;
+
         var progress = new Progress<OperationProgress>(update =>
         {
             var tail = string.IsNullOrEmpty(update.Current) ? string.Empty : $" · {update.Current}";
+
+            string head;
 
             if (determinate)
             {
                 ProgressValue = update.Completed;
                 var percent = update.Completed * 100 / total;
-                StatusCaption = $"{caption} {update.Completed} / {total} ({percent} %){tail}";
+                head = $"{caption} {update.Completed} / {total} ({percent} %)";
             }
             else
             {
-                StatusCaption = $"{caption} {update.Completed}{tail}";
+                head = $"{caption} {update.Completed}";
             }
+
+            StatusCaption = head;
+            ProgressDetail = head + tail;
         });
 
         try
@@ -841,7 +899,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
             var expanded = !_collapsed.Contains(sub);
             var sizes = _dirSizeCache?.GetValueOrDefault(sub);
-            buffer.Add(new(sub, indent, expanded, sizes?.Left ?? 0, sizes?.Right ?? 0, this));
+            buffer.Add(new(sub, indent, expanded, sizes?.Left ?? 0, sizes?.Right ?? 0, this) { Outcome = _outcomes.GetValueOrDefault(sub) });
 
             if (expanded)
             {
@@ -856,7 +914,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
                 continue;
             }
 
-            buffer.Add(new(file, indent, this));
+            buffer.Add(new(file, indent, this) { Outcome = _outcomes.GetValueOrDefault(file) });
         }
     }
 
@@ -866,6 +924,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         {
             SummaryText = "Сравнение не выполнялось.";
             _stats = NewZeroStats();
+            _dirStats = NewZeroStats();
             _total = 0;
             NotifyLedgerChanged();
             HasPending = false;
@@ -884,6 +943,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             + $"конфликтов: {stats[ComparisonStatus.Conflict]}";
 
         _stats = stats;
+        _dirStats = _result.GetDirectoryStatistics();
         _total = stats.Values.Sum();
         NotifyLedgerChanged();
 
@@ -905,6 +965,10 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         OnPropertyChanged(nameof(RightOnlyCount));
         OnPropertyChanged(nameof(ModifiedCount));
         OnPropertyChanged(nameof(ConflictCount));
+        OnPropertyChanged(nameof(IdenticalDirCount));
+        OnPropertyChanged(nameof(LeftOnlyDirCount));
+        OnPropertyChanged(nameof(RightOnlyDirCount));
+        OnPropertyChanged(nameof(ModifiedDirCount));
         OnPropertyChanged(nameof(IdenticalFraction));
         OnPropertyChanged(nameof(LeftOnlyFraction));
         OnPropertyChanged(nameof(RightOnlyFraction));
@@ -915,13 +979,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     private bool HasActionableChanges()
     {
-        if (_result is null)
-        {
-            return false;
-        }
-
-        var stats = _result.GetStatistics();
-        return stats.Any(kv => kv.Key != ComparisonStatus.Identical && kv.Value > 0);
+        return _result is not null && _result.CountPlannedActions().Total > 0;
     }
 
     private void LoadSettings()

@@ -106,6 +106,52 @@ public class SyncEngineTests
     }
 
     [Test]
+    public void CopyToRight_CreatesEmptyOneSidedDirectory()
+    {
+        Directory.CreateDirectory(Path.Combine(_leftDir, "empty"));
+
+        var root = new DirectoryComparison("root", "");
+        root.SubDirectories.Add(new("empty", "empty")
+        {
+            Status = ComparisonStatus.LeftOnly,
+            Action = SyncAction.CopyToRight,
+        });
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
+        var report = engine.Execute(result, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(Directory.Exists(Path.Combine(_rightDir, "empty")), Is.True);
+            Assert.That(report.CopiedCount, Is.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public void ApplyMode_AssignsActionsToOneSidedDirectories_AndCountsThem()
+    {
+        var root = new DirectoryComparison("root", "");
+        var left = new DirectoryComparison("onlyLeft", "onlyLeft") { Status = ComparisonStatus.LeftOnly };
+        var right = new DirectoryComparison("onlyRight", "onlyRight") { Status = ComparisonStatus.RightOnly };
+        root.SubDirectories.Add(left);
+        root.SubDirectories.Add(right);
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        result.ApplyMode(SyncMode.LeftToRight);
+
+        var planned = result.CountPlannedActions();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(left.Action, Is.EqualTo(SyncAction.CopyToRight));
+            Assert.That(right.Action, Is.EqualTo(SyncAction.Skip));
+            Assert.That(planned.DirCopies, Is.EqualTo(1));
+            Assert.That(planned.Total, Is.EqualTo(1));
+        }
+    }
+
+    [Test]
     public void Skip_DoesNothing()
     {
         File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "hello");

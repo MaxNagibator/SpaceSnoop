@@ -57,6 +57,50 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger)
         }
     }
 
+    private static void DeleteDirectory(string path)
+    {
+        if (Directory.Exists(path))
+        {
+            FileSystem.DeleteDirectory(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+        }
+    }
+
+    private void ApplyDirectoryAction(DirectoryComparison dir, string leftBase, string rightBase, SyncReport report)
+    {
+        try
+        {
+            switch (dir.Action)
+            {
+                case SyncAction.CopyToRight:
+                    Directory.CreateDirectory(Path.Combine(rightBase, dir.RelativePath));
+                    report.CopiedCount++;
+                    break;
+
+                case SyncAction.CopyToLeft:
+                    Directory.CreateDirectory(Path.Combine(leftBase, dir.RelativePath));
+                    report.CopiedCount++;
+                    break;
+
+                case SyncAction.DeleteLeft:
+                    DeleteDirectory(Path.Combine(leftBase, dir.RelativePath));
+                    report.DeletedCount++;
+                    break;
+
+                case SyncAction.DeleteRight:
+                    DeleteDirectory(Path.Combine(rightBase, dir.RelativePath));
+                    report.DeletedCount++;
+                    break;
+            }
+
+            logger.SyncFileApplied(dir.Action, dir.RelativePath);
+        }
+        catch (Exception ex)
+        {
+            report.Errors.Add(new(dir.RelativePath, dir.Action, ex.Message));
+            logger.SyncFileFailed(ex, dir.Action, dir.RelativePath);
+        }
+    }
+
     private void ExecuteRecursive(
         DirectoryComparison dir,
         string leftBase,
@@ -65,6 +109,21 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger)
         IProgress<OperationProgress>? progress,
         CancellationToken cancel)
     {
+        cancel.ThrowIfCancellationRequested();
+
+        if (dir.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
+        {
+            ApplyDirectoryAction(dir, leftBase, rightBase, report);
+            progress?.Report(new(report.SuccessCount + report.Errors.Count, dir.RelativePath));
+            return;
+        }
+
+        if (dir.Action is SyncAction.CopyToRight or SyncAction.CopyToLeft)
+        {
+            ApplyDirectoryAction(dir, leftBase, rightBase, report);
+            progress?.Report(new(report.SuccessCount + report.Errors.Count, dir.RelativePath));
+        }
+
         foreach (var file in dir.Files)
         {
             cancel.ThrowIfCancellationRequested();

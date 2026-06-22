@@ -31,6 +31,30 @@ public class ComparisonResultTests
     }
 
     [Test]
+    public void DirectoryStatistics_CountsSubdirectoriesByStatus_ExcludingRoot()
+    {
+        var root = new DirectoryComparison("root", "") { Status = ComparisonStatus.Modified };
+
+        root.SubDirectories.Add(new("only-left", "only-left") { Status = ComparisonStatus.LeftOnly });
+        root.SubDirectories.Add(new("only-right", "only-right") { Status = ComparisonStatus.RightOnly });
+
+        var modified = new DirectoryComparison("modified", "modified") { Status = ComparisonStatus.Modified };
+        modified.SubDirectories.Add(new("nested-id", "modified\\nested-id") { Status = ComparisonStatus.Identical });
+        root.SubDirectories.Add(modified);
+
+        var stats = new ComparisonResult("C:\\Left", "C:\\Right", root).GetDirectoryStatistics();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(stats[ComparisonStatus.LeftOnly], Is.EqualTo(1));
+            Assert.That(stats[ComparisonStatus.RightOnly], Is.EqualTo(1));
+            Assert.That(stats[ComparisonStatus.Modified], Is.EqualTo(1));
+            Assert.That(stats[ComparisonStatus.Identical], Is.EqualTo(1));
+            Assert.That(stats[ComparisonStatus.Conflict], Is.Zero);
+        }
+    }
+
+    [Test]
     public void ApplyLeftToRightMode_SetsCorrectActions()
     {
         var root = new DirectoryComparison("root", "");

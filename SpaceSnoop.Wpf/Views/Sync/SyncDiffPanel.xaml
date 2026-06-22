@@ -217,8 +217,9 @@
                         <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                                   Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
                                                   Foreground="{DynamicResource State.Error}" />
-                        <TextBlock Text="{Binding PlacementTarget.DataContext.FileDeleteHeader, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                   VerticalAlignment="Center" />
+                        <TextBlock
+                            Text="{Binding PlacementTarget.DataContext.FileDeleteHeader, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                            VerticalAlignment="Center" />
                     </StackPanel>
                 </MenuItem.Header>
             </MenuItem>
@@ -270,8 +271,9 @@
                         <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                                   Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
                                                   Foreground="{DynamicResource State.Error}" />
-                        <TextBlock Text="{Binding PlacementTarget.DataContext.DirDeleteHeader, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                   VerticalAlignment="Center" />
+                        <TextBlock
+                            Text="{Binding PlacementTarget.DataContext.DirDeleteHeader, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                            VerticalAlignment="Center" />
                     </StackPanel>
                 </MenuItem.Header>
             </MenuItem>
@@ -300,14 +302,21 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
-                        <Border x:Name="RowBd"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Stretch"
-                                              VerticalAlignment="Center" />
-                        </Border>
+                        <Grid>
+                            <Border x:Name="RowBd"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Stretch"
+                                                  VerticalAlignment="Center" />
+                            </Border>
+                            <Border x:Name="OutcomeBar"
+                                    Width="4"
+                                    HorizontalAlignment="Left"
+                                    Background="Transparent"
+                                    IsHitTestVisible="False" />
+                        </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver"
                                      Value="True">
@@ -324,6 +333,18 @@
                                         Property="BorderThickness"
                                         Value="0,1,0,1" />
                             </Trigger>
+                            <DataTrigger Binding="{Binding Outcome}"
+                                         Value="Applied">
+                                <Setter TargetName="OutcomeBar"
+                                        Property="Background"
+                                        Value="{DynamicResource State.Success}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Outcome}"
+                                         Value="Failed">
+                                <Setter TargetName="OutcomeBar"
+                                        Property="Background"
+                                        Value="{DynamicResource State.Error}" />
+                            </DataTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -568,7 +589,7 @@
                                 <Button Grid.Column="0"
                                         Style="{StaticResource ChevronToggle}"
                                         Command="{Binding ToggleExpandCommand}"
-                                        Visibility="{Binding IsDirectory, Converter={StaticResource BoolToVisibility}}">
+                                        Visibility="{Binding LeftExpanderVisible, Converter={StaticResource BoolToVisibility}}">
                                     <iconPacks:PackIconLucide Kind="{Binding ExpandIconKind}"
                                                               Width="12"
                                                               Height="12" />
@@ -643,7 +664,7 @@
                                 <Button Grid.Column="0"
                                         Style="{StaticResource ChevronToggle}"
                                         Command="{Binding ToggleExpandCommand}"
-                                        Visibility="{Binding IsDirectory, Converter={StaticResource BoolToVisibility}}">
+                                        Visibility="{Binding RightExpanderVisible, Converter={StaticResource BoolToVisibility}}">
                                     <iconPacks:PackIconLucide Kind="{Binding ExpandIconKind}"
                                                               Width="12"
                                                               Height="12" />

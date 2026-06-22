@@ -15,6 +15,9 @@ public sealed partial class SyncNodeViewModel : ObservableObject
         SyncAction.Skip,
     ];
 
+    private static readonly SyncAction[] OneSidedLeftCycle = [SyncAction.CopyToRight, SyncAction.Skip];
+    private static readonly SyncAction[] OneSidedRightCycle = [SyncAction.CopyToLeft, SyncAction.Skip];
+
     private readonly DirectoryComparison? _dir;
     private readonly FileComparison? _file;
     private readonly SyncViewModel _owner;
@@ -64,6 +67,8 @@ public sealed partial class SyncNodeViewModel : ObservableObject
 
     public bool IsExpanded { get; }
 
+    public SyncOutcome Outcome { get; init; }
+
     public bool IsDirectory => _dir is not null;
 
     public bool IsFile => _file is not null;
@@ -103,6 +108,11 @@ public sealed partial class SyncNodeViewModel : ObservableObject
                     : IconFor(_file.Action);
             }
 
+            if (IsOneSidedDir)
+            {
+                return IconFor(_dir!.Action);
+            }
+
             if (!_subtreeActionable)
             {
                 return PackIconLucideKind.None;
@@ -112,15 +122,19 @@ public sealed partial class SyncNodeViewModel : ObservableObject
         }
     }
 
-    public SyncAction? Action => _file?.Action ?? _subtreeAction;
+    public SyncAction? Action => _file?.Action ?? (IsOneSidedDir ? _dir!.Action : _subtreeAction);
 
-    public bool CanCycle => _file is not null ? Status != ComparisonStatus.Identical : _subtreeActionable;
+    public bool CanCycle => _file is not null ? Status != ComparisonStatus.Identical : _subtreeActionable || IsOneSidedDir;
 
-    public bool ShowAction => IsFile || _subtreeActionable;
+    public bool ShowAction => IsFile || _subtreeActionable || IsOneSidedDir;
 
     public bool LeftContentVisible => !(LeftAbsent && _owner.BlankAbsent);
 
     public bool RightContentVisible => !(RightAbsent && _owner.BlankAbsent);
+
+    public bool LeftExpanderVisible => IsDirectory && LeftContentVisible;
+
+    public bool RightExpanderVisible => IsDirectory && RightContentVisible;
 
     public bool CanCompareContent => _file is not null && Status is not (ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly);
 
@@ -136,19 +150,23 @@ public sealed partial class SyncNodeViewModel : ObservableObject
 
     public string DirDeleteHeader => Status == ComparisonStatus.RightOnly ? "Удалить всё справа (в корзину)" : "Удалить всё слева (в корзину)";
 
-    private SyncAction[] FileActionCycle => Status switch
-    {
-        ComparisonStatus.LeftOnly => LeftOnlyActions,
-        ComparisonStatus.RightOnly => RightOnlyActions,
-        _ => BothSidesActions,
-    };
-
     public string ActionHint
     {
         get
         {
             if (_file is null)
             {
+                if (IsOneSidedDir)
+                {
+                    return _dir!.Action switch
+                    {
+                        SyncAction.CopyToRight => "Каталог только слева – создать справа (клик меняет)",
+                        SyncAction.CopyToLeft => "Каталог только справа – создать слева (клик меняет)",
+                        SyncAction.DeleteLeft or SyncAction.DeleteRight => "Каталог будет удалён в корзину (клик: копировать)",
+                        _ => "Каталог пропускается (клик: копировать)",
+                    };
+                }
+
                 if (!_subtreeActionable)
                 {
                     return "Каталог";
@@ -179,6 +197,28 @@ public sealed partial class SyncNodeViewModel : ObservableObject
                 _ => "Действие не задано – клик выбирает следующее",
             };
         }
+    }
+
+    private bool IsOneSidedDir => _dir is { Status: ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly };
+
+    private SyncAction[] FileActionCycle => Status switch
+    {
+        ComparisonStatus.LeftOnly => LeftOnlyActions,
+        ComparisonStatus.RightOnly => RightOnlyActions,
+        _ => BothSidesActions,
+    };
+
+    public void RefreshSubtreeAction()
+    {
+        if (_dir is null)
+        {
+            return;
+        }
+
+        (_subtreeActionable, _subtreeAction) = ComputeSubtreeAction(_dir);
+        OnPropertyChanged(nameof(ActionIconKind));
+        OnPropertyChanged(nameof(Action));
+        OnPropertyChanged(nameof(ActionHint));
     }
 
     private static PackIconLucideKind IconFor(SyncAction action)
@@ -274,7 +314,20 @@ public sealed partial class SyncNodeViewModel : ObservableObject
             return;
         }
 
-        if (_dir is not null && _subtreeActionable)
+        if (_dir is null)
+        {
+            return;
+        }
+
+        if (IsOneSidedDir)
+        {
+            var cycle = _dir.Status == ComparisonStatus.LeftOnly ? OneSidedLeftCycle : OneSidedRightCycle;
+            var index = Array.IndexOf(cycle, _dir.Action);
+            ApplyToSubtree(index < 0 ? cycle[0] : cycle[(index + 1) % cycle.Length]);
+            return;
+        }
+
+        if (_subtreeActionable)
         {
             var index = _subtreeAction is { } current ? Array.IndexOf(DirActionCycle, current) : -1;
             ApplyToSubtree(index < 0 ? DirActionCycle[0] : DirActionCycle[(index + 1) % DirActionCycle.Length]);
@@ -340,19 +393,6 @@ public sealed partial class SyncNodeViewModel : ObservableObject
         {
             _owner.ApplyToSubtree(_dir, action);
         }
-    }
-
-    public void RefreshSubtreeAction()
-    {
-        if (_dir is null)
-        {
-            return;
-        }
-
-        (_subtreeActionable, _subtreeAction) = ComputeSubtreeAction(_dir);
-        OnPropertyChanged(nameof(ActionIconKind));
-        OnPropertyChanged(nameof(Action));
-        OnPropertyChanged(nameof(ActionHint));
     }
 
     private void SetAction(SyncAction action)
