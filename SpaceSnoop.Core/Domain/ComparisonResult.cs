@@ -32,9 +32,9 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
         return stats;
     }
 
-    public void ApplyMode(SyncMode mode)
+    public void ApplyMode(SyncMode mode, bool mirror = false)
     {
-        ApplyModeRecursive(Root, mode);
+        ApplyModeRecursive(Root, mode, mirror);
     }
 
     public bool HasUnresolvedConflicts()
@@ -95,15 +95,15 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
 
         foreach (var sub in dir.SubDirectories)
         {
-            switch (sub.Action)
+            if (sub.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
             {
-                case SyncAction.CopyToRight or SyncAction.CopyToLeft:
-                    dirCopies++;
-                    break;
+                dirDeletes++;
+                continue;
+            }
 
-                case SyncAction.DeleteLeft or SyncAction.DeleteRight:
-                    dirDeletes++;
-                    break;
+            if (sub.Action is SyncAction.CopyToRight or SyncAction.CopyToLeft)
+            {
+                dirCopies++;
             }
 
             CountPlannedRecursive(sub, ref newCopies, ref modifiedCopies, ref deletes, ref dirCopies, ref dirDeletes);
@@ -160,14 +160,14 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
         }
     }
 
-    private static void ApplyModeRecursive(DirectoryComparison dir, SyncMode mode)
+    private static void ApplyModeRecursive(DirectoryComparison dir, SyncMode mode, bool mirror)
     {
         foreach (var file in dir.Files)
         {
             file.Action = mode switch
             {
-                SyncMode.LeftToRight => ApplyLeftToRight(file),
-                SyncMode.RightToLeft => ApplyRightToLeft(file),
+                SyncMode.LeftToRight => ApplyLeftToRight(file, mirror),
+                SyncMode.RightToLeft => ApplyRightToLeft(file, mirror),
                 SyncMode.Bidirectional => ApplyBidirectional(file),
                 _ => SyncAction.Skip,
             };
@@ -175,37 +175,43 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
 
         foreach (var sub in dir.SubDirectories)
         {
-            sub.Action = ApplyDirMode(sub, mode);
-            ApplyModeRecursive(sub, mode);
+            sub.Action = ApplyDirMode(sub, mode, mirror);
+            ApplyModeRecursive(sub, mode, mirror);
         }
     }
 
-    private static SyncAction ApplyDirMode(DirectoryComparison dir, SyncMode mode)
+    private static SyncAction ApplyDirMode(DirectoryComparison dir, SyncMode mode, bool mirror)
     {
         return dir.Status switch
         {
-            ComparisonStatus.LeftOnly => mode == SyncMode.RightToLeft ? SyncAction.Skip : SyncAction.CopyToRight,
-            ComparisonStatus.RightOnly => mode == SyncMode.LeftToRight ? SyncAction.Skip : SyncAction.CopyToLeft,
+            ComparisonStatus.LeftOnly => mode == SyncMode.RightToLeft
+                ? mirror ? SyncAction.DeleteLeft : SyncAction.Skip
+                : SyncAction.CopyToRight,
+            ComparisonStatus.RightOnly => mode == SyncMode.LeftToRight
+                ? mirror ? SyncAction.DeleteRight : SyncAction.Skip
+                : SyncAction.CopyToLeft,
             _ => SyncAction.None,
         };
     }
 
-    private static SyncAction ApplyLeftToRight(FileComparison file)
+    private static SyncAction ApplyLeftToRight(FileComparison file, bool mirror)
     {
         return file.Status switch
         {
             ComparisonStatus.LeftOnly => SyncAction.CopyToRight,
             ComparisonStatus.Modified => SyncAction.CopyToRight,
+            ComparisonStatus.RightOnly when mirror => SyncAction.DeleteRight,
             _ => SyncAction.Skip,
         };
     }
 
-    private static SyncAction ApplyRightToLeft(FileComparison file)
+    private static SyncAction ApplyRightToLeft(FileComparison file, bool mirror)
     {
         return file.Status switch
         {
             ComparisonStatus.RightOnly => SyncAction.CopyToLeft,
             ComparisonStatus.Modified => SyncAction.CopyToLeft,
+            ComparisonStatus.LeftOnly when mirror => SyncAction.DeleteLeft,
             _ => SyncAction.Skip,
         };
     }

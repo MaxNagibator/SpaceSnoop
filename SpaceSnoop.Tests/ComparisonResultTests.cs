@@ -166,6 +166,48 @@ public class ComparisonResultTests
         }
     }
 
+    [TestCase(SyncMode.LeftToRight, ComparisonStatus.RightOnly, SyncAction.DeleteRight)]
+    [TestCase(SyncMode.RightToLeft, ComparisonStatus.LeftOnly, SyncAction.DeleteLeft)]
+    public void Mirror_DeletesOppositeSideOnlyItems(SyncMode mode, ComparisonStatus orphanStatus, SyncAction expected)
+    {
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("orphan.txt", "orphan.txt") { Status = orphanStatus });
+        var orphanDir = new DirectoryComparison("orphan", "orphan") { Status = orphanStatus };
+        root.SubDirectories.Add(orphanDir);
+
+        var result = new ComparisonResult("C:\\Left", "C:\\Right", root);
+        result.ApplyMode(mode, true);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(root.Files[0].Action, Is.EqualTo(expected));
+            Assert.That(orphanDir.Action, Is.EqualTo(expected));
+        }
+    }
+
+    [Test]
+    public void MirrorCount_CountsDirDeleteOnce_NotNestedFiles()
+    {
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("keep.txt", "keep.txt") { Status = ComparisonStatus.LeftOnly });
+
+        var extra = new DirectoryComparison("extra", "extra") { Status = ComparisonStatus.RightOnly };
+        extra.Files.Add(new("nested.txt", "extra\\nested.txt") { Status = ComparisonStatus.RightOnly });
+        root.SubDirectories.Add(extra);
+
+        var result = new ComparisonResult("C:\\Left", "C:\\Right", root);
+        result.ApplyMode(SyncMode.LeftToRight, true);
+        var planned = result.CountPlannedActions();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(planned.NewCopies, Is.EqualTo(1));
+            Assert.That(planned.Deletes, Is.Zero);
+            Assert.That(planned.DirDeletes, Is.EqualTo(1));
+            Assert.That(planned.Total, Is.EqualTo(2));
+        }
+    }
+
     [Test]
     public void HasUnresolvedConflicts_ReturnsTrueWhenConflictsWithNoAction()
     {

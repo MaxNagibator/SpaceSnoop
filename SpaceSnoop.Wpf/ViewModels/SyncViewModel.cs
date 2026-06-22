@@ -53,6 +53,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private int _selectedModeIndex;
 
     [ObservableProperty]
+    private bool _mirror;
+
+    [ObservableProperty]
     private bool _showIdentical;
 
     [ObservableProperty]
@@ -148,6 +151,15 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         SyncMode.RightToLeft => "Направление: справа налево. Клик – сменить, ПКМ – поменять пути местами.",
         SyncMode.Bidirectional => "Направление: двустороннее. Клик – сменить, ПКМ – поменять пути местами.",
         _ => "Направление: слева направо. Клик – сменить, ПКМ – поменять пути местами.",
+    };
+
+    public bool MirrorApplicable => CurrentMode != SyncMode.Bidirectional;
+
+    public string MirrorHint => CurrentMode switch
+    {
+        SyncMode.RightToLeft => "Зеркало: удалять слева то, чего нет справа (в корзину).",
+        SyncMode.Bidirectional => "Зеркало доступно только при одностороннем направлении.",
+        _ => "Зеркало: удалять справа то, чего нет слева (в корзину).",
     };
 
     public string PageTitle => "Синхронизация";
@@ -461,12 +473,13 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _logger.CompareStarted(left, right);
 
         var mode = CurrentMode;
+        var mirror = Mirror;
 
         var prepared = await RunAsync("Сравнение каталогов:", (token, progress) =>
         {
             var comparer = new DirectoryComparer(filter, _comparerLogger);
             var compared = comparer.Compare(left, right, token, progress);
-            compared.ApplyMode(mode);
+            compared.ApplyMode(mode, mirror);
             return new ComparePreparation(compared, BuildDirSizeCache(compared.Root));
         });
 
@@ -716,13 +729,26 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         Persist(SettingsKeys.SyncMode, value.ToString());
         OnPropertyChanged(nameof(DirectionIconKind));
         OnPropertyChanged(nameof(DirectionHint));
+        OnPropertyChanged(nameof(MirrorApplicable));
+        OnPropertyChanged(nameof(MirrorHint));
+        ReapplyMode();
+    }
 
+    partial void OnMirrorChanged(bool value)
+    {
+        Persist(SettingsKeys.SyncMirror, value ? "true" : "false");
+        OnPropertyChanged(nameof(MirrorHint));
+        ReapplyMode();
+    }
+
+    private void ReapplyMode()
+    {
         if (_result is null)
         {
             return;
         }
 
-        _result.ApplyMode(CurrentMode);
+        _result.ApplyMode(CurrentMode, Mirror);
         RebuildRows();
         UpdateSummary();
     }
@@ -991,6 +1017,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         Exclusions = _settings.GetStringValue(SettingsKeys.SyncExclusions) ?? Operations.DefaultExclusions;
 
         SelectedModeIndex = Math.Clamp(_settings.GetInt(SettingsKeys.SyncMode), 0, ModeOrder.Length - 1);
+        Mirror = _settings.GetBool(SettingsKeys.SyncMirror);
         ShowIdentical = _settings.GetBool(SettingsKeys.SyncShowIdentical);
         ShowSizes = _settings.GetBool(SettingsKeys.SyncShowSizes, AppDefaults.SyncShowSizesDefault);
         ShowModified = _settings.GetBool(SettingsKeys.SyncShowModified);

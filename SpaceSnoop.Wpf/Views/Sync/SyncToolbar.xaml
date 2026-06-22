@@ -253,6 +253,25 @@
                               VerticalAlignment="Center"
                               Margin="0,0,16,0"
                               ToolTip="Направление синхронизации" />
+                    <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
+                                  IsChecked="{Binding Mirror}"
+                                  IsEnabled="{Binding MirrorApplicable}"
+                                  MinWidth="0"
+                                  Padding="9,0"
+                                  VerticalAlignment="Center"
+                                  Margin="0,0,16,0"
+                                  ToolTip="{Binding MirrorHint}"
+                                  AutomationProperties.Name="{Binding MirrorHint}">
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FlipHorizontal2}"
+                                                      Width="14"
+                                                      Height="14"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,6,0" />
+                            <TextBlock Text="Зеркало"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </ToggleButton>
                     <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Funnel}"
                                               Width="13"
                                               Height="13"
