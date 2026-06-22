@@ -77,6 +77,9 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1209, Level = LogLevel.Warning, Message = "Не удалось сравнить содержимое файла {Path}")]
     public static partial void ContentCompareFailed(this ILogger logger, Exception exception, string path);
 
+    [LoggerMessage(EventId = 1210, Level = LogLevel.Information, Message = "Git-папки исключены из синхронизации: {Count}")]
+    public static partial void SyncGitFoldersSkipped(this ILogger logger, int count);
+
     [LoggerMessage(EventId = 1300, Level = LogLevel.Warning, Message = "Не удалось положить лог-секцию в буфер обмена")]
     public static partial void ClipboardLogSectionFailed(this ILogger logger, Exception exception);
 

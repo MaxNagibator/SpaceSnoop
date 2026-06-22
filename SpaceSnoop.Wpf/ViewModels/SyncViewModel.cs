@@ -27,6 +27,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private Dictionary<DirectoryComparison, (long Left, long Right)>? _dirSizeCache;
     private CancellationTokenSource? _cts;
     private bool _suppressPersist;
+    private bool _gitPromptDeclined;
     private bool _isIndeterminate = true;
     private double _progressValue;
     private double _progressMax = 1;
@@ -375,6 +376,24 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         return !string.IsNullOrWhiteSpace(path) && !Directory.Exists(path.Trim());
     }
 
+    private static int CountGitDirectories(DirectoryComparison dir)
+    {
+        var count = 0;
+
+        foreach (var sub in dir.SubDirectories)
+        {
+            if (string.Equals(sub.Name, ".git", StringComparison.OrdinalIgnoreCase))
+            {
+                count++;
+                continue;
+            }
+
+            count += CountGitDirectories(sub);
+        }
+
+        return count;
+    }
+
     private void HashModifiedFiles(DirectoryComparison dir, string leftBase, string rightBase, IProgress<OperationProgress> progress, ref int done, CancellationToken token)
     {
         foreach (var file in dir.Files.Where(static f => f.Status == ComparisonStatus.Modified))
@@ -500,6 +519,40 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         StatusCaption = SummaryText;
 
         _logger.CompareFinished(_total, (long)stopwatch.Elapsed.TotalMilliseconds);
+
+        await OfferToSkipGitAsync();
+    }
+
+    private async Task OfferToSkipGitAsync()
+    {
+        if (_result is null || _gitPromptDeclined)
+        {
+            return;
+        }
+
+        var gitFolders = CountGitDirectories(_result.Root);
+
+        if (gitFolders == 0)
+        {
+            return;
+        }
+
+        var message = $"Найдены git-папки (.git): {gitFolders}."
+                      + Environment.NewLine
+                      + "Их можно синхронизировать (read-only снимается автоматически), но это множество мелких служебных файлов, которые в резервной копии обычно не нужны."
+                      + Environment.NewLine
+                      + Environment.NewLine
+                      + "Пропустить .git и копировать только рабочие файлы?";
+
+        if (!_dialogs.Confirm("Git-папки", message))
+        {
+            _gitPromptDeclined = true;
+            return;
+        }
+
+        _logger.SyncGitFoldersSkipped(gitFolders);
+        Exclusions = string.IsNullOrWhiteSpace(Exclusions) ? ".git" : $"{Exclusions},.git";
+        await CompareAsync();
     }
 
     private bool CanHash()
