@@ -10,7 +10,7 @@
              d:DesignHeight="320"
              d:DesignWidth="640"
              Width="{DynamicResource Dialog.Width.Medium}"
-             MinHeight="240">
+             MinHeight="200">
 
     <Grid Margin="22">
         <Grid.RowDefinitions>
@@ -34,11 +34,67 @@
         </StackPanel>
 
         <Grid Grid.Row="1"
-              Margin="0,12,0,0">
-            <TextBlock Text="{Binding IntroText}"
-                       Style="{StaticResource TextBlock.Subtle}"
-                       TextWrapping="Wrap"
-                       Visibility="{Binding IsIdle, Converter={StaticResource BoolToVisibility}}" />
+              Margin="0,14,0,0">
+            <Border Style="{StaticResource Card.Inset}"
+                    Padding="14"
+                    Visibility="{Binding IsIdle, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <iconPacks:PackIconLucide Grid.Column="0"
+                                                  Kind="{x:Static iconPacks:PackIconLucideKind.Folder}"
+                                                  Width="15"
+                                                  Height="15"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,9,0"
+                                                  Foreground="{DynamicResource Fg.Muted}" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding SourceName}"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   FontWeight="Medium"
+                                   Foreground="{DynamicResource Fg.Primary}" />
+                        <TextBlock Grid.Column="2"
+                                   Text="{Binding SourceSize}"
+                                   VerticalAlignment="Center"
+                                   Margin="12,0,0,0"
+                                   FontFamily="{DynamicResource Font.Mono}"
+                                   FontSize="{DynamicResource Font.Size.S}"
+                                   Foreground="{DynamicResource Fg.Muted}" />
+                    </Grid>
+
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <iconPacks:PackIconLucide Grid.Column="0"
+                                                  Kind="{x:Static iconPacks:PackIconLucideKind.FileArchive}"
+                                                  Width="15"
+                                                  Height="15"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,9,0"
+                                                  Foreground="{DynamicResource Accent.Primary}" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding TargetName}"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   FontFamily="{DynamicResource Font.Mono}"
+                                   FontSize="{DynamicResource Font.Size.S}"
+                                   Foreground="{DynamicResource Fg.Secondary}" />
+                    </Grid>
+
+                    <TextBlock Text="{Binding FateText}"
+                               Margin="0,12,0,0"
+                               TextWrapping="Wrap"
+                               Style="{StaticResource TextBlock.Subtle}" />
+                </StackPanel>
+            </Border>
+
             <TextBlock Text="{Binding StatusText}"
                        Style="{StaticResource TextBlock.Subtle}"
                        TextWrapping="Wrap"

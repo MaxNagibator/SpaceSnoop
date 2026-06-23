@@ -50,11 +50,12 @@ public sealed partial class ArchiveProgressDialogViewModel : ObservableObject, I
         _logger = logger;
         _total = request.Files.Count;
 
-        var name = Path.GetFileName(request.SourcePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-        var size = SizeFormatter.Format(request.TotalBytes);
-        IntroText = request.DeleteOriginal
-            ? $"Упаковать «{name}» ({size}) в {Path.GetFileName(request.TargetPath)}. После проверки архива оригинал → в корзину."
-            : $"Упаковать «{name}» ({size}) в {Path.GetFileName(request.TargetPath)}. Оригинал останется на месте.";
+        SourceName = Path.GetFileName(request.SourcePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        SourceSize = $"{SizeFormatter.Format(request.TotalBytes)} · {_total:N0} файлов";
+        TargetName = Path.GetFileName(request.TargetPath);
+        FateText = request.DeleteOriginal
+            ? "После проверки архива оригинал отправится в корзину."
+            : "Оригинал останется на месте.";
     }
 
     public event EventHandler<bool>? RequestClose;
@@ -63,7 +64,13 @@ public sealed partial class ArchiveProgressDialogViewModel : ObservableObject, I
 
     public string ActionText => "Упаковать";
 
-    public string IntroText { get; }
+    public string SourceName { get; }
+
+    public string SourceSize { get; }
+
+    public string TargetName { get; }
+
+    public string FateText { get; }
 
     public bool OriginalDeleted { get; private set; }
 
