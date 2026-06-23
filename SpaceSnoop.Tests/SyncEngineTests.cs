@@ -320,4 +320,30 @@ public class SyncEngineTests
             Assert.That(report.SuccessCount, Is.EqualTo(2));
         }
     }
+
+    [Test]
+    public void WriteDetails_ListsAppliedActionsWithSizes_AndOmitsZeroSize()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "copy.txt"), "data");
+        File.WriteAllText(Path.Combine(_leftDir, "gone.txt"), "data");
+
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("copy.txt", "copy.txt") { Status = ComparisonStatus.LeftOnly, Action = SyncAction.CopyToRight, LeftSize = 1024 });
+        root.Files.Add(new("gone.txt", "gone.txt") { Status = ComparisonStatus.LeftOnly, Action = SyncAction.DeleteLeft, LeftSize = 0 });
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var report = new SyncEngine(NullLogger<SyncEngine>.Instance).Execute(result, CancellationToken.None);
+
+        var writer = new StringWriter();
+        report.WriteDetails(writer);
+        var text = writer.ToString();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.Applied, Has.Count.EqualTo(2));
+            Assert.That(text, Does.Contain("CopyToRight «copy.txt» (1КБ)"));
+            Assert.That(text, Does.Contain("DeleteLeft «gone.txt»"));
+            Assert.That(text, Does.Not.Contain("gone.txt» ("));
+        }
+    }
 }

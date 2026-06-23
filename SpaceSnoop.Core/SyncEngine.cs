@@ -12,6 +12,16 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger)
         return report;
     }
 
+    private static long AppliedBytes(FileComparison file)
+    {
+        return file.Action switch
+        {
+            SyncAction.CopyToRight or SyncAction.DeleteLeft => file.LeftSize ?? file.RightSize ?? 0,
+            SyncAction.CopyToLeft or SyncAction.DeleteRight => file.RightSize ?? file.LeftSize ?? 0,
+            _ => 0,
+        };
+    }
+
     private static void ExecuteFileAction(FileComparison file, string leftBase, string rightBase)
     {
         var leftPath = Path.Combine(leftBase, file.RelativePath);
@@ -111,6 +121,7 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger)
                     break;
             }
 
+            report.Applied.Add(new(dir.Action, dir.RelativePath, 0));
             logger.SyncFileApplied(dir.Action, dir.RelativePath);
         }
         catch (Exception ex)
@@ -165,6 +176,7 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger)
                     report.CopiedCount++;
                 }
 
+                report.Applied.Add(new(file.Action, file.RelativePath, AppliedBytes(file)));
                 logger.SyncFileApplied(file.Action, file.RelativePath);
             }
             catch (Exception ex)
@@ -188,7 +200,24 @@ public sealed class SyncReport
     public int CopiedCount { get; set; }
     public int DeletedCount { get; set; }
     public int SuccessCount => CopiedCount + DeletedCount;
+    public List<SyncApplied> Applied { get; } = [];
     public List<SyncError> Errors { get; } = [];
+
+    public void WriteDetails(TextWriter writer)
+    {
+        foreach (var item in Applied)
+        {
+            var size = item.Bytes > 0 ? $" ({SizeFormatter.Format(item.Bytes)})" : string.Empty;
+            writer.WriteLine($"  {item.Action} «{item.RelativePath}»{size}");
+        }
+
+        foreach (var error in Errors)
+        {
+            writer.WriteLine($"  ОШИБКА: {error.RelativePath} ({error.Action}): {error.Message}");
+        }
+    }
 }
+
+public sealed record SyncApplied(SyncAction Action, string RelativePath, long Bytes);
 
 public sealed record SyncError(string RelativePath, SyncAction Action, string Message);

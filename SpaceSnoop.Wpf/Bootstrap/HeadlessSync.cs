@@ -145,11 +145,7 @@ internal sealed class HeadlessSync
             var path = Path.Combine(AppStorage.DataDirectory, AppInfo.SyncLogFileName);
             using var writer = new StreamWriter(path, true);
             writer.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Автосинхронизация [{name}]: {report.SuccessCount} успешно, {report.Errors.Count} ошибок");
-
-            foreach (var error in report.Errors)
-            {
-                writer.WriteLine($"  ОШИБКА: {error.RelativePath} ({error.Action}): {error.Message}");
-            }
+            report.WriteDetails(writer);
         }
         catch (Exception exception)
         {
