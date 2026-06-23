@@ -469,12 +469,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     }
 
     [RelayCommand(CanExecute = nameof(CanRun))]
-    private async Task OpenScheduleAsync()
-    {
-        await _dialogs.ShowAsync(new ScheduleDialogViewModel(_settings));
-    }
-
-    [RelayCommand(CanExecute = nameof(CanRun))]
     private async Task CompareAsync()
     {
         var left = LeftPath.Trim();

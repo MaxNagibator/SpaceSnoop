@@ -151,6 +151,7 @@ public partial class App : Application
 
         services.AddSingleton<ScanViewModel>();
         services.AddSingleton<SyncViewModel>();
+        services.AddSingleton<ScheduleViewModel>();
         services.AddSingleton<DockerViewModel>();
         services.AddSingleton<LogsViewModel>();
         services.AddSingleton<AboutViewModel>();
