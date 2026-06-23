@@ -5,6 +5,8 @@ namespace SpaceSnoop.Core;
 
 public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<DirectoryComparer> logger)
 {
+    public static readonly TimeSpan FatTimestampTolerance = TimeSpan.FromSeconds(2);
+
     public ComparisonResult Compare(string leftPath, string rightPath, CancellationToken cancel, IProgress<OperationProgress>? progress = null)
     {
         var leftDir = new DirectoryInfo(leftPath);
@@ -35,6 +37,11 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
                               || comparison.SubDirectories.Any(x => x.Status != ComparisonStatus.Identical);
 
         return hasNonIdentical ? ComparisonStatus.Modified : ComparisonStatus.Identical;
+    }
+
+    private static bool IsReparsePoint(FileSystemInfo info)
+    {
+        return (info.Attributes & FileAttributes.ReparsePoint) != 0;
     }
 
     private DirectoryComparison CompareDirectories(
@@ -94,7 +101,7 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
                 fileComparison.RightModified = rightFile.LastWriteTime;
 
                 var sizeDiffers = leftFile.Length != rightFile.Length;
-                var timeDiffers = leftFile.LastWriteTime != rightFile.LastWriteTime;
+                var timeDiffers = (leftFile.LastWriteTime - rightFile.LastWriteTime).Duration() > FatTimestampTolerance;
 
                 fileComparison.Status = sizeDiffers || timeDiffers
                     ? ComparisonStatus.Modified
@@ -174,11 +181,6 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         }
 
         return result;
-    }
-
-    private static bool IsReparsePoint(FileSystemInfo info)
-    {
-        return (info.Attributes & FileAttributes.ReparsePoint) != 0;
     }
 
     private Dictionary<string, DirectoryInfo> GetFilteredDirectories(DirectoryInfo? dir)

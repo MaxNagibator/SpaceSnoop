@@ -85,6 +85,24 @@ public class DirectoryComparerTests
         Assert.That(result.Root.Files[0].Status, Is.EqualTo(ComparisonStatus.Modified));
     }
 
+    [TestCase(2, ExpectedResult = ComparisonStatus.Identical)]
+    [TestCase(3, ExpectedResult = ComparisonStatus.Modified)]
+    public ComparisonStatus SameSizeTimestampWithinFatGranularity_TreatedIdentical(int secondsApart)
+    {
+        var leftPath = Path.Combine(_leftDir, "a.txt");
+        var rightPath = Path.Combine(_rightDir, "a.txt");
+        File.WriteAllText(leftPath, "same content");
+        File.WriteAllText(rightPath, "same content");
+        var baseTime = new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Local);
+        File.SetLastWriteTime(leftPath, baseTime);
+        File.SetLastWriteTime(rightPath, baseTime.AddSeconds(secondsApart));
+
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
+        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
+
+        return result.Root.Files[0].Status;
+    }
+
     [Test]
     public void SubdirOnlyInLeft_MarkedLeftOnly()
     {

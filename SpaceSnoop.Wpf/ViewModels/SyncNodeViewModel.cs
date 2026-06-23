@@ -124,6 +124,8 @@ public sealed partial class SyncNodeViewModel : ObservableObject
 
     public SyncAction? Action => _file?.Action ?? (IsOneSidedDir ? _dir!.Action : _subtreeAction);
 
+    public string DiffReason => _file is null ? string.Empty : DescribeDiff(_file);
+
     public bool CanCycle => _file is not null ? Status != ComparisonStatus.Identical : _subtreeActionable || IsOneSidedDir;
 
     public bool ShowAction => IsFile || _subtreeActionable || IsOneSidedDir;
@@ -187,7 +189,7 @@ public sealed partial class SyncNodeViewModel : ObservableObject
                 return "Файлы идентичны";
             }
 
-            return _file.Action switch
+            var actionText = _file.Action switch
             {
                 SyncAction.CopyToRight => "Копировать слева направо",
                 SyncAction.CopyToLeft => "Копировать справа налево",
@@ -196,6 +198,9 @@ public sealed partial class SyncNodeViewModel : ObservableObject
                 SyncAction.DeleteRight => "Удалить справа",
                 _ => "Действие не задано – клик выбирает следующее",
             };
+
+            var reason = DiffReason;
+            return reason.Length == 0 ? actionText : $"{actionText}\nРазличие: {reason}";
         }
     }
 
@@ -207,6 +212,26 @@ public sealed partial class SyncNodeViewModel : ObservableObject
         ComparisonStatus.RightOnly => RightOnlyActions,
         _ => BothSidesActions,
     };
+
+    public static string DescribeDiff(FileComparison file)
+    {
+        if (file.Status != ComparisonStatus.Modified)
+        {
+            return string.Empty;
+        }
+
+        var sizeDiffers = file.LeftSize != file.RightSize;
+        var delta = file is { LeftModified: { } left, RightModified: { } right } ? (left - right).Duration() : TimeSpan.Zero;
+        var timeDiffers = delta > DirectoryComparer.FatTimestampTolerance;
+
+        return (sizeDiffers, timeDiffers) switch
+        {
+            (true, true) => $"размер и время (Δ {FormatDelta(delta)})",
+            (true, false) => "размер",
+            (false, true) => $"время (Δ {FormatDelta(delta)})",
+            _ => string.Empty,
+        };
+    }
 
     public void RefreshSubtreeAction()
     {
@@ -275,7 +300,24 @@ public sealed partial class SyncNodeViewModel : ObservableObject
 
     private static string FormatModified(DateTime? value)
     {
-        return value is { } dt ? dt.ToString("yyyy-MM-dd HH:mm") : string.Empty;
+        return value is { } dt ? dt.ToString("yyyy-MM-dd HH:mm:ss") : string.Empty;
+    }
+
+    private static string FormatDelta(TimeSpan delta)
+    {
+        var d = delta.Duration();
+
+        if (d.TotalSeconds < 60)
+        {
+            return $"{(int)Math.Round(d.TotalSeconds)} с";
+        }
+
+        if (d.TotalMinutes < 60)
+        {
+            return $"{(int)Math.Round(d.TotalMinutes)} мин";
+        }
+
+        return $"{d.TotalHours:0.#} ч";
     }
 
     [RelayCommand]
