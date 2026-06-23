@@ -45,5 +45,7 @@ public static class SettingsKeys
     public const string SyncDiffCollapse = "wpf.sync.diff_collapse";
     public const string SyncPathSuggest = "wpf.sync.path_suggest";
 
+    public const string ScheduleProfiles = "wpf.schedule.profiles";
+
     public static string Theme => ThemeManager.SettingsKeyName;
 }

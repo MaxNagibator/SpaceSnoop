@@ -7,18 +7,27 @@ namespace SpaceSnoop.Wpf.Tests;
 public class SyncSchedulerTests
 {
     private const string Exe = @"C:\Program Files\SpaceSnoop\SpaceSnoop.Wpf.exe";
+    private const string Id = "ab12cd34";
 
     [Test]
-    public void Команда_создания_содержит_имя_задачи_путь_и_флаг_синхронизации()
+    public void Команда_создания_содержит_имя_задачи_путь_и_аргумент_профиля()
     {
-        var args = SyncScheduler.BuildCreateArgs(ScheduleInterval.Daily, new(3, 0, 0), Exe);
+        var args = SyncScheduler.BuildCreateArgs(SyncScheduler.TaskNameFor(Id), ScheduleInterval.Daily, new(3, 0, 0), Exe, $"--sync {Id}");
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(Value(args, "/tn"), Is.EqualTo(SyncScheduler.TaskName));
-            Assert.That(Value(args, "/tr"), Is.EqualTo($"\"{Exe}\" --sync"));
+            Assert.That(Value(args, "/tn"), Is.EqualTo($"SpaceSnoop Sync [{Id}]"));
+            Assert.That(Value(args, "/tr"), Is.EqualTo($"\"{Exe}\" --sync {Id}"));
             Assert.That(args, Does.Contain("/f"));
         }
+    }
+
+    [Test]
+    public void Пустой_аргумент_оставляет_только_путь_в_команде()
+    {
+        var args = SyncScheduler.BuildCreateArgs(SyncScheduler.TaskNameFor(Id), ScheduleInterval.Daily, new(3, 0, 0), Exe, string.Empty);
+
+        Assert.That(Value(args, "/tr"), Is.EqualTo($"\"{Exe}\""));
     }
 
     [TestCase(ScheduleInterval.Daily, "DAILY", true)]
@@ -26,7 +35,7 @@ public class SyncSchedulerTests
     [TestCase(ScheduleInterval.OnLogon, "ONLOGON", false)]
     public void Периодичность_задаёт_расписание_и_наличие_времени(ScheduleInterval interval, string schedule, bool hasTime)
     {
-        var args = SyncScheduler.BuildCreateArgs(interval, new(3, 30, 0), Exe);
+        var args = SyncScheduler.BuildCreateArgs(SyncScheduler.TaskNameFor(Id), interval, new(3, 30, 0), Exe, $"--sync {Id}");
 
         using (Assert.EnterMultipleScope())
         {
@@ -47,6 +56,41 @@ public class SyncSchedulerTests
     public void Индекс_режима_отображается_в_направление(int index, SyncMode expected)
     {
         Assert.That(HeadlessSync.MapMode(index), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void Статус_парсится_из_verbose_CSV_строки()
+    {
+        const string csv =
+            @"""DESK"",""\SpaceSnoop Sync"",""24.06.2026 3:00:00"",""Ready"",""Interactive"",""23.06.2026 3:00:05"",""0"",""DESK\u"",""task""";
+
+        var status = ScheduleStatus.Parse(csv);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(status.Exists, Is.True);
+            Assert.That(status.NextRun, Is.EqualTo("24.06.2026 3:00:00"));
+            Assert.That(status.LastRun, Is.EqualTo("23.06.2026 3:00:05"));
+            Assert.That(status.LastResult, Is.EqualTo(0));
+            Assert.That(status.LastResultText, Is.EqualTo("Успех"));
+        }
+    }
+
+    [Test]
+    public void Пустой_вывод_даёт_отсутствующий_статус()
+    {
+        Assert.That(ScheduleStatus.Parse(string.Empty).Exists, Is.False);
+    }
+
+    [TestCase(0, "Успех")]
+    [TestCase(1, "Завершилась с ошибками")]
+    [TestCase(3, "Каталог недоступен")]
+    [TestCase(ScheduleStatus.NeverRun, "Ещё не запускалась")]
+    [TestCase(ScheduleStatus.Running, "Выполняется")]
+    [TestCase(12345, "Код 12345")]
+    public void Код_результата_расшифровывается(int code, string expected)
+    {
+        Assert.That(ScheduleStatus.DecodeResult(code), Is.EqualTo(expected));
     }
 
     private static string Value(List<string> args, string flag)

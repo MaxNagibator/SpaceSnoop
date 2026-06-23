@@ -94,6 +94,21 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1214, Level = LogLevel.Error, Message = "Автосинхронизация прервана ошибкой")]
     public static partial void HeadlessSyncFailed(this ILogger logger, Exception exception);
 
+    [LoggerMessage(EventId = 1250, Level = LogLevel.Information, Message = "Профиль расписания сохранён: «{Name}» (активно: {Enabled})")]
+    public static partial void ScheduleProfileSaved(this ILogger logger, string name, bool enabled);
+
+    [LoggerMessage(EventId = 1251, Level = LogLevel.Information, Message = "Профиль расписания удалён: «{Name}»")]
+    public static partial void ScheduleProfileRemoved(this ILogger logger, string name);
+
+    [LoggerMessage(EventId = 1252, Level = LogLevel.Information, Message = "Профиль расписания запущен вручную: «{Name}»")]
+    public static partial void ScheduleProfileRunNow(this ILogger logger, string name);
+
+    [LoggerMessage(EventId = 1253, Level = LogLevel.Warning, Message = "Не удалось применить задачу Планировщика для «{Name}»: {Error}")]
+    public static partial void ScheduleTaskFailed(this ILogger logger, string name, string error);
+
+    [LoggerMessage(EventId = 1254, Level = LogLevel.Information, Message = "Расписание перенесено в профиль: «{Name}»")]
+    public static partial void ScheduleProfileMigrated(this ILogger logger, string name);
+
     [LoggerMessage(EventId = 1300, Level = LogLevel.Warning, Message = "Не удалось положить лог-секцию в буфер обмена")]
     public static partial void ClipboardLogSectionFailed(this ILogger logger, Exception exception);
 

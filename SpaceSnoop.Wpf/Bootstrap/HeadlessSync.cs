@@ -6,12 +6,45 @@ namespace SpaceSnoop.Wpf.Bootstrap;
 
 internal sealed class HeadlessSync
 {
-    public static int Run(ISettingsStore settings, KeepShellLogging logging)
+    public static int Run(ISettingsStore settings, KeepShellLogging logging, string? profileId = null)
     {
         var logger = logging.CreateLogger<HeadlessSync>();
 
-        var left = (settings.GetStringValue(SettingsKeys.SyncLeft) ?? string.Empty).Trim();
-        var right = (settings.GetStringValue(SettingsKeys.SyncRight) ?? string.Empty).Trim();
+        string name, left, right, exclusions;
+        SyncMode mode;
+        bool mirror;
+
+        if (!string.IsNullOrEmpty(profileId))
+        {
+            var profile = SyncProfileStore.Find(settings, profileId);
+
+            if (profile is null)
+            {
+                logger.HeadlessSyncAborted($"профиль не найден: {profileId}");
+                return 2;
+            }
+
+            name = profile.Name;
+            left = profile.Left.Trim();
+            right = profile.Right.Trim();
+            mode = MapMode(profile.Mode);
+            mirror = profile.Mirror;
+            exclusions = profile.Exclusions;
+        }
+        else
+        {
+            name = "глобальные настройки";
+            left = (settings.GetStringValue(SettingsKeys.SyncLeft) ?? string.Empty).Trim();
+            right = (settings.GetStringValue(SettingsKeys.SyncRight) ?? string.Empty).Trim();
+            mode = MapMode(settings.GetInt(SettingsKeys.SyncMode));
+            mirror = settings.GetBool(SettingsKeys.SyncMirror);
+            exclusions = settings.GetStringValue(SettingsKeys.SyncExclusions) ?? string.Empty;
+
+            if (string.IsNullOrEmpty(exclusions))
+            {
+                exclusions = settings.GetStringValue(SettingsKeys.DefaultExclusions) ?? string.Empty;
+            }
+        }
 
         if (string.IsNullOrEmpty(left) || string.IsNullOrEmpty(right))
         {
@@ -23,16 +56,6 @@ internal sealed class HeadlessSync
         {
             logger.HeadlessSyncAborted("каталог недоступен");
             return 3;
-        }
-
-        var mode = MapMode(settings.GetInt(SettingsKeys.SyncMode));
-        var mirror = settings.GetBool(SettingsKeys.SyncMirror);
-
-        var exclusions = settings.GetStringValue(SettingsKeys.SyncExclusions);
-
-        if (string.IsNullOrEmpty(exclusions))
-        {
-            exclusions = settings.GetStringValue(SettingsKeys.DefaultExclusions) ?? string.Empty;
         }
 
         if (mirror && mode != SyncMode.Bidirectional)
@@ -62,7 +85,7 @@ internal sealed class HeadlessSync
             var report = engine.Execute(result, CancellationToken.None);
 
             stopwatch.Stop();
-            WriteLog(report, logger);
+            WriteLog(name, report, logger);
             logger.HeadlessSyncFinished(report.SuccessCount, report.Errors.Count, (long)stopwatch.Elapsed.TotalMilliseconds);
 
             return report.Errors.Count == 0 ? 0 : 1;
@@ -84,13 +107,13 @@ internal sealed class HeadlessSync
         };
     }
 
-    private static void WriteLog(SyncReport report, ILogger logger)
+    private static void WriteLog(string name, SyncReport report, ILogger logger)
     {
         try
         {
             var path = Path.Combine(AppStorage.DataDirectory, AppInfo.SyncLogFileName);
             using var writer = new StreamWriter(path, true);
-            writer.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Автосинхронизация: {report.SuccessCount} успешно, {report.Errors.Count} ошибок");
+            writer.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Автосинхронизация [{name}]: {report.SuccessCount} успешно, {report.Errors.Count} ошибок");
 
             foreach (var error in report.Errors)
             {

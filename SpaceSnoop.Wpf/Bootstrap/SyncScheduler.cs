@@ -4,14 +4,19 @@ namespace SpaceSnoop.Wpf.Bootstrap;
 
 public static class SyncScheduler
 {
-    public static string TaskName => $"{AppInfo.Name} Sync";
+    public static string LegacyTaskName => $"{AppInfo.Name} Sync";
 
-    public static bool Exists()
+    public static string TaskNameFor(string id)
     {
-        return Run(["/query", "/tn", TaskName], out _) == 0;
+        return $"{AppInfo.Name} Sync [{id}]";
     }
 
-    public static bool Create(ScheduleInterval interval, TimeSpan time, out string error)
+    public static bool Exists(string taskName)
+    {
+        return Run(["/query", "/tn", taskName], out _) == 0;
+    }
+
+    public static bool Create(string taskName, ScheduleInterval interval, TimeSpan time, string argument, out string error)
     {
         var exe = Environment.ProcessPath;
 
@@ -21,20 +26,39 @@ public static class SyncScheduler
             return false;
         }
 
-        return Run(BuildCreateArgs(interval, time, exe), out error) == 0;
+        return Run(BuildCreateArgs(taskName, interval, time, exe, argument), out error) == 0;
     }
 
-    public static bool Remove(out string error)
+    public static bool Remove(string taskName, out string error)
     {
-        return Run(["/delete", "/tn", TaskName, "/f"], out error) == 0;
+        return Run(["/delete", "/tn", taskName, "/f"], out error) == 0;
     }
 
-    public static List<string> BuildCreateArgs(ScheduleInterval interval, TimeSpan time, string exePath)
+    public static bool RunNow(string taskName, out string error)
     {
+        return Run(["/run", "/tn", taskName], out error) == 0;
+    }
+
+    public static bool SetEnabled(string taskName, bool enabled, out string error)
+    {
+        return Run(["/change", "/tn", taskName, enabled ? "/enable" : "/disable"], out error) == 0;
+    }
+
+    public static ScheduleStatus Query(string taskName)
+    {
+        return Execute(["/query", "/tn", taskName, "/fo", "CSV", "/v", "/nh"], out var output, out _) == 0
+            ? ScheduleStatus.Parse(output)
+            : ScheduleStatus.Missing;
+    }
+
+    public static List<string> BuildCreateArgs(string taskName, ScheduleInterval interval, TimeSpan time, string exePath, string argument)
+    {
+        var target = string.IsNullOrEmpty(argument) ? $"\"{exePath}\"" : $"\"{exePath}\" {argument}";
+
         var args = new List<string>
         {
-            "/create", "/tn", TaskName,
-            "/tr", $"\"{exePath}\" {AppInfo.SyncArgument}",
+            "/create", "/tn", taskName,
+            "/tr", target,
             "/f",
         };
 
@@ -63,6 +87,13 @@ public static class SyncScheduler
 
     private static int Run(IEnumerable<string> args, out string error)
     {
+        var code = Execute(args, out _, out var standardError);
+        error = code == 0 ? string.Empty : standardError.Trim();
+        return code;
+    }
+
+    private static int Execute(IEnumerable<string> args, out string standardOutput, out string standardError)
+    {
         try
         {
             var info = new ProcessStartInfo("schtasks.exe")
@@ -79,16 +110,16 @@ public static class SyncScheduler
             }
 
             using var process = Process.Start(info)!;
-            var standardError = process.StandardError.ReadToEnd();
-            process.StandardOutput.ReadToEnd();
+            standardOutput = process.StandardOutput.ReadToEnd();
+            standardError = process.StandardError.ReadToEnd();
             process.WaitForExit();
 
-            error = process.ExitCode == 0 ? string.Empty : standardError.Trim();
             return process.ExitCode;
         }
         catch (Exception exception)
         {
-            error = exception.Message;
+            standardOutput = string.Empty;
+            standardError = exception.Message;
             return -1;
         }
     }

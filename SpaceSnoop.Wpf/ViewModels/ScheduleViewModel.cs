@@ -1,117 +1,209 @@
-using MahApps.Metro.IconPacks;
+﻿using KeepShell.Services;
+using System.Collections.ObjectModel;
+using System.IO;
 using System.Windows.Input;
 
 namespace SpaceSnoop.Wpf.ViewModels;
 
-public sealed partial class ScheduleViewModel(ISettingsStore settings)
-    : ObservableObject, IPageHeader, IPageRefresh
+public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, IPageRefresh
 {
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(TimeApplicable))]
-    private int _selectedIntervalIndex;
+    private readonly IDialogService _dialogs;
+    private readonly ILogger<ScheduleViewModel> _logger;
 
-    [ObservableProperty]
-    private string _time = "03:00";
+    private bool _migrated;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(StatusText))]
-    [NotifyPropertyChangedFor(nameof(StatusIconKind))]
-    [NotifyCanExecuteChangedFor(nameof(RemoveCommand))]
-    private bool _exists;
+    public ScheduleViewModel(ISettingsStore settings, IDialogService dialogs, ILogger<ScheduleViewModel> logger)
+    {
+        Settings = settings;
+        _dialogs = dialogs;
+        _logger = logger;
 
-    [ObservableProperty]
-    private string _message = string.Empty;
+        foreach (var model in SyncProfileStore.Load(settings))
+        {
+            Profiles.Add(new(this, model));
+        }
+
+        Profiles.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasProfiles));
+    }
+
+    public ISettingsStore Settings { get; }
+
+    public IReadOnlyList<string> Modes { get; } = ["Слева направо", "Справа налево", "Двусторонний"];
 
     public IReadOnlyList<string> Intervals { get; } = ["Ежедневно", "Каждый час", "При входе в систему"];
+
+    public ObservableCollection<SyncProfileViewModel> Profiles { get; } = [];
+
+    public ObservableCollection<ScheduleRunEntry> History { get; } = [];
+
+    public bool HasProfiles => Profiles.Count > 0;
+
+    public bool HasHistory => History.Count > 0;
 
     public string PageTitle => "Расписание";
 
     public string PageDescription =>
-        "Периодический автозапуск синхронизации через Планировщик Windows с текущими настройками страницы «Синхронизация».";
+        "Профили автосинхронизации через Планировщик Windows: каждый со своими каталогами, направлением и временем запуска.";
 
-    public string? RefreshTooltip => "Проверить задачу в Планировщике";
+    public string? RefreshTooltip => "Обновить статусы и историю";
 
-    public string Summary
-    {
-        get
-        {
-            var left = settings.GetStringValue(SettingsKeys.SyncLeft);
-            var right = settings.GetStringValue(SettingsKeys.SyncRight);
-
-            if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
-            {
-                return "Каталоги не заданы на странице «Синхронизация».";
-            }
-
-            var arrow = settings.GetInt(SettingsKeys.SyncMode) switch
-            {
-                1 => "←",
-                2 => "↔",
-                _ => "→",
-            };
-
-            return $"{left}   {arrow}   {right}";
-        }
-    }
-
-    public bool MirrorWarning => settings.GetBool(SettingsKeys.SyncMirror) && settings.GetInt(SettingsKeys.SyncMode) != 2;
-
-    public bool TimeApplicable => SelectedIntervalIndex != 2;
-
-    public string StatusText => Exists ? "Задача активна в Планировщике Windows." : "Расписание не настроено.";
-
-    public PackIconLucideKind StatusIconKind => Exists ? PackIconLucideKind.CalendarCheck : PackIconLucideKind.CalendarOff;
-
-    ICommand IPageRefresh.RefreshCommand => RefreshStatusCommand;
+    ICommand IPageRefresh.RefreshCommand => RefreshStatusesCommand;
 
     public void Refresh()
     {
-        Exists = SyncScheduler.Exists();
-        OnPropertyChanged(nameof(Summary));
-        OnPropertyChanged(nameof(MirrorWarning));
+        EnsureMigrated();
+
+        foreach (var profile in Profiles)
+        {
+            profile.RefreshStatus();
+        }
+
+        LoadHistory();
+    }
+
+    public void Persist()
+    {
+        SyncProfileStore.Save(Settings, Profiles.Select(profile => profile.ToModel()));
+    }
+
+    public bool Confirm(string title, string message)
+    {
+        return _dialogs.Confirm(title, message);
+    }
+
+    public void RemoveProfile(SyncProfileViewModel profile)
+    {
+        Profiles.Remove(profile);
+        Persist();
+        _logger.ScheduleProfileRemoved(profile.DisplayName);
+    }
+
+    public void LogSaved(string name, bool enabled)
+    {
+        _logger.ScheduleProfileSaved(name, enabled);
+    }
+
+    public void LogRunNow(string name)
+    {
+        _logger.ScheduleProfileRunNow(name);
+    }
+
+    public void LogTaskFailed(string name, string error)
+    {
+        _logger.ScheduleTaskFailed(name, error);
     }
 
     [RelayCommand]
-    private void RefreshStatus()
+    private void AddProfile()
+    {
+        var model = new SyncProfile
+        {
+            Id = Guid.NewGuid().ToString("N")[..8],
+            Name = $"Профиль {Profiles.Count + 1}",
+            Left = (Settings.GetStringValue(SettingsKeys.SyncLeft) ?? string.Empty).Trim(),
+            Right = (Settings.GetStringValue(SettingsKeys.SyncRight) ?? string.Empty).Trim(),
+            Mode = Settings.GetInt(SettingsKeys.SyncMode),
+            Mirror = Settings.GetBool(SettingsKeys.SyncMirror),
+            Exclusions = (Settings.GetStringValue(SettingsKeys.SyncExclusions) ?? string.Empty).Trim(),
+        };
+
+        var profile = new SyncProfileViewModel(this, model) { IsEditing = true };
+        Profiles.Add(profile);
+        Persist();
+    }
+
+    [RelayCommand]
+    private void RefreshStatuses()
     {
         Refresh();
     }
 
-    [RelayCommand]
-    private void Save()
+    private void EnsureMigrated()
     {
-        var interval = SelectedIntervalIndex switch
+        if (_migrated)
         {
-            1 => ScheduleInterval.Hourly,
-            2 => ScheduleInterval.OnLogon,
-            _ => ScheduleInterval.Daily,
-        };
-
-        var time = TimeSpan.Zero;
-
-        if (interval != ScheduleInterval.OnLogon
-            && (!TimeSpan.TryParse(Time, out time) || time < TimeSpan.Zero || time.TotalHours >= 24))
-        {
-            Message = "Время укажите в формате ЧЧ:ММ, например 03:00.";
             return;
         }
 
-        Message = SyncScheduler.Create(interval, time, out var error)
-            ? Applied("Расписание сохранено.")
-            : $"Не удалось создать задачу: {error}";
+        _migrated = true;
+
+        if (Profiles.Count > 0)
+        {
+            return;
+        }
+
+        var left = (Settings.GetStringValue(SettingsKeys.SyncLeft) ?? string.Empty).Trim();
+        var right = (Settings.GetStringValue(SettingsKeys.SyncRight) ?? string.Empty).Trim();
+        var legacyExists = SyncScheduler.Exists(SyncScheduler.LegacyTaskName);
+
+        if (!legacyExists && (left.Length == 0 || right.Length == 0))
+        {
+            return;
+        }
+
+        var exclusions = (Settings.GetStringValue(SettingsKeys.SyncExclusions) ?? string.Empty).Trim();
+
+        if (exclusions.Length == 0)
+        {
+            exclusions = (Settings.GetStringValue(SettingsKeys.DefaultExclusions) ?? string.Empty).Trim();
+        }
+
+        var model = new SyncProfile
+        {
+            Id = Guid.NewGuid().ToString("N")[..8],
+            Name = "По умолчанию",
+            Left = left,
+            Right = right,
+            Mode = Settings.GetInt(SettingsKeys.SyncMode),
+            Mirror = Settings.GetBool(SettingsKeys.SyncMirror),
+            Exclusions = exclusions,
+            Enabled = legacyExists,
+        };
+
+        Profiles.Add(new(this, model));
+        Persist();
+
+        if (!legacyExists)
+        {
+            return;
+        }
+
+        SyncScheduler.Remove(SyncScheduler.LegacyTaskName, out _);
+        SyncScheduler.Create(SyncScheduler.TaskNameFor(model.Id), ScheduleInterval.Daily, new(3, 0, 0), $"{AppInfo.SyncArgument} {model.Id}", out _);
+        _logger.ScheduleProfileMigrated(model.Name);
     }
 
-    [RelayCommand(CanExecute = nameof(Exists))]
-    private void Remove()
+    private void LoadHistory()
     {
-        Message = SyncScheduler.Remove(out var error)
-            ? Applied("Расписание удалено.")
-            : $"Не удалось удалить задачу: {error}";
-    }
+        History.Clear();
 
-    private string Applied(string message)
-    {
-        Exists = SyncScheduler.Exists();
-        return message;
+        var path = Path.Combine(AppStorage.DataDirectory, AppInfo.SyncLogFileName);
+
+        if (!File.Exists(path))
+        {
+            OnPropertyChanged(nameof(HasHistory));
+            return;
+        }
+
+        try
+        {
+            var lines = File.ReadLines(path)
+                .Where(static line => line.StartsWith('[') && line.Contains("Автосинхронизация"))
+                .Reverse()
+                .Take(40);
+
+            foreach (var line in lines)
+            {
+                History.Add(new(line, !line.Contains("0 ошибок")));
+            }
+        }
+        catch (IOException)
+        {
+            // TODO: журнал может быть занят пишущим процессом – пропускаем, обновится позже
+        }
+
+        OnPropertyChanged(nameof(HasHistory));
     }
 }
+
+public sealed record ScheduleRunEntry(string Text, bool HasErrors);

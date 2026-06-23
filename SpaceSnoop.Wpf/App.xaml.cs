@@ -21,9 +21,12 @@ public partial class App : Application
             FileNamePrefix = AppInfo.LogFilePrefix,
         });
 
-        if (Array.Exists(e.Args, static arg => string.Equals(arg, AppInfo.SyncArgument, StringComparison.OrdinalIgnoreCase)))
+        var syncIndex = Array.FindIndex(e.Args, static arg => string.Equals(arg, AppInfo.SyncArgument, StringComparison.OrdinalIgnoreCase));
+
+        if (syncIndex >= 0)
         {
-            RunHeadlessSync();
+            var profileId = syncIndex + 1 < e.Args.Length ? e.Args[syncIndex + 1] : null;
+            RunHeadlessSync(profileId);
             return;
         }
 
@@ -163,7 +166,7 @@ public partial class App : Application
         return services.BuildServiceProvider();
     }
 
-    private void RunHeadlessSync()
+    private void RunHeadlessSync(string? profileId)
     {
         var exitCode = 1;
 
@@ -171,7 +174,7 @@ public partial class App : Application
         {
             var settingsPath = Path.Combine(AppStorage.DataDirectory, TomlSettingsFile.PrimaryFileName);
             ISettingsStore settings = new SettingsStore(settingsPath);
-            exitCode = HeadlessSync.Run(settings, _logging!);
+            exitCode = HeadlessSync.Run(settings, _logging!, profileId);
         }
         catch (Exception ex)
         {
