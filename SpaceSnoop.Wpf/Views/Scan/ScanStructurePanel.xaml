@@ -409,7 +409,7 @@
                 </StackPanel>
 
                 <TextBlock Grid.Column="2"
-                           Text="ДОЛЯ · РАЗМЕР"
+                           Text="ФАЙЛЫ · ДОЛЯ · РАЗМЕР"
                            Style="{StaticResource Caption}"
                            Visibility="{Binding TreeVisible, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
             </Grid>
@@ -449,6 +449,8 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto"
+                                                  MinWidth="58" />
+                                <ColumnDefinition Width="Auto"
                                                   MinWidth="46" />
                                 <ColumnDefinition Width="172" />
                             </Grid.ColumnDefinitions>
@@ -476,7 +478,27 @@
                                 </TextBlock>
                             </StackPanel>
 
-                            <TextBlock Grid.Column="1"
+                            <StackPanel Grid.Column="1"
+                                        Orientation="Horizontal"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Margin="0,0,14,0"
+                                        ToolTip="Вложенных файлов"
+                                        Visibility="{Binding IsDirectory, Converter={StaticResource BoolToVisibility}}">
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Files}"
+                                                          Width="11"
+                                                          Height="11"
+                                                          VerticalAlignment="Center"
+                                                          Margin="0,0,4,0"
+                                                          Foreground="{DynamicResource Fg.Muted}" />
+                                <TextBlock Text="{Binding FileCountText}"
+                                           VerticalAlignment="Center"
+                                           FontFamily="{DynamicResource Font.Mono}"
+                                           FontSize="{DynamicResource Font.Size.Caption}"
+                                           Foreground="{DynamicResource Fg.Muted}" />
+                            </StackPanel>
+
+                            <TextBlock Grid.Column="2"
                                        Text="{Binding ShareText}"
                                        HorizontalAlignment="Right"
                                        VerticalAlignment="Center"
@@ -486,7 +508,7 @@
                                        Foreground="{DynamicResource Fg.Muted}" />
 
                             <Border x:Name="ScanBarTrack"
-                                    Grid.Column="2"
+                                    Grid.Column="3"
                                     Height="17"
                                     Background="{DynamicResource Bg.SurfaceMute}"
                                     CornerRadius="{DynamicResource Radius.S}"

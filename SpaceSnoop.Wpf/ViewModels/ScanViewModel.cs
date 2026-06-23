@@ -187,6 +187,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         new("По размеру", ScanSortField.Size),
         new("По дате создания", ScanSortField.CreationDate),
         new("По времени последнего доступа", ScanSortField.LastAccessTime),
+        new("По количеству файлов", ScanSortField.FileCount),
     ];
 
     public ScanPreferences Preferences { get; }

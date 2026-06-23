@@ -8,6 +8,7 @@ public class DirectorySpace : SpaceBase
     private readonly List<DirectorySpace> _subDirectories;
     private readonly List<FileSpace> _files;
     private long? _maxTotalSize;
+    private int? _totalFileCount;
     private long _totalSize;
 
     /// <summary>
@@ -52,7 +53,7 @@ public class DirectorySpace : SpaceBase
     /// <summary>
     /// Количество всех файлов в директории, включая подкаталоги.
     /// </summary>
-    public int TotalFileCount => Files.Count + _subDirectories.Sum(x => x.TotalFileCount);
+    public int TotalFileCount => _totalFileCount ??= Files.Count + _subDirectories.Sum(x => x.TotalFileCount);
 
     /// <summary>
     /// Количество всех подкаталогов (включая вложенные).
@@ -86,6 +87,7 @@ public class DirectorySpace : SpaceBase
                 {base.GetTooltipText()}
                 Общий размер: {TotalSizeText}
                 Размер файлов в директории: {SizeText}
+                Вложенных файлов: {TotalFileCount:N0} · каталогов: {TotalDirectoryCount:N0}
                 """;
     }
 
@@ -98,6 +100,7 @@ public class DirectorySpace : SpaceBase
         _totalSize += subDirectory.TotalSize;
         _subDirectories.Add(subDirectory);
         _maxTotalSize = null;
+        _totalFileCount = null;
     }
 
     /// <summary>
@@ -114,6 +117,7 @@ public class DirectorySpace : SpaceBase
 
         _totalSize = Size;
         _maxTotalSize = null;
+        _totalFileCount = null;
     }
 
     /// <summary>
@@ -153,6 +157,7 @@ public class DirectorySpace : SpaceBase
 
         _totalSize -= child.TotalSize;
         _maxTotalSize = null;
+        _totalFileCount = null;
 
         if (Parent is DirectorySpace parentDir && parentDir.ContainsChild(this))
         {
@@ -219,6 +224,7 @@ public class DirectorySpace : SpaceBase
     {
         _totalSize -= size;
         _maxTotalSize = null;
+        _totalFileCount = null;
 
         if (Parent is DirectorySpace parentDir && parentDir.ContainsChild(this))
         {

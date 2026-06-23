@@ -14,4 +14,7 @@ public enum ScanSortField
 
     /// <summary>По времени последнего доступа.</summary>
     LastAccessTime = 3,
+
+    /// <summary>По количеству вложенных файлов.</summary>
+    FileCount = 4,
 }
