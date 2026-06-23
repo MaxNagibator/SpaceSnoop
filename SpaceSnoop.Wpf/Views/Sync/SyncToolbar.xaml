@@ -229,7 +229,7 @@
                     </Button>
                     <Button Style="{StaticResource Button.Primary}"
                             Command="{Binding SyncCommand}"
-                            Margin="0,0,16,0">
+                            Margin="0,0,8,0">
                         <StackPanel Orientation="Horizontal">
                             <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ArrowRightLeft}"
                                                       Width="15"
@@ -237,6 +237,19 @@
                                                       VerticalAlignment="Center"
                                                       Margin="0,0,6,0" />
                             <TextBlock Text="Синхронизировать" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource Button.Secondary}"
+                            Command="{Binding OpenScheduleCommand}"
+                            Margin="0,0,16,0"
+                            ToolTip="Периодический автозапуск через Планировщик Windows">
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.CalendarClock}"
+                                                      Width="15"
+                                                      Height="15"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,6,0" />
+                            <TextBlock Text="Запланировать" />
                         </StackPanel>
                     </Button>
                 </StackPanel>

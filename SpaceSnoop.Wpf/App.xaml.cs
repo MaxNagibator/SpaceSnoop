@@ -21,6 +21,12 @@ public partial class App : Application
             FileNamePrefix = AppInfo.LogFilePrefix,
         });
 
+        if (Array.Exists(e.Args, static arg => string.Equals(arg, AppInfo.SyncArgument, StringComparison.OrdinalIgnoreCase)))
+        {
+            RunHeadlessSync();
+            return;
+        }
+
         AttachExceptionHandlers();
 
         StyledMessageBox.DefaultTitle = AppInfo.Name;
@@ -154,6 +160,24 @@ public partial class App : Application
         services.AddSingleton<MainWindow>();
 
         return services.BuildServiceProvider();
+    }
+
+    private void RunHeadlessSync()
+    {
+        var exitCode = 1;
+
+        try
+        {
+            var settingsPath = Path.Combine(AppStorage.DataDirectory, TomlSettingsFile.PrimaryFileName);
+            ISettingsStore settings = new SettingsStore(settingsPath);
+            exitCode = HeadlessSync.Run(settings, _logging!);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "Автосинхронизация не смогла запуститься");
+        }
+
+        Shutdown(exitCode);
     }
 
     private void AttachExceptionHandlers()

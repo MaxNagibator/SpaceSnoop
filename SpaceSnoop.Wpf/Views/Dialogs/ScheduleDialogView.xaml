@@ -1,0 +1,178 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Dialogs.ScheduleDialogView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:ScheduleDialogViewModel}"
+             d:DesignWidth="520"
+             Width="{DynamicResource Dialog.Width.Medium}">
+
+    <Grid Margin="22">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0"
+                    Orientation="Horizontal">
+            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.CalendarClock}"
+                                      Width="20"
+                                      Height="20"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,10,0"
+                                      Foreground="{DynamicResource Accent.Primary}" />
+            <TextBlock Text="{Binding Title}"
+                       Style="{StaticResource TextBlock.Heading}"
+                       VerticalAlignment="Center" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="1"
+                   Text="Запуск автосинхронизации с текущими настройками страницы «Синхронизация» через Планировщик Windows."
+                   Style="{StaticResource TextBlock.Subtle}"
+                   TextWrapping="Wrap"
+                   Margin="0,10,0,0" />
+
+        <Border Grid.Row="2"
+                Style="{StaticResource Card.Inset}"
+                Padding="12,10"
+                Margin="0,14,0,0">
+            <TextBlock Text="{Binding Summary}"
+                       TextWrapping="Wrap"
+                       FontFamily="{DynamicResource Font.Mono}"
+                       FontSize="{DynamicResource Font.Size.S}"
+                       Foreground="{DynamicResource Fg.Secondary}" />
+        </Border>
+
+        <Border Grid.Row="3"
+                Background="{DynamicResource State.WarningSoft}"
+                CornerRadius="{DynamicResource Radius.M}"
+                Padding="12,9"
+                Margin="0,10,0,0"
+                Visibility="{Binding MirrorWarning, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+            <StackPanel Orientation="Horizontal">
+                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
+                                          Width="15"
+                                          Height="15"
+                                          VerticalAlignment="Top"
+                                          Margin="0,1,9,0"
+                                          Foreground="{DynamicResource State.Warning}" />
+                <TextBlock
+                    Text="Включено «Зеркало»: лишние файлы на приёмнике будут удаляться в корзину без подтверждения."
+                    TextWrapping="Wrap"
+                    MaxWidth="380"
+                    FontSize="{DynamicResource Font.Size.S}"
+                    Foreground="{DynamicResource Fg.Secondary}" />
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="4"
+              Margin="0,16,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0"
+                       Text="Периодичность"
+                       VerticalAlignment="Center"
+                       Margin="0,0,14,0"
+                       Style="{StaticResource TextBlock.Subtle}" />
+            <ComboBox Grid.Column="1"
+                      ItemsSource="{Binding Intervals}"
+                      SelectedIndex="{Binding SelectedIntervalIndex}"
+                      Style="{StaticResource ComboBox.Toolbar}" />
+        </Grid>
+
+        <Grid Grid.Row="5"
+              Margin="0,10,0,0"
+              Visibility="{Binding TimeApplicable, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0"
+                       Text="Время"
+                       VerticalAlignment="Center"
+                       Margin="0,0,14,0"
+                       Style="{StaticResource TextBlock.Subtle}" />
+            <TextBox Grid.Column="1"
+                     Text="{Binding Time, UpdateSourceTrigger=PropertyChanged}"
+                     Style="{StaticResource TextBox.Toolbar}"
+                     HorizontalAlignment="Left"
+                     Width="90"
+                     ToolTip="Время первого запуска в формате ЧЧ:ММ" />
+        </Grid>
+
+        <StackPanel Grid.Row="6"
+                    Orientation="Horizontal"
+                    Margin="0,16,0,0">
+            <iconPacks:PackIconLucide Kind="{Binding StatusIconKind}"
+                                      Width="15"
+                                      Height="15"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,8,0"
+                                      Foreground="{DynamicResource Fg.Muted}" />
+            <TextBlock Text="{Binding StatusText}"
+                       VerticalAlignment="Center"
+                       Style="{StaticResource TextBlock.Subtle}" />
+        </StackPanel>
+
+        <Grid Grid.Row="7"
+              Margin="0,18,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0"
+                       Text="{Binding Message}"
+                       VerticalAlignment="Center"
+                       TextWrapping="Wrap"
+                       Margin="0,0,12,0"
+                       FontSize="{DynamicResource Font.Size.S}"
+                       Foreground="{DynamicResource Fg.Muted}" />
+
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal">
+                <Button Style="{StaticResource Button.Ghost}"
+                        Command="{Binding RemoveCommand}"
+                        Content="Удалить"
+                        Foreground="{DynamicResource State.Error}"
+                        MinHeight="{DynamicResource Control.Height.Default}"
+                        Padding="14,6"
+                        Margin="0,0,8,0" />
+                <Button Style="{StaticResource Button.Ghost}"
+                        Command="{Binding CloseCommand}"
+                        Content="Закрыть"
+                        MinHeight="{DynamicResource Control.Height.Default}"
+                        Padding="14,6"
+                        Margin="0,0,8,0"
+                        IsCancel="True" />
+                <Button Style="{StaticResource Button.Primary}"
+                        Command="{Binding SaveCommand}"
+                        MinHeight="{DynamicResource Control.Height.Default}"
+                        Padding="16,6"
+                        IsDefault="True">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.CalendarPlus}"
+                                                  Width="14"
+                                                  Height="14"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,6,0" />
+                        <TextBlock Text="Сохранить" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

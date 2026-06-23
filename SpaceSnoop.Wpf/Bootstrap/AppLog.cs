@@ -80,6 +80,20 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1210, Level = LogLevel.Information, Message = "Git-папки исключены из синхронизации: {Count}")]
     public static partial void SyncGitFoldersSkipped(this ILogger logger, int count);
 
+    [LoggerMessage(EventId = 1211, Level = LogLevel.Information,
+        Message = "Автосинхронизация начата: «{Left}» → «{Right}» (режим: {Mode}, зеркало: {Mirror})")]
+    public static partial void HeadlessSyncStarted(this ILogger logger, string left, string right, SyncMode mode, bool mirror);
+
+    [LoggerMessage(EventId = 1212, Level = LogLevel.Information,
+        Message = "Автосинхронизация завершена: успешно {Success}, ошибок {Errors}, за {ElapsedMs} мс")]
+    public static partial void HeadlessSyncFinished(this ILogger logger, int success, int errors, long elapsedMs);
+
+    [LoggerMessage(EventId = 1213, Level = LogLevel.Warning, Message = "Автосинхронизация отменена: {Reason}")]
+    public static partial void HeadlessSyncAborted(this ILogger logger, string reason);
+
+    [LoggerMessage(EventId = 1214, Level = LogLevel.Error, Message = "Автосинхронизация прервана ошибкой")]
+    public static partial void HeadlessSyncFailed(this ILogger logger, Exception exception);
+
     [LoggerMessage(EventId = 1300, Level = LogLevel.Warning, Message = "Не удалось положить лог-секцию в буфер обмена")]
     public static partial void ClipboardLogSectionFailed(this ILogger logger, Exception exception);
 
