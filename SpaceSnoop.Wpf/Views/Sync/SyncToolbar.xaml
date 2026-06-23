@@ -193,155 +193,144 @@
                 </Button>
             </Grid>
 
-            <Grid Margin="0,12,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+            <WrapPanel Margin="0,12,0,0">
+                <Button Style="{StaticResource Button.Primary}"
+                        Command="{Binding CompareCommand}"
+                        VerticalAlignment="Center"
+                        Margin="0,0,8,8">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.GitCompare}"
+                                                  Width="15"
+                                                  Height="15"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,6,0" />
+                        <TextBlock Text="Сравнить" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource Button.Secondary}"
+                        Command="{Binding HashCommand}"
+                        VerticalAlignment="Center"
+                        Margin="0,0,8,8"
+                        ToolTip="Сверить изменённые файлы по содержимому">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Fingerprint}"
+                                                  Width="15"
+                                                  Height="15"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,6,0" />
+                        <TextBlock Text="Хеши" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource Button.Primary}"
+                        Command="{Binding SyncCommand}"
+                        VerticalAlignment="Center"
+                        Margin="0,0,16,8">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ArrowRightLeft}"
+                                                  Width="15"
+                                                  Height="15"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,6,0" />
+                        <TextBlock Text="Синхронизировать" />
+                    </StackPanel>
+                </Button>
 
-                <StackPanel Grid.Column="0"
-                            Orientation="Horizontal">
-                    <Button Style="{StaticResource Button.Primary}"
-                            Command="{Binding CompareCommand}"
-                            Margin="0,0,8,0">
-                        <StackPanel Orientation="Horizontal">
-                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.GitCompare}"
-                                                      Width="15"
-                                                      Height="15"
-                                                      VerticalAlignment="Center"
-                                                      Margin="0,0,6,0" />
-                            <TextBlock Text="Сравнить" />
-                        </StackPanel>
-                    </Button>
-                    <Button Style="{StaticResource Button.Secondary}"
-                            Command="{Binding HashCommand}"
-                            Margin="0,0,8,0"
-                            ToolTip="Сверить изменённые файлы по содержимому">
-                        <StackPanel Orientation="Horizontal">
-                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Fingerprint}"
-                                                      Width="15"
-                                                      Height="15"
-                                                      VerticalAlignment="Center"
-                                                      Margin="0,0,6,0" />
-                            <TextBlock Text="Хеши" />
-                        </StackPanel>
-                    </Button>
-                    <Button Style="{StaticResource Button.Primary}"
-                            Command="{Binding SyncCommand}"
-                            Margin="0,0,16,0">
-                        <StackPanel Orientation="Horizontal">
-                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ArrowRightLeft}"
-                                                      Width="15"
-                                                      Height="15"
-                                                      VerticalAlignment="Center"
-                                                      Margin="0,0,6,0" />
-                            <TextBlock Text="Синхронизировать" />
-                        </StackPanel>
-                    </Button>
-                </StackPanel>
-
-                <StackPanel Grid.Column="1"
-                            Orientation="Horizontal"
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Center"
-                            Margin="16,0,0,0">
-                    <ComboBox ItemsSource="{Binding Modes}"
-                              SelectedIndex="{Binding SelectedModeIndex}"
-                              Style="{StaticResource ComboBox.Toolbar}"
-                              MinWidth="172"
+                <ComboBox ItemsSource="{Binding Modes}"
+                          SelectedIndex="{Binding SelectedModeIndex}"
+                          Style="{StaticResource ComboBox.Toolbar}"
+                          MinWidth="172"
+                          VerticalAlignment="Center"
+                          Margin="0,0,16,8"
+                          ToolTip="Направление синхронизации" />
+                <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
+                              IsChecked="{Binding Mirror}"
+                              IsEnabled="{Binding MirrorApplicable}"
+                              MinWidth="0"
+                              Padding="9,0"
                               VerticalAlignment="Center"
-                              Margin="0,0,16,0"
-                              ToolTip="Направление синхронизации" />
-                    <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
-                                  IsChecked="{Binding Mirror}"
-                                  IsEnabled="{Binding MirrorApplicable}"
-                                  MinWidth="0"
-                                  Padding="9,0"
-                                  VerticalAlignment="Center"
-                                  Margin="0,0,16,0"
-                                  ToolTip="{Binding MirrorHint}"
-                                  AutomationProperties.Name="{Binding MirrorHint}">
-                        <StackPanel Orientation="Horizontal">
-                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FlipHorizontal2}"
-                                                      Width="14"
-                                                      Height="14"
-                                                      VerticalAlignment="Center"
-                                                      Margin="0,0,6,0" />
-                            <TextBlock Text="Зеркало"
-                                       VerticalAlignment="Center" />
-                        </StackPanel>
-                    </ToggleButton>
-                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Funnel}"
-                                              Width="13"
-                                              Height="13"
-                                              VerticalAlignment="Center"
-                                              Margin="0,0,6,0"
-                                              Foreground="{DynamicResource Fg.Muted}" />
-                    <TextBlock Text="Исключения"
-                               VerticalAlignment="Center"
-                               Margin="0,0,8,0"
-                               Style="{StaticResource TextBlock.Subtle}" />
+                              Margin="0,0,16,8"
+                              ToolTip="{Binding MirrorHint}"
+                              AutomationProperties.Name="{Binding MirrorHint}">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FlipHorizontal2}"
+                                                  Width="14"
+                                                  Height="14"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,6,0" />
+                        <TextBlock Text="Зеркало"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </ToggleButton>
+                <Grid VerticalAlignment="Center"
+                      Margin="0,0,16,8">
                     <TextBox Text="{Binding Exclusions, UpdateSourceTrigger=PropertyChanged}"
                              Style="{StaticResource TextBox.Toolbar}"
                              Width="200"
-                             VerticalAlignment="Center"
-                             ToolTip="Глоб-шаблоны через запятую, напр. bin,obj,*.tmp" />
-                </StackPanel>
+                             Padding="26,0,8,0"
+                             VerticalContentAlignment="Center"
+                             ToolTip="Исключения: глоб-шаблоны через запятую, напр. bin,obj,*.tmp" />
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Funnel}"
+                                              Width="13"
+                                              Height="13"
+                                              HorizontalAlignment="Left"
+                                              VerticalAlignment="Center"
+                                              Margin="9,0,0,0"
+                                              IsHitTestVisible="False"
+                                              Foreground="{DynamicResource Fg.Muted}" />
+                </Grid>
 
-                <StackPanel Grid.Column="2"
-                            Orientation="Horizontal"
-                            VerticalAlignment="Center">
-                    <Border Padding="6,3"
-                            CornerRadius="{DynamicResource Radius.M}"
-                            Background="{DynamicResource Bg.Surface}"
-                            BorderThickness="1"
-                            BorderBrush="{DynamicResource Border.Subtle}"
-                            ToolTip="Разрешить все спорные элементы разом">
-                        <StackPanel Orientation="Horizontal"
-                                    VerticalAlignment="Center">
-                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.GitMerge}"
-                                                      Width="13"
-                                                      Height="13"
-                                                      VerticalAlignment="Center"
-                                                      Margin="2,0,8,0"
-                                                      Foreground="{DynamicResource Fg.Muted}" />
-                            <Button Style="{StaticResource Button.Ghost}"
-                                    Command="{Binding ResolveAllToRightCommand}"
-                                    Padding="9,2"
-                                    MinHeight="26"
-                                    Foreground="{DynamicResource State.Success}"
-                                    ToolTip="Все спорные – слева направо"
-                                    AutomationProperties.Name="Все спорные – слева направо">
-                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ArrowRight}"
-                                                          Width="14"
-                                                          Height="14" />
-                            </Button>
-                            <Button Style="{StaticResource Button.Ghost}"
-                                    Command="{Binding ResolveAllToLeftCommand}"
-                                    Padding="9,2"
-                                    MinHeight="26"
-                                    Foreground="{DynamicResource State.Info}"
-                                    ToolTip="Все спорные – справа налево"
-                                    AutomationProperties.Name="Все спорные – справа налево">
-                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ArrowLeft}"
-                                                          Width="14"
-                                                          Height="14" />
-                            </Button>
-                            <Button Style="{StaticResource Button.Ghost}"
-                                    Command="{Binding ResolveAllSkipCommand}"
-                                    Padding="9,2"
-                                    MinHeight="26"
-                                    ToolTip="Пропустить все спорные"
-                                    AutomationProperties.Name="Пропустить все спорные">
-                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Ban}"
-                                                          Width="14"
-                                                          Height="14" />
-                            </Button>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-            </Grid>
+                <Border Padding="6,3"
+                        CornerRadius="{DynamicResource Radius.M}"
+                        Background="{DynamicResource Bg.Surface}"
+                        BorderThickness="1"
+                        BorderBrush="{DynamicResource Border.Subtle}"
+                        VerticalAlignment="Center"
+                        Margin="0,0,0,8"
+                        Visibility="{Binding IsBidirectional, Converter={StaticResource BoolToVisibility}}"
+                        ToolTip="Разрешить все спорные элементы разом">
+                    <StackPanel Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.GitMerge}"
+                                                  Width="13"
+                                                  Height="13"
+                                                  VerticalAlignment="Center"
+                                                  Margin="2,0,8,0"
+                                                  Foreground="{DynamicResource Fg.Muted}" />
+                        <Button Style="{StaticResource Button.Ghost}"
+                                Command="{Binding ResolveAllToRightCommand}"
+                                Padding="9,2"
+                                MinHeight="26"
+                                Foreground="{DynamicResource State.Success}"
+                                ToolTip="Все спорные – слева направо"
+                                AutomationProperties.Name="Все спорные – слева направо">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ArrowRight}"
+                                                      Width="14"
+                                                      Height="14" />
+                        </Button>
+                        <Button Style="{StaticResource Button.Ghost}"
+                                Command="{Binding ResolveAllToLeftCommand}"
+                                Padding="9,2"
+                                MinHeight="26"
+                                Foreground="{DynamicResource State.Info}"
+                                ToolTip="Все спорные – справа налево"
+                                AutomationProperties.Name="Все спорные – справа налево">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ArrowLeft}"
+                                                      Width="14"
+                                                      Height="14" />
+                        </Button>
+                        <Button Style="{StaticResource Button.Ghost}"
+                                Command="{Binding ResolveAllSkipCommand}"
+                                Padding="9,2"
+                                MinHeight="26"
+                                ToolTip="Пропустить все спорные"
+                                AutomationProperties.Name="Пропустить все спорные">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Ban}"
+                                                      Width="14"
+                                                      Height="14" />
+                        </Button>
+                    </StackPanel>
+                </Border>
+            </WrapPanel>
         </StackPanel>
     </Border>
 </UserControl>

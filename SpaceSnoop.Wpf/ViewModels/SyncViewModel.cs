@@ -155,6 +155,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public bool MirrorApplicable => CurrentMode != SyncMode.Bidirectional;
 
+    public bool IsBidirectional => CurrentMode == SyncMode.Bidirectional;
+
     public string MirrorHint => CurrentMode switch
     {
         SyncMode.RightToLeft => "Зеркало: удалять слева то, чего нет справа (в корзину).",
@@ -782,6 +784,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         OnPropertyChanged(nameof(DirectionIconKind));
         OnPropertyChanged(nameof(DirectionHint));
         OnPropertyChanged(nameof(MirrorApplicable));
+        OnPropertyChanged(nameof(IsBidirectional));
         OnPropertyChanged(nameof(MirrorHint));
         ReapplyMode();
     }
