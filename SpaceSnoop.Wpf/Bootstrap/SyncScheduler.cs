@@ -34,21 +34,21 @@ public static class SyncScheduler
         return Run(["/delete", "/tn", taskName, "/f"], out error) == 0;
     }
 
-    public static bool RunNow(string taskName, out string error)
+    public static bool Disable(string taskName, out string error)
     {
-        return Run(["/run", "/tn", taskName], out error) == 0;
-    }
-
-    public static bool SetEnabled(string taskName, bool enabled, out string error)
-    {
-        return Run(["/change", "/tn", taskName, enabled ? "/enable" : "/disable"], out error) == 0;
+        return Run(["/change", "/tn", taskName, "/disable"], out error) == 0;
     }
 
     public static ScheduleStatus Query(string taskName)
     {
-        return Execute(["/query", "/tn", taskName, "/fo", "CSV", "/v", "/nh"], out var output, out _) == 0
-            ? ScheduleStatus.Parse(output)
-            : ScheduleStatus.Missing;
+        if (Execute(["/query", "/tn", taskName, "/fo", "CSV", "/v", "/nh"], out var output, out _) != 0)
+        {
+            return ScheduleStatus.Missing;
+        }
+
+        var enabled = Execute(["/query", "/tn", taskName, "/xml"], out var xml, out _) != 0 || ScheduleStatus.ParseEnabled(xml);
+
+        return ScheduleStatus.Parse(output) with { Enabled = enabled };
     }
 
     public static List<string> BuildCreateArgs(string taskName, ScheduleInterval interval, TimeSpan time, string exePath, string argument)
@@ -62,6 +62,8 @@ public static class SyncScheduler
             "/f",
         };
 
+        // TODO: schtasks CLI не умеет «выполнить при пропуске старта» и запуск без входа в систему –
+        //       пропущенные (ПК спал/выключен) и offline-прогоны не навёрстываются; апгрейд – регистрация задачи через XML (StartWhenAvailable + /ru SYSTEM)
         switch (interval)
         {
             case ScheduleInterval.Hourly:
@@ -110,9 +112,12 @@ public static class SyncScheduler
             }
 
             using var process = Process.Start(info)!;
-            standardOutput = process.StandardOutput.ReadToEnd();
-            standardError = process.StandardError.ReadToEnd();
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
             process.WaitForExit();
+
+            standardOutput = outputTask.GetAwaiter().GetResult();
+            standardError = errorTask.GetAwaiter().GetResult();
 
             return process.ExitCode;
         }

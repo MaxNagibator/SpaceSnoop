@@ -9,6 +9,7 @@ public sealed record ScheduleStatus
     public const int Running = 267009;
 
     public bool Exists { get; init; }
+    public bool Enabled { get; init; } = true;
     public string NextRun { get; init; } = "–";
     public string LastRun { get; init; } = "–";
     public int LastResult { get; init; }
@@ -54,10 +55,24 @@ public sealed record ScheduleStatus
             2 => "Каталоги не настроены",
             3 => "Каталог недоступен",
             4 => "Зеркало отменено: источник пуст",
+            5 => "Каталоги пересекаются",
             NeverRun => "Ещё не запускалась",
             Running => "Выполняется",
             _ => $"Код {code}",
         };
+    }
+
+    public static bool ParseEnabled(string xml)
+    {
+        var start = xml.IndexOf("<Settings>", StringComparison.Ordinal);
+        var end = xml.IndexOf("</Settings>", StringComparison.Ordinal);
+
+        if (start < 0 || end <= start)
+        {
+            return true;
+        }
+
+        return xml.IndexOf("<Enabled>false</Enabled>", start, end - start, StringComparison.Ordinal) < 0;
     }
 
     private static List<string> SplitCsv(string line)

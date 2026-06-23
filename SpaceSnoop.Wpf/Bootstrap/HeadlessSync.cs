@@ -58,6 +58,12 @@ internal sealed class HeadlessSync
             return 3;
         }
 
+        if (SyncProfile.PathsOverlap(left, right))
+        {
+            logger.HeadlessSyncAborted("каталоги совпадают или вложены");
+            return 5;
+        }
+
         if (mirror && mode != SyncMode.Bidirectional)
         {
             var source = mode == SyncMode.RightToLeft ? right : left;
@@ -72,8 +78,26 @@ internal sealed class HeadlessSync
         logger.HeadlessSyncStarted(left, right, mode, mirror);
         var stopwatch = Stopwatch.StartNew();
 
+        using var mutex = new Mutex(false, @"Global\SpaceSnoop_HeadlessSync");
+        var acquired = false;
+
         try
         {
+            try
+            {
+                acquired = mutex.WaitOne(TimeSpan.FromMinutes(10));
+            }
+            catch (AbandonedMutexException)
+            {
+                acquired = true;
+            }
+
+            if (!acquired)
+            {
+                logger.HeadlessSyncAborted("другой прогон ещё выполняется");
+                return 1;
+            }
+
             var filter = new ExclusionFilter(exclusions);
             var comparer = new DirectoryComparer(filter, NullLogger<DirectoryComparer>.Instance);
             var result = comparer.Compare(left, right, CancellationToken.None);
@@ -94,6 +118,13 @@ internal sealed class HeadlessSync
         {
             logger.HeadlessSyncFailed(exception);
             return 1;
+        }
+        finally
+        {
+            if (acquired)
+            {
+                mutex.ReleaseMutex();
+            }
         }
     }
 

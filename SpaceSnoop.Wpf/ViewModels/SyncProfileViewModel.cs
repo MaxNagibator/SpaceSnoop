@@ -60,6 +60,10 @@ public sealed partial class SyncProfileViewModel : ObservableObject
     private bool _isScheduled;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatusIconKind))]
+    private bool _osEnabled = true;
+
+    [ObservableProperty]
     private string _nextRun = "–";
 
     [ObservableProperty]
@@ -107,7 +111,7 @@ public sealed partial class SyncProfileViewModel : ObservableObject
     public bool MirrorWarning => Mirror && SelectedModeIndex != 2;
 
     public PackIconLucideKind StatusIconKind =>
-        Enabled && IsScheduled ? PackIconLucideKind.CalendarCheck : PackIconLucideKind.CalendarOff;
+        Enabled && IsScheduled && OsEnabled ? PackIconLucideKind.CalendarCheck : PackIconLucideKind.CalendarOff;
 
     public string Summary
     {
@@ -136,8 +140,6 @@ public sealed partial class SyncProfileViewModel : ObservableObject
         _ => $"Ежедневно в {Time}",
     };
 
-    private string TaskName => SyncScheduler.TaskNameFor(Id);
-
     public SyncProfile ToModel()
     {
         return new()
@@ -162,8 +164,13 @@ public sealed partial class SyncProfileViewModel : ObservableObject
 
     public void RefreshStatus()
     {
-        var status = SyncScheduler.Query(TaskName);
+        ApplyStatus(SyncScheduler.Query(TaskName));
+    }
+
+    public void ApplyStatus(ScheduleStatus status)
+    {
         IsScheduled = status.Exists;
+        OsEnabled = !status.Exists || status.Enabled;
         NextRun = status.Exists ? status.NextRun : "–";
         LastRun = status.Exists ? status.LastRun : "–";
         LastResult = status.Exists ? status.LastResultText : "–";
@@ -323,7 +330,7 @@ public sealed partial class SyncProfileViewModel : ObservableObject
         {
             if (SyncScheduler.Exists(TaskName))
             {
-                SyncScheduler.SetEnabled(TaskName, false, out _);
+                SyncScheduler.Disable(TaskName, out _);
             }
 
             Message = "Профиль сохранён, автозапуск выключен.";
@@ -350,6 +357,12 @@ public sealed partial class SyncProfileViewModel : ObservableObject
             return false;
         }
 
+        if (SyncProfile.PathsOverlap(left, right))
+        {
+            reason = "Каталоги не должны совпадать или быть вложены друг в друга.";
+            return false;
+        }
+
         if (TimeApplicable && (!TimeSpan.TryParse(Time, out var time) || time < TimeSpan.Zero || time.TotalHours >= 24))
         {
             reason = "Время укажите в формате ЧЧ:ММ, например 03:00.";
@@ -359,4 +372,6 @@ public sealed partial class SyncProfileViewModel : ObservableObject
         reason = string.Empty;
         return true;
     }
+
+    internal string TaskName => SyncScheduler.TaskNameFor(Id);
 }

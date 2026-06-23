@@ -51,11 +51,19 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
 
     public void Refresh()
     {
+        _ = RefreshAsync();
+    }
+
+    public async Task RefreshAsync()
+    {
         EnsureMigrated();
 
-        foreach (var profile in Profiles)
+        var profiles = Profiles.ToArray();
+        var statuses = await Task.Run(() => Array.ConvertAll(profiles, profile => SyncScheduler.Query(profile.TaskName)));
+
+        for (var i = 0; i < profiles.Length; i++)
         {
-            profile.RefreshStatus();
+            profiles[i].ApplyStatus(statuses[i]);
         }
 
         LoadHistory();
@@ -93,6 +101,11 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
         _logger.ScheduleTaskFailed(name, error);
     }
 
+    internal static bool LineHasErrors(string line)
+    {
+        return !line.Contains(", 0 ошибок", StringComparison.Ordinal);
+    }
+
     [RelayCommand]
     private void AddProfile()
     {
@@ -113,9 +126,9 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
     }
 
     [RelayCommand]
-    private void RefreshStatuses()
+    private Task RefreshStatuses()
     {
-        Refresh();
+        return RefreshAsync();
     }
 
     private void EnsureMigrated()
@@ -194,7 +207,7 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
 
             foreach (var line in lines)
             {
-                History.Add(new(line, !line.Contains("0 ошибок")));
+                History.Add(new(line, LineHasErrors(line)));
             }
         }
         catch (IOException)

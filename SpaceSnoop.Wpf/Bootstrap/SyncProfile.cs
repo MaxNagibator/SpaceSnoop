@@ -1,4 +1,6 @@
-﻿namespace SpaceSnoop.Wpf.Bootstrap;
+﻿using System.IO;
+
+namespace SpaceSnoop.Wpf.Bootstrap;
 
 public sealed class SyncProfile
 {
@@ -12,4 +14,32 @@ public sealed class SyncProfile
     public ScheduleInterval Interval { get; set; } = ScheduleInterval.Daily;
     public string Time { get; set; } = "03:00";
     public bool Enabled { get; set; }
+
+    public static bool PathsOverlap(string left, string right)
+    {
+        string a, b;
+
+        try
+        {
+            a = Trim(Path.GetFullPath(left));
+            b = Trim(Path.GetFullPath(right));
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return false;
+        }
+
+        if (string.Equals(a, b, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return b.StartsWith(a + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+               || a.StartsWith(b + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+
+        static string Trim(string path)
+        {
+            return path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+    }
 }

@@ -1,5 +1,6 @@
 ﻿using SpaceSnoop.Core.Domain;
 using SpaceSnoop.Wpf.Bootstrap;
+using SpaceSnoop.Wpf.ViewModels;
 
 namespace SpaceSnoop.Wpf.Tests;
 
@@ -85,12 +86,57 @@ public class SyncSchedulerTests
     [TestCase(0, "Успех")]
     [TestCase(1, "Завершилась с ошибками")]
     [TestCase(3, "Каталог недоступен")]
+    [TestCase(5, "Каталоги пересекаются")]
     [TestCase(ScheduleStatus.NeverRun, "Ещё не запускалась")]
     [TestCase(ScheduleStatus.Running, "Выполняется")]
     [TestCase(12345, "Код 12345")]
     public void Код_результата_расшифровывается(int code, string expected)
     {
         Assert.That(ScheduleStatus.DecodeResult(code), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void Отключённая_задача_читается_из_xml()
+    {
+        const string xml = "<Task><Settings><Enabled>false</Enabled></Settings><Triggers /></Task>";
+
+        Assert.That(ScheduleStatus.ParseEnabled(xml), Is.False);
+    }
+
+    [Test]
+    public void Включённый_триггер_не_путается_с_состоянием_задачи()
+    {
+        const string xml = "<Task><Triggers><CalendarTrigger><Enabled>false</Enabled></CalendarTrigger></Triggers><Settings><Enabled>true</Enabled></Settings></Task>";
+
+        Assert.That(ScheduleStatus.ParseEnabled(xml), Is.True);
+    }
+
+    [TestCase("<Task><Settings /></Task>")]
+    [TestCase("")]
+    public void Без_явного_состояния_задача_считается_включённой(string xml)
+    {
+        Assert.That(ScheduleStatus.ParseEnabled(xml), Is.True);
+    }
+
+    [TestCase("...: 5 успешно, 0 ошибок", false)]
+    [TestCase("...: 0 успешно, 0 ошибок", false)]
+    [TestCase("...: 5 успешно, 3 ошибок", true)]
+    [TestCase("...: 5 успешно, 20 ошибок", true)]
+    [TestCase("...: 5 успешно, 100 ошибок", true)]
+    public void Строка_истории_подсвечивается_только_при_реальных_ошибках(string line, bool hasErrors)
+    {
+        Assert.That(ScheduleViewModel.LineHasErrors(line), Is.EqualTo(hasErrors));
+    }
+
+    [TestCase(@"C:\A", @"C:\B", false)]
+    [TestCase(@"C:\A", @"C:\AB", false)]
+    [TestCase(@"C:\A", @"C:\A", true)]
+    [TestCase(@"C:\A\", @"C:\A", true)]
+    [TestCase(@"C:\A", @"C:\A\Sub", true)]
+    [TestCase(@"C:\A\Sub", @"C:\A", true)]
+    public void Совпадающие_и_вложенные_каталоги_распознаются(string left, string right, bool overlap)
+    {
+        Assert.That(SyncProfile.PathsOverlap(left, right), Is.EqualTo(overlap));
     }
 
     private static string Value(List<string> args, string flag)
