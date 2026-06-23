@@ -32,6 +32,9 @@ public static class SettingsKeys
     public const string DeleteMode = "wpf.delete.mode";
     public const string DefaultExclusions = "wpf.exclusions.default";
 
+    public const string ArchiveDeleteOriginal = "wpf.archive.delete_original";
+    public const string ArchiveCompression = "wpf.archive.compression";
+
     public const string SyncLeft = "wpf.sync.left";
     public const string SyncRight = "wpf.sync.right";
     public const string SyncExclusions = "wpf.sync.exclusions";

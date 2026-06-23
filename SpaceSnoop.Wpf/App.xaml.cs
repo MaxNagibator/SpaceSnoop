@@ -132,6 +132,7 @@ public partial class App : Application
 
         services.AddSingleton<DiskSpaceCalculator>();
         services.AddSingleton<DockerService>();
+        services.AddSingleton<ArchiveService>();
 
         services.AddKeepShell();
         services.AddSingleton<ShellPreferences>();
@@ -151,6 +152,7 @@ public partial class App : Application
         services.AddSingleton<ScanInspectorViewModel>();
         services.AddSingleton<ScanNodeFactory>();
         services.AddSingleton<DeleteProgressDialogFactory>();
+        services.AddSingleton<ArchiveProgressDialogFactory>();
 
         services.AddSingleton<ScanViewModel>();
         services.AddSingleton<SyncViewModel>();

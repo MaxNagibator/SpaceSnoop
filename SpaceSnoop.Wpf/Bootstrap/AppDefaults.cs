@@ -1,4 +1,6 @@
-﻿namespace SpaceSnoop.Wpf.Bootstrap;
+﻿using System.IO.Compression;
+
+namespace SpaceSnoop.Wpf.Bootstrap;
 
 public static class AppDefaults
 {
@@ -17,6 +19,9 @@ public static class AppDefaults
 
     public const bool DeleteConfirmDefault = true;
     public const DeleteMode DeleteModeDefault = DeleteMode.RecycleBin;
+
+    public const bool ArchiveDeleteOriginalDefault = true;
+    public const CompressionLevel ArchiveCompressionDefault = CompressionLevel.Optimal;
 
     public const bool WarnIfNotAdminDefault = true;
     public const StartupPage StartupPageDefault = StartupPage.Scan;

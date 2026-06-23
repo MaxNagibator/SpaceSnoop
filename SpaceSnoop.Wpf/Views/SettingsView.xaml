@@ -17,6 +17,7 @@
             <settings:SettingsAppearanceCard />
             <settings:SettingsScanCard />
             <settings:SettingsDeleteCard />
+            <settings:SettingsArchiveCard />
             <settings:SettingsExclusionsCard />
             <settings:SettingsStartupCard />
             <settings:SettingsFileCard />

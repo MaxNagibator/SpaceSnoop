@@ -1,6 +1,7 @@
 ﻿using KeepShell.Services;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO.Compression;
 
 namespace SpaceSnoop.Wpf.ViewModels;
 
@@ -94,6 +95,14 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         new(DeleteMode.Permanent, "Безвозвратно"),
     ];
 
+    public IReadOnlyList<EnumOption<CompressionLevel>> CompressionOptions { get; } =
+    [
+        new(CompressionLevel.Optimal, "Оптимальное"),
+        new(CompressionLevel.SmallestSize, "Максимальное (медленно)"),
+        new(CompressionLevel.Fastest, "Быстрое"),
+        new(CompressionLevel.NoCompression, "Без сжатия (только упаковка)"),
+    ];
+
     public EnumOption<AppTheme> SelectedThemeOption
     {
         get => ThemeOptions.First(o => o.Value == Theme.Current);
@@ -140,6 +149,19 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
             if (value.Value != Operations.DeleteMode)
             {
                 Operations.DeleteMode = value.Value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public EnumOption<CompressionLevel> SelectedCompressionOption
+    {
+        get => CompressionOptions.First(o => o.Value == Operations.ArchiveCompression);
+        set
+        {
+            if (value.Value != Operations.ArchiveCompression)
+            {
+                Operations.ArchiveCompression = value.Value;
                 OnPropertyChanged();
             }
         }

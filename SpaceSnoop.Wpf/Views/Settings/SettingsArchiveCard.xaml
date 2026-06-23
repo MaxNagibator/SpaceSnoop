@@ -1,0 +1,54 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Settings.SettingsArchiveCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
+             d:DesignWidth="900">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Views/Settings/SettingsResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Border Style="{StaticResource Card.Inset}"
+            Margin="0,0,0,10">
+        <StackPanel>
+            <TextBlock Text="Архивация"
+                       Style="{StaticResource Setting.SectionTitle}" />
+
+            <Grid Margin="0,14,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="240" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Уровень сжатия .zip"
+                               Style="{StaticResource Setting.Label}" />
+                    <TextBlock
+                        Text="Применяется при «Упаковать в архив». Уже сжатые данные (видео, фото, архивы) почти не уменьшаются."
+                        Style="{StaticResource Setting.Hint}"
+                        Margin="0,2,0,0" />
+                </StackPanel>
+                <ComboBox Grid.Column="1"
+                          Style="{StaticResource ComboBox.Form}"
+                          ItemsSource="{Binding CompressionOptions}"
+                          SelectedItem="{Binding SelectedCompressionOption}"
+                          DisplayMemberPath="Label"
+                          VerticalAlignment="Center" />
+            </Grid>
+
+            <CheckBox Content="После упаковки убирать оригинал в корзину"
+                      IsChecked="{Binding Operations.DeleteOriginalAfterArchive, Mode=TwoWay}"
+                      Margin="0,16,0,0"
+                      VerticalAlignment="Center" />
+            <TextBlock Style="{StaticResource Setting.Hint}"
+                       Text="Оригинальная папка удаляется только после успешной проверки архива и попадает в корзину (можно восстановить)." />
+        </StackPanel>
+    </Border>
+</UserControl>

@@ -177,4 +177,19 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 1610, Level = LogLevel.Error, Message = "Docker: ошибка удаления объекта ({Kind} {Name})")]
     public static partial void DockerObjectRemoveFailed(this ILogger logger, Exception exception, string kind, string name);
+
+    [LoggerMessage(EventId = 1700, Level = LogLevel.Information, Message = "Упаковка в архив начата: {Path}")]
+    public static partial void ArchiveStarted(this ILogger logger, string path);
+
+    [LoggerMessage(EventId = 1701, Level = LogLevel.Information, Message = "Упаковка в архив завершена: {Path} – {Summary}")]
+    public static partial void ArchiveFinished(this ILogger logger, string path, string summary);
+
+    [LoggerMessage(EventId = 1702, Level = LogLevel.Error, Message = "Ошибка архивации: {Path}")]
+    public static partial void ArchiveFailed(this ILogger logger, Exception exception, string path);
+
+    [LoggerMessage(EventId = 1703, Level = LogLevel.Information, Message = "Архивация отменена: {Path}")]
+    public static partial void ArchiveCancelled(this ILogger logger, string path);
+
+    [LoggerMessage(EventId = 1704, Level = LogLevel.Warning, Message = "Архив не прошёл проверку, оригинал не тронут: {Path} ({Detail})")]
+    public static partial void ArchiveVerifyFailed(this ILogger logger, string path, string detail);
 }

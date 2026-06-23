@@ -1,4 +1,6 @@
-﻿namespace SpaceSnoop.Wpf.ViewModels;
+﻿using System.IO.Compression;
+
+namespace SpaceSnoop.Wpf.ViewModels;
 
 public sealed partial class OperationPreferences : ObservableObject
 {
@@ -17,6 +19,12 @@ public sealed partial class OperationPreferences : ObservableObject
     [ObservableProperty]
     private bool _syncPathSuggest = AppDefaults.SyncPathSuggestDefault;
 
+    [ObservableProperty]
+    private bool _deleteOriginalAfterArchive = AppDefaults.ArchiveDeleteOriginalDefault;
+
+    [ObservableProperty]
+    private CompressionLevel _archiveCompression = AppDefaults.ArchiveCompressionDefault;
+
     public OperationPreferences(ISettingsStore settings)
     {
         _settings = settings;
@@ -26,6 +34,8 @@ public sealed partial class OperationPreferences : ObservableObject
         DeleteMode = _settings.GetEnum(SettingsKeys.DeleteMode, AppDefaults.DeleteModeDefault);
         DefaultExclusions = _settings.GetStringValue(SettingsKeys.DefaultExclusions) ?? string.Empty;
         SyncPathSuggest = _settings.GetBool(SettingsKeys.SyncPathSuggest, AppDefaults.SyncPathSuggestDefault);
+        DeleteOriginalAfterArchive = _settings.GetBool(SettingsKeys.ArchiveDeleteOriginal, AppDefaults.ArchiveDeleteOriginalDefault);
+        ArchiveCompression = _settings.GetEnum(SettingsKeys.ArchiveCompression, AppDefaults.ArchiveCompressionDefault);
         _suppressPersist = false;
     }
 
@@ -58,6 +68,22 @@ public sealed partial class OperationPreferences : ObservableObject
         if (!_suppressPersist)
         {
             _settings.SetBool(SettingsKeys.SyncPathSuggest, value);
+        }
+    }
+
+    partial void OnDeleteOriginalAfterArchiveChanged(bool value)
+    {
+        if (!_suppressPersist)
+        {
+            _settings.SetBool(SettingsKeys.ArchiveDeleteOriginal, value);
+        }
+    }
+
+    partial void OnArchiveCompressionChanged(CompressionLevel value)
+    {
+        if (!_suppressPersist)
+        {
+            _settings.SetEnum(SettingsKeys.ArchiveCompression, value);
         }
     }
 }
