@@ -94,6 +94,12 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1214, Level = LogLevel.Error, Message = "Автосинхронизация прервана ошибкой")]
     public static partial void HeadlessSyncFailed(this ILogger logger, Exception exception);
 
+    [LoggerMessage(EventId = 1215, Level = LogLevel.Error, Message = "Операция «{Operation}» завершилась ошибкой")]
+    public static partial void SyncOperationFailed(this ILogger logger, Exception exception, string operation);
+
+    [LoggerMessage(EventId = 1216, Level = LogLevel.Information, Message = "Операция «{Operation}» отменена")]
+    public static partial void SyncOperationCancelled(this ILogger logger, string operation);
+
     [LoggerMessage(EventId = 1250, Level = LogLevel.Information, Message = "Профиль расписания сохранён: «{Name}» (активно: {Enabled})")]
     public static partial void ScheduleProfileSaved(this ILogger logger, string name, bool enabled);
 

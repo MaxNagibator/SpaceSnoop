@@ -159,6 +159,12 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         {
             foreach (var file in dir.EnumerateFiles().Where(x => !exclusionFilter.IsExcluded(x.Name)))
             {
+                if (IsReparsePoint(file))
+                {
+                    logger.CompareReparsePointSkipped(file.FullName);
+                    continue;
+                }
+
                 result[file.Name] = file;
             }
         }
@@ -168,6 +174,11 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         }
 
         return result;
+    }
+
+    private static bool IsReparsePoint(FileSystemInfo info)
+    {
+        return (info.Attributes & FileAttributes.ReparsePoint) != 0;
     }
 
     private Dictionary<string, DirectoryInfo> GetFilteredDirectories(DirectoryInfo? dir)
@@ -183,6 +194,12 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         {
             foreach (var sub in dir.EnumerateDirectories().Where(x => !exclusionFilter.IsExcluded(x.Name)))
             {
+                if (IsReparsePoint(sub))
+                {
+                    logger.CompareReparsePointSkipped(sub.FullName);
+                    continue;
+                }
+
                 result[sub.Name] = sub;
             }
         }

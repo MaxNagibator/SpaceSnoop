@@ -18,4 +18,7 @@ internal static partial class CoreLog
 
     [LoggerMessage(EventId = 1214, Level = LogLevel.Debug, Message = "Сканирование: пропущена ссылка (reparse point) «{Path}»")]
     public static partial void ScanReparsePointSkipped(this ILogger logger, string path);
+
+    [LoggerMessage(EventId = 1215, Level = LogLevel.Debug, Message = "Сравнение: пропущена ссылка (reparse point) «{Path}»")]
+    public static partial void CompareReparsePointSkipped(this ILogger logger, string path);
 }

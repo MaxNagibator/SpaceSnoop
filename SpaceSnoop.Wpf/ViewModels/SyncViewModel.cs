@@ -8,7 +8,6 @@ using System.Windows.Input;
 
 namespace SpaceSnoop.Wpf.ViewModels;
 
-// TODO: Шляпа с ILogger
 public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPageStatus
 {
     private const long MaxDiffBytes = 5 * 1024 * 1024;
@@ -873,6 +872,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         var token = _cts.Token;
         IsBusy = true;
 
+        var operation = caption.TrimEnd(' ', ':');
         var determinate = total > 0;
 
         if (determinate)
@@ -917,6 +917,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
         catch (OperationCanceledException)
         {
+            _logger.SyncOperationCancelled(operation);
             SummaryText = "Операция отменена.";
             StatusCaption = SummaryText;
             return null;
@@ -924,6 +925,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         catch (Exception exception)
         {
             var cause = exception.Unwrap();
+            _logger.SyncOperationFailed(cause, operation);
             _dialogs.Error("Ошибка", cause.Message);
             SummaryText = $"Ошибка: {cause.Message}";
             StatusCaption = SummaryText;

@@ -154,6 +154,58 @@ public class DirectoryComparerTests
         }
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void SymbolicLink_SkippedFromComparison(bool isDirectory)
+    {
+        var target = Path.Combine(_tempDir, "target");
+        var link = Path.Combine(_leftDir, "link");
+
+        if (isDirectory)
+        {
+            Directory.CreateDirectory(target);
+        }
+        else
+        {
+            File.WriteAllText(target, "real content");
+        }
+
+        if (!TryCreateSymlink(link, target, isDirectory))
+        {
+            Assert.Ignore("Создание символьных ссылок недоступно (нет прав / режима разработчика).");
+        }
+
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
+        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Root.Files, Is.Empty);
+            Assert.That(result.Root.SubDirectories, Is.Empty);
+        }
+    }
+
+    private static bool TryCreateSymlink(string path, string target, bool isDirectory)
+    {
+        try
+        {
+            if (isDirectory)
+            {
+                Directory.CreateSymbolicLink(path, target);
+            }
+            else
+            {
+                File.CreateSymbolicLink(path, target);
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
     [Test]
     public void FileComparison_ContainsMetadata()
     {
