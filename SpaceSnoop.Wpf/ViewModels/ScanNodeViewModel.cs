@@ -222,6 +222,15 @@ public sealed partial class ScanNodeViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void ArchiveToZip()
+    {
+        if (Space is DirectorySpace)
+        {
+            _factory?.RequestArchive(this);
+        }
+    }
+
+    [RelayCommand]
     private void MarkDeleted()
     {
         if (Space is null || Space.IsDeleted)

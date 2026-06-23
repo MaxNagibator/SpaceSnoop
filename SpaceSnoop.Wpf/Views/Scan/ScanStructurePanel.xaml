@@ -317,6 +317,23 @@
                     </StackPanel>
                 </MenuItem.Header>
             </MenuItem>
+
+            <Separator
+                Visibility="{Binding PlacementTarget.DataContext.IsDirectory, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}" />
+            <MenuItem
+                Command="{Binding PlacementTarget.DataContext.ArchiveToZipCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                ToolTip="Упаковать папку в .zip; после проверки архива оригинал можно убрать в корзину (см. Настройки)"
+                Visibility="{Binding PlacementTarget.DataContext.IsDirectory, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+                <MenuItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                                  Kind="{x:Static iconPacks:PackIconLucideKind.Package}"
+                                                  Foreground="{DynamicResource State.Info}" />
+                        <TextBlock Text="Упаковать в архив (.zip)"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </MenuItem.Header>
+            </MenuItem>
         </ContextMenu>
     </UserControl.Resources>
 

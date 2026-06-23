@@ -2,6 +2,7 @@
 
 public sealed class ScanNodeFactory(ILogger<ScanNodeViewModel> logger)
 {
+    public event Action<ScanNodeViewModel>? ArchiveRequested;
     public event Action? MarksChanged;
 
     public ScanNodeViewModel Create(SpaceBase space, double siblingMax, double parentTotal, ScanSortState sort)
@@ -12,5 +13,10 @@ public sealed class ScanNodeFactory(ILogger<ScanNodeViewModel> logger)
     public void RaiseMarksChanged()
     {
         MarksChanged?.Invoke();
+    }
+
+    public void RequestArchive(ScanNodeViewModel node)
+    {
+        ArchiveRequested?.Invoke(node);
     }
 }
