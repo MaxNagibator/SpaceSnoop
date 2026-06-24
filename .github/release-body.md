@@ -12,7 +12,4 @@
 
 ## Статистика
 
-Скачиваний этого
-релиза: [![v__VERSION__](https://img.shields.io/github/downloads/__SLUG__/v__VERSION__/total?label=&color=2ea44f)](__REPO__/releases/tag/v__VERSION__) ·
-всего по
-проекту: [![всего](https://img.shields.io/github/downloads/__SLUG__/total?label=&color=1f6feb)](__REPO__/releases)
+Скачиваний этого релиза: [![v__VERSION__](https://img.shields.io/github/downloads/__SLUG__/v__VERSION__/total?label=&color=2ea44f)](__REPO__/releases/tag/v__VERSION__) · всего по проекту: [![всего](https://img.shields.io/github/downloads/__SLUG__/total?label=&color=1f6feb)](__REPO__/releases)
