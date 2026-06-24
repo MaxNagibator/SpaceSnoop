@@ -510,11 +510,70 @@
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <Grid Grid.Row="0"
+                  Margin="14,4,18,8"
+                  Visibility="{Binding FlatView, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Grid Grid.Column="0"
+                      MaxWidth="340"
+                      HorizontalAlignment="Left">
+                    <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource TextBox.Toolbar}"
+                             Padding="26,0,8,0"
+                             VerticalContentAlignment="Center"
+                             ToolTip="Фильтр списка по пути файла" />
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Search}"
+                                              Width="13"
+                                              Height="13"
+                                              HorizontalAlignment="Left"
+                                              VerticalAlignment="Center"
+                                              Margin="9,0,0,0"
+                                              IsHitTestVisible="False"
+                                              Foreground="{DynamicResource Fg.Muted}" />
+                </Grid>
+
+                <ComboBox Grid.Column="1"
+                          SelectedValuePath="Tag"
+                          SelectedValue="{Binding FlatSort}"
+                          Style="{StaticResource ComboBox.Toolbar}"
+                          MinWidth="150"
+                          Margin="8,0,0,0"
+                          VerticalAlignment="Center"
+                          ToolTip="Сортировка списка">
+                    <ComboBoxItem Content="По пути"
+                                  Tag="{x:Static vm:SyncFlatSortField.Path}" />
+                    <ComboBoxItem Content="По размеру"
+                                  Tag="{x:Static vm:SyncFlatSortField.Size}" />
+                    <ComboBoxItem Content="По статусу"
+                                  Tag="{x:Static vm:SyncFlatSortField.Status}" />
+                </ComboBox>
+
+                <ToggleButton Grid.Column="2"
+                              Style="{StaticResource ToggleButton.Toolbar}"
+                              IsChecked="{Binding FlatSortDescending}"
+                              MinWidth="0"
+                              Padding="9,0"
+                              Margin="8,0,0,0"
+                              VerticalAlignment="Center"
+                              ToolTip="Сортировать по убыванию"
+                              AutomationProperties.Name="Сортировать по убыванию">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ArrowDownUp}"
+                                              Width="14"
+                                              Height="14" />
+                </ToggleButton>
+            </Grid>
+
+            <Grid Grid.Row="1"
                   Margin="14,6,18,8"
                   Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
                 <Grid.ColumnDefinitions>
@@ -552,13 +611,13 @@
                 </Grid>
             </Grid>
 
-            <Border Grid.Row="0"
+            <Border Grid.Row="1"
                     VerticalAlignment="Bottom"
                     Height="1"
                     Background="{DynamicResource Border.Subtle}"
                     Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
 
-            <ListBox Grid.Row="1"
+            <ListBox Grid.Row="2"
                      ItemsSource="{Binding Rows}"
                      Background="Transparent"
                      BorderThickness="0"
@@ -604,7 +663,7 @@
                                                           Style="{StaticResource NodeIcon}"
                                                           Visibility="{Binding LeftContentVisible, Converter={StaticResource BoolToVisibility}}" />
                                 <TextBlock Grid.Column="2"
-                                           Text="{Binding Name}"
+                                           Text="{Binding DisplayName}"
                                            Style="{StaticResource NodeNameLeft}"
                                            Visibility="{Binding LeftContentVisible, Converter={StaticResource BoolToVisibility}}" />
                                 <iconPacks:PackIconLucide Grid.Column="3"
@@ -679,7 +738,7 @@
                                                           Style="{StaticResource NodeIcon}"
                                                           Visibility="{Binding RightContentVisible, Converter={StaticResource BoolToVisibility}}" />
                                 <TextBlock Grid.Column="2"
-                                           Text="{Binding Name}"
+                                           Text="{Binding DisplayName}"
                                            Style="{StaticResource NodeNameRight}"
                                            Visibility="{Binding RightContentVisible, Converter={StaticResource BoolToVisibility}}" />
                                 <iconPacks:PackIconLucide Grid.Column="3"
@@ -721,7 +780,7 @@
                 </ListBox.ItemTemplate>
             </ListBox>
 
-            <keepshell:EmptyState Grid.Row="1"
+            <keepshell:EmptyState Grid.Row="2"
                                   Icon="GitCompareArrows"
                                   IconSize="40"
                                   Heading="Сравнение ещё не выполнялось"
@@ -733,7 +792,7 @@
                                   HorizontalAlignment="Center"
                                   Visibility="{Binding HasResult, Converter={StaticResource InverseBoolToVisibility}, FallbackValue=Visible}" />
 
-            <Border Grid.Row="2"
+            <Border Grid.Row="3"
                     BorderThickness="0,1,0,0"
                     BorderBrush="{DynamicResource Border.Subtle}"
                     Padding="10,5">
@@ -755,6 +814,23 @@
                                 Orientation="Horizontal"
                                 VerticalAlignment="Center"
                                 Margin="12,0,0,0">
+                        <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
+                                      IsChecked="{Binding FlatView}"
+                                      MinWidth="0"
+                                      Padding="9,0"
+                                      Margin="0,0,8,0"
+                                      ToolTip="Плоский список различающихся файлов вместо дерева каталогов"
+                                      AutomationProperties.Name="Плоский список файлов вместо дерева">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.List}"
+                                                          Width="14"
+                                                          Height="14"
+                                                          VerticalAlignment="Center"
+                                                          Margin="0,0,6,0" />
+                                <TextBlock Text="Список"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </ToggleButton>
                         <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
                                       IsChecked="{Binding ShowIdentical}"
                                       MinWidth="0"

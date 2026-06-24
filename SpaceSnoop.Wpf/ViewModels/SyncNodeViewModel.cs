@@ -21,6 +21,7 @@ public sealed partial class SyncNodeViewModel : ObservableObject
     private readonly DirectoryComparison? _dir;
     private readonly FileComparison? _file;
     private readonly SyncViewModel _owner;
+    private readonly bool _flat;
     private bool _subtreeActionable;
     private SyncAction? _subtreeAction;
 
@@ -45,10 +46,11 @@ public sealed partial class SyncNodeViewModel : ObservableObject
         (_subtreeActionable, _subtreeAction) = ComputeSubtreeAction(dir);
     }
 
-    public SyncNodeViewModel(FileComparison file, int indent, SyncViewModel owner)
+    public SyncNodeViewModel(FileComparison file, int indent, SyncViewModel owner, bool flat = false)
     {
         _file = file;
         _owner = owner;
+        _flat = flat;
         Indent = indent;
 
         LeftSizeText = file.LeftSize is { } left ? SizeFormatter.Format(left) : string.Empty;
@@ -74,6 +76,8 @@ public sealed partial class SyncNodeViewModel : ObservableObject
     public bool IsFile => _file is not null;
 
     public string Name => _dir?.Name ?? _file?.Name ?? string.Empty;
+
+    public string DisplayName => _flat && _file is not null ? _file.RelativePath : Name;
 
     public ComparisonStatus Status => _dir?.Status ?? _file?.Status ?? ComparisonStatus.Identical;
 

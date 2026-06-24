@@ -74,6 +74,18 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private bool _hideApplied;
 
     [ObservableProperty]
+    private bool _flatView;
+
+    [ObservableProperty]
+    private SyncFlatSortField _flatSort = AppDefaults.SyncFlatSortDefault;
+
+    [ObservableProperty]
+    private bool _flatSortDescending;
+
+    [ObservableProperty]
+    private string _searchText = string.Empty;
+
+    [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CompareCommand))]
     [NotifyCanExecuteChangedFor(nameof(HashCommand))]
     [NotifyCanExecuteChangedFor(nameof(SyncCommand))]
@@ -255,6 +267,53 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         var dialog = new FileDiffDialogViewModel(_settings, file.Name, leftPath, rightPath, built.Lines, built.Added, built.Removed);
         await _dialogs.ShowAsync(dialog);
+    }
+
+    internal static IEnumerable<FileComparison> SortFlatFiles(IEnumerable<FileComparison> files, SyncFlatSortField field, bool descending)
+    {
+        return field switch
+        {
+            SyncFlatSortField.Size => descending
+                ? files.OrderByDescending(FileSize)
+                : files.OrderBy(FileSize),
+            SyncFlatSortField.Status => descending
+                ? files.OrderByDescending(file => (int)file.Status).ThenBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
+                : files.OrderBy(file => (int)file.Status).ThenBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase),
+            _ => descending
+                ? files.OrderByDescending(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
+                : files.OrderBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase),
+        };
+
+        static long FileSize(FileComparison file)
+        {
+            return Math.Max(file.LeftSize ?? 0, file.RightSize ?? 0);
+        }
+    }
+
+    internal static IEnumerable<FileComparison> CollectVisibleFiles(DirectoryComparison dir, bool showIdentical, bool hideApplied, IReadOnlyDictionary<object, SyncOutcome> outcomes)
+    {
+        foreach (var sub in dir.SubDirectories)
+        {
+            foreach (var file in CollectVisibleFiles(sub, showIdentical, hideApplied, outcomes))
+            {
+                yield return file;
+            }
+        }
+
+        foreach (var file in dir.Files)
+        {
+            if (!showIdentical && file.Status == ComparisonStatus.Identical)
+            {
+                continue;
+            }
+
+            if (hideApplied && outcomes.GetValueOrDefault(file) == SyncOutcome.Applied)
+            {
+                continue;
+            }
+
+            yield return file;
+        }
     }
 
     private static void ApplyActionRecursive(DirectoryComparison dir, SyncAction action)
@@ -889,6 +948,44 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
     }
 
+    partial void OnFlatViewChanged(bool value)
+    {
+        Persist(SettingsKeys.SyncFlatView, value ? "true" : "false");
+
+        if (_result is not null)
+        {
+            RebuildRows();
+        }
+    }
+
+    partial void OnFlatSortChanged(SyncFlatSortField value)
+    {
+        Persist(SettingsKeys.SyncFlatSort, value.ToString());
+
+        if (_result is not null && FlatView)
+        {
+            RebuildRows();
+        }
+    }
+
+    partial void OnFlatSortDescendingChanged(bool value)
+    {
+        Persist(SettingsKeys.SyncFlatSortDesc, value ? "true" : "false");
+
+        if (_result is not null && FlatView)
+        {
+            RebuildRows();
+        }
+    }
+
+    partial void OnSearchTextChanged(string value)
+    {
+        if (_result is not null && FlatView)
+        {
+            RebuildRows();
+        }
+    }
+
     partial void OnLeftPathChanged(string value)
     {
         Persist(SettingsKeys.SyncLeft, value);
@@ -1019,7 +1116,27 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
 
         var buffer = new List<SyncNodeViewModel>();
-        FlattenDirectory(_result.Root, 0, buffer);
+
+        if (FlatView)
+        {
+            var files = CollectVisibleFiles(_result.Root, ShowIdentical, HideApplied, _outcomes);
+            var search = SearchText.Trim();
+
+            if (search.Length > 0)
+            {
+                files = files.Where(file => file.RelativePath.Contains(search, StringComparison.OrdinalIgnoreCase));
+            }
+
+            foreach (var file in SortFlatFiles(files, FlatSort, FlatSortDescending))
+            {
+                buffer.Add(new(file, 0, this, true) { Outcome = _outcomes.GetValueOrDefault(file) });
+            }
+        }
+        else
+        {
+            FlattenDirectory(_result.Root, 0, buffer);
+        }
+
         Rows.ReplaceAll(buffer);
     }
 
@@ -1147,6 +1264,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         BlankAbsent = _settings.GetBool(SettingsKeys.SyncBlankAbsent);
         Verify = _settings.GetBool(SettingsKeys.SyncVerify, AppDefaults.SyncVerifyDefault);
         HideApplied = _settings.GetBool(SettingsKeys.SyncHideApplied);
+        FlatView = _settings.GetBool(SettingsKeys.SyncFlatView);
+        FlatSort = _settings.GetEnum(SettingsKeys.SyncFlatSort, AppDefaults.SyncFlatSortDefault);
+        FlatSortDescending = _settings.GetBool(SettingsKeys.SyncFlatSortDesc);
 
         _suppressPersist = false;
     }
