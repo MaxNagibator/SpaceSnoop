@@ -3,7 +3,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO.Compression;
 
-namespace SpaceSnoop.Wpf.ViewModels;
+namespace SpaceSnoop.Wpf.ViewModels.Settings;
 
 public sealed record EnumOption<T>(T Value, string Label) where T : struct, Enum
 {

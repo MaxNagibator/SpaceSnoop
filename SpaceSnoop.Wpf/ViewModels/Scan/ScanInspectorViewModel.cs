@@ -1,7 +1,7 @@
 ﻿using System.Globalization;
 using System.Text;
 
-namespace SpaceSnoop.Wpf.ViewModels;
+namespace SpaceSnoop.Wpf.ViewModels.Scan;
 
 public sealed partial class ScanInspectorViewModel : ObservableObject
 {

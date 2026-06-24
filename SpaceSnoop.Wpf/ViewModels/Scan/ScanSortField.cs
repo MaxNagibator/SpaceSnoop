@@ -1,4 +1,4 @@
-﻿namespace SpaceSnoop.Wpf.ViewModels;
+﻿namespace SpaceSnoop.Wpf.ViewModels.Scan;
 
 /// <summary>Поле, по которому сортируется дерево сканирования.</summary>
 public enum ScanSortField

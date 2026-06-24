@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace SpaceSnoop.Wpf.ViewModels;
+namespace SpaceSnoop.Wpf.ViewModels.About;
 
 public sealed partial class AboutViewModel(ErrorReportService errorReports, ILogger<AboutViewModel> logger)
     : ObservableObject, IPageHeader

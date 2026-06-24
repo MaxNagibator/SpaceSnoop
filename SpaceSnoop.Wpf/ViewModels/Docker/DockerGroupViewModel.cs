@@ -1,7 +1,7 @@
 ﻿using MahApps.Metro.IconPacks;
 using System.Collections.ObjectModel;
 
-namespace SpaceSnoop.Wpf.ViewModels;
+namespace SpaceSnoop.Wpf.ViewModels.Docker;
 
 public sealed partial class DockerGroupViewModel : ObservableObject
 {

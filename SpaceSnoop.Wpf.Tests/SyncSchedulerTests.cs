@@ -1,6 +1,6 @@
 ﻿using SpaceSnoop.Core.Domain;
 using SpaceSnoop.Wpf.Bootstrap;
-using SpaceSnoop.Wpf.ViewModels;
+using SpaceSnoop.Wpf.ViewModels.Schedule;
 
 namespace SpaceSnoop.Wpf.Tests;
 

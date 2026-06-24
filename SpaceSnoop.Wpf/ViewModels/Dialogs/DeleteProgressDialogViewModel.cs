@@ -3,7 +3,7 @@ using Microsoft.VisualBasic.FileIO;
 using System.Collections.ObjectModel;
 using System.IO;
 
-namespace SpaceSnoop.Wpf.ViewModels;
+namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
 
 public sealed partial class DeleteProgressDialogViewModel : ObservableObject, IDialogViewModel
 {

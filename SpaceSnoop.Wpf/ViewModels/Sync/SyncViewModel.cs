@@ -6,7 +6,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows.Input;
 
-namespace SpaceSnoop.Wpf.ViewModels;
+namespace SpaceSnoop.Wpf.ViewModels.Sync;
 
 public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPageStatus
 {

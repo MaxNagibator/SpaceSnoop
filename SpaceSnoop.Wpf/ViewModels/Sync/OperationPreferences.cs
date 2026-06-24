@@ -1,6 +1,6 @@
 ﻿using System.IO.Compression;
 
-namespace SpaceSnoop.Wpf.ViewModels;
+namespace SpaceSnoop.Wpf.ViewModels.Sync;
 
 public sealed partial class OperationPreferences : ObservableObject
 {

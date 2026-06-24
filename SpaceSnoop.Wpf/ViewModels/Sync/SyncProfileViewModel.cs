@@ -3,7 +3,7 @@ using Microsoft.Win32;
 using System.Diagnostics;
 using System.IO;
 
-namespace SpaceSnoop.Wpf.ViewModels;
+namespace SpaceSnoop.Wpf.ViewModels.Sync;
 
 public sealed partial class SyncProfileViewModel : ObservableObject
 {

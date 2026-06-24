@@ -1,6 +1,6 @@
 ﻿using MahApps.Metro.IconPacks;
 
-namespace SpaceSnoop.Wpf.ViewModels;
+namespace SpaceSnoop.Wpf.ViewModels.Sync;
 
 public sealed partial class SyncNodeViewModel : ObservableObject
 {

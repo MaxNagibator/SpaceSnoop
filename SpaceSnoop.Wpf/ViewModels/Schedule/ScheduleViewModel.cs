@@ -3,7 +3,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows.Input;
 
-namespace SpaceSnoop.Wpf.ViewModels;
+namespace SpaceSnoop.Wpf.ViewModels.Schedule;
 
 public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, IPageRefresh
 {

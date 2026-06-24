@@ -5,7 +5,7 @@ using System.IO;
 using System.Net.Http;
 using System.Text.Json;
 
-namespace SpaceSnoop.Wpf.ViewModels;
+namespace SpaceSnoop.Wpf.ViewModels.Settings;
 
 public sealed partial class AppUpdateViewModel : ObservableObject
 {

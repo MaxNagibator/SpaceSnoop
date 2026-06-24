@@ -1,4 +1,4 @@
-﻿namespace SpaceSnoop.Wpf.ViewModels;
+﻿namespace SpaceSnoop.Wpf.ViewModels.Scan;
 
 public sealed class ScanSortOption(string name, ScanSortField field)
 {

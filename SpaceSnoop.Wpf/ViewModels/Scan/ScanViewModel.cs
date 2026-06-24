@@ -7,7 +7,7 @@ using System.IO;
 using System.Windows.Input;
 using System.Windows.Threading;
 
-namespace SpaceSnoop.Wpf.ViewModels;
+namespace SpaceSnoop.Wpf.ViewModels.Scan;
 
 public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPageStatus
 {

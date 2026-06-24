@@ -3,7 +3,7 @@ using MahApps.Metro.IconPacks;
 using SpaceSnoop.Wpf.Diff;
 using System.Collections.ObjectModel;
 
-namespace SpaceSnoop.Wpf.ViewModels;
+namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
 
 public sealed partial class FileDiffDialogViewModel : ObservableObject, IDialogViewModel
 {

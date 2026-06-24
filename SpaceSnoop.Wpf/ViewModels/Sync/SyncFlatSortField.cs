@@ -1,4 +1,4 @@
-﻿namespace SpaceSnoop.Wpf.ViewModels;
+﻿namespace SpaceSnoop.Wpf.ViewModels.Sync;
 
 public enum SyncFlatSortField
 {

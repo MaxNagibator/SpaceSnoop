@@ -1,5 +1,5 @@
 ﻿using SpaceSnoop.Core.Domain;
-using SpaceSnoop.Wpf.ViewModels;
+using SpaceSnoop.Wpf.ViewModels.Scan;
 
 namespace SpaceSnoop.Wpf.Tests;
 

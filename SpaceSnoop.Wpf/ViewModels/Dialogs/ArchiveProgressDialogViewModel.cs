@@ -1,7 +1,7 @@
 ﻿using KeepShell.Services.Modal;
 using System.IO;
 
-namespace SpaceSnoop.Wpf.ViewModels;
+namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
 
 public sealed partial class ArchiveProgressDialogViewModel : ObservableObject, IDialogViewModel
 {

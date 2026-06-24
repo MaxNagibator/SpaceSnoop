@@ -1,4 +1,5 @@
-﻿using SpaceSnoop.Wpf.ViewModels;
+﻿using SpaceSnoop.Wpf.ViewModels.Dialogs;
+using SpaceSnoop.Wpf.ViewModels.Sync;
 
 namespace SpaceSnoop.Wpf.Tests;
 

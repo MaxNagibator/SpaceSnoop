@@ -1,4 +1,4 @@
-﻿namespace SpaceSnoop.Wpf.ViewModels;
+﻿namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
 
 /// <summary>Состояние строки в диалоге прогресса удаления.</summary>
 public enum DeleteRowState

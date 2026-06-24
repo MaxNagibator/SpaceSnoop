@@ -1,7 +1,7 @@
-using System.IO;
+﻿using System.IO;
 using System.Security;
 
-namespace SpaceSnoop.Wpf.ViewModels;
+namespace SpaceSnoop.Wpf.ViewModels.Scan;
 
 public sealed partial class DriveItem(string path) : ObservableObject
 {

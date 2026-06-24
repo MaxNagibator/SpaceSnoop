@@ -1,6 +1,6 @@
 ﻿using KeepShell.Services.Modal;
 
-namespace SpaceSnoop.Wpf.ViewModels;
+namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
 
 public enum GitFolderPromptChoice
 {

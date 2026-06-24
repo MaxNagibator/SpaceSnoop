@@ -1,4 +1,4 @@
-﻿namespace SpaceSnoop.Wpf.ViewModels;
+﻿namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
 
 public sealed partial class DeleteRowViewModel(SpaceBase space) : ObservableObject
 {
