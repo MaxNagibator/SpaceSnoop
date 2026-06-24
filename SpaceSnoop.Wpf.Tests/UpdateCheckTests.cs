@@ -1,4 +1,5 @@
 ﻿using SpaceSnoop.Wpf.Bootstrap;
+using SpaceSnoop.Wpf.ViewModels.Settings;
 
 namespace SpaceSnoop.Wpf.Tests;
 
@@ -53,7 +54,42 @@ public class UpdateCheckTests
     {
         string[] assets = ["SpaceSnoop-Classic-v2.9.0.exe", "SpaceSnoop-Classic-v2.9.0-portable.zip"];
 
-        Assert.That(UpdateCheck.PickAsset(assets, "SpaceSnoop", false), Is.Null);
-        Assert.That(UpdateCheck.PickAsset(assets, "SpaceSnoop", true), Is.Null);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(UpdateCheck.PickAsset(assets, "SpaceSnoop", false), Is.Null);
+            Assert.That(UpdateCheck.PickAsset(assets, "SpaceSnoop", true), Is.Null);
+        }
+    }
+
+    [Test]
+    public void История_изменений_берёт_только_секцию_изменений_из_тела_релиза()
+    {
+        var body = """
+                   ## Скачать
+
+                   EXE ZIP Portable
+
+                   ## Статистика
+
+                   12 скачиваний
+
+                   ## Изменения
+
+                   - Добавлена карта
+                     Карта теперь рисуется пиксельным буфером.
+                   - Исправлена синхронизация
+                   """;
+
+        Assert.That(AppUpdateViewModel.ExtractChanges(body), Is.EqualTo("- Добавлена карта\r\n  Карта теперь рисуется пиксельным буфером.\r\n- Исправлена синхронизация"));
+        var items = AppUpdateViewModel.ExtractChangeItems(body);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(items, Has.Count.EqualTo(2));
+            Assert.That(items[0].Summary, Is.EqualTo("Добавлена карта"));
+            Assert.That(items[0].Details, Is.EqualTo(["Карта теперь рисуется пиксельным буфером."]));
+            Assert.That(items[1].Summary, Is.EqualTo("Исправлена синхронизация"));
+            Assert.That(items[1].Details, Is.Empty);
+        }
     }
 }

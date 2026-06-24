@@ -5,7 +5,7 @@ using System.Text;
 
 namespace SpaceSnoop.Wpf.ViewModels.About;
 
-public sealed partial class AboutViewModel(ErrorReportService errorReports, ILogger<AboutViewModel> logger)
+public sealed partial class AboutViewModel(ErrorReportService errorReports, AppUpdateViewModel updater, ILogger<AboutViewModel> logger)
     : ObservableObject, IPageHeader
 {
     public string AppName => AppInfo.Name;
@@ -38,6 +38,8 @@ public sealed partial class AboutViewModel(ErrorReportService errorReports, ILog
 
     public string PageDescription => "Что за шнырь, что у него под капотом и куда бежать, если что-то сломалось.";
 
+    public AppUpdateViewModel Updater => updater;
+
     [RelayCommand]
     private void OpenRepository()
     {
@@ -48,6 +50,15 @@ public sealed partial class AboutViewModel(ErrorReportService errorReports, ILog
     private void OpenReleases()
     {
         OpenUrl(AppInfo.ReleasesUrl);
+    }
+
+    [RelayCommand]
+    private void OpenReleaseUrl(string? url)
+    {
+        if (!string.IsNullOrWhiteSpace(url))
+        {
+            OpenUrl(url);
+        }
     }
 
     [RelayCommand]

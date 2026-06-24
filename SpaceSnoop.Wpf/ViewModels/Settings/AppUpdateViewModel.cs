@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace SpaceSnoop.Wpf.ViewModels.Settings;
 
@@ -47,6 +48,21 @@ public sealed partial class AppUpdateViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasReleaseNotes))]
     private string _releaseNotes = string.Empty;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasChangelog))]
+    private string _changelog = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasChangelog))]
+    private IReadOnlyList<ReleaseNoteViewModel> _changelogEntries = [];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasChangelogStatus))]
+    private string _changelogStatus = string.Empty;
+
+    [ObservableProperty]
+    private bool _isChangelogLoading;
+
     public AppUpdateViewModel(UpdatePreferences preferences, ISettingsStore settings, IDialogService dialogs, ILogger<AppUpdateViewModel> logger)
     {
         _preferences = preferences;
@@ -64,6 +80,10 @@ public sealed partial class AppUpdateViewModel : ObservableObject
 
     public bool HasReleaseNotes => !string.IsNullOrWhiteSpace(ReleaseNotes);
 
+    public bool HasChangelog => ChangelogEntries.Count > 0 || !string.IsNullOrWhiteSpace(Changelog);
+
+    public bool HasChangelogStatus => !string.IsNullOrWhiteSpace(ChangelogStatus);
+
     public void Start()
     {
         if (_started)
@@ -77,6 +97,111 @@ public sealed partial class AppUpdateViewModel : ObservableObject
         {
             _ = CheckAsync();
         }
+    }
+
+    [RelayCommand]
+    public async Task LoadChangelog()
+    {
+        if (HasChangelog || IsChangelogLoading)
+        {
+            return;
+        }
+
+        var repo = string.IsNullOrWhiteSpace(_preferences.Repository) ? AppInfo.RepoSlug : _preferences.Repository.Trim();
+
+        try
+        {
+            IsChangelogLoading = true;
+            ChangelogStatus = "Загружаем историю изменений…";
+
+            using var json = await GetReleasesAsync(repo);
+            var releases = json.RootElement;
+
+            ChangelogEntries = releases.ValueKind == JsonValueKind.Array ? BuildChangelogEntries(releases) : [];
+            Changelog = releases.ValueKind == JsonValueKind.Array ? BuildChangelog(releases) : string.Empty;
+            ChangelogStatus = HasChangelog ? string.Empty : "Релизы не найдены";
+        }
+        catch (Exception ex)
+        {
+            ChangelogStatus = "Не удалось загрузить историю изменений";
+            _logger.UpdateCheckFailed(ex);
+        }
+        finally
+        {
+            IsChangelogLoading = false;
+        }
+    }
+
+    internal static string ExtractChanges(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return string.Empty;
+        }
+
+        var text = body.Replace("\r\n", "\n", StringComparison.Ordinal);
+        const string marker = "## Изменения";
+        var index = text.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+
+        if (index >= 0)
+        {
+            text = text[(index + marker.Length)..].Trim();
+            var next = text.IndexOf("\n## ", StringComparison.Ordinal);
+
+            if (next >= 0)
+            {
+                text = text[..next].Trim();
+            }
+        }
+
+        return text.Replace("\n", Environment.NewLine, StringComparison.Ordinal).Trim();
+    }
+
+    internal static IReadOnlyList<ReleaseChangeViewModel> ExtractChangeItems(string? body)
+    {
+        var changes = ExtractChanges(body);
+
+        if (string.IsNullOrWhiteSpace(changes))
+        {
+            return [];
+        }
+
+        var items = new List<ReleaseChangeViewModel>();
+        List<string>? details = null;
+
+        foreach (var line in changes.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (line.StartsWith("**Полный список:**", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (line.StartsWith("- ", StringComparison.Ordinal) || line.StartsWith("* ", StringComparison.Ordinal))
+            {
+                details = [];
+                items.Add(new(line[2..].Trim(), details));
+                continue;
+            }
+
+            var detail = line.Trim();
+
+            if (detail.Length == 0)
+            {
+                continue;
+            }
+
+            if (details is null)
+            {
+                details = [];
+                items.Add(new(detail, details));
+            }
+            else
+            {
+                details.Add(detail);
+            }
+        }
+
+        return items;
     }
 
     private void OnPreferencesChanged(object? sender, PropertyChangedEventArgs e)
@@ -146,6 +271,68 @@ public sealed partial class AppUpdateViewModel : ObservableObject
         return string.Join($"{Environment.NewLine}{Environment.NewLine}", notes);
     }
 
+    private static string BuildChangelog(JsonElement releases)
+    {
+        return string.Join($"{Environment.NewLine}{Environment.NewLine}", BuildChangelogEntries(releases)
+            .Select(static entry =>
+                $"## {entry.Title} · {entry.PublishedDate}{Environment.NewLine}{string.Join(Environment.NewLine, entry.Changes.Select(static change => FormatChange(change)))}"));
+    }
+
+    private static string FormatChange(ReleaseChangeViewModel change)
+    {
+        var lines = new List<string> { $"- {change.Summary}" };
+        lines.AddRange(change.Details.Select(static detail => $"  {detail}"));
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    private static IReadOnlyList<ReleaseNoteViewModel> BuildChangelogEntries(JsonElement releases)
+    {
+        var entries = new List<ReleaseNoteViewModel>();
+
+        foreach (var release in releases.EnumerateArray())
+        {
+            var tag = release.TryGetProperty("tag_name", out var tagProperty) ? tagProperty.GetString() : null;
+            var name = release.TryGetProperty("name", out var nameProperty) ? nameProperty.GetString() : null;
+            var date = release.TryGetProperty("published_at", out var dateProperty) ? dateProperty.GetString() : null;
+            var body = release.TryGetProperty("body", out var bodyProperty) ? bodyProperty.GetString() : null;
+            var url = release.TryGetProperty("html_url", out var urlProperty) ? urlProperty.GetString() : null;
+            var title = string.IsNullOrWhiteSpace(name) ? tag : name;
+
+            if (string.IsNullOrWhiteSpace(title))
+            {
+                continue;
+            }
+
+            var publishedDate = string.IsNullOrWhiteSpace(date) || date.Length < 10 ? "без даты" : date[..10];
+            var changes = ExtractChangeItems(body);
+            var compareUrl = ExtractCompareUrl(body);
+
+            entries.Add(new(title, publishedDate, changes.Count == 0 ? [new("Изменения не описаны.", [])] : changes, compareUrl ?? url));
+        }
+
+        return entries;
+    }
+
+    private static string? ExtractCompareUrl(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return null;
+        }
+
+        var match = Regex.Match(body, @"https://\S+/compare/\S+");
+        return match.Success ? match.Value.TrimEnd('.') : null;
+    }
+
+    private static async Task<JsonDocument> GetReleasesAsync(string repo)
+    {
+        using var response = await Http.GetAsync($"https://api.github.com/repos/{repo}/releases?per_page=100");
+        response.EnsureSuccessStatusCode();
+
+        await using var stream = await response.Content.ReadAsStreamAsync();
+        return await JsonDocument.ParseAsync(stream);
+    }
+
     private async Task CheckAsync(bool announce = false)
     {
         if (_checking)
@@ -161,11 +348,7 @@ public sealed partial class AppUpdateViewModel : ObservableObject
 
         try
         {
-            using var response = await Http.GetAsync($"https://api.github.com/repos/{repo}/releases");
-            response.EnsureSuccessStatusCode();
-
-            await using var stream = await response.Content.ReadAsStreamAsync();
-            using var json = await JsonDocument.ParseAsync(stream);
+            using var json = await GetReleasesAsync(repo);
             var releases = json.RootElement;
 
             if (releases.ValueKind != JsonValueKind.Array || releases.GetArrayLength() == 0)
@@ -178,6 +361,9 @@ public sealed partial class AppUpdateViewModel : ObservableObject
             _latestTag = latest.TryGetProperty("tag_name", out var tag) ? tag.GetString() : null;
             _releaseUrl = latest.TryGetProperty("html_url", out var url) ? url.GetString() : null;
             ReleaseNotes = BuildReleaseNotes(releases);
+            ChangelogEntries = BuildChangelogEntries(releases);
+            Changelog = BuildChangelog(releases);
+            ChangelogStatus = HasChangelog ? string.Empty : "Релизы не найдены";
 
             if (!UpdateCheck.IsNewer(_latestTag, AppInfo.Version))
             {
@@ -421,3 +607,7 @@ public sealed partial class AppUpdateViewModel : ObservableObject
         }
     }
 }
+
+public sealed record ReleaseNoteViewModel(string Title, string PublishedDate, IReadOnlyList<ReleaseChangeViewModel> Changes, string? CompareUrl);
+
+public sealed record ReleaseChangeViewModel(string Summary, IReadOnlyList<string> Details);
