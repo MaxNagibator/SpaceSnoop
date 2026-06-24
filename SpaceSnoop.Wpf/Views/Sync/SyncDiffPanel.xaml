@@ -850,7 +850,7 @@
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="3*" />
                     </Grid.ColumnDefinitions>
 
                     <TextBlock Grid.Column="0"
@@ -861,15 +861,15 @@
                                VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis" />
 
-                    <StackPanel Grid.Column="1"
-                                Orientation="Horizontal"
-                                VerticalAlignment="Center"
-                                Margin="12,0,0,0">
+                    <WrapPanel Grid.Column="1"
+                               HorizontalAlignment="Right"
+                               VerticalAlignment="Center"
+                               Margin="12,0,0,-4">
                         <Button Style="{StaticResource Button.Secondary}"
                                 Command="{Binding ExpandAllCommand}"
                                 MinWidth="0"
                                 Padding="9,0"
-                                Margin="0,0,8,0"
+                                Margin="0,0,8,4"
                                 ToolTip="Развернуть все каталоги в дереве"
                                 AutomationProperties.Name="Развернуть все каталоги"
                                 Visibility="{Binding FlatView, Converter={StaticResource InverseBoolToVisibility}}">
@@ -881,7 +881,7 @@
                                 Command="{Binding CollapseAllCommand}"
                                 MinWidth="0"
                                 Padding="9,0"
-                                Margin="0,0,8,0"
+                                Margin="0,0,8,4"
                                 ToolTip="Свернуть все каталоги в дереве"
                                 AutomationProperties.Name="Свернуть все каталоги"
                                 Visibility="{Binding FlatView, Converter={StaticResource InverseBoolToVisibility}}">
@@ -893,7 +893,7 @@
                                       IsChecked="{Binding FlatView}"
                                       MinWidth="0"
                                       Padding="9,0"
-                                      Margin="0,0,8,0"
+                                      Margin="0,0,8,4"
                                       ToolTip="Плоский список различающихся файлов вместо дерева каталогов"
                                       AutomationProperties.Name="Плоский список файлов вместо дерева">
                             <StackPanel Orientation="Horizontal">
@@ -910,7 +910,7 @@
                                       IsChecked="{Binding ShowIdentical}"
                                       MinWidth="0"
                                       Padding="9,0"
-                                      Margin="0,0,8,0"
+                                      Margin="0,0,8,4"
                                       ToolTip="Показывать одинаковые файлы"
                                       AutomationProperties.Name="Показывать одинаковые файлы">
                             <StackPanel Orientation="Horizontal">
@@ -927,7 +927,7 @@
                                       IsChecked="{Binding ShowSizes}"
                                       MinWidth="0"
                                       Padding="9,0"
-                                      Margin="0,0,8,0"
+                                      Margin="0,0,8,4"
                                       ToolTip="Показывать размеры файлов"
                                       AutomationProperties.Name="Показывать размеры файлов">
                             <StackPanel Orientation="Horizontal">
@@ -944,7 +944,7 @@
                                       IsChecked="{Binding ShowModified}"
                                       MinWidth="0"
                                       Padding="9,0"
-                                      Margin="0,0,8,0"
+                                      Margin="0,0,8,4"
                                       ToolTip="Показывать время последнего изменения файла"
                                       AutomationProperties.Name="Показывать время последнего изменения файла">
                             <StackPanel Orientation="Horizontal">
@@ -961,6 +961,7 @@
                                       IsChecked="{Binding BlankAbsent}"
                                       MinWidth="0"
                                       Padding="9,0"
+                                      Margin="0,0,0,4"
                                       ToolTip="Отсутствующую сторону показывать пустой, а не зачёркнутым именем"
                                       AutomationProperties.Name="Отсутствующую сторону показывать пустой">
                             <StackPanel Orientation="Horizontal">
@@ -977,7 +978,7 @@
                                       IsChecked="{Binding ShowApplied}"
                                       MinWidth="0"
                                       Padding="9,0"
-                                      Margin="8,0,0,0"
+                                      Margin="8,0,0,4"
                                       ToolTip="Показывать строки, успешно применённые при последней синхронизации"
                                       AutomationProperties.Name="Показывать успешно применённые строки">
                             <StackPanel Orientation="Horizontal">
@@ -990,7 +991,7 @@
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </ToggleButton>
-                    </StackPanel>
+                    </WrapPanel>
                 </Grid>
             </Border>
         </Grid>
