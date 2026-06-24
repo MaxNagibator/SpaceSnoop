@@ -182,6 +182,32 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _ => "Зеркало: удалять справа то, чего нет слева (в корзину).",
     };
 
+    public bool MirrorDeletes => Mirror && MirrorApplicable;
+
+    public bool ExclusionsEmpty => string.IsNullOrWhiteSpace(Exclusions);
+
+    public bool SearchTextEmpty => string.IsNullOrWhiteSpace(SearchText);
+
+    public string CompositionHint =>
+        $"Файлы: только слева {LeftOnlyCount:N0}, только справа {RightOnlyCount:N0}, изменены {ModifiedCount:N0}, конфликты {ConflictCount:N0}, одинаковые {IdenticalCount:N0}.{Environment.NewLine}"
+        + $"Каталоги: только слева {LeftOnlyDirCount:N0}, только справа {RightOnlyDirCount:N0}, изменены {ModifiedDirCount:N0}, одинаковые {IdenticalDirCount:N0}.";
+
+    public string LeftOnlyHint => $"Файлов: {LeftOnlyCount:N0}; каталогов: {LeftOnlyDirCount:N0}";
+
+    public string RightOnlyHint => $"Файлов: {RightOnlyCount:N0}; каталогов: {RightOnlyDirCount:N0}";
+
+    public string ModifiedHint => $"Файлов: {ModifiedCount:N0}; каталогов: {ModifiedDirCount:N0}";
+
+    public string ConflictHint => $"Файлов: {ConflictCount:N0}";
+
+    public string IdenticalHint => $"Файлов: {IdenticalCount:N0}; каталогов: {IdenticalDirCount:N0}";
+
+    public bool ShowApplied
+    {
+        get => !HideApplied;
+        set => HideApplied = !value;
+    }
+
     public string PageTitle => "Синхронизация";
 
     public string PageDescription => "Сравнение и синхронизация двух каталогов.";
@@ -207,6 +233,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     public ICommand CancelCommand => CancelOperationCommand;
 
     private SyncMode CurrentMode => ModeOrder[Math.Clamp(SelectedModeIndex, 0, ModeOrder.Length - 1)];
+
+    private PlannedActions CurrentPlan => _result?.CountPlannedActions() ?? new(0, 0, 0, 0, 0);
 
     public void NotifyActionsChanged()
     {
@@ -775,46 +803,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             return;
         }
 
-        var planned = _result.CountPlannedActions();
-        var direction = CurrentMode switch
-        {
-            SyncMode.RightToLeft => "справа налево",
-            SyncMode.Bidirectional => "в обе стороны",
-            _ => "слева направо",
-        };
-
-        var lines = new List<string> { $"Направление: {direction}.", string.Empty };
-
-        if (planned.Copies > 0)
-        {
-            lines.Add($"Скопировать файлов: {planned.Copies:N0}");
-
-            if (planned.ModifiedCopies > 0)
-            {
-                lines.Add($"    – новых: {planned.NewCopies:N0}");
-                lines.Add($"    – изменённых: {planned.ModifiedCopies:N0}");
-            }
-        }
-
-        if (planned.DirCopies > 0)
-        {
-            lines.Add($"Создать каталогов: {planned.DirCopies:N0}");
-        }
-
-        if (planned.Deletes > 0)
-        {
-            lines.Add($"Удалить файлов в корзину: {planned.Deletes:N0}");
-        }
-
-        if (planned.DirDeletes > 0)
-        {
-            lines.Add($"Удалить каталогов в корзину: {planned.DirDeletes:N0}");
-        }
-
-        if (planned.Total == 0)
-        {
-            lines.Add("Изменений нет.");
-        }
+        var planned = CurrentPlan;
+        var lines = BuildPlanLines(planned, true);
 
         if (planned.ModifiedCopies > 0)
         {
@@ -972,6 +962,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         OnPropertyChanged(nameof(MirrorApplicable));
         OnPropertyChanged(nameof(IsBidirectional));
         OnPropertyChanged(nameof(MirrorHint));
+        OnPropertyChanged(nameof(MirrorDeletes));
         ReapplyMode();
     }
 
@@ -979,6 +970,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     {
         Persist(SettingsKeys.SyncMirror, value ? "true" : "false");
         OnPropertyChanged(nameof(MirrorHint));
+        OnPropertyChanged(nameof(MirrorDeletes));
         ReapplyMode();
     }
 
@@ -1031,6 +1023,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     partial void OnHideAppliedChanged(bool value)
     {
+        OnPropertyChanged(nameof(ShowApplied));
         Persist(SettingsKeys.SyncHideApplied, value ? "true" : "false");
 
         if (_result is not null)
@@ -1071,6 +1064,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     partial void OnSearchTextChanged(string value)
     {
+        OnPropertyChanged(nameof(SearchTextEmpty));
+
         if (_result is not null && FlatView)
         {
             RebuildRows();
@@ -1091,6 +1086,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     partial void OnExclusionsChanged(string value)
     {
+        OnPropertyChanged(nameof(ExclusionsEmpty));
         Persist(SettingsKeys.SyncExclusions, value);
     }
 
@@ -1336,6 +1332,60 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         HashCommand.NotifyCanExecuteChanged();
     }
 
+    private string DirectionText()
+    {
+        return CurrentMode switch
+        {
+            SyncMode.RightToLeft => "справа налево",
+            SyncMode.Bidirectional => "в обе стороны",
+            _ => "слева направо",
+        };
+    }
+
+    private List<string> BuildPlanLines(PlannedActions planned, bool includeDirection)
+    {
+        var lines = new List<string>();
+
+        if (includeDirection)
+        {
+            lines.Add($"Направление: {DirectionText()}.");
+            lines.Add(string.Empty);
+        }
+
+        if (planned.Copies > 0)
+        {
+            lines.Add($"Скопировать файлов: {planned.Copies:N0}");
+
+            if (planned.ModifiedCopies > 0)
+            {
+                lines.Add($"    – новых: {planned.NewCopies:N0}");
+                lines.Add($"    – изменённых: {planned.ModifiedCopies:N0}");
+            }
+        }
+
+        if (planned.DirCopies > 0)
+        {
+            lines.Add($"Создать каталогов: {planned.DirCopies:N0}");
+        }
+
+        if (planned.Deletes > 0)
+        {
+            lines.Add($"Удалить файлов в корзину: {planned.Deletes:N0}");
+        }
+
+        if (planned.DirDeletes > 0)
+        {
+            lines.Add($"Удалить каталогов в корзину: {planned.DirDeletes:N0}");
+        }
+
+        if (planned.Total == 0)
+        {
+            lines.Add("Изменений нет.");
+        }
+
+        return lines;
+    }
+
     private double Fraction(ComparisonStatus status)
     {
         return _total > 0 ? (double)_stats[status] / _total : 0;
@@ -1359,6 +1409,12 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         OnPropertyChanged(nameof(ModifiedFraction));
         OnPropertyChanged(nameof(ConflictFraction));
         OnPropertyChanged(nameof(HasConflicts));
+        OnPropertyChanged(nameof(CompositionHint));
+        OnPropertyChanged(nameof(LeftOnlyHint));
+        OnPropertyChanged(nameof(RightOnlyHint));
+        OnPropertyChanged(nameof(ModifiedHint));
+        OnPropertyChanged(nameof(ConflictHint));
+        OnPropertyChanged(nameof(IdenticalHint));
     }
 
     private bool HasActionableChanges()

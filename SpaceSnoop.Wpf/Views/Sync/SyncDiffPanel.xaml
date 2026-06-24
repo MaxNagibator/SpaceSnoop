@@ -553,13 +553,20 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <TextBox Grid.Column="0"
-                         Width="240"
-                         HorizontalAlignment="Left"
-                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                         Style="{StaticResource TextBox.IconField}"
-                         Tag="{x:Static iconPacks:PackIconLucideKind.Search}"
-                         ToolTip="Фильтр списка по пути файла" />
+                <Grid Grid.Column="0"
+                      Width="240"
+                      HorizontalAlignment="Left">
+                    <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource TextBox.IconField}"
+                             Tag="{x:Static iconPacks:PackIconLucideKind.Search}"
+                             ToolTip="Фильтр списка по пути файла" />
+                    <TextBlock Text="Фильтр по пути"
+                               Margin="36,0,8,0"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource Fg.Muted}"
+                               IsHitTestVisible="False"
+                               Visibility="{Binding SearchTextEmpty, Converter={StaticResource BoolToVisibility}}" />
+                </Grid>
 
                 <ComboBox Grid.Column="1"
                           SelectedValuePath="Tag"
@@ -597,33 +604,58 @@
                   Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="56" />
+                    <ColumnDefinition Width="60" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
                 <Grid Grid.Column="0"
                       Margin="0,0,8,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
                     <TextBlock Text="ЛЕВАЯ"
                                Style="{StaticResource Caption}"
                                HorizontalAlignment="Left" />
-                    <TextBlock Text="РАЗМЕР"
+                    <TextBlock Grid.Column="1"
+                               Text="ДАТА"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,18,0"
+                               Visibility="{Binding ShowModified, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock Grid.Column="2"
+                               Text="РАЗМЕР"
                                Style="{StaticResource Caption}"
                                HorizontalAlignment="Right"
                                Visibility="{Binding ShowSizes, Converter={StaticResource BoolToVisibility}}" />
                 </Grid>
 
-                <TextBlock Grid.Column="1"
-                           Text="ДЕЙСТВИЕ"
-                           Style="{StaticResource Caption}"
-                           HorizontalAlignment="Center"
-                           ToolTip="Кружок по центру строки задаёт действие синхронизации – клик циклически переключает копирование / пропуск / удаление." />
+                <iconPacks:PackIconLucide Grid.Column="1"
+                                          Kind="{x:Static iconPacks:PackIconLucideKind.MousePointerClick}"
+                                          Width="14"
+                                          Height="14"
+                                          HorizontalAlignment="Center"
+                                          Foreground="{DynamicResource Fg.Muted}"
+                                          ToolTip="Кружок по центру строки задаёт действие синхронизации – клик циклически переключает копирование / пропуск / удаление."
+                                          AutomationProperties.Name="Действие синхронизации" />
 
                 <Grid Grid.Column="2"
                       Margin="8,0,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
                     <TextBlock Text="ПРАВАЯ"
                                Style="{StaticResource Caption}"
                                HorizontalAlignment="Left" />
-                    <TextBlock Text="РАЗМЕР"
+                    <TextBlock Grid.Column="1"
+                               Text="ДАТА"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,18,0"
+                               Visibility="{Binding ShowModified, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock Grid.Column="2"
+                               Text="РАЗМЕР"
                                Style="{StaticResource Caption}"
                                HorizontalAlignment="Right"
                                Visibility="{Binding ShowSizes, Converter={StaticResource BoolToVisibility}}" />
@@ -655,7 +687,7 @@
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="56" />
+                                <ColumnDefinition Width="60" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
 
@@ -870,7 +902,7 @@
                                                           Height="14"
                                                           VerticalAlignment="Center"
                                                           Margin="0,0,6,0" />
-                                <TextBlock Text="Список"
+                                <TextBlock Text="Файлы"
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </ToggleButton>
@@ -904,7 +936,7 @@
                                                           Height="14"
                                                           VerticalAlignment="Center"
                                                           Margin="0,0,6,0" />
-                                <TextBlock Text="Размеры"
+                                <TextBlock Text="Размер"
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </ToggleButton>
@@ -921,7 +953,7 @@
                                                           Height="14"
                                                           VerticalAlignment="Center"
                                                           Margin="0,0,6,0" />
-                                <TextBlock Text="Изменён"
+                                <TextBlock Text="Дата"
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </ToggleButton>
@@ -937,24 +969,24 @@
                                                           Height="14"
                                                           VerticalAlignment="Center"
                                                           Margin="0,0,6,0" />
-                                <TextBlock Text="Пусто"
+                                <TextBlock Text="Пустота"
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </ToggleButton>
                         <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
-                                      IsChecked="{Binding HideApplied}"
+                                      IsChecked="{Binding ShowApplied}"
                                       MinWidth="0"
                                       Padding="9,0"
                                       Margin="8,0,0,0"
-                                      ToolTip="Скрыть строки, успешно применённые при последней синхронизации"
-                                      AutomationProperties.Name="Скрыть успешно применённые строки">
+                                      ToolTip="Показывать строки, успешно применённые при последней синхронизации"
+                                      AutomationProperties.Name="Показывать успешно применённые строки">
                             <StackPanel Orientation="Horizontal">
                                 <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.CheckCheck}"
                                                           Width="14"
                                                           Height="14"
                                                           VerticalAlignment="Center"
                                                           Margin="0,0,6,0" />
-                                <TextBlock Text="Скрыть применённые"
+                                <TextBlock Text="Применённые"
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </ToggleButton>

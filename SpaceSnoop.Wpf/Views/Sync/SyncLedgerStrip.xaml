@@ -98,7 +98,8 @@
                        Margin="14,8,0,8">
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center"
-                            Margin="0,0,20,0">
+                            Margin="0,0,20,0"
+                            ToolTip="{Binding LeftOnlyHint}">
                     <Ellipse Width="8"
                              Height="8"
                              VerticalAlignment="Center"
@@ -135,7 +136,8 @@
 
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center"
-                            Margin="0,0,20,0">
+                            Margin="0,0,20,0"
+                            ToolTip="{Binding RightOnlyHint}">
                     <Ellipse Width="8"
                              Height="8"
                              VerticalAlignment="Center"
@@ -172,7 +174,8 @@
 
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center"
-                            Margin="0,0,20,0">
+                            Margin="0,0,20,0"
+                            ToolTip="{Binding ModifiedHint}">
                     <Ellipse Width="8"
                              Height="8"
                              VerticalAlignment="Center"
@@ -209,7 +212,8 @@
 
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center"
-                            Margin="0,0,20,0">
+                            Margin="0,0,20,0"
+                            ToolTip="{Binding ConflictHint}">
                     <Ellipse Width="8"
                              Height="8"
                              VerticalAlignment="Center"
@@ -235,7 +239,8 @@
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal"
-                            VerticalAlignment="Center">
+                            VerticalAlignment="Center"
+                            ToolTip="{Binding IdenticalHint}">
                     <Ellipse Width="8"
                              Height="8"
                              VerticalAlignment="Center"
@@ -275,7 +280,8 @@
             <StackPanel Grid.Column="2"
                         Orientation="Horizontal"
                         VerticalAlignment="Center"
-                        Margin="20,0,14,0">
+                        Margin="20,0,14,0"
+                        ToolTip="{Binding CompositionHint}">
                 <TextBlock Text="СОСТАВ"
                            Style="{StaticResource Caption}"
                            Margin="0,0,10,0" />
