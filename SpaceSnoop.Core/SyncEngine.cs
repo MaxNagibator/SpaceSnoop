@@ -3,7 +3,7 @@ using Microsoft.VisualBasic.FileIO;
 
 namespace SpaceSnoop.Core;
 
-public sealed class SyncEngine(ILogger<SyncEngine> logger)
+public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = true)
 {
     public SyncReport Execute(ComparisonResult comparisonResult, CancellationToken cancel, IProgress<OperationProgress>? progress = null)
     {
@@ -22,42 +22,21 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger)
         };
     }
 
-    private static void ExecuteFileAction(FileComparison file, string leftBase, string rightBase)
+    private static void CopyAtomic(string source, string destination)
     {
-        var leftPath = Path.Combine(leftBase, file.RelativePath);
-        var rightPath = Path.Combine(rightBase, file.RelativePath);
+        var temp = destination + ".sstmp";
 
-        switch (file.Action)
+        try
         {
-            case SyncAction.CopyToRight:
-                EnsureDirectoryExists(rightPath);
-                ClearReadOnly(rightPath);
-                File.Copy(leftPath, rightPath, true);
-                break;
-
-            case SyncAction.CopyToLeft:
-                EnsureDirectoryExists(leftPath);
-                ClearReadOnly(leftPath);
-                File.Copy(rightPath, leftPath, true);
-                break;
-
-            case SyncAction.DeleteLeft:
-                if (File.Exists(leftPath))
-                {
-                    ClearReadOnly(leftPath);
-                    FileSystem.DeleteFile(leftPath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
-                }
-
-                break;
-
-            case SyncAction.DeleteRight:
-                if (File.Exists(rightPath))
-                {
-                    ClearReadOnly(rightPath);
-                    FileSystem.DeleteFile(rightPath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
-                }
-
-                break;
+            File.Copy(source, temp, true);
+            File.Move(temp, destination, true);
+        }
+        finally
+        {
+            if (File.Exists(temp))
+            {
+                File.Delete(temp);
+            }
         }
     }
 
@@ -86,11 +65,71 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger)
         }
     }
 
-    private static void DeleteDirectory(string path)
+    private void ExecuteFileAction(FileComparison file, string leftBase, string rightBase)
     {
-        if (Directory.Exists(path))
+        var leftPath = Path.Combine(leftBase, file.RelativePath);
+        var rightPath = Path.Combine(rightBase, file.RelativePath);
+
+        switch (file.Action)
+        {
+            case SyncAction.CopyToRight:
+                EnsureDirectoryExists(rightPath);
+                ClearReadOnly(rightPath);
+                CopyAtomic(leftPath, rightPath);
+                break;
+
+            case SyncAction.CopyToLeft:
+                EnsureDirectoryExists(leftPath);
+                ClearReadOnly(leftPath);
+                CopyAtomic(rightPath, leftPath);
+                break;
+
+            case SyncAction.DeleteLeft:
+                if (File.Exists(leftPath))
+                {
+                    ClearReadOnly(leftPath);
+                    RecycleFile(leftPath);
+                }
+
+                break;
+
+            case SyncAction.DeleteRight:
+                if (File.Exists(rightPath))
+                {
+                    ClearReadOnly(rightPath);
+                    RecycleFile(rightPath);
+                }
+
+                break;
+        }
+    }
+
+    private void RecycleFile(string path)
+    {
+        if (showDeleteUi)
+        {
+            FileSystem.DeleteFile(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+        }
+        else
+        {
+            RecycleBin.DeleteSilent(path);
+        }
+    }
+
+    private void DeleteDirectory(string path)
+    {
+        if (!Directory.Exists(path))
+        {
+            return;
+        }
+
+        if (showDeleteUi)
         {
             FileSystem.DeleteDirectory(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+        }
+        else
+        {
+            RecycleBin.DeleteSilent(path);
         }
     }
 

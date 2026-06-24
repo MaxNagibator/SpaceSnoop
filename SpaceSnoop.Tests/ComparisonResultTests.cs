@@ -95,7 +95,7 @@ public class ComparisonResultTests
     }
 
     [Test]
-    public void ApplyBidirectionalMode_NewestWins_ConflictOnSameDate()
+    public void ApplyBidirectionalMode_NewestWins_ConflictOnSameDate_CopiesOneSided()
     {
         var now = DateTime.Now;
         var earlier = now.AddHours(-1);
@@ -135,8 +135,8 @@ public class ComparisonResultTests
             Assert.That(root.Files[1].Action, Is.EqualTo(SyncAction.CopyToLeft));
             Assert.That(root.Files[2].Action, Is.EqualTo(SyncAction.None));
             Assert.That(root.Files[2].Status, Is.EqualTo(ComparisonStatus.Conflict));
-            Assert.That(root.Files[3].Action, Is.EqualTo(SyncAction.None));
-            Assert.That(root.Files[4].Action, Is.EqualTo(SyncAction.None));
+            Assert.That(root.Files[3].Action, Is.EqualTo(SyncAction.CopyToRight));
+            Assert.That(root.Files[4].Action, Is.EqualTo(SyncAction.CopyToLeft));
         }
     }
 

@@ -483,6 +483,12 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             return;
         }
 
+        if (SyncProfile.PathsOverlap(left, right))
+        {
+            _dialogs.Warning("Сравнение", "Каталоги совпадают или вложены друг в друга — синхронизация невозможна.");
+            return;
+        }
+
         var filter = new ExclusionFilter(Exclusions);
         var stopwatch = Stopwatch.StartNew();
 

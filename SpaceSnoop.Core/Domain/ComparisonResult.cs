@@ -235,8 +235,10 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
                 return SyncAction.None;
 
             case ComparisonStatus.LeftOnly:
+                return SyncAction.CopyToRight;
+
             case ComparisonStatus.RightOnly:
-                return SyncAction.None;
+                return SyncAction.CopyToLeft;
 
             default:
                 return SyncAction.Skip;

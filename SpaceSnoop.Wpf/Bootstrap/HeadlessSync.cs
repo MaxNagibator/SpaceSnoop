@@ -105,7 +105,7 @@ internal sealed class HeadlessSync
             result.ApplyMode(mode, mirror);
             result.ResolveAllConflicts(SyncAction.Skip);
 
-            var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
+            var engine = new SyncEngine(NullLogger<SyncEngine>.Instance, false);
             var report = engine.Execute(result, CancellationToken.None);
 
             stopwatch.Stop();

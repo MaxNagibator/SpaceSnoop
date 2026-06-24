@@ -300,6 +300,31 @@ public class SyncEngineTests
     }
 
     [Test]
+    public void DeleteLeft_SilentMode_RemovesFileWithoutUi()
+    {
+        var filePath = Path.Combine(_leftDir, "remove.txt");
+        File.WriteAllText(filePath, "delete me");
+
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("remove.txt", "remove.txt")
+        {
+            Status = ComparisonStatus.LeftOnly,
+            Action = SyncAction.DeleteLeft,
+        });
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance, false);
+        var report = engine.Execute(result, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.Exists(filePath), Is.False);
+            Assert.That(report.SuccessCount, Is.EqualTo(1));
+            Assert.That(report.Errors, Is.Empty);
+        }
+    }
+
+    [Test]
     public void Report_SplitsCopiedAndDeleted()
     {
         File.WriteAllText(Path.Combine(_leftDir, "copy.txt"), "data");
