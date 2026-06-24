@@ -279,23 +279,13 @@
                                    VerticalAlignment="Center" />
                     </StackPanel>
                 </ToggleButton>
-                <Grid VerticalAlignment="Center"
-                      Margin="0,0,16,8">
-                    <TextBox Text="{Binding Exclusions, UpdateSourceTrigger=PropertyChanged}"
-                             Style="{StaticResource TextBox.Toolbar}"
-                             Width="200"
-                             Padding="26,0,8,0"
-                             VerticalContentAlignment="Center"
-                             ToolTip="Исключения: глоб-шаблоны через запятую, напр. bin,obj,*.tmp" />
-                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Funnel}"
-                                              Width="13"
-                                              Height="13"
-                                              HorizontalAlignment="Left"
-                                              VerticalAlignment="Center"
-                                              Margin="9,0,0,0"
-                                              IsHitTestVisible="False"
-                                              Foreground="{DynamicResource Fg.Muted}" />
-                </Grid>
+                <TextBox Text="{Binding Exclusions, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource TextBox.IconField}"
+                         Tag="{x:Static iconPacks:PackIconLucideKind.Funnel}"
+                         Width="200"
+                         VerticalAlignment="Center"
+                         Margin="0,0,16,8"
+                         ToolTip="Исключения: глоб-шаблоны через запятую, напр. bin,obj,*.tmp" />
 
                 <Border Padding="6,3"
                         CornerRadius="{DynamicResource Radius.M}"

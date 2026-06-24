@@ -25,10 +25,11 @@ public sealed partial class SyncNodeViewModel : ObservableObject
     private bool _subtreeActionable;
     private SyncAction? _subtreeAction;
 
-    public SyncNodeViewModel(DirectoryComparison dir, int indent, bool isExpanded, long leftSize, long rightSize, SyncViewModel owner)
+    public SyncNodeViewModel(DirectoryComparison dir, int indent, bool isExpanded, long leftSize, long rightSize, SyncViewModel owner, bool flat = false)
     {
         _dir = dir;
         _owner = owner;
+        _flat = flat;
         Indent = indent;
         IsExpanded = isExpanded;
 
@@ -77,7 +78,7 @@ public sealed partial class SyncNodeViewModel : ObservableObject
 
     public string Name => _dir?.Name ?? _file?.Name ?? string.Empty;
 
-    public string DisplayName => _flat && _file is not null ? _file.RelativePath : Name;
+    public string DisplayName => _flat ? _file?.RelativePath ?? _dir?.RelativePath ?? Name : Name;
 
     public ComparisonStatus Status => _dir?.Status ?? _file?.Status ?? ComparisonStatus.Identical;
 
@@ -138,9 +139,11 @@ public sealed partial class SyncNodeViewModel : ObservableObject
 
     public bool RightContentVisible => !(RightAbsent && _owner.BlankAbsent);
 
-    public bool LeftExpanderVisible => IsDirectory && LeftContentVisible;
+    public bool LeftExpanderVisible => IsDirectory && LeftContentVisible && !_flat;
 
-    public bool RightExpanderVisible => IsDirectory && RightContentVisible;
+    public bool RightExpanderVisible => IsDirectory && RightContentVisible && !_flat;
+
+    public GridLength ExpanderColumnWidth => _flat ? new GridLength(0) : new GridLength(14);
 
     public bool CanCompareContent => _file is not null && Status is not (ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly);
 

@@ -95,6 +95,32 @@ public class SyncFlatFilesTests
         Assert.That(sorted, Is.EqualTo([leftOnly, modifiedA, modifiedZ]));
     }
 
+    [Test]
+    public void Пустые_односторонние_каталоги_берутся_верхним_уровнем_без_файловых()
+    {
+        var kept = OneSided("kept", ComparisonStatus.LeftOnly, File("kept/x.txt", ComparisonStatus.LeftOnly));
+        var leaf = OneSided("leaf", ComparisonStatus.LeftOnly);
+        var branch = OneSided("branch", ComparisonStatus.LeftOnly);
+        branch.SubDirectories.Add(leaf);
+        var solo = OneSided("solo", ComparisonStatus.RightOnly);
+
+        var root = Dir("");
+        root.SubDirectories.Add(kept);
+        root.SubDirectories.Add(branch);
+        root.SubDirectories.Add(solo);
+
+        var dirs = SyncViewModel.CollectEmptyDirs(root, false, NoOutcomes).ToList();
+
+        Assert.That(dirs, Is.EqualTo([branch, solo]));
+    }
+
+    private static DirectoryComparison OneSided(string name, ComparisonStatus status, params FileComparison[] files)
+    {
+        var dir = Dir(name, files);
+        dir.Status = status;
+        return dir;
+    }
+
     private static FileComparison File(string relativePath, ComparisonStatus status)
     {
         var name = relativePath.Split('/')[^1];

@@ -516,7 +516,7 @@
             </Grid.RowDefinitions>
 
             <Grid Grid.Row="0"
-                  Margin="14,4,18,8"
+                  Margin="6,4,18,8"
                   Visibility="{Binding FlatView, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -524,23 +524,13 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <Grid Grid.Column="0"
-                      MaxWidth="340"
-                      HorizontalAlignment="Left">
-                    <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                             Style="{StaticResource TextBox.Toolbar}"
-                             Padding="26,0,8,0"
-                             VerticalContentAlignment="Center"
-                             ToolTip="Фильтр списка по пути файла" />
-                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Search}"
-                                              Width="13"
-                                              Height="13"
-                                              HorizontalAlignment="Left"
-                                              VerticalAlignment="Center"
-                                              Margin="9,0,0,0"
-                                              IsHitTestVisible="False"
-                                              Foreground="{DynamicResource Fg.Muted}" />
-                </Grid>
+                <TextBox Grid.Column="0"
+                         Width="240"
+                         HorizontalAlignment="Left"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource TextBox.IconField}"
+                         Tag="{x:Static iconPacks:PackIconLucideKind.Search}"
+                         ToolTip="Фильтр списка по пути файла" />
 
                 <ComboBox Grid.Column="1"
                           SelectedValuePath="Tag"
@@ -644,7 +634,7 @@
                                   Margin="{Binding IndentMargin}"
                                   VerticalAlignment="Center">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="14" />
+                                    <ColumnDefinition Width="{Binding ExpanderColumnWidth}" />
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
@@ -719,7 +709,7 @@
                                   Margin="{Binding IndentMargin}"
                                   VerticalAlignment="Center">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="14" />
+                                    <ColumnDefinition Width="{Binding ExpanderColumnWidth}" />
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />

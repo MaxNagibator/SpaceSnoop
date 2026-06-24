@@ -290,6 +290,32 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
     }
 
+    internal static IEnumerable<DirectoryComparison> CollectEmptyDirs(DirectoryComparison dir, bool hideApplied, IReadOnlyDictionary<object, SyncOutcome> outcomes)
+    {
+        foreach (var sub in dir.SubDirectories)
+        {
+            if (sub.Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly && SubtreeHasNoFiles(sub))
+            {
+                if (!hideApplied || outcomes.GetValueOrDefault(sub) != SyncOutcome.Applied)
+                {
+                    yield return sub;
+                }
+
+                continue;
+            }
+
+            foreach (var nested in CollectEmptyDirs(sub, hideApplied, outcomes))
+            {
+                yield return nested;
+            }
+        }
+
+        static bool SubtreeHasNoFiles(DirectoryComparison node)
+        {
+            return node.Files.Count == 0 && node.SubDirectories.All(SubtreeHasNoFiles);
+        }
+    }
+
     internal static IEnumerable<FileComparison> CollectVisibleFiles(DirectoryComparison dir, bool showIdentical, bool hideApplied, IReadOnlyDictionary<object, SyncOutcome> outcomes)
     {
         foreach (var sub in dir.SubDirectories)
@@ -1130,6 +1156,18 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             foreach (var file in SortFlatFiles(files, FlatSort, FlatSortDescending))
             {
                 buffer.Add(new(file, 0, this, true) { Outcome = _outcomes.GetValueOrDefault(file) });
+            }
+
+            var dirs = CollectEmptyDirs(_result.Root, HideApplied, _outcomes);
+
+            if (search.Length > 0)
+            {
+                dirs = dirs.Where(dir => dir.RelativePath.Contains(search, StringComparison.OrdinalIgnoreCase));
+            }
+
+            foreach (var dir in dirs.OrderBy(dir => dir.RelativePath, StringComparer.OrdinalIgnoreCase))
+            {
+                buffer.Add(new(dir, 0, false, 0, 0, this, flat: true) { Outcome = _outcomes.GetValueOrDefault(dir) });
             }
         }
         else
