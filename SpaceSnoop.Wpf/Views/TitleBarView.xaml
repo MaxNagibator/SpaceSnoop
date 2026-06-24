@@ -153,6 +153,52 @@
                         Orientation="Horizontal"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
 
+                <Border Background="{DynamicResource Accent.Soft}"
+                        BorderBrush="{DynamicResource Accent.Primary}"
+                        BorderThickness="1"
+                        CornerRadius="{DynamicResource Radius.Pill}"
+                        Padding="2,1"
+                        Margin="0,4,12,4"
+                        VerticalAlignment="Center"
+                        Visibility="{Binding AppUpdate.HasPendingUpdate, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                    <StackPanel Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <Button Style="{StaticResource Theme.SegmentButton}"
+                                Command="{Binding AppUpdate.ShowDetailsCommand}"
+                                Padding="5,4,4,4"
+                                MinHeight="24"
+                                VerticalAlignment="Center"
+                                ToolTip="Открыть окно установки обновления"
+                                AutomationProperties.Name="Доступно обновление приложения">
+                            <StackPanel Orientation="Horizontal"
+                                        VerticalAlignment="Center">
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Sparkles}"
+                                                          Width="14"
+                                                          Height="14"
+                                                          Foreground="{DynamicResource Accent.Primary}"
+                                                          VerticalAlignment="Center"
+                                                          Margin="0,0,6,0" />
+                                <TextBlock Text="{Binding AppUpdate.PillText}"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource Fg.Primary}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource Theme.SegmentButton}"
+                                Command="{Binding AppUpdate.DismissCommand}"
+                                Padding="4,4"
+                                MinHeight="24"
+                                VerticalAlignment="Center"
+                                ToolTip="Скрыть для этой версии"
+                                AutomationProperties.Name="Скрыть уведомление об обновлении">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.X}"
+                                                      Width="12"
+                                                      Height="12"
+                                                      VerticalAlignment="Center"
+                                                      Foreground="{DynamicResource Fg.Secondary}" />
+                        </Button>
+                    </StackPanel>
+                </Border>
+
                 <Button Style="{StaticResource Theme.SegmentButton}"
                         Command="{Binding CurrentPageRefresh.RefreshCommand}"
                         Width="36"

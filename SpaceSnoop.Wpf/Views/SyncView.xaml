@@ -14,11 +14,13 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <sync:SyncToolbar Grid.Row="0" />
         <sync:SyncLedgerStrip Grid.Row="1" />
-        <sync:SyncDiffPanel Grid.Row="2" />
+        <sync:SyncProgressStrip Grid.Row="2" />
+        <sync:SyncDiffPanel Grid.Row="3" />
     </Grid>
 </UserControl>

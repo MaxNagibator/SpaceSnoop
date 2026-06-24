@@ -1,0 +1,133 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Schedule.ScheduleView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
+             xmlns:schedule="clr-namespace:SpaceSnoop.Wpf.Views.Schedule"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:ScheduleViewModel}"
+             d:DesignHeight="640"
+             d:DesignWidth="900">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Views/Settings/SettingsResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <Style x:Key="Schedule.HistoryLine"
+                   TargetType="TextBlock">
+                <Setter Property="Margin"
+                        Value="0,3,0,0" />
+                <Setter Property="TextWrapping"
+                        Value="Wrap" />
+                <Setter Property="FontFamily"
+                        Value="{DynamicResource Font.Mono}" />
+                <Setter Property="FontSize"
+                        Value="{DynamicResource Font.Size.S}" />
+                <Setter Property="Foreground"
+                        Value="{DynamicResource Fg.Secondary}" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding HasErrors}"
+                                 Value="True">
+                        <Setter Property="Foreground"
+                                Value="{DynamicResource State.Error}" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  Padding="0,0,12,0">
+        <StackPanel>
+
+            <Border Style="{StaticResource Card.Inset}"
+                    Margin="0,0,0,10">
+                <StackPanel>
+                    <TextBlock Text="Как это работает"
+                               Style="{StaticResource Setting.SectionTitle}" />
+                    <TextBlock
+                        Text="Каждый профиль – отдельная задача Планировщика Windows, запускающая автосинхронизацию в фоне с собственными каталогами, направлением и временем. «Запустить сейчас» прогоняет профиль немедленно, не дожидаясь расписания."
+                        Style="{StaticResource Setting.Hint}" />
+                </StackPanel>
+            </Border>
+
+            <Grid Margin="0,4,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           Text="Профили"
+                           VerticalAlignment="Center"
+                           FontWeight="{DynamicResource Font.Weight.SemiBold}"
+                           FontSize="{DynamicResource Font.Size.L}"
+                           Foreground="{DynamicResource Fg.Primary}" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Button.Primary}"
+                        Command="{Binding AddProfileCommand}"
+                        MinHeight="{DynamicResource Control.Height.Default}"
+                        Padding="14,6">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Plus}"
+                                                  Width="14"
+                                                  Height="14"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,6,0" />
+                        <TextBlock Text="Добавить профиль" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+
+            <Border Style="{StaticResource Card.Inset}"
+                    Margin="0,0,0,10"
+                    Visibility="{Binding HasProfiles, Converter={StaticResource InverseBoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Text="Профилей пока нет."
+                               Style="{StaticResource Setting.Label}" />
+                    <TextBlock Text="Добавьте профиль, чтобы запланировать автосинхронизацию каталогов."
+                               Style="{StaticResource Setting.Hint}" />
+                </StackPanel>
+            </Border>
+
+            <ItemsControl ItemsSource="{Binding Profiles}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:SyncProfileViewModel}">
+                        <schedule:ScheduleProfileCard />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Border Style="{StaticResource Card.Inset}"
+                    Margin="0,6,0,10">
+                <StackPanel>
+                    <TextBlock Text="История прогонов"
+                               Style="{StaticResource Setting.SectionTitle}" />
+                    <TextBlock Text="Последние записи журнала автосинхронизации (sync-log.txt)."
+                               Style="{StaticResource Setting.Hint}" />
+
+                    <TextBlock Text="Прогонов ещё не было."
+                               Style="{StaticResource TextBlock.Subtle}"
+                               Margin="0,12,0,0"
+                               Visibility="{Binding HasHistory, Converter={StaticResource InverseBoolToVisibility}}" />
+
+                    <ItemsControl ItemsSource="{Binding History}"
+                                  Margin="0,10,0,0"
+                                  Visibility="{Binding HasHistory, Converter={StaticResource BoolToVisibility}}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:ScheduleRunEntry}">
+                                <TextBlock Text="{Binding Text}"
+                                           Style="{StaticResource Schedule.HistoryLine}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

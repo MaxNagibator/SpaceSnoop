@@ -17,8 +17,18 @@ public partial class App : Application
 
         _logging = KeepShellLogging.Bootstrap(new()
         {
+            LogsDirectory = Path.Combine(AppStorage.DataDirectory, AppStorage.LogsFolderName),
             FileNamePrefix = AppInfo.LogFilePrefix,
         });
+
+        var syncIndex = Array.FindIndex(e.Args, static arg => string.Equals(arg, AppInfo.SyncArgument, StringComparison.OrdinalIgnoreCase));
+
+        if (syncIndex >= 0)
+        {
+            var profileId = syncIndex + 1 < e.Args.Length ? e.Args[syncIndex + 1] : null;
+            RunHeadlessSync(profileId);
+            return;
+        }
 
         AttachExceptionHandlers();
 
@@ -30,7 +40,7 @@ public partial class App : Application
 
         try
         {
-            var settingsPath = Path.Combine(AppContext.BaseDirectory, TomlSettingsFile.PrimaryFileName);
+            var settingsPath = Path.Combine(AppStorage.DataDirectory, TomlSettingsFile.PrimaryFileName);
             ISettingsStore settings = new SettingsStore(settingsPath);
             AppThemes.Register();
             var themeKey = settings.GetStringValue(SettingsKeys.Theme);
@@ -122,11 +132,13 @@ public partial class App : Application
 
         services.AddSingleton<DiskSpaceCalculator>();
         services.AddSingleton<DockerService>();
+        services.AddSingleton<ArchiveService>();
 
         services.AddKeepShell();
         services.AddSingleton<ShellPreferences>();
         services.AddSingleton<OperationPreferences>();
         services.AddSingleton<ScanPreferences>();
+        services.AddSingleton<UpdatePreferences>();
         services.AddSingleton<ThemeViewModel>();
 
         services.AddSingleton(new ErrorReportOptions
@@ -141,18 +153,39 @@ public partial class App : Application
         services.AddSingleton<ScanInspectorViewModel>();
         services.AddSingleton<ScanNodeFactory>();
         services.AddSingleton<DeleteProgressDialogFactory>();
+        services.AddSingleton<ArchiveProgressDialogFactory>();
 
         services.AddSingleton<ScanViewModel>();
         services.AddSingleton<SyncViewModel>();
+        services.AddSingleton<ScheduleViewModel>();
         services.AddSingleton<DockerViewModel>();
         services.AddSingleton<LogsViewModel>();
         services.AddSingleton<AboutViewModel>();
         services.AddSingleton<SettingsViewModel>();
 
+        services.AddSingleton<AppUpdateViewModel>();
         services.AddSingleton<ShellViewModel>();
         services.AddSingleton<MainWindow>();
 
         return services.BuildServiceProvider();
+    }
+
+    private void RunHeadlessSync(string? profileId)
+    {
+        var exitCode = 1;
+
+        try
+        {
+            var settingsPath = Path.Combine(AppStorage.DataDirectory, TomlSettingsFile.PrimaryFileName);
+            ISettingsStore settings = new SettingsStore(settingsPath);
+            exitCode = HeadlessSync.Run(settings, _logging!, profileId);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "Автосинхронизация не смогла запуститься");
+        }
+
+        Shutdown(exitCode);
     }
 
     private void AttachExceptionHandlers()

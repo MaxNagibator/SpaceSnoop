@@ -1,4 +1,4 @@
-namespace SpaceSnoop.Core.Domain;
+﻿namespace SpaceSnoop.Core.Domain;
 
 public sealed class ComparisonResult(string leftPath, string rightPath, DirectoryComparison root)
 {
@@ -19,9 +19,22 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
         return stats;
     }
 
-    public void ApplyMode(SyncMode mode)
+    public Dictionary<ComparisonStatus, int> GetDirectoryStatistics()
     {
-        ApplyModeRecursive(Root, mode);
+        var stats = new Dictionary<ComparisonStatus, int>();
+
+        foreach (var status in Enum.GetValues<ComparisonStatus>())
+        {
+            stats[status] = 0;
+        }
+
+        CountDirectoriesRecursive(Root, stats);
+        return stats;
+    }
+
+    public void ApplyMode(SyncMode mode, bool mirror = false)
+    {
+        ApplyModeRecursive(Root, mode, mirror);
     }
 
     public bool HasUnresolvedConflicts()
@@ -37,6 +50,64 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
     public int ResolveAllConflicts(SyncAction action)
     {
         return ResolveAllConflictsRecursive(Root, action);
+    }
+
+    public PlannedActions CountPlannedActions()
+    {
+        var newCopies = 0;
+        var modifiedCopies = 0;
+        var deletes = 0;
+        var dirCopies = 0;
+        var dirDeletes = 0;
+        CountPlannedRecursive(Root, ref newCopies, ref modifiedCopies, ref deletes, ref dirCopies, ref dirDeletes);
+        return new(newCopies, modifiedCopies, deletes, dirCopies, dirDeletes);
+    }
+
+    private static void CountPlannedRecursive(
+        DirectoryComparison dir,
+        ref int newCopies,
+        ref int modifiedCopies,
+        ref int deletes,
+        ref int dirCopies,
+        ref int dirDeletes)
+    {
+        foreach (var file in dir.Files)
+        {
+            switch (file.Action)
+            {
+                case SyncAction.CopyToRight or SyncAction.CopyToLeft:
+                    if (file.Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly)
+                    {
+                        newCopies++;
+                    }
+                    else
+                    {
+                        modifiedCopies++;
+                    }
+
+                    break;
+
+                case SyncAction.DeleteLeft or SyncAction.DeleteRight:
+                    deletes++;
+                    break;
+            }
+        }
+
+        foreach (var sub in dir.SubDirectories)
+        {
+            if (sub.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
+            {
+                dirDeletes++;
+                continue;
+            }
+
+            if (sub.Action is SyncAction.CopyToRight or SyncAction.CopyToLeft)
+            {
+                dirCopies++;
+            }
+
+            CountPlannedRecursive(sub, ref newCopies, ref modifiedCopies, ref deletes, ref dirCopies, ref dirDeletes);
+        }
     }
 
     private static bool HasPendingResolutionRecursive(DirectoryComparison dir)
@@ -80,14 +151,23 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
         }
     }
 
-    private static void ApplyModeRecursive(DirectoryComparison dir, SyncMode mode)
+    private static void CountDirectoriesRecursive(DirectoryComparison dir, Dictionary<ComparisonStatus, int> stats)
+    {
+        foreach (var sub in dir.SubDirectories)
+        {
+            stats[sub.Status]++;
+            CountDirectoriesRecursive(sub, stats);
+        }
+    }
+
+    private static void ApplyModeRecursive(DirectoryComparison dir, SyncMode mode, bool mirror)
     {
         foreach (var file in dir.Files)
         {
             file.Action = mode switch
             {
-                SyncMode.LeftToRight => ApplyLeftToRight(file),
-                SyncMode.RightToLeft => ApplyRightToLeft(file),
+                SyncMode.LeftToRight => ApplyLeftToRight(file, mirror),
+                SyncMode.RightToLeft => ApplyRightToLeft(file, mirror),
                 SyncMode.Bidirectional => ApplyBidirectional(file),
                 _ => SyncAction.Skip,
             };
@@ -95,26 +175,43 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
 
         foreach (var sub in dir.SubDirectories)
         {
-            ApplyModeRecursive(sub, mode);
+            sub.Action = ApplyDirMode(sub, mode, mirror);
+            ApplyModeRecursive(sub, mode, mirror);
         }
     }
 
-    private static SyncAction ApplyLeftToRight(FileComparison file)
+    private static SyncAction ApplyDirMode(DirectoryComparison dir, SyncMode mode, bool mirror)
+    {
+        return dir.Status switch
+        {
+            ComparisonStatus.LeftOnly => mode == SyncMode.RightToLeft
+                ? mirror ? SyncAction.DeleteLeft : SyncAction.Skip
+                : SyncAction.CopyToRight,
+            ComparisonStatus.RightOnly => mode == SyncMode.LeftToRight
+                ? mirror ? SyncAction.DeleteRight : SyncAction.Skip
+                : SyncAction.CopyToLeft,
+            _ => SyncAction.None,
+        };
+    }
+
+    private static SyncAction ApplyLeftToRight(FileComparison file, bool mirror)
     {
         return file.Status switch
         {
             ComparisonStatus.LeftOnly => SyncAction.CopyToRight,
             ComparisonStatus.Modified => SyncAction.CopyToRight,
+            ComparisonStatus.RightOnly when mirror => SyncAction.DeleteRight,
             _ => SyncAction.Skip,
         };
     }
 
-    private static SyncAction ApplyRightToLeft(FileComparison file)
+    private static SyncAction ApplyRightToLeft(FileComparison file, bool mirror)
     {
         return file.Status switch
         {
             ComparisonStatus.RightOnly => SyncAction.CopyToLeft,
             ComparisonStatus.Modified => SyncAction.CopyToLeft,
+            ComparisonStatus.LeftOnly when mirror => SyncAction.DeleteLeft,
             _ => SyncAction.Skip,
         };
     }
@@ -138,8 +235,10 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
                 return SyncAction.None;
 
             case ComparisonStatus.LeftOnly:
+                return SyncAction.CopyToRight;
+
             case ComparisonStatus.RightOnly:
-                return SyncAction.None;
+                return SyncAction.CopyToLeft;
 
             default:
                 return SyncAction.Skip;
@@ -151,4 +250,11 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
         return dir.Files.Any(x => x.Status == ComparisonStatus.Conflict && x.Action == SyncAction.None)
                || dir.SubDirectories.Any(HasUnresolvedConflictsRecursive);
     }
+}
+
+public sealed record PlannedActions(int NewCopies, int ModifiedCopies, int Deletes, int DirCopies, int DirDeletes)
+{
+    public int Copies => NewCopies + ModifiedCopies;
+
+    public int Total => Copies + Deletes + DirCopies + DirDeletes;
 }

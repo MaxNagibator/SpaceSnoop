@@ -78,6 +78,8 @@ public sealed partial class ScanNodeViewModel : ObservableObject
 
     public string ShareText => $"{Share * 100:0}%";
 
+    public string FileCountText => Space is DirectorySpace dir ? dir.TotalFileCount.ToString("N0") : string.Empty;
+
     public string AbsolutePath => Space?.AbsolutePath ?? string.Empty;
 
     public string Tooltip => Space?.GetTooltipText() ?? string.Empty;
@@ -216,6 +218,15 @@ public sealed partial class ScanNodeViewModel : ObservableObject
         catch (Exception ex)
         {
             _logger.OpenExplorerFailed(ex, Space.AbsolutePath);
+        }
+    }
+
+    [RelayCommand]
+    private void ArchiveToZip()
+    {
+        if (Space is DirectorySpace)
+        {
+            _factory?.RequestArchive(this);
         }
     }
 

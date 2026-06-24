@@ -106,6 +106,52 @@ public class SyncEngineTests
     }
 
     [Test]
+    public void CopyToRight_CreatesEmptyOneSidedDirectory()
+    {
+        Directory.CreateDirectory(Path.Combine(_leftDir, "empty"));
+
+        var root = new DirectoryComparison("root", "");
+        root.SubDirectories.Add(new("empty", "empty")
+        {
+            Status = ComparisonStatus.LeftOnly,
+            Action = SyncAction.CopyToRight,
+        });
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
+        var report = engine.Execute(result, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(Directory.Exists(Path.Combine(_rightDir, "empty")), Is.True);
+            Assert.That(report.CopiedCount, Is.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public void ApplyMode_AssignsActionsToOneSidedDirectories_AndCountsThem()
+    {
+        var root = new DirectoryComparison("root", "");
+        var left = new DirectoryComparison("onlyLeft", "onlyLeft") { Status = ComparisonStatus.LeftOnly };
+        var right = new DirectoryComparison("onlyRight", "onlyRight") { Status = ComparisonStatus.RightOnly };
+        root.SubDirectories.Add(left);
+        root.SubDirectories.Add(right);
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        result.ApplyMode(SyncMode.LeftToRight);
+
+        var planned = result.CountPlannedActions();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(left.Action, Is.EqualTo(SyncAction.CopyToRight));
+            Assert.That(right.Action, Is.EqualTo(SyncAction.Skip));
+            Assert.That(planned.DirCopies, Is.EqualTo(1));
+            Assert.That(planned.Total, Is.EqualTo(1));
+        }
+    }
+
+    [Test]
     public void Skip_DoesNothing()
     {
         File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "hello");
@@ -146,6 +192,32 @@ public class SyncEngineTests
         engine.Execute(result, CancellationToken.None);
 
         Assert.That(File.ReadAllText(Path.Combine(_rightDir, "a.txt")), Is.EqualTo("new content"));
+    }
+
+    [Test]
+    public void CopyToRight_OverwritesReadOnlyDestination()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "new content");
+        var destination = Path.Combine(_rightDir, "a.txt");
+        File.WriteAllText(destination, "old content");
+        File.SetAttributes(destination, File.GetAttributes(destination) | FileAttributes.ReadOnly);
+
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("a.txt", "a.txt")
+        {
+            Status = ComparisonStatus.Modified,
+            Action = SyncAction.CopyToRight,
+        });
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
+        var report = engine.Execute(result, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.ReadAllText(destination), Is.EqualTo("new content"));
+            Assert.That(report.Errors, Is.Empty);
+        }
     }
 
     [Test]
@@ -199,6 +271,176 @@ public class SyncEngineTests
         {
             Assert.That(File.Exists(filePath), Is.False);
             Assert.That(report.SuccessCount, Is.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public void DeleteLeft_RemovesReadOnlyFile()
+    {
+        var filePath = Path.Combine(_leftDir, "remove.txt");
+        File.WriteAllText(filePath, "delete me");
+        File.SetAttributes(filePath, File.GetAttributes(filePath) | FileAttributes.ReadOnly);
+
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("remove.txt", "remove.txt")
+        {
+            Status = ComparisonStatus.LeftOnly,
+            Action = SyncAction.DeleteLeft,
+        });
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
+        var report = engine.Execute(result, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.Exists(filePath), Is.False);
+            Assert.That(report.Errors, Is.Empty);
+        }
+    }
+
+    [Test]
+    public void DeleteLeft_SilentMode_RemovesFileWithoutUi()
+    {
+        var filePath = Path.Combine(_leftDir, "remove.txt");
+        File.WriteAllText(filePath, "delete me");
+
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("remove.txt", "remove.txt")
+        {
+            Status = ComparisonStatus.LeftOnly,
+            Action = SyncAction.DeleteLeft,
+        });
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance, false);
+        var report = engine.Execute(result, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.Exists(filePath), Is.False);
+            Assert.That(report.SuccessCount, Is.EqualTo(1));
+            Assert.That(report.Errors, Is.Empty);
+        }
+    }
+
+    [Test]
+    public void Report_SplitsCopiedAndDeleted()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "copy.txt"), "data");
+        File.WriteAllText(Path.Combine(_leftDir, "gone.txt"), "data");
+
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("copy.txt", "copy.txt") { Status = ComparisonStatus.LeftOnly, Action = SyncAction.CopyToRight });
+        root.Files.Add(new("gone.txt", "gone.txt") { Status = ComparisonStatus.LeftOnly, Action = SyncAction.DeleteLeft });
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
+        var report = engine.Execute(result, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.CopiedCount, Is.EqualTo(1));
+            Assert.That(report.DeletedCount, Is.EqualTo(1));
+            Assert.That(report.SuccessCount, Is.EqualTo(2));
+        }
+    }
+
+    [Test]
+    public void Verify_AfterSuccessfulSync_ReportsNoMismatches()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "hello world");
+
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("a.txt", "a.txt") { Status = ComparisonStatus.LeftOnly, Action = SyncAction.CopyToRight });
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
+        var report = engine.Execute(result, CancellationToken.None);
+
+        engine.Verify(report, _leftDir, _rightDir, CancellationToken.None);
+
+        Assert.That(report.Mismatches, Is.Empty);
+    }
+
+    [Test]
+    public void Verify_MissingDestination_ReportsMismatch()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "data");
+
+        var report = new SyncReport();
+        report.Applied.Add(new(SyncAction.CopyToRight, "a.txt", 4));
+
+        new SyncEngine(NullLogger<SyncEngine>.Instance).Verify(report, _leftDir, _rightDir, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.Mismatches, Has.Count.EqualTo(1));
+            Assert.That(report.Mismatches[0].RelativePath, Is.EqualTo("a.txt"));
+        }
+    }
+
+    [Test]
+    public void Verify_DivergentContent_ReportsMismatch()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "source-long-content");
+        File.WriteAllText(Path.Combine(_rightDir, "a.txt"), "x");
+
+        var report = new SyncReport();
+        report.Applied.Add(new(SyncAction.CopyToRight, "a.txt", 0));
+
+        new SyncEngine(NullLogger<SyncEngine>.Instance).Verify(report, _leftDir, _rightDir, CancellationToken.None);
+
+        Assert.That(report.Mismatches, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public void Verify_DeletedFileStillPresent_ReportsMismatch()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "still here");
+
+        var report = new SyncReport();
+        report.Applied.Add(new(SyncAction.DeleteLeft, "a.txt", 0));
+
+        new SyncEngine(NullLogger<SyncEngine>.Instance).Verify(report, _leftDir, _rightDir, CancellationToken.None);
+
+        Assert.That(report.Mismatches, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public void Verify_DeletedFileGone_NoMismatch()
+    {
+        var report = new SyncReport();
+        report.Applied.Add(new(SyncAction.DeleteLeft, "gone.txt", 0));
+
+        new SyncEngine(NullLogger<SyncEngine>.Instance).Verify(report, _leftDir, _rightDir, CancellationToken.None);
+
+        Assert.That(report.Mismatches, Is.Empty);
+    }
+
+    [Test]
+    public void WriteDetails_ListsAppliedActionsWithSizes_AndOmitsZeroSize()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "copy.txt"), "data");
+        File.WriteAllText(Path.Combine(_leftDir, "gone.txt"), "data");
+
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("copy.txt", "copy.txt") { Status = ComparisonStatus.LeftOnly, Action = SyncAction.CopyToRight, LeftSize = 1024 });
+        root.Files.Add(new("gone.txt", "gone.txt") { Status = ComparisonStatus.LeftOnly, Action = SyncAction.DeleteLeft, LeftSize = 0 });
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var report = new SyncEngine(NullLogger<SyncEngine>.Instance).Execute(result, CancellationToken.None);
+
+        var writer = new StringWriter();
+        report.WriteDetails(writer);
+        var text = writer.ToString();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.Applied, Has.Count.EqualTo(2));
+            Assert.That(text, Does.Contain("CopyToRight «copy.txt» (1КБ)"));
+            Assert.That(text, Does.Contain("DeleteLeft «gone.txt»"));
+            Assert.That(text, Does.Not.Contain("gone.txt» ("));
         }
     }
 }

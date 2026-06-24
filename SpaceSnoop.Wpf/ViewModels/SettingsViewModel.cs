@@ -1,5 +1,7 @@
-﻿using System.ComponentModel;
+﻿using KeepShell.Services;
+using System.ComponentModel;
 using System.Diagnostics;
+using System.IO.Compression;
 
 namespace SpaceSnoop.Wpf.ViewModels;
 
@@ -21,6 +23,8 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         ShellPreferences shell,
         OperationPreferences operations,
         ScanPreferences scan,
+        UpdatePreferences update,
+        AppUpdateViewModel updater,
         ISettingsStore settings,
         ILogger<SettingsViewModel> logger)
     {
@@ -28,6 +32,8 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         Shell = shell;
         Operations = operations;
         Scan = scan;
+        Update = update;
+        Updater = updater;
         _settings = settings;
         _logger = logger;
 
@@ -42,11 +48,37 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
 
     public ScanPreferences Scan { get; }
 
+    public UpdatePreferences Update { get; }
+
+    public AppUpdateViewModel Updater { get; }
+
+    public IReadOnlyList<string> UpdateRepositoryPresets { get; } =
+    [
+        "MaxNagibator/SpaceSnoop",
+        "TheVSAKeeper/SpaceSnoop",
+    ];
+
     public string PageTitle => "Настройки";
 
     public string PageDescription => "Параметры приложения. Изменения сохраняются автоматически.";
 
     public string SettingsFilePath => _settings.FilePath;
+
+    public string DataDirectory => AppStorage.DataDirectory;
+
+    public bool StoreInAppData
+    {
+        get => AppStorage.UseAppData;
+        set
+        {
+            if (value != AppStorage.UseAppData)
+            {
+                ChangeStorageLocation(value);
+            }
+
+            OnPropertyChanged();
+        }
+    }
 
     public IReadOnlyList<EnumOption<AppTheme>> ThemeOptions { get; } =
     [
@@ -75,6 +107,14 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     [
         new(DeleteMode.RecycleBin, "В корзину"),
         new(DeleteMode.Permanent, "Безвозвратно"),
+    ];
+
+    public IReadOnlyList<EnumOption<CompressionLevel>> CompressionOptions { get; } =
+    [
+        new(CompressionLevel.Optimal, "Оптимальное"),
+        new(CompressionLevel.SmallestSize, "Максимальное (медленно)"),
+        new(CompressionLevel.Fastest, "Быстрое"),
+        new(CompressionLevel.NoCompression, "Без сжатия (только упаковка)"),
     ];
 
     public EnumOption<AppTheme> SelectedThemeOption
@@ -128,12 +168,85 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         }
     }
 
+    public EnumOption<CompressionLevel> SelectedCompressionOption
+    {
+        get => CompressionOptions.First(o => o.Value == Operations.ArchiveCompression);
+        set
+        {
+            if (value.Value != Operations.ArchiveCompression)
+            {
+                Operations.ArchiveCompression = value.Value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
     private void OnThemePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(ThemeViewModel.Current))
         {
             OnPropertyChanged(nameof(SelectedThemeOption));
         }
+    }
+
+    private void ChangeStorageLocation(bool useAppData)
+    {
+        var source = AppStorage.DataDirectory;
+        var destination = AppStorage.DirectoryFor(useAppData);
+        var place = useAppData ? "в папке AppData" : "рядом с программой";
+
+        var choice = StyledMessageBox.Show($"""
+                                            Хранить файлы приложения {place}:
+                                            {destination}
+
+                                            Скопировать туда текущие настройки, логи и журналы?
+                                            После смены приложение будет перезапущено.
+                                            """,
+            "Расположение данных",
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Question);
+
+        if (choice == MessageBoxResult.Cancel)
+        {
+            return;
+        }
+
+        try
+        {
+            if (choice == MessageBoxResult.Yes)
+            {
+                _settings.Flush();
+                AppStorage.Migrate(source, destination);
+            }
+
+            AppStorage.SetUseAppData(useAppData);
+            _logger.StorageLocationChanged(destination);
+        }
+        catch (Exception exception)
+        {
+            _logger.StorageLocationChangeFailed(exception, destination);
+            StyledMessageBox.Show($"Не удалось изменить расположение данных.{Environment.NewLine}{Environment.NewLine}{exception.Message}",
+                "Расположение данных",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+
+            return;
+        }
+
+        var executable = Environment.ProcessPath;
+
+        if (!string.IsNullOrEmpty(executable))
+        {
+            Process.Start(executable);
+        }
+
+        Application.Current.Shutdown();
+    }
+
+    [RelayCommand]
+    private void SetUpdateRepository(string repository)
+    {
+        Update.Repository = repository;
     }
 
     [RelayCommand]

@@ -5,12 +5,25 @@ namespace SpaceSnoop.Core;
 
 public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<DirectoryComparer> logger)
 {
-    public ComparisonResult Compare(string leftPath, string rightPath, CancellationToken cancel)
+    public static readonly TimeSpan FatTimestampTolerance = TimeSpan.FromSeconds(2);
+
+    public static bool FilesIdentical(FileInfo left, FileInfo right)
+    {
+        if (left.Length != right.Length)
+        {
+            return false;
+        }
+
+        return (left.LastWriteTime - right.LastWriteTime).Duration() <= FatTimestampTolerance;
+    }
+
+    public ComparisonResult Compare(string leftPath, string rightPath, CancellationToken cancel, IProgress<OperationProgress>? progress = null)
     {
         var leftDir = new DirectoryInfo(leftPath);
         var rightDir = new DirectoryInfo(rightPath);
 
-        var root = CompareDirectories(leftDir, rightDir, "", cancel);
+        var processed = 0;
+        var root = CompareDirectories(leftDir, rightDir, "", progress, ref processed, cancel);
 
         return new(leftPath, rightPath, root);
     }
@@ -36,21 +49,34 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         return hasNonIdentical ? ComparisonStatus.Modified : ComparisonStatus.Identical;
     }
 
+    private static bool IsReparsePoint(FileSystemInfo info)
+    {
+        return (info.Attributes & FileAttributes.ReparsePoint) != 0;
+    }
+
     private DirectoryComparison CompareDirectories(
         DirectoryInfo? leftDir,
         DirectoryInfo? rightDir,
         string relativePath,
+        IProgress<OperationProgress>? progress,
+        ref int processed,
         CancellationToken cancel)
     {
         cancel.ThrowIfCancellationRequested();
 
         var name = leftDir?.Name ?? rightDir!.Name;
-        var comparison = new DirectoryComparison(name, relativePath);
+        var comparison = new DirectoryComparison(name, relativePath)
+        {
+            LeftModified = leftDir is { Exists: true } ? leftDir.LastWriteTime : null,
+            RightModified = rightDir is { Exists: true } ? rightDir.LastWriteTime : null,
+        };
 
         CompareFiles(comparison, leftDir, rightDir, relativePath);
-        CompareSubDirectories(comparison, leftDir, rightDir, relativePath, cancel);
+        CompareSubDirectories(comparison, leftDir, rightDir, relativePath, progress, ref processed, cancel);
 
         comparison.Status = DetermineDirectoryStatus(comparison, leftDir, rightDir);
+
+        progress?.Report(new(++processed, string.IsNullOrEmpty(relativePath) ? name : relativePath));
 
         return comparison;
     }
@@ -84,12 +110,9 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
                 fileComparison.LeftModified = leftFile.LastWriteTime;
                 fileComparison.RightModified = rightFile.LastWriteTime;
 
-                var sizeDiffers = leftFile.Length != rightFile.Length;
-                var timeDiffers = leftFile.LastWriteTime != rightFile.LastWriteTime;
-
-                fileComparison.Status = sizeDiffers || timeDiffers
-                    ? ComparisonStatus.Modified
-                    : ComparisonStatus.Identical;
+                fileComparison.Status = FilesIdentical(leftFile, rightFile)
+                    ? ComparisonStatus.Identical
+                    : ComparisonStatus.Modified;
             }
             else if (hasLeft)
             {
@@ -113,6 +136,8 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         DirectoryInfo? leftDir,
         DirectoryInfo? rightDir,
         string relativePath,
+        IProgress<OperationProgress>? progress,
+        ref int processed,
         CancellationToken cancel)
     {
         var leftDirs = GetFilteredDirectories(leftDir);
@@ -130,7 +155,7 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
             leftDirs.TryGetValue(dirName, out var leftSub);
             rightDirs.TryGetValue(dirName, out var rightSub);
 
-            var subComparison = CompareDirectories(leftSub, rightSub, dirRelativePath, cancel);
+            var subComparison = CompareDirectories(leftSub, rightSub, dirRelativePath, progress, ref processed, cancel);
             comparison.SubDirectories.Add(subComparison);
         }
     }
@@ -148,6 +173,12 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         {
             foreach (var file in dir.EnumerateFiles().Where(x => !exclusionFilter.IsExcluded(x.Name)))
             {
+                if (IsReparsePoint(file))
+                {
+                    logger.CompareReparsePointSkipped(file.FullName);
+                    continue;
+                }
+
                 result[file.Name] = file;
             }
         }
@@ -172,6 +203,12 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         {
             foreach (var sub in dir.EnumerateDirectories().Where(x => !exclusionFilter.IsExcluded(x.Name)))
             {
+                if (IsReparsePoint(sub))
+                {
+                    logger.CompareReparsePointSkipped(sub.FullName);
+                    continue;
+                }
+
                 result[sub.Name] = sub;
             }
         }

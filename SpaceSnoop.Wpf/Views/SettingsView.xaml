@@ -17,7 +17,9 @@
             <settings:SettingsAppearanceCard />
             <settings:SettingsScanCard />
             <settings:SettingsDeleteCard />
+            <settings:SettingsArchiveCard />
             <settings:SettingsExclusionsCard />
+            <settings:SettingsUpdateCard />
             <settings:SettingsStartupCard />
             <settings:SettingsFileCard />
         </StackPanel>

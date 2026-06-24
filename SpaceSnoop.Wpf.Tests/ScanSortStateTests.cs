@@ -75,6 +75,24 @@ public class ScanSortStateTests
     }
 
     [Test]
+    public void По_количеству_файлов_учитывает_вложенные_и_инверсия_переворачивает()
+    {
+        var few = MakeDirWithFiles("few", 1);
+        var many = MakeDirWithFiles("many", 1);
+        Assert.That(many.TotalFileCount, Is.EqualTo(1));
+
+        var nested = MakeDirWithFiles("nested", 4);
+        many.Add(nested);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(many.TotalFileCount, Is.EqualTo(5));
+            Assert.That(new ScanSortState { Field = ScanSortField.FileCount, Invert = false }.Compare(few, many), Is.LessThan(0));
+            Assert.That(new ScanSortState { Field = ScanSortField.FileCount, Invert = true }.Compare(few, many), Is.GreaterThan(0));
+        }
+    }
+
+    [Test]
     public void Пустые_узлы_уходят_в_конец()
     {
         var dir = MakeDir("a", 1);
@@ -102,6 +120,25 @@ public class ScanSortStateTests
             dir.AddFiles(files.AsSpan());
         }
 
+        return dir;
+    }
+
+    private DirectorySpace MakeDirWithFiles(string name, int fileCount)
+    {
+        var path = Path.Combine(_tempDir, name);
+        Directory.CreateDirectory(path);
+        var dir = new DirectorySpace(name, null, DateTime.Now, DateTime.Now);
+
+        var infos = new FileInfo[fileCount];
+
+        for (var i = 0; i < fileCount; i++)
+        {
+            var filePath = Path.Combine(path, $"f{i}.bin");
+            File.WriteAllBytes(filePath, [1]);
+            infos[i] = new(filePath);
+        }
+
+        dir.AddFiles(infos.AsSpan());
         return dir;
     }
 

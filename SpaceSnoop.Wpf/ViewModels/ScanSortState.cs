@@ -37,9 +37,15 @@ public sealed class ScanSortState : IComparer<SpaceBase>
             ScanSortField.Size => x.TotalSize.CompareTo(y.TotalSize),
             ScanSortField.CreationDate => x.CreationDate.CompareTo(y.CreationDate),
             ScanSortField.LastAccessTime => x.LastAccessTime.CompareTo(y.LastAccessTime),
+            ScanSortField.FileCount => FileCountOf(x).CompareTo(FileCountOf(y)),
             _ => 0,
         };
 
         return Invert ? -result : result;
+    }
+
+    private static int FileCountOf(SpaceBase space)
+    {
+        return space is DirectorySpace dir ? dir.TotalFileCount : 0;
     }
 }

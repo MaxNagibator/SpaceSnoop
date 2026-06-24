@@ -1,4 +1,4 @@
-using SpaceSnoop.Services;
+﻿using SpaceSnoop.Services;
 
 namespace SpaceSnoop;
 
@@ -144,7 +144,7 @@ public partial class SyncForm : Form
     private void OnResolveConflictsClicked(object? sender, EventArgs e)
     {
         _resolveConflictsMenu.Show(_resolveConflictsButton,
-            new Point(0, _resolveConflictsButton.Height));
+            new(0, _resolveConflictsButton.Height));
     }
 
     private void OnResolveAllToRightClicked(object? sender, EventArgs e)
@@ -160,19 +160,6 @@ public partial class SyncForm : Form
     private void OnResolveAllSkipClicked(object? sender, EventArgs e)
     {
         ResolveAllConflicts(SyncAction.Skip);
-    }
-
-    private void ResolveAllConflicts(SyncAction action)
-    {
-        if (_comparisonResult == null)
-        {
-            return;
-        }
-
-        var count = _comparisonResult.ResolveAllConflicts(action);
-        _diffView.RefreshView();
-        UpdateSummary();
-        _statusLabel.Text = $"Разрешено элементов: {count}.";
     }
 
     private void OnHashCompleted(object? sender, SyncWorkerService.HashResponse? response)
@@ -304,11 +291,7 @@ public partial class SyncForm : Form
 
         using var writer = new StreamWriter(logPath, true);
         writer.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Синхронизация: {report.SuccessCount} успешно, {report.Errors.Count} ошибок");
-
-        foreach (var error in report.Errors)
-        {
-            writer.WriteLine($"  ОШИБКА: {error.RelativePath} ({error.Action}): {error.Message}");
-        }
+        report.WriteDetails(writer);
     }
 
     private static Dictionary<string, string> ParseIni(string[] lines)
@@ -328,12 +311,24 @@ public partial class SyncForm : Form
         return result;
     }
 
+    private void ResolveAllConflicts(SyncAction action)
+    {
+        if (_comparisonResult == null)
+        {
+            return;
+        }
+
+        var count = _comparisonResult.ResolveAllConflicts(action);
+        _diffView.RefreshView();
+        UpdateSummary();
+        _statusLabel.Text = $"Разрешено элементов: {count}.";
+    }
+
     private void ResetCancellationTokenSource()
     {
         _cancellationTokenSource?.Dispose();
         _cancellationTokenSource = new();
     }
-
 
     private void ApplyCurrentMode()
     {
@@ -376,7 +371,6 @@ public partial class SyncForm : Form
         _resolveConflictsButton.Enabled = hasPending;
         _hashButton.Enabled = stats[ComparisonStatus.Modified] > 0;
     }
-
 
     private void LoadSettings()
     {

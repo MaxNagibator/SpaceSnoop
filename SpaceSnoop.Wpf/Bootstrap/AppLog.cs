@@ -77,6 +77,47 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1209, Level = LogLevel.Warning, Message = "Не удалось сравнить содержимое файла {Path}")]
     public static partial void ContentCompareFailed(this ILogger logger, Exception exception, string path);
 
+    [LoggerMessage(EventId = 1210, Level = LogLevel.Information, Message = "Git-папки исключены из синхронизации: {Count}")]
+    public static partial void SyncGitFoldersSkipped(this ILogger logger, int count);
+
+    [LoggerMessage(EventId = 1211, Level = LogLevel.Information,
+        Message = "Автосинхронизация начата: «{Left}» → «{Right}» (режим: {Mode}, зеркало: {Mirror})")]
+    public static partial void HeadlessSyncStarted(this ILogger logger, string left, string right, SyncMode mode, bool mirror);
+
+    [LoggerMessage(EventId = 1212, Level = LogLevel.Information,
+        Message = "Автосинхронизация завершена: успешно {Success}, ошибок {Errors}, за {ElapsedMs} мс")]
+    public static partial void HeadlessSyncFinished(this ILogger logger, int success, int errors, long elapsedMs);
+
+    [LoggerMessage(EventId = 1213, Level = LogLevel.Warning, Message = "Автосинхронизация отменена: {Reason}")]
+    public static partial void HeadlessSyncAborted(this ILogger logger, string reason);
+
+    [LoggerMessage(EventId = 1214, Level = LogLevel.Error, Message = "Автосинхронизация прервана ошибкой")]
+    public static partial void HeadlessSyncFailed(this ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 1215, Level = LogLevel.Error, Message = "Операция «{Operation}» завершилась ошибкой")]
+    public static partial void SyncOperationFailed(this ILogger logger, Exception exception, string operation);
+
+    [LoggerMessage(EventId = 1216, Level = LogLevel.Information, Message = "Операция «{Operation}» отменена")]
+    public static partial void SyncOperationCancelled(this ILogger logger, string operation);
+
+    [LoggerMessage(EventId = 1217, Level = LogLevel.Information, Message = "Проверка синхронизации: проверено {Checked}, расхождений {Mismatches}")]
+    public static partial void SyncVerified(this ILogger logger, int @checked, int mismatches);
+
+    [LoggerMessage(EventId = 1250, Level = LogLevel.Information, Message = "Профиль расписания сохранён: «{Name}» (активно: {Enabled})")]
+    public static partial void ScheduleProfileSaved(this ILogger logger, string name, bool enabled);
+
+    [LoggerMessage(EventId = 1251, Level = LogLevel.Information, Message = "Профиль расписания удалён: «{Name}»")]
+    public static partial void ScheduleProfileRemoved(this ILogger logger, string name);
+
+    [LoggerMessage(EventId = 1252, Level = LogLevel.Information, Message = "Профиль расписания запущен вручную: «{Name}»")]
+    public static partial void ScheduleProfileRunNow(this ILogger logger, string name);
+
+    [LoggerMessage(EventId = 1253, Level = LogLevel.Warning, Message = "Не удалось применить задачу Планировщика для «{Name}»: {Error}")]
+    public static partial void ScheduleTaskFailed(this ILogger logger, string name, string error);
+
+    [LoggerMessage(EventId = 1254, Level = LogLevel.Information, Message = "Расписание перенесено в профиль: «{Name}»")]
+    public static partial void ScheduleProfileMigrated(this ILogger logger, string name);
+
     [LoggerMessage(EventId = 1300, Level = LogLevel.Warning, Message = "Не удалось положить лог-секцию в буфер обмена")]
     public static partial void ClipboardLogSectionFailed(this ILogger logger, Exception exception);
 
@@ -94,6 +135,12 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 1401, Level = LogLevel.Warning, Message = "Не удалось скопировать путь к файлу настроек")]
     public static partial void CopySettingsPathFailed(this ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 1402, Level = LogLevel.Information, Message = "Расположение данных изменено: {Path}")]
+    public static partial void StorageLocationChanged(this ILogger logger, string path);
+
+    [LoggerMessage(EventId = 1403, Level = LogLevel.Error, Message = "Не удалось изменить расположение данных: {Path}")]
+    public static partial void StorageLocationChangeFailed(this ILogger logger, Exception exception, string path);
 
     [LoggerMessage(EventId = 1500, Level = LogLevel.Warning, Message = "Не удалось открыть проводник для {Path}")]
     public static partial void OpenExplorerFailed(this ILogger logger, Exception exception, string path);
@@ -133,4 +180,34 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 1610, Level = LogLevel.Error, Message = "Docker: ошибка удаления объекта ({Kind} {Name})")]
     public static partial void DockerObjectRemoveFailed(this ILogger logger, Exception exception, string kind, string name);
+
+    [LoggerMessage(EventId = 1700, Level = LogLevel.Information, Message = "Упаковка в архив начата: {Path}")]
+    public static partial void ArchiveStarted(this ILogger logger, string path);
+
+    [LoggerMessage(EventId = 1701, Level = LogLevel.Information, Message = "Упаковка в архив завершена: {Path} – {Summary}")]
+    public static partial void ArchiveFinished(this ILogger logger, string path, string summary);
+
+    [LoggerMessage(EventId = 1702, Level = LogLevel.Error, Message = "Ошибка архивации: {Path}")]
+    public static partial void ArchiveFailed(this ILogger logger, Exception exception, string path);
+
+    [LoggerMessage(EventId = 1703, Level = LogLevel.Information, Message = "Архивация отменена: {Path}")]
+    public static partial void ArchiveCancelled(this ILogger logger, string path);
+
+    [LoggerMessage(EventId = 1704, Level = LogLevel.Warning, Message = "Архив не прошёл проверку, оригинал не тронут: {Path} ({Detail})")]
+    public static partial void ArchiveVerifyFailed(this ILogger logger, string path, string detail);
+
+    [LoggerMessage(EventId = 1800, Level = LogLevel.Information, Message = "Доступно обновление: {Latest} (текущая {Current})")]
+    public static partial void UpdateAvailable(this ILogger logger, string latest, string current);
+
+    [LoggerMessage(EventId = 1801, Level = LogLevel.Debug, Message = "Обновлений нет: текущая {Current}, последняя {Latest}")]
+    public static partial void UpdateUpToDate(this ILogger logger, string current, string latest);
+
+    [LoggerMessage(EventId = 1802, Level = LogLevel.Debug, Message = "Не удалось проверить обновления")]
+    public static partial void UpdateCheckFailed(this ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 1803, Level = LogLevel.Information, Message = "Обновление скачано: {Path}")]
+    public static partial void UpdateDownloaded(this ILogger logger, string path);
+
+    [LoggerMessage(EventId = 1804, Level = LogLevel.Warning, Message = "Не удалось скачать обновление: {Url}")]
+    public static partial void UpdateDownloadFailed(this ILogger logger, Exception exception, string url);
 }

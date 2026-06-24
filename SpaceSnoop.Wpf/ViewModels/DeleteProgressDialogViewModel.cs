@@ -169,7 +169,7 @@ public sealed partial class DeleteProgressDialogViewModel : ObservableObject, ID
 
     private List<SpaceBase> RunDeletion(IProgress<DeleteTick> progress, CancellationToken token)
     {
-        var logPath = Path.Combine(AppContext.BaseDirectory, AppInfo.DeletionLogFileName);
+        var logPath = Path.Combine(AppStorage.DataDirectory, AppInfo.DeletionLogFileName);
         long freed = 0;
         var completed = 0;
         var failed = 0;

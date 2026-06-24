@@ -24,27 +24,32 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         ThemeViewModel theme,
         ScanViewModel scan,
         SyncViewModel sync,
+        ScheduleViewModel schedule,
         DockerViewModel docker,
         LogsViewModel logs,
         AboutViewModel about,
         SettingsViewModel settingsPage,
         ModalHostViewModel modal,
-        ShellPreferences preferences)
+        ShellPreferences preferences,
+        AppUpdateViewModel appUpdate)
         : base(modal)
     {
         Theme = theme;
         Theme.PropertyChanged += OnThemePropertyChanged;
         Preferences = preferences;
         Preferences.PropertyChanged += OnPreferencesPropertyChanged;
+        AppUpdate = appUpdate;
 
         var scanItem = new NavigationItem("Сканирование", PackIconLucideKind.HardDrive, scan);
         var syncItem = new NavigationItem("Синхронизация", PackIconLucideKind.FolderSync, sync);
+        var scheduleItem = new NavigationItem("Расписание", PackIconLucideKind.CalendarClock, schedule);
         var dockerItem = new NavigationItem("Docker", PackIconLucideKind.Container, docker);
         var logsItem = new NavigationItem("Логи", PackIconLucideKind.ScrollText, logs);
         var aboutItem = new NavigationItem("О программе", PackIconLucideKind.Info, about);
 
         Sections.Add(scanItem);
         Sections.Add(syncItem);
+        Sections.Add(scheduleItem);
         Sections.Add(dockerItem);
         Sections.Add(logsItem);
         Sections.Add(aboutItem);
@@ -53,6 +58,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         {
             [SectionKey.Scan] = scanItem,
             [SectionKey.Sync] = syncItem,
+            [SectionKey.Schedule] = scheduleItem,
             [SectionKey.Docker] = dockerItem,
             [SectionKey.Logs] = logsItem,
             [SectionKey.About] = aboutItem,
@@ -62,11 +68,15 @@ public sealed partial class ShellViewModel : ShellViewModelBase
 
         IsNavCollapsed = Preferences.NavCollapsed;
         Selected = ResolveStartupSection();
+
+        AppUpdate.Start();
     }
 
     public ThemeViewModel Theme { get; }
 
     public ShellPreferences Preferences { get; }
+
+    public AppUpdateViewModel AppUpdate { get; }
 
     public bool IsElevated { get; } = AdminElevation.IsElevated;
 

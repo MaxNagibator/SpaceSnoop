@@ -4,34 +4,54 @@ namespace SpaceSnoop.Wpf.ViewModels;
 
 public sealed partial class SyncNodeViewModel : ObservableObject
 {
-    private static readonly SyncAction[] ActionCycle =
+    private static readonly SyncAction[] LeftOnlyActions = [SyncAction.CopyToRight, SyncAction.Skip, SyncAction.DeleteLeft];
+    private static readonly SyncAction[] RightOnlyActions = [SyncAction.CopyToLeft, SyncAction.Skip, SyncAction.DeleteRight];
+    private static readonly SyncAction[] BothSidesActions = [SyncAction.CopyToRight, SyncAction.CopyToLeft, SyncAction.Skip];
+
+    private static readonly SyncAction[] DirActionCycle =
     [
         SyncAction.CopyToRight,
         SyncAction.CopyToLeft,
         SyncAction.Skip,
-        SyncAction.DeleteLeft,
-        SyncAction.DeleteRight,
     ];
+
+    private static readonly SyncAction[] OneSidedLeftCycle = [SyncAction.CopyToRight, SyncAction.Skip];
+    private static readonly SyncAction[] OneSidedRightCycle = [SyncAction.CopyToLeft, SyncAction.Skip];
 
     private readonly DirectoryComparison? _dir;
     private readonly FileComparison? _file;
     private readonly SyncViewModel _owner;
+    private readonly bool _flat;
+    private bool _subtreeActionable;
+    private SyncAction? _subtreeAction;
 
-    public SyncNodeViewModel(DirectoryComparison dir, int indent, bool isExpanded, long leftSize, long rightSize, SyncViewModel owner)
+    public SyncNodeViewModel(DirectoryComparison dir, int indent, bool isExpanded, long leftSize, long rightSize, SyncViewModel owner, bool flat = false)
     {
         _dir = dir;
         _owner = owner;
+        _flat = flat;
         Indent = indent;
         IsExpanded = isExpanded;
 
         LeftSizeText = LeftAbsent ? string.Empty : SizeFormatter.Format(leftSize);
         RightSizeText = RightAbsent ? string.Empty : SizeFormatter.Format(rightSize);
+        LeftModifiedText = LeftAbsent ? string.Empty : FormatModified(dir.LeftModified);
+        RightModifiedText = RightAbsent ? string.Empty : FormatModified(dir.RightModified);
+
+        if (dir is { LeftModified: { } leftTime, RightModified: { } rightTime })
+        {
+            LeftIsNewer = leftTime > rightTime;
+            RightIsNewer = rightTime > leftTime;
+        }
+
+        (_subtreeActionable, _subtreeAction) = ComputeSubtreeAction(dir);
     }
 
-    public SyncNodeViewModel(FileComparison file, int indent, SyncViewModel owner)
+    public SyncNodeViewModel(FileComparison file, int indent, SyncViewModel owner, bool flat = false)
     {
         _file = file;
         _owner = owner;
+        _flat = flat;
         Indent = indent;
 
         LeftSizeText = file.LeftSize is { } left ? SizeFormatter.Format(left) : string.Empty;
@@ -50,11 +70,15 @@ public sealed partial class SyncNodeViewModel : ObservableObject
 
     public bool IsExpanded { get; }
 
+    public SyncOutcome Outcome { get; init; }
+
     public bool IsDirectory => _dir is not null;
 
     public bool IsFile => _file is not null;
 
     public string Name => _dir?.Name ?? _file?.Name ?? string.Empty;
+
+    public string DisplayName => _flat ? _file?.RelativePath ?? _dir?.RelativePath ?? Name : Name;
 
     public ComparisonStatus Status => _dir?.Status ?? _file?.Status ?? ComparisonStatus.Identical;
 
@@ -82,33 +106,58 @@ public sealed partial class SyncNodeViewModel : ObservableObject
     {
         get
         {
-            if (_file is null)
+            if (_file is not null)
+            {
+                return Status == ComparisonStatus.Identical
+                    ? PackIconLucideKind.Equal
+                    : IconFor(_file.Action);
+            }
+
+            if (IsOneSidedDir)
+            {
+                return IconFor(_dir!.Action);
+            }
+
+            if (!_subtreeActionable)
             {
                 return PackIconLucideKind.None;
             }
 
-            return Status == ComparisonStatus.Identical
-                ? PackIconLucideKind.Equal
-                : _file.Action switch
-                {
-                    SyncAction.CopyToRight => PackIconLucideKind.ArrowRight,
-                    SyncAction.CopyToLeft => PackIconLucideKind.ArrowLeft,
-                    SyncAction.Skip => PackIconLucideKind.Ban,
-                    SyncAction.DeleteLeft or SyncAction.DeleteRight => PackIconLucideKind.Trash2,
-                    _ => PackIconLucideKind.Zap,
-                };
+            return _subtreeAction is { } action ? IconFor(action) : PackIconLucideKind.Minus;
         }
     }
 
-    public SyncAction? Action => _file?.Action;
+    public SyncAction? Action => _file?.Action ?? (IsOneSidedDir ? _dir!.Action : _subtreeAction);
 
-    public bool CanCycle => _file is not null && Status != ComparisonStatus.Identical;
+    public string DiffReason => _file is null ? string.Empty : DescribeDiff(_file);
+
+    public bool CanCycle => _file is not null ? Status != ComparisonStatus.Identical : _subtreeActionable || IsOneSidedDir;
+
+    public bool ShowAction => IsFile || _subtreeActionable || IsOneSidedDir;
+
+    public bool LeftContentVisible => !(LeftAbsent && _owner.BlankAbsent);
+
+    public bool RightContentVisible => !(RightAbsent && _owner.BlankAbsent);
+
+    public bool LeftExpanderVisible => IsDirectory && LeftContentVisible && !_flat;
+
+    public bool RightExpanderVisible => IsDirectory && RightContentVisible && !_flat;
+
+    public GridLength ExpanderColumnWidth => _flat ? new GridLength(0) : new GridLength(14);
 
     public bool CanCompareContent => _file is not null && Status is not (ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly);
 
+    public bool CanCopyRight => IsFile && Status is ComparisonStatus.LeftOnly or ComparisonStatus.Modified or ComparisonStatus.Conflict;
+
+    public bool CanCopyLeft => IsFile && Status is ComparisonStatus.RightOnly or ComparisonStatus.Modified or ComparisonStatus.Conflict;
+
+    public bool CanDeleteFile => IsFile && Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly;
+
+    public string FileDeleteHeader => Status == ComparisonStatus.LeftOnly ? "Удалить слева (в корзину)" : "Удалить справа (в корзину)";
+
     public bool CanDirDelete => IsDirectory && Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly;
 
-    public string DirDeleteHeader => Status == ComparisonStatus.RightOnly ? "Всё удалить справа" : "Всё удалить слева";
+    public string DirDeleteHeader => Status == ComparisonStatus.RightOnly ? "Удалить всё справа (в корзину)" : "Удалить всё слева (в корзину)";
 
     public string ActionHint
     {
@@ -116,7 +165,30 @@ public sealed partial class SyncNodeViewModel : ObservableObject
         {
             if (_file is null)
             {
-                return "Каталог";
+                if (IsOneSidedDir)
+                {
+                    return _dir!.Action switch
+                    {
+                        SyncAction.CopyToRight => "Каталог только слева – создать справа (клик меняет)",
+                        SyncAction.CopyToLeft => "Каталог только справа – создать слева (клик меняет)",
+                        SyncAction.DeleteLeft or SyncAction.DeleteRight => "Каталог будет удалён в корзину (клик: копировать)",
+                        _ => "Каталог пропускается (клик: копировать)",
+                    };
+                }
+
+                if (!_subtreeActionable)
+                {
+                    return "Каталог";
+                }
+
+                return _subtreeAction switch
+                {
+                    SyncAction.CopyToRight => "Всё слева направо – клик меняет",
+                    SyncAction.CopyToLeft => "Всё справа налево – клик меняет",
+                    SyncAction.Skip => "Всё пропустить – клик меняет",
+                    SyncAction.DeleteLeft or SyncAction.DeleteRight => "Всё удалить – клик задаёт «всё копировать →»",
+                    _ => "Разные действия – клик задаёт «всё копировать →»",
+                };
             }
 
             if (Status == ComparisonStatus.Identical)
@@ -124,7 +196,7 @@ public sealed partial class SyncNodeViewModel : ObservableObject
                 return "Файлы идентичны";
             }
 
-            return _file.Action switch
+            var actionText = _file.Action switch
             {
                 SyncAction.CopyToRight => "Копировать слева направо",
                 SyncAction.CopyToLeft => "Копировать справа налево",
@@ -133,12 +205,126 @@ public sealed partial class SyncNodeViewModel : ObservableObject
                 SyncAction.DeleteRight => "Удалить справа",
                 _ => "Действие не задано – клик выбирает следующее",
             };
+
+            var reason = DiffReason;
+            return reason.Length == 0 ? actionText : $"{actionText}\nРазличие: {reason}";
+        }
+    }
+
+    private bool IsOneSidedDir => _dir is { Status: ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly };
+
+    private SyncAction[] FileActionCycle => Status switch
+    {
+        ComparisonStatus.LeftOnly => LeftOnlyActions,
+        ComparisonStatus.RightOnly => RightOnlyActions,
+        _ => BothSidesActions,
+    };
+
+    public static string DescribeDiff(FileComparison file)
+    {
+        if (file.Status != ComparisonStatus.Modified)
+        {
+            return string.Empty;
+        }
+
+        var sizeDiffers = file.LeftSize != file.RightSize;
+        var delta = file is { LeftModified: { } left, RightModified: { } right } ? (left - right).Duration() : TimeSpan.Zero;
+        var timeDiffers = delta > DirectoryComparer.FatTimestampTolerance;
+
+        return (sizeDiffers, timeDiffers) switch
+        {
+            (true, true) => $"размер и время (Δ {FormatDelta(delta)})",
+            (true, false) => "размер",
+            (false, true) => $"время (Δ {FormatDelta(delta)})",
+            _ => string.Empty,
+        };
+    }
+
+    public void RefreshSubtreeAction()
+    {
+        if (_dir is null)
+        {
+            return;
+        }
+
+        (_subtreeActionable, _subtreeAction) = ComputeSubtreeAction(_dir);
+        OnPropertyChanged(nameof(ActionIconKind));
+        OnPropertyChanged(nameof(Action));
+        OnPropertyChanged(nameof(ActionHint));
+    }
+
+    private static PackIconLucideKind IconFor(SyncAction action)
+    {
+        return action switch
+        {
+            SyncAction.CopyToRight => PackIconLucideKind.ArrowRight,
+            SyncAction.CopyToLeft => PackIconLucideKind.ArrowLeft,
+            SyncAction.Skip => PackIconLucideKind.Ban,
+            SyncAction.DeleteLeft or SyncAction.DeleteRight => PackIconLucideKind.Trash2,
+            _ => PackIconLucideKind.Zap,
+        };
+    }
+
+    private static (bool Actionable, SyncAction? Uniform) ComputeSubtreeAction(DirectoryComparison root)
+    {
+        var actionable = false;
+        var first = true;
+        var mixed = false;
+        var uniform = SyncAction.None;
+
+        Walk(root);
+
+        return (actionable, mixed || !actionable ? null : uniform);
+
+        void Walk(DirectoryComparison dir)
+        {
+            foreach (var file in dir.Files)
+            {
+                if (file.Status == ComparisonStatus.Identical)
+                {
+                    continue;
+                }
+
+                actionable = true;
+
+                if (first)
+                {
+                    uniform = file.Action;
+                    first = false;
+                }
+                else if (file.Action != uniform)
+                {
+                    mixed = true;
+                }
+            }
+
+            foreach (var sub in dir.SubDirectories)
+            {
+                Walk(sub);
+            }
         }
     }
 
     private static string FormatModified(DateTime? value)
     {
-        return value is { } dt ? dt.ToString("yyyy-MM-dd HH:mm") : string.Empty;
+        return value is { } dt ? dt.ToString("yyyy-MM-dd HH:mm:ss") : string.Empty;
+    }
+
+    private static string FormatDelta(TimeSpan delta)
+    {
+        var d = delta.Duration();
+
+        if (d.TotalSeconds < 60)
+        {
+            return $"{(int)Math.Round(d.TotalSeconds)} с";
+        }
+
+        if (d.TotalMinutes < 60)
+        {
+            return $"{(int)Math.Round(d.TotalMinutes)} мин";
+        }
+
+        return $"{d.TotalHours:0.#} ч";
     }
 
     [RelayCommand]
@@ -164,13 +350,37 @@ public sealed partial class SyncNodeViewModel : ObservableObject
     [RelayCommand]
     private void CycleAction()
     {
-        if (_file is null || Status == ComparisonStatus.Identical)
+        if (_file is not null)
+        {
+            if (Status == ComparisonStatus.Identical)
+            {
+                return;
+            }
+
+            var cycle = FileActionCycle;
+            var index = Array.IndexOf(cycle, _file.Action);
+            SetAction(index < 0 ? cycle[0] : cycle[(index + 1) % cycle.Length]);
+            return;
+        }
+
+        if (_dir is null)
         {
             return;
         }
 
-        var index = Array.IndexOf(ActionCycle, _file.Action);
-        SetAction(index < 0 ? ActionCycle[0] : ActionCycle[(index + 1) % ActionCycle.Length]);
+        if (IsOneSidedDir)
+        {
+            var cycle = _dir.Status == ComparisonStatus.LeftOnly ? OneSidedLeftCycle : OneSidedRightCycle;
+            var index = Array.IndexOf(cycle, _dir.Action);
+            ApplyToSubtree(index < 0 ? cycle[0] : cycle[(index + 1) % cycle.Length]);
+            return;
+        }
+
+        if (_subtreeActionable)
+        {
+            var index = _subtreeAction is { } current ? Array.IndexOf(DirActionCycle, current) : -1;
+            ApplyToSubtree(index < 0 ? DirActionCycle[0] : DirActionCycle[(index + 1) % DirActionCycle.Length]);
+        }
     }
 
     [RelayCommand]

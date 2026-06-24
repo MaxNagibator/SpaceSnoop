@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
              xmlns:conv="clr-namespace:SpaceSnoop.Wpf.Converters"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
@@ -15,6 +16,20 @@
         <Style x:Key="TallyValue"
                TargetType="TextBlock"
                BasedOn="{StaticResource StatValue}" />
+
+        <Style x:Key="DirTally"
+               TargetType="StackPanel">
+            <Setter Property="Orientation"
+                    Value="Horizontal" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Setter Property="Margin"
+                    Value="8,0,0,0" />
+        </Style>
+
+        <Style x:Key="DirTallyValue"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource Caption}" />
 
         <Style x:Key="LedgerStrip"
                TargetType="Border"
@@ -94,6 +109,28 @@
                                Margin="0,0,7,0" />
                     <TextBlock Text="{Binding LeftOnlyCount}"
                                Style="{StaticResource TallyValue}" />
+                    <StackPanel>
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel"
+                                   BasedOn="{StaticResource DirTally}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding LeftOnlyDirCount}"
+                                                 Value="0">
+                                        <Setter Property="Visibility"
+                                                Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Folder}"
+                                                  Width="10"
+                                                  Height="10"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,4,0"
+                                                  Foreground="{DynamicResource Fg.Muted}" />
+                        <TextBlock Text="{Binding LeftOnlyDirCount}"
+                                   Style="{StaticResource DirTallyValue}" />
+                    </StackPanel>
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal"
@@ -109,6 +146,28 @@
                                Margin="0,0,7,0" />
                     <TextBlock Text="{Binding RightOnlyCount}"
                                Style="{StaticResource TallyValue}" />
+                    <StackPanel>
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel"
+                                   BasedOn="{StaticResource DirTally}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding RightOnlyDirCount}"
+                                                 Value="0">
+                                        <Setter Property="Visibility"
+                                                Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Folder}"
+                                                  Width="10"
+                                                  Height="10"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,4,0"
+                                                  Foreground="{DynamicResource Fg.Muted}" />
+                        <TextBlock Text="{Binding RightOnlyDirCount}"
+                                   Style="{StaticResource DirTallyValue}" />
+                    </StackPanel>
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal"
@@ -124,6 +183,28 @@
                                Margin="0,0,7,0" />
                     <TextBlock Text="{Binding ModifiedCount}"
                                Style="{StaticResource TallyValue}" />
+                    <StackPanel>
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel"
+                                   BasedOn="{StaticResource DirTally}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ModifiedDirCount}"
+                                                 Value="0">
+                                        <Setter Property="Visibility"
+                                                Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Folder}"
+                                                  Width="10"
+                                                  Height="10"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,4,0"
+                                                  Foreground="{DynamicResource Fg.Muted}" />
+                        <TextBlock Text="{Binding ModifiedDirCount}"
+                                   Style="{StaticResource DirTallyValue}" />
+                    </StackPanel>
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal"
@@ -166,6 +247,28 @@
                     <TextBlock Text="{Binding IdenticalCount}"
                                Style="{StaticResource TallyValue}"
                                Foreground="{DynamicResource Fg.Muted}" />
+                    <StackPanel>
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel"
+                                   BasedOn="{StaticResource DirTally}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IdenticalDirCount}"
+                                                 Value="0">
+                                        <Setter Property="Visibility"
+                                                Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Folder}"
+                                                  Width="10"
+                                                  Height="10"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,4,0"
+                                                  Foreground="{DynamicResource Fg.Muted}" />
+                        <TextBlock Text="{Binding IdenticalDirCount}"
+                                   Style="{StaticResource DirTallyValue}" />
+                    </StackPanel>
                 </StackPanel>
             </WrapPanel>
 

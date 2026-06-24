@@ -1,4 +1,6 @@
-﻿using System.Collections.Concurrent;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using System.Collections.Concurrent;
 using System.Security;
 
 namespace SpaceSnoop.Core;
@@ -6,8 +8,9 @@ namespace SpaceSnoop.Core;
 /// <summary>
 /// Калькулятор для вычисления занимаемого дискового пространства директории и ее подкаталогов.
 /// </summary>
-public class DiskSpaceCalculator
+public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator>? logger = null)
 {
+    private readonly ILogger _log = logger ?? NullLogger<DiskSpaceCalculator>.Instance;
     /// <summary>
     /// Вычисляет занимаемое дисковое пространство указанной директории и ее подкаталогов.
     /// </summary>
@@ -97,13 +100,11 @@ public class DiskSpaceCalculator
             progress?.AddFiles(files.Length, directorySpace.Size);
 
             var isRoot = parent is null;
-            var subDirectories = directory.EnumerateDirectories();
+            var subDirectories = Traversable(directory.GetDirectories());
 
             if (isRoot)
             {
-                var topLevel = subDirectories as DirectoryInfo[] ?? subDirectories.ToArray();
-                progress?.SetTopLevelTotal(topLevel.Length);
-                subDirectories = topLevel;
+                progress?.SetTopLevelTotal(subDirectories.Length);
             }
 
             foreach (var subDirectory in subDirectories)
@@ -122,8 +123,9 @@ public class DiskSpaceCalculator
         {
             throw;
         }
-        catch (Exception exception) when (exception is UnauthorizedAccessException or SecurityException)
+        catch (Exception exception) when (IsTraversalError(exception))
         {
+            _log.ScanDirectorySkipped(exception, directory.FullName);
             directorySpace.Error();
         }
 
@@ -143,13 +145,16 @@ public class DiskSpaceCalculator
         progress?.EnterDirectory(directory.FullName);
 
         Span<FileInfo> files;
+        DirectoryInfo[] subDirectories;
 
         try
         {
             files = directory.GetFiles();
+            subDirectories = directory.GetDirectories();
         }
-        catch (Exception exception) when (exception is UnauthorizedAccessException or SecurityException)
+        catch (Exception exception) when (IsTraversalError(exception))
         {
+            _log.ScanDirectorySkipped(exception, directory.FullName);
             directorySpace.Error();
             return directorySpace;
         }
@@ -157,7 +162,7 @@ public class DiskSpaceCalculator
         directorySpace.AddFiles(files);
         progress?.AddFiles(files.Length, directorySpace.Size);
 
-        AddSubDirectories(directorySpace, directory.GetDirectories(), counter, progress, cancel);
+        AddSubDirectories(directorySpace, Traversable(subDirectories), counter, progress, cancel);
 
         return directorySpace;
     }
@@ -211,5 +216,38 @@ public class DiskSpaceCalculator
         {
             counter.Inc();
         }
+    }
+
+    private DirectoryInfo[] Traversable(DirectoryInfo[] subDirectories)
+    {
+        if (!Array.Exists(subDirectories, IsReparsePoint))
+        {
+            return subDirectories;
+        }
+
+        var traversable = new List<DirectoryInfo>(subDirectories.Length);
+
+        foreach (var subDirectory in subDirectories)
+        {
+            if (IsReparsePoint(subDirectory))
+            {
+                _log.ScanReparsePointSkipped(subDirectory.FullName);
+                continue;
+            }
+
+            traversable.Add(subDirectory);
+        }
+
+        return [.. traversable];
+    }
+
+    private static bool IsReparsePoint(DirectoryInfo directory)
+    {
+        return (directory.Attributes & FileAttributes.ReparsePoint) != 0;
+    }
+
+    private static bool IsTraversalError(Exception exception)
+    {
+        return exception is IOException or UnauthorizedAccessException or SecurityException or ArgumentException or NotSupportedException;
     }
 }

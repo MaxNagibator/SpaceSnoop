@@ -19,6 +19,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     private readonly OperationPreferences _operations;
     private readonly ScanNodeFactory _nodeFactory;
     private readonly DeleteProgressDialogFactory _deleteDialogFactory;
+    private readonly ArchiveProgressDialogFactory _archiveDialogFactory;
     private readonly ILogger<ScanViewModel> _logger;
     private readonly DispatcherTimer _progressTimer;
 
@@ -142,6 +143,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         ScanInspectorViewModel inspector,
         ScanNodeFactory nodeFactory,
         DeleteProgressDialogFactory deleteDialogFactory,
+        ArchiveProgressDialogFactory archiveDialogFactory,
         ILogger<ScanViewModel> logger)
     {
         _calculator = calculator;
@@ -150,6 +152,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         _operations = operations;
         _nodeFactory = nodeFactory;
         _deleteDialogFactory = deleteDialogFactory;
+        _archiveDialogFactory = archiveDialogFactory;
         _logger = logger;
 
         Inspector = inspector;
@@ -158,6 +161,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         Inspector.Intensity = Preferences.Intensity;
 
         _nodeFactory.MarksChanged += RecountMarked;
+        _nodeFactory.ArchiveRequested += OnArchiveRequested;
 
         _progressTimer = new() { Interval = ProgressPollInterval };
         _progressTimer.Tick += OnProgressTick;
@@ -187,6 +191,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         new("По размеру", ScanSortField.Size),
         new("По дате создания", ScanSortField.CreationDate),
         new("По времени последнего доступа", ScanSortField.LastAccessTime),
+        new("По количеству файлов", ScanSortField.FileCount),
     ];
 
     public ScanPreferences Preferences { get; }
@@ -236,6 +241,30 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
         Inspector.Intensity = Preferences.Intensity;
         OnPropertyChanged(nameof(Intensity));
+    }
+
+    private async void OnArchiveRequested(ScanNodeViewModel node)
+    {
+        if (node.Space is not DirectorySpace dir)
+        {
+            return;
+        }
+
+        var dialog = _archiveDialogFactory.Create(dir);
+
+        try
+        {
+            await _dialogs.ShowAsync(dialog);
+        }
+        finally
+        {
+            dialog.RequestStop();
+        }
+
+        if (dialog.OriginalDeleted)
+        {
+            ApplyDeletionResult([dir]);
+        }
     }
 
     private static long? EstimateTotalBytes(DirectoryInfo directory)
@@ -700,8 +729,9 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         }
         catch (Exception exception)
         {
-            _logger.ScanFailed(exception, path);
-            _dialogs.Error("Ошибка сканирования", exception.Message);
+            var cause = exception.Unwrap();
+            _logger.ScanFailed(cause, path);
+            _dialogs.Error("Ошибка сканирования", cause.Message);
         }
         finally
         {

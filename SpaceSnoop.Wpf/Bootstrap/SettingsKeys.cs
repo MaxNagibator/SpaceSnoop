@@ -32,16 +32,33 @@ public static class SettingsKeys
     public const string DeleteMode = "wpf.delete.mode";
     public const string DefaultExclusions = "wpf.exclusions.default";
 
+    public const string ArchiveDeleteOriginal = "wpf.archive.delete_original";
+    public const string ArchiveCompression = "wpf.archive.compression";
+
     public const string SyncLeft = "wpf.sync.left";
     public const string SyncRight = "wpf.sync.right";
     public const string SyncExclusions = "wpf.sync.exclusions";
     public const string SyncMode = "wpf.sync.mode";
+    public const string SyncMirror = "wpf.sync.mirror";
     public const string SyncShowIdentical = "wpf.sync.show_identical";
     public const string SyncShowSizes = "wpf.sync.show_sizes";
     public const string SyncShowModified = "wpf.sync.show_modified";
+    public const string SyncBlankAbsent = "wpf.sync.blank_absent";
+    public const string SyncVerify = "wpf.sync.verify";
+    public const string SyncHideApplied = "wpf.sync.hide_applied";
+    public const string SyncFlatView = "wpf.sync.flat_view";
+    public const string SyncFlatSort = "wpf.sync.flat_sort";
+    public const string SyncFlatSortDesc = "wpf.sync.flat_sort_desc";
     public const string SyncDiffUnified = "wpf.sync.diff_unified";
     public const string SyncDiffCollapse = "wpf.sync.diff_collapse";
     public const string SyncPathSuggest = "wpf.sync.path_suggest";
+
+    public const string ScheduleProfiles = "wpf.schedule.profiles";
+
+    public const string UpdateDismissedVersion = "wpf.update.dismissed";
+    public const string UpdateRepository = "wpf.update.repository";
+    public const string UpdateCheckOnStartup = "wpf.update.check";
+    public const string UpdateAutoDownload = "wpf.update.auto_download";
 
     public static string Theme => ThemeManager.SettingsKeyName;
 }
