@@ -52,6 +52,7 @@ public static class SettingsKeys
     public const string SyncDiffUnified = "wpf.sync.diff_unified";
     public const string SyncDiffCollapse = "wpf.sync.diff_collapse";
     public const string SyncPathSuggest = "wpf.sync.path_suggest";
+    public const string SyncGitFolders = "wpf.sync.git_folders";
 
     public const string ScheduleProfiles = "wpf.schedule.profiles";
 

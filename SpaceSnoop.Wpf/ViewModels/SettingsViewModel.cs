@@ -117,6 +117,13 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         new(CompressionLevel.NoCompression, "Без сжатия (только упаковка)"),
     ];
 
+    public IReadOnlyList<EnumOption<GitFolderPromptChoice>> GitFolderOptions { get; } =
+    [
+        new(GitFolderPromptChoice.Ask, "Спрашивать"),
+        new(GitFolderPromptChoice.Skip, "Всегда пропускать"),
+        new(GitFolderPromptChoice.Keep, "Синхронизировать"),
+    ];
+
     public EnumOption<AppTheme> SelectedThemeOption
     {
         get => ThemeOptions.First(o => o.Value == Theme.Current);
@@ -178,6 +185,16 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
                 Operations.ArchiveCompression = value.Value;
                 OnPropertyChanged();
             }
+        }
+    }
+
+    public EnumOption<GitFolderPromptChoice> SelectedGitFolderOption
+    {
+        get => GitFolderOptions.First(o => o.Value == _settings.GetEnum(SettingsKeys.SyncGitFolders, GitFolderPromptChoice.Ask));
+        set
+        {
+            _settings.SetEnum(SettingsKeys.SyncGitFolders, value.Value);
+            OnPropertyChanged();
         }
     }
 

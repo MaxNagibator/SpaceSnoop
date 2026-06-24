@@ -378,6 +378,17 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
     }
 
+    internal static string AddGitExclusion(string exclusions)
+    {
+        var parts = exclusions.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        return parts.Any(static part => string.Equals(part, ".git", StringComparison.OrdinalIgnoreCase))
+            ? exclusions
+            : string.IsNullOrWhiteSpace(exclusions)
+                ? ".git"
+                : $"{exclusions.TrimEnd()},.git";
+    }
+
     private static void ApplyActionRecursive(DirectoryComparison dir, SyncAction action)
     {
         if (dir.Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly)
@@ -667,21 +678,39 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             return;
         }
 
-        var message = $"Найдены git-папки (.git): {gitFolders}."
-                      + Environment.NewLine
-                      + "Их можно синхронизировать (read-only снимается автоматически), но это множество мелких служебных файлов, которые в резервной копии обычно не нужны."
-                      + Environment.NewLine
-                      + Environment.NewLine
-                      + "Пропустить .git и копировать только рабочие файлы?";
+        var choice = _settings.GetEnum(SettingsKeys.SyncGitFolders, GitFolderPromptChoice.Ask);
 
-        if (!_dialogs.Confirm("Git-папки", message))
+        if (choice == GitFolderPromptChoice.Keep)
         {
-            _gitPromptDeclined = true;
+            return;
+        }
+
+        if (choice == GitFolderPromptChoice.Ask)
+        {
+            var prompt = new GitFolderPromptViewModel(gitFolders);
+            var skip = await _dialogs.ShowAsync(prompt);
+
+            if (prompt.Choice != GitFolderPromptChoice.Ask)
+            {
+                _settings.SetEnum(SettingsKeys.SyncGitFolders, prompt.Choice);
+            }
+
+            if (!skip)
+            {
+                _gitPromptDeclined = true;
+                return;
+            }
+        }
+
+        var updatedExclusions = AddGitExclusion(Exclusions);
+
+        if (string.Equals(updatedExclusions, Exclusions, StringComparison.Ordinal))
+        {
             return;
         }
 
         _logger.SyncGitFoldersSkipped(gitFolders);
-        Exclusions = string.IsNullOrWhiteSpace(Exclusions) ? ".git" : $"{Exclusions},.git";
+        Exclusions = updatedExclusions;
         await CompareAsync();
     }
 
