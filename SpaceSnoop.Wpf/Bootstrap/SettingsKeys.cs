@@ -52,5 +52,7 @@ public static class SettingsKeys
 
     public const string ScheduleProfiles = "wpf.schedule.profiles";
 
+    public const string UpdateDismissedVersion = "wpf.update.dismissed";
+
     public static string Theme => ThemeManager.SettingsKeyName;
 }

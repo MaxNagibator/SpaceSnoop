@@ -30,13 +30,15 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         AboutViewModel about,
         SettingsViewModel settingsPage,
         ModalHostViewModel modal,
-        ShellPreferences preferences)
+        ShellPreferences preferences,
+        AppUpdateViewModel appUpdate)
         : base(modal)
     {
         Theme = theme;
         Theme.PropertyChanged += OnThemePropertyChanged;
         Preferences = preferences;
         Preferences.PropertyChanged += OnPreferencesPropertyChanged;
+        AppUpdate = appUpdate;
 
         var scanItem = new NavigationItem("Сканирование", PackIconLucideKind.HardDrive, scan);
         var syncItem = new NavigationItem("Синхронизация", PackIconLucideKind.FolderSync, sync);
@@ -66,11 +68,15 @@ public sealed partial class ShellViewModel : ShellViewModelBase
 
         IsNavCollapsed = Preferences.NavCollapsed;
         Selected = ResolveStartupSection();
+
+        AppUpdate.Start();
     }
 
     public ThemeViewModel Theme { get; }
 
     public ShellPreferences Preferences { get; }
+
+    public AppUpdateViewModel AppUpdate { get; }
 
     public bool IsElevated { get; } = AdminElevation.IsElevated;
 

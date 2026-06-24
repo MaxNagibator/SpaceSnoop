@@ -162,6 +162,7 @@ public partial class App : Application
         services.AddSingleton<AboutViewModel>();
         services.AddSingleton<SettingsViewModel>();
 
+        services.AddSingleton<AppUpdateViewModel>();
         services.AddSingleton<ShellViewModel>();
         services.AddSingleton<MainWindow>();
 

@@ -30,15 +30,6 @@ jobs:
           VERSION=$(grep -oP '(?<=<Version>).*(?=</Version>)' Directory.Build.props)
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Create tag if needed
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        shell: bash
-        run: |
-          if ! git ls-remote --tags origin "refs/tags/v${{ steps.version.outputs.VERSION }}" | grep -q .; then
-            git tag "v${{ steps.version.outputs.VERSION }}"
-            git push origin "v${{ steps.version.outputs.VERSION }}"
-          fi
-
       - name: Decide if release is needed
         id: decide
         shell: bash
@@ -126,7 +117,7 @@ jobs:
           retention-days: 1
 
   publish:
-    needs: [prepare, build]
+    needs: [ prepare, build ]
     if: needs.prepare.outputs.should_release == 'true'
     runs-on: ubuntu-latest
 
@@ -141,6 +132,12 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+
+      - name: Generate checksums
+        shell: bash
+        run: |
+          cd dist
+          sha256sum *.exe *.zip > SHA256SUMS.txt
 
       - name: Render release body
         shell: bash

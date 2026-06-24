@@ -195,4 +195,13 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 1704, Level = LogLevel.Warning, Message = "Архив не прошёл проверку, оригинал не тронут: {Path} ({Detail})")]
     public static partial void ArchiveVerifyFailed(this ILogger logger, string path, string detail);
+
+    [LoggerMessage(EventId = 1800, Level = LogLevel.Information, Message = "Доступно обновление: {Latest} (текущая {Current})")]
+    public static partial void UpdateAvailable(this ILogger logger, string latest, string current);
+
+    [LoggerMessage(EventId = 1801, Level = LogLevel.Debug, Message = "Обновлений нет: текущая {Current}, последняя {Latest}")]
+    public static partial void UpdateUpToDate(this ILogger logger, string current, string latest);
+
+    [LoggerMessage(EventId = 1802, Level = LogLevel.Debug, Message = "Не удалось проверить обновления")]
+    public static partial void UpdateCheckFailed(this ILogger logger, Exception exception);
 }
