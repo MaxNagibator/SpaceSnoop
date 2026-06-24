@@ -228,6 +228,42 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         RebuildRows();
     }
 
+    public void CollapseSubtree(DirectoryComparison dir)
+    {
+        AddCollapsed(dir);
+        RebuildRows();
+    }
+
+    public void ExpandSubtree(DirectoryComparison dir)
+    {
+        RemoveCollapsed(dir);
+        RebuildRows();
+    }
+
+    [RelayCommand]
+    public void CollapseAll()
+    {
+        if (_result is null)
+        {
+            return;
+        }
+
+        CollapseAllDirectories(_result.Root);
+        RebuildRows();
+    }
+
+    [RelayCommand]
+    public void ExpandAll()
+    {
+        if (_result is null)
+        {
+            return;
+        }
+
+        _collapsed.Clear();
+        RebuildRows();
+    }
+
     public void ApplyToSubtree(DirectoryComparison dir, SyncAction action)
     {
         ApplyActionRecursive(dir, action);
@@ -1121,15 +1157,30 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private void CollapseAllDirectories(DirectoryComparison root)
     {
         _collapsed.Clear();
-        AddCollapsed(root);
+        AddCollapsedChildren(root);
+    }
 
-        void AddCollapsed(DirectoryComparison dir)
+    private void AddCollapsed(DirectoryComparison dir)
+    {
+        _collapsed.Add(dir);
+        AddCollapsedChildren(dir);
+    }
+
+    private void AddCollapsedChildren(DirectoryComparison dir)
+    {
+        foreach (var sub in dir.SubDirectories)
         {
-            foreach (var sub in dir.SubDirectories)
-            {
-                _collapsed.Add(sub);
-                AddCollapsed(sub);
-            }
+            AddCollapsed(sub);
+        }
+    }
+
+    private void RemoveCollapsed(DirectoryComparison dir)
+    {
+        _collapsed.Remove(dir);
+
+        foreach (var sub in dir.SubDirectories)
+        {
+            RemoveCollapsed(sub);
         }
     }
 
@@ -1167,7 +1218,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
             foreach (var dir in dirs.OrderBy(dir => dir.RelativePath, StringComparer.OrdinalIgnoreCase))
             {
-                buffer.Add(new(dir, 0, false, 0, 0, this, flat: true) { Outcome = _outcomes.GetValueOrDefault(dir) });
+                buffer.Add(new(dir, 0, false, 0, 0, this, true) { Outcome = _outcomes.GetValueOrDefault(dir) });
             }
         }
         else

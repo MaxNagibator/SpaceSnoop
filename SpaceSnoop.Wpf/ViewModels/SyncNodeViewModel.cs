@@ -76,6 +76,8 @@ public sealed partial class SyncNodeViewModel : ObservableObject
 
     public bool IsFile => _file is not null;
 
+    public bool TreeExpansionActionsVisible => IsDirectory && !_flat;
+
     public string Name => _dir?.Name ?? _file?.Name ?? string.Empty;
 
     public string DisplayName => _flat ? _file?.RelativePath ?? _dir?.RelativePath ?? Name : Name;
@@ -333,6 +335,24 @@ public sealed partial class SyncNodeViewModel : ObservableObject
         if (_dir is not null)
         {
             _owner.ToggleExpand(_dir);
+        }
+    }
+
+    [RelayCommand]
+    private void ExpandSubtree()
+    {
+        if (_dir is not null)
+        {
+            _owner.ExpandSubtree(_dir);
+        }
+    }
+
+    [RelayCommand]
+    private void CollapseSubtree()
+    {
+        if (_dir is not null)
+        {
+            _owner.CollapseSubtree(_dir);
         }
     }
 

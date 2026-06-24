@@ -277,6 +277,35 @@
                     </StackPanel>
                 </MenuItem.Header>
             </MenuItem>
+
+            <Separator
+                Visibility="{Binding PlacementTarget.DataContext.TreeExpansionActionsVisible, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}" />
+            <MenuItem
+                Command="{Binding PlacementTarget.DataContext.ExpandSubtreeCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                Visibility="{Binding PlacementTarget.DataContext.TreeExpansionActionsVisible, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+                <MenuItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                                  Kind="{x:Static iconPacks:PackIconLucideKind.ChevronsUpDown}"
+                                                  Foreground="{DynamicResource Fg.Muted}" />
+                        <TextBlock Text="Развернуть эту ветку"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </MenuItem.Header>
+            </MenuItem>
+            <MenuItem
+                Command="{Binding PlacementTarget.DataContext.CollapseSubtreeCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                Visibility="{Binding PlacementTarget.DataContext.TreeExpansionActionsVisible, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+                <MenuItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                                  Kind="{x:Static iconPacks:PackIconLucideKind.ChevronsDownUp}"
+                                                  Foreground="{DynamicResource Fg.Muted}" />
+                        <TextBlock Text="Свернуть эту ветку"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </MenuItem.Header>
+            </MenuItem>
         </ContextMenu>
 
         <Style x:Key="DiffRow"
@@ -804,6 +833,30 @@
                                 Orientation="Horizontal"
                                 VerticalAlignment="Center"
                                 Margin="12,0,0,0">
+                        <Button Style="{StaticResource Button.Secondary}"
+                                Command="{Binding ExpandAllCommand}"
+                                MinWidth="0"
+                                Padding="9,0"
+                                Margin="0,0,8,0"
+                                ToolTip="Развернуть все каталоги в дереве"
+                                AutomationProperties.Name="Развернуть все каталоги"
+                                Visibility="{Binding FlatView, Converter={StaticResource InverseBoolToVisibility}}">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ChevronsUpDown}"
+                                                      Width="14"
+                                                      Height="14" />
+                        </Button>
+                        <Button Style="{StaticResource Button.Secondary}"
+                                Command="{Binding CollapseAllCommand}"
+                                MinWidth="0"
+                                Padding="9,0"
+                                Margin="0,0,8,0"
+                                ToolTip="Свернуть все каталоги в дереве"
+                                AutomationProperties.Name="Свернуть все каталоги"
+                                Visibility="{Binding FlatView, Converter={StaticResource InverseBoolToVisibility}}">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ChevronsDownUp}"
+                                                      Width="14"
+                                                      Height="14" />
+                        </Button>
                         <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
                                       IsChecked="{Binding FlatView}"
                                       MinWidth="0"
