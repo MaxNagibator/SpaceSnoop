@@ -7,6 +7,16 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
 {
     public static readonly TimeSpan FatTimestampTolerance = TimeSpan.FromSeconds(2);
 
+    public static bool FilesIdentical(FileInfo left, FileInfo right)
+    {
+        if (left.Length != right.Length)
+        {
+            return false;
+        }
+
+        return (left.LastWriteTime - right.LastWriteTime).Duration() <= FatTimestampTolerance;
+    }
+
     public ComparisonResult Compare(string leftPath, string rightPath, CancellationToken cancel, IProgress<OperationProgress>? progress = null)
     {
         var leftDir = new DirectoryInfo(leftPath);
@@ -100,12 +110,9 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
                 fileComparison.LeftModified = leftFile.LastWriteTime;
                 fileComparison.RightModified = rightFile.LastWriteTime;
 
-                var sizeDiffers = leftFile.Length != rightFile.Length;
-                var timeDiffers = (leftFile.LastWriteTime - rightFile.LastWriteTime).Duration() > FatTimestampTolerance;
-
-                fileComparison.Status = sizeDiffers || timeDiffers
-                    ? ComparisonStatus.Modified
-                    : ComparisonStatus.Identical;
+                fileComparison.Status = FilesIdentical(leftFile, rightFile)
+                    ? ComparisonStatus.Identical
+                    : ComparisonStatus.Modified;
             }
             else if (hasLeft)
             {

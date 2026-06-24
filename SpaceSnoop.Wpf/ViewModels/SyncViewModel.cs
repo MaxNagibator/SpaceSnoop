@@ -68,6 +68,12 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private bool _blankAbsent;
 
     [ObservableProperty]
+    private bool _verify = AppDefaults.SyncVerifyDefault;
+
+    [ObservableProperty]
+    private bool _hideApplied;
+
+    [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CompareCommand))]
     [NotifyCanExecuteChangedFor(nameof(HashCommand))]
     [NotifyCanExecuteChangedFor(nameof(SyncCommand))]
@@ -679,10 +685,19 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         _logger.SyncStarted(CurrentMode);
 
+        var verify = Verify;
+
         var report = await RunAsync("Синхронизация:", (token, progress) =>
         {
             var engine = new SyncEngine(_engineLogger);
-            return engine.Execute(result, token, progress);
+            var executed = engine.Execute(result, token, progress);
+
+            if (verify)
+            {
+                engine.Verify(executed, result.LeftPath, result.RightPath, token);
+            }
+
+            return executed;
         }, planned.Total);
 
         stopwatch.Stop();
@@ -694,10 +709,17 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         _logger.SyncFinished(report.SuccessCount, report.Errors.Count, (long)stopwatch.Elapsed.TotalMilliseconds);
 
+        if (verify)
+        {
+            _logger.SyncVerified(report.Applied.Count, report.Mismatches.Count);
+        }
+
         WriteSyncLog(report);
-        _outcomes = SyncOutcomes.Build(result, report.Errors);
+        _outcomes = SyncOutcomes.Build(result, report.Errors, report.Mismatches);
         RebuildRows();
-        SummaryText = $"Готово за {stopwatch.Elapsed.TotalSeconds:F2} с. Успешно: {report.SuccessCount:N0}, ошибок: {report.Errors.Count:N0}";
+
+        var verifyText = verify ? $", расхождений: {report.Mismatches.Count:N0}" : string.Empty;
+        SummaryText = $"Готово за {stopwatch.Elapsed.TotalSeconds:F2} с. Успешно: {report.SuccessCount:N0}, ошибок: {report.Errors.Count:N0}{verifyText}";
         StatusCaption = SummaryText;
 
         if (report.Errors.Count > 0)
@@ -711,6 +733,18 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             }
 
             _dialogs.Warning("Ошибки", $"Ошибки при синхронизации:{Environment.NewLine}{list}");
+        }
+        else if (report.Mismatches.Count > 0)
+        {
+            const int MaxShown = 20;
+            var list = string.Join(Environment.NewLine, report.Mismatches.Take(MaxShown).Select(m => $"  {m.RelativePath}: {m.Reason}"));
+
+            if (report.Mismatches.Count > MaxShown)
+            {
+                list += $"{Environment.NewLine}  …и ещё {report.Mismatches.Count - MaxShown}";
+            }
+
+            _dialogs.Warning("Расхождения после синхронизации", $"После применения проверка нашла расхождения:{Environment.NewLine}{list}");
         }
         else
         {
@@ -833,6 +867,21 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     partial void OnBlankAbsentChanged(bool value)
     {
         Persist(SettingsKeys.SyncBlankAbsent, value ? "true" : "false");
+
+        if (_result is not null)
+        {
+            RebuildRows();
+        }
+    }
+
+    partial void OnVerifyChanged(bool value)
+    {
+        Persist(SettingsKeys.SyncVerify, value ? "true" : "false");
+    }
+
+    partial void OnHideAppliedChanged(bool value)
+    {
+        Persist(SettingsKeys.SyncHideApplied, value ? "true" : "false");
 
         if (_result is not null)
         {
@@ -983,9 +1032,16 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
                 continue;
             }
 
+            var outcome = _outcomes.GetValueOrDefault(sub);
+
+            if (HideApplied && outcome == SyncOutcome.Applied)
+            {
+                continue;
+            }
+
             var expanded = !_collapsed.Contains(sub);
             var sizes = _dirSizeCache?.GetValueOrDefault(sub);
-            buffer.Add(new(sub, indent, expanded, sizes?.Left ?? 0, sizes?.Right ?? 0, this) { Outcome = _outcomes.GetValueOrDefault(sub) });
+            buffer.Add(new(sub, indent, expanded, sizes?.Left ?? 0, sizes?.Right ?? 0, this) { Outcome = outcome });
 
             if (expanded)
             {
@@ -1000,7 +1056,14 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
                 continue;
             }
 
-            buffer.Add(new(file, indent, this) { Outcome = _outcomes.GetValueOrDefault(file) });
+            var outcome = _outcomes.GetValueOrDefault(file);
+
+            if (HideApplied && outcome == SyncOutcome.Applied)
+            {
+                continue;
+            }
+
+            buffer.Add(new(file, indent, this) { Outcome = outcome });
         }
     }
 
@@ -1082,6 +1145,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         ShowSizes = _settings.GetBool(SettingsKeys.SyncShowSizes, AppDefaults.SyncShowSizesDefault);
         ShowModified = _settings.GetBool(SettingsKeys.SyncShowModified);
         BlankAbsent = _settings.GetBool(SettingsKeys.SyncBlankAbsent);
+        Verify = _settings.GetBool(SettingsKeys.SyncVerify, AppDefaults.SyncVerifyDefault);
+        HideApplied = _settings.GetBool(SettingsKeys.SyncHideApplied);
 
         _suppressPersist = false;
     }

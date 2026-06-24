@@ -100,6 +100,9 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1216, Level = LogLevel.Information, Message = "Операция «{Operation}» отменена")]
     public static partial void SyncOperationCancelled(this ILogger logger, string operation);
 
+    [LoggerMessage(EventId = 1217, Level = LogLevel.Information, Message = "Проверка синхронизации: проверено {Checked}, расхождений {Mismatches}")]
+    public static partial void SyncVerified(this ILogger logger, int @checked, int mismatches);
+
     [LoggerMessage(EventId = 1250, Level = LogLevel.Information, Message = "Профиль расписания сохранён: «{Name}» (активно: {Enabled})")]
     public static partial void ScheduleProfileSaved(this ILogger logger, string name, bool enabled);
 

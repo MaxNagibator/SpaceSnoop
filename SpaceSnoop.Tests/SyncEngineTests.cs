@@ -347,6 +347,78 @@ public class SyncEngineTests
     }
 
     [Test]
+    public void Verify_AfterSuccessfulSync_ReportsNoMismatches()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "hello world");
+
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("a.txt", "a.txt") { Status = ComparisonStatus.LeftOnly, Action = SyncAction.CopyToRight });
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
+        var report = engine.Execute(result, CancellationToken.None);
+
+        engine.Verify(report, _leftDir, _rightDir, CancellationToken.None);
+
+        Assert.That(report.Mismatches, Is.Empty);
+    }
+
+    [Test]
+    public void Verify_MissingDestination_ReportsMismatch()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "data");
+
+        var report = new SyncReport();
+        report.Applied.Add(new(SyncAction.CopyToRight, "a.txt", 4));
+
+        new SyncEngine(NullLogger<SyncEngine>.Instance).Verify(report, _leftDir, _rightDir, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.Mismatches, Has.Count.EqualTo(1));
+            Assert.That(report.Mismatches[0].RelativePath, Is.EqualTo("a.txt"));
+        }
+    }
+
+    [Test]
+    public void Verify_DivergentContent_ReportsMismatch()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "source-long-content");
+        File.WriteAllText(Path.Combine(_rightDir, "a.txt"), "x");
+
+        var report = new SyncReport();
+        report.Applied.Add(new(SyncAction.CopyToRight, "a.txt", 0));
+
+        new SyncEngine(NullLogger<SyncEngine>.Instance).Verify(report, _leftDir, _rightDir, CancellationToken.None);
+
+        Assert.That(report.Mismatches, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public void Verify_DeletedFileStillPresent_ReportsMismatch()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "still here");
+
+        var report = new SyncReport();
+        report.Applied.Add(new(SyncAction.DeleteLeft, "a.txt", 0));
+
+        new SyncEngine(NullLogger<SyncEngine>.Instance).Verify(report, _leftDir, _rightDir, CancellationToken.None);
+
+        Assert.That(report.Mismatches, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public void Verify_DeletedFileGone_NoMismatch()
+    {
+        var report = new SyncReport();
+        report.Applied.Add(new(SyncAction.DeleteLeft, "gone.txt", 0));
+
+        new SyncEngine(NullLogger<SyncEngine>.Instance).Verify(report, _leftDir, _rightDir, CancellationToken.None);
+
+        Assert.That(report.Mismatches, Is.Empty);
+    }
+
+    [Test]
     public void WriteDetails_ListsAppliedActionsWithSizes_AndOmitsZeroSize()
     {
         File.WriteAllText(Path.Combine(_leftDir, "copy.txt"), "data");

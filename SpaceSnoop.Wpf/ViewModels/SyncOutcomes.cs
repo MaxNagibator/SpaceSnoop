@@ -4,26 +4,31 @@ public enum SyncOutcome
 {
     None = 0,
     Applied = 1,
-    Failed = 2,
+    Mismatch = 2,
+    Failed = 3,
 }
 
 public static class SyncOutcomes
 {
-    public static Dictionary<object, SyncOutcome> Build(ComparisonResult result, IReadOnlyList<SyncError> errors)
+    public static Dictionary<object, SyncOutcome> Build(
+        ComparisonResult result,
+        IReadOnlyList<SyncError> errors,
+        IReadOnlyList<SyncMismatch> mismatches)
     {
         var failed = new HashSet<string>(errors.Select(static e => e.RelativePath), StringComparer.OrdinalIgnoreCase);
+        var mismatched = new HashSet<string>(mismatches.Select(static m => m.RelativePath), StringComparer.OrdinalIgnoreCase);
         var map = new Dictionary<object, SyncOutcome>();
-        Walk(result.Root, failed, map);
+        Walk(result.Root, failed, mismatched, map);
         return map;
     }
 
-    private static SyncOutcome Walk(DirectoryComparison dir, HashSet<string> failed, Dictionary<object, SyncOutcome> map)
+    private static SyncOutcome Walk(DirectoryComparison dir, HashSet<string> failed, HashSet<string> mismatched, Dictionary<object, SyncOutcome> map)
     {
-        var rollup = OutcomeFor(dir.Action, dir.RelativePath, failed);
+        var rollup = OutcomeFor(dir.Action, dir.RelativePath, failed, mismatched);
 
         foreach (var file in dir.Files)
         {
-            var outcome = OutcomeFor(file.Action, file.RelativePath, failed);
+            var outcome = OutcomeFor(file.Action, file.RelativePath, failed, mismatched);
 
             if (outcome != SyncOutcome.None)
             {
@@ -34,7 +39,7 @@ public static class SyncOutcomes
 
         foreach (var sub in dir.SubDirectories)
         {
-            rollup = Max(rollup, Walk(sub, failed, map));
+            rollup = Max(rollup, Walk(sub, failed, mismatched, map));
         }
 
         if (rollup != SyncOutcome.None)
@@ -45,14 +50,19 @@ public static class SyncOutcomes
         return rollup;
     }
 
-    private static SyncOutcome OutcomeFor(SyncAction action, string relativePath, HashSet<string> failed)
+    private static SyncOutcome OutcomeFor(SyncAction action, string relativePath, HashSet<string> failed, HashSet<string> mismatched)
     {
         if (action is SyncAction.None or SyncAction.Skip)
         {
             return SyncOutcome.None;
         }
 
-        return failed.Contains(relativePath) ? SyncOutcome.Failed : SyncOutcome.Applied;
+        if (failed.Contains(relativePath))
+        {
+            return SyncOutcome.Failed;
+        }
+
+        return mismatched.Contains(relativePath) ? SyncOutcome.Mismatch : SyncOutcome.Applied;
     }
 
     private static SyncOutcome Max(SyncOutcome a, SyncOutcome b)

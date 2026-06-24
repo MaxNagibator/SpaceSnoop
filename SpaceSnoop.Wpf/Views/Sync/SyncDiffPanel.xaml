@@ -340,6 +340,12 @@
                                         Value="{DynamicResource State.Success}" />
                             </DataTrigger>
                             <DataTrigger Binding="{Binding Outcome}"
+                                         Value="Mismatch">
+                                <Setter TargetName="OutcomeBar"
+                                        Property="Background"
+                                        Value="{DynamicResource State.Warning}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Outcome}"
                                          Value="Failed">
                                 <Setter TargetName="OutcomeBar"
                                         Property="Background"
@@ -813,6 +819,23 @@
                                                           VerticalAlignment="Center"
                                                           Margin="0,0,6,0" />
                                 <TextBlock Text="Пусто"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
+                                      IsChecked="{Binding HideApplied}"
+                                      MinWidth="0"
+                                      Padding="9,0"
+                                      Margin="8,0,0,0"
+                                      ToolTip="Скрыть строки, успешно применённые при последней синхронизации"
+                                      AutomationProperties.Name="Скрыть успешно применённые строки">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.CheckCheck}"
+                                                          Width="14"
+                                                          Height="14"
+                                                          VerticalAlignment="Center"
+                                                          Margin="0,0,6,0" />
+                                <TextBlock Text="Скрыть применённые"
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </ToggleButton>

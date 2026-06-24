@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.VisualBasic.FileIO;
+using System.Security;
 
 namespace SpaceSnoop.Core;
 
@@ -10,6 +11,76 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         var report = new SyncReport();
         ExecuteRecursive(comparisonResult.Root, comparisonResult.LeftPath, comparisonResult.RightPath, report, progress, cancel);
         return report;
+    }
+
+    public void Verify(SyncReport report, string leftBase, string rightBase, CancellationToken cancel)
+    {
+        foreach (var item in report.Applied)
+        {
+            if (cancel.IsCancellationRequested)
+            {
+                return;
+            }
+
+            var leftPath = Path.Combine(leftBase, item.RelativePath);
+            var rightPath = Path.Combine(rightBase, item.RelativePath);
+
+            var reason = item.Action switch
+            {
+                SyncAction.CopyToRight => VerifyCopy(leftPath, rightPath),
+                SyncAction.CopyToLeft => VerifyCopy(rightPath, leftPath),
+                SyncAction.DeleteLeft => VerifyGone(leftPath),
+                SyncAction.DeleteRight => VerifyGone(rightPath),
+                _ => null,
+            };
+
+            if (reason is not null)
+            {
+                report.Mismatches.Add(new(item.RelativePath, item.Action, reason));
+            }
+        }
+    }
+
+    private static string? VerifyCopy(string source, string destination)
+    {
+        try
+        {
+            if (Directory.Exists(destination))
+            {
+                return null;
+            }
+
+            var destinationFile = new FileInfo(destination);
+
+            if (!destinationFile.Exists)
+            {
+                return "приёмник отсутствует после копирования";
+            }
+
+            var sourceFile = new FileInfo(source);
+
+            return sourceFile.Exists && !DirectoryComparer.FilesIdentical(sourceFile, destinationFile)
+                ? "содержимое расходится после копирования"
+                : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SecurityException)
+        {
+            return $"не удалось проверить: {ex.Message}";
+        }
+    }
+
+    private static string? VerifyGone(string path)
+    {
+        try
+        {
+            return File.Exists(path) || Directory.Exists(path)
+                ? "не удалён после синхронизации"
+                : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SecurityException)
+        {
+            return $"не удалось проверить: {ex.Message}";
+        }
     }
 
     private static long AppliedBytes(FileComparison file)
@@ -241,6 +312,7 @@ public sealed class SyncReport
     public int SuccessCount => CopiedCount + DeletedCount;
     public List<SyncApplied> Applied { get; } = [];
     public List<SyncError> Errors { get; } = [];
+    public List<SyncMismatch> Mismatches { get; } = [];
 
     public void WriteDetails(TextWriter writer)
     {
@@ -254,9 +326,16 @@ public sealed class SyncReport
         {
             writer.WriteLine($"  ОШИБКА: {error.RelativePath} ({error.Action}): {error.Message}");
         }
+
+        foreach (var mismatch in Mismatches)
+        {
+            writer.WriteLine($"  РАСХОЖДЕНИЕ: {mismatch.RelativePath} ({mismatch.Action}): {mismatch.Reason}");
+        }
     }
 }
 
 public sealed record SyncApplied(SyncAction Action, string RelativePath, long Bytes);
 
 public sealed record SyncError(string RelativePath, SyncAction Action, string Message);
+
+public sealed record SyncMismatch(string RelativePath, SyncAction Action, string Reason);

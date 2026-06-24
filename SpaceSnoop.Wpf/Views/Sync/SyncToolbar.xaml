@@ -261,6 +261,24 @@
                                    VerticalAlignment="Center" />
                     </StackPanel>
                 </ToggleButton>
+                <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
+                              IsChecked="{Binding Verify}"
+                              MinWidth="0"
+                              Padding="9,0"
+                              VerticalAlignment="Center"
+                              Margin="0,0,16,8"
+                              ToolTip="После синхронизации сверять затронутые файлы (размер + дата) без полного пересравнения"
+                              AutomationProperties.Name="Проверять результат после синхронизации">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ShieldCheck}"
+                                                  Width="14"
+                                                  Height="14"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,6,0" />
+                        <TextBlock Text="Проверять"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </ToggleButton>
                 <Grid VerticalAlignment="Center"
                       Margin="0,0,16,8">
                     <TextBox Text="{Binding Exclusions, UpdateSourceTrigger=PropertyChanged}"

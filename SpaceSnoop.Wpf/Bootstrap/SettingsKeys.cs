@@ -44,6 +44,8 @@ public static class SettingsKeys
     public const string SyncShowSizes = "wpf.sync.show_sizes";
     public const string SyncShowModified = "wpf.sync.show_modified";
     public const string SyncBlankAbsent = "wpf.sync.blank_absent";
+    public const string SyncVerify = "wpf.sync.verify";
+    public const string SyncHideApplied = "wpf.sync.hide_applied";
     public const string SyncDiffUnified = "wpf.sync.diff_unified";
     public const string SyncDiffCollapse = "wpf.sync.diff_collapse";
     public const string SyncPathSuggest = "wpf.sync.path_suggest";
