@@ -262,7 +262,8 @@
 
             <MenuItem
                 Command="{Binding PlacementTarget.DataContext.MarkDeletedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                ToolTip="Пометить узел и всё вложенное на удаление">
+                ToolTip="Пометить узел и всё вложенное на удаление"
+                Visibility="{Binding PlacementTarget.DataContext.IsMarkedDeleted, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource InverseBoolToVisibility}}">
                 <MenuItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
@@ -275,7 +276,8 @@
             </MenuItem>
             <MenuItem
                 Command="{Binding PlacementTarget.DataContext.UnmarkDeletedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                ToolTip="Снять пометку с узла и всего вложенного">
+                ToolTip="Снять пометку с узла и всего вложенного"
+                Visibility="{Binding PlacementTarget.DataContext.IsMarkedDeleted, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
                 <MenuItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
@@ -292,7 +294,7 @@
             <MenuItem
                 Command="{Binding PlacementTarget.DataContext.MarkContentsDeletedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                 ToolTip="Пометить на удаление всё вложенное; сама папка останется"
-                Visibility="{Binding PlacementTarget.DataContext.IsDirectory, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+                Visibility="{Binding PlacementTarget.DataContext.CanMarkContentsDeleted, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
                 <MenuItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
@@ -306,7 +308,7 @@
             <MenuItem
                 Command="{Binding PlacementTarget.DataContext.UnmarkContentsCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                 ToolTip="Снять пометку со всего содержимого папки"
-                Visibility="{Binding PlacementTarget.DataContext.IsDirectory, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+                Visibility="{Binding PlacementTarget.DataContext.CanUnmarkContents, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
                 <MenuItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"

@@ -98,6 +98,10 @@ public sealed partial class ScanNodeViewModel : ObservableObject
 
     public bool HasPreviewTiles => IsDirectory && PreviewTiles.Count > 0;
 
+    public bool CanMarkContentsDeleted => IsDirectory && !HasMarkedContents;
+
+    public bool CanUnmarkContents => IsDirectory && HasMarkedContents;
+
     public IReadOnlyList<ScanNodeViewModel> PreviewTiles
     {
         get
@@ -111,6 +115,8 @@ public sealed partial class ScanNodeViewModel : ObservableObject
                 .ToList();
         }
     }
+
+    private bool HasMarkedContents => Space is DirectorySpace dir && EnumerateChildren(dir).Any(HasDeletedRecursive);
 
     public void EnsureLoaded()
     {
@@ -193,6 +199,16 @@ public sealed partial class ScanNodeViewModel : ObservableObject
                 file.Restore();
             }
         }
+    }
+
+    private static bool HasDeletedRecursive(SpaceBase space)
+    {
+        if (space.IsDeleted)
+        {
+            return true;
+        }
+
+        return space is DirectorySpace dir && EnumerateChildren(dir).Any(HasDeletedRecursive);
     }
 
     partial void OnIsExpandedChanged(bool value)
@@ -297,6 +313,8 @@ public sealed partial class ScanNodeViewModel : ObservableObject
         if (Space is not null)
         {
             IsMarkedDeleted = Space.IsDeleted;
+            OnPropertyChanged(nameof(CanMarkContentsDeleted));
+            OnPropertyChanged(nameof(CanUnmarkContents));
         }
 
         foreach (var child in Children)

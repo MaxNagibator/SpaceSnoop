@@ -261,6 +261,11 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
             dialog.RequestStop();
         }
 
+        if (dialog.CreatedArchivePath is { } archivePath)
+        {
+            AddArchiveToTree(dir, archivePath);
+        }
+
         if (dialog.OriginalDeleted)
         {
             ApplyDeletionResult([dir]);
@@ -349,9 +354,56 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         node.NotifyPropertiesChanged();
     }
 
+    private static bool RefreshNodeAfterAddition(ScanNodeViewModel node, DirectorySpace parent)
+    {
+        if (ReferenceEquals(node.Space, parent))
+        {
+            node.ReloadChildren();
+            node.NotifyPropertiesChanged();
+            return true;
+        }
+
+        foreach (var child in node.Children)
+        {
+            if (RefreshNodeAfterAddition(child, parent))
+            {
+                node.NotifyPropertiesChanged();
+                return true;
+            }
+        }
+
+        node.NotifyPropertiesChanged();
+        return false;
+    }
+
     private static string NormalizePath(string path)
     {
         return path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    }
+
+    private void AddArchiveToTree(DirectorySpace source, string archivePath)
+    {
+        if (source.Parent is not DirectorySpace parent || !File.Exists(archivePath))
+        {
+            return;
+        }
+
+        parent.AddFile(new(archivePath));
+
+        foreach (var root in Roots)
+        {
+            RefreshNodeAfterAddition(root, parent);
+        }
+
+        if (TreemapRoot is not null)
+        {
+            RebuildTiles();
+        }
+
+        if (SelectedNode is not null)
+        {
+            Inspector.Show(SelectedNode, _rootTotalSize);
+        }
     }
 
     private DriveItem AddDrive(string path)

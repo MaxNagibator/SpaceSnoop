@@ -5,6 +5,22 @@ namespace SpaceSnoop.Tests;
 [TestFixture]
 public class DirectorySpaceRemoveTests
 {
+    [SetUp]
+    public void SetUp()
+    {
+        _tempDir = Path.Combine(Path.GetTempPath(), $"SpaceSnoopRemove_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(_tempDir);
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        if (Directory.Exists(_tempDir))
+        {
+            Directory.Delete(_tempDir, true);
+        }
+    }
+
     private static (DirectorySpace Root, DirectorySpace Sub1, DirectorySpace Sub2, SpaceBase File1, SpaceBase File2) BuildTree(string tempDir)
     {
         var rootDir = new DirectoryInfo(tempDir);
@@ -43,22 +59,6 @@ public class DirectorySpaceRemoveTests
 
     private string _tempDir = null!;
 
-    [SetUp]
-    public void SetUp()
-    {
-        _tempDir = Path.Combine(Path.GetTempPath(), $"SpaceSnoopRemove_{Guid.NewGuid():N}");
-        Directory.CreateDirectory(_tempDir);
-    }
-
-    [TearDown]
-    public void TearDown()
-    {
-        if (Directory.Exists(_tempDir))
-        {
-            Directory.Delete(_tempDir, true);
-        }
-    }
-
     [Test]
     public void Remove_FileFromSubdir_UpdatesParentAndGrandparentTotalSize()
     {
@@ -72,10 +72,36 @@ public class DirectorySpaceRemoveTests
         {
             Assert.That(sub1.TotalSize, Is.EqualTo(sub1Before - file1.TotalSize),
                 "TotalSize подкаталога уменьшился на размер файла");
+
             Assert.That(root.TotalSize, Is.EqualTo(rootBefore - file1.TotalSize),
                 "TotalSize корня уменьшился на размер файла");
+
             Assert.That(sub1.Files, Does.Not.Contain(file1),
                 "Файл удалён из коллекции Files");
+        }
+    }
+
+    [Test]
+    public void AddFile_ToSubdir_UpdatesParentAndGrandparentTotalSize()
+    {
+        var (root, sub1, _, _, _) = BuildTree(_tempDir);
+        var rootBefore = root.TotalSize;
+        var sub1Before = sub1.TotalSize;
+        var archivePath = Path.Combine(_tempDir, "sub1.zip");
+        File.WriteAllBytes(archivePath, new byte[75]);
+
+        var added = sub1.AddFile(new(archivePath));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(sub1.TotalSize, Is.EqualTo(sub1Before + added.TotalSize),
+                "TotalSize подкаталога увеличился на размер файла");
+
+            Assert.That(root.TotalSize, Is.EqualTo(rootBefore + added.TotalSize),
+                "TotalSize корня увеличился на размер файла");
+
+            Assert.That(sub1.Files, Does.Contain(added),
+                "Файл добавлен в коллекцию Files");
         }
     }
 
@@ -92,6 +118,7 @@ public class DirectorySpaceRemoveTests
         {
             Assert.That(root.TotalSize, Is.EqualTo(rootBefore - sub1Size),
                 "TotalSize корня уменьшился на размер удалённого подкаталога");
+
             Assert.That(root.SubDirectories, Does.Not.Contain(sub1),
                 "Подкаталог удалён из коллекции SubDirectories");
         }
@@ -133,7 +160,7 @@ public class DirectorySpaceRemoveTests
         FileInfo[] files = [new(filePath)];
         scanRoot.AddFiles(files.AsSpan());
 
-        scanRoot.FixAbsolutePath(new DirectoryInfo(dirPath));
+        scanRoot.FixAbsolutePath(new(dirPath));
 
         var syntheticParent = (DirectorySpace)scanRoot.Parent!;
         var syntheticBefore = syntheticParent.TotalSize;

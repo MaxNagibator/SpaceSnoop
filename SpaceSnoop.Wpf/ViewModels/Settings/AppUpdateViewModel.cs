@@ -43,6 +43,10 @@ public sealed partial class AppUpdateViewModel : ObservableObject
     [ObservableProperty]
     private string _checkStatus = string.Empty;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasReleaseNotes))]
+    private string _releaseNotes = string.Empty;
+
     public AppUpdateViewModel(UpdatePreferences preferences, ISettingsStore settings, IDialogService dialogs, ILogger<AppUpdateViewModel> logger)
     {
         _preferences = preferences;
@@ -57,6 +61,8 @@ public sealed partial class AppUpdateViewModel : ObservableObject
         IsDownloading ? $"Загрузка {DownloadPercent}%"
         : _downloadedPath is not null ? "Готово к установке"
         : $"Доступна версия {VersionLabel}";
+
+    public bool HasReleaseNotes => !string.IsNullOrWhiteSpace(ReleaseNotes);
 
     public void Start()
     {
@@ -114,6 +120,32 @@ public sealed partial class AppUpdateViewModel : ObservableObject
         }
     }
 
+    private static string BuildReleaseNotes(JsonElement releases)
+    {
+        var notes = new List<string>();
+
+        foreach (var release in releases.EnumerateArray())
+        {
+            var tag = release.TryGetProperty("tag_name", out var tagProperty) ? tagProperty.GetString() : null;
+
+            if (!UpdateCheck.IsNewer(tag, AppInfo.Version))
+            {
+                continue;
+            }
+
+            var body = release.TryGetProperty("body", out var bodyProperty) ? bodyProperty.GetString()?.Trim() : null;
+
+            if (string.IsNullOrWhiteSpace(body))
+            {
+                continue;
+            }
+
+            notes.Add($"{tag}{Environment.NewLine}{body}");
+        }
+
+        return string.Join($"{Environment.NewLine}{Environment.NewLine}", notes);
+    }
+
     private async Task CheckAsync(bool announce = false)
     {
         if (_checking)
@@ -129,15 +161,23 @@ public sealed partial class AppUpdateViewModel : ObservableObject
 
         try
         {
-            using var response = await Http.GetAsync($"https://api.github.com/repos/{repo}/releases/latest");
+            using var response = await Http.GetAsync($"https://api.github.com/repos/{repo}/releases");
             response.EnsureSuccessStatusCode();
 
             await using var stream = await response.Content.ReadAsStreamAsync();
             using var json = await JsonDocument.ParseAsync(stream);
-            var root = json.RootElement;
+            var releases = json.RootElement;
 
-            _latestTag = root.TryGetProperty("tag_name", out var tag) ? tag.GetString() : null;
-            _releaseUrl = root.TryGetProperty("html_url", out var url) ? url.GetString() : null;
+            if (releases.ValueKind != JsonValueKind.Array || releases.GetArrayLength() == 0)
+            {
+                CheckStatus = "Релизы не найдены";
+                return;
+            }
+
+            var latest = releases.EnumerateArray().FirstOrDefault();
+            _latestTag = latest.TryGetProperty("tag_name", out var tag) ? tag.GetString() : null;
+            _releaseUrl = latest.TryGetProperty("html_url", out var url) ? url.GetString() : null;
+            ReleaseNotes = BuildReleaseNotes(releases);
 
             if (!UpdateCheck.IsNewer(_latestTag, AppInfo.Version))
             {
@@ -146,7 +186,7 @@ public sealed partial class AppUpdateViewModel : ObservableObject
                 return;
             }
 
-            ResolveAsset(root);
+            ResolveAsset(latest);
 
             var dismissed = string.Equals(_latestTag, _settings.GetStringValue(SettingsKeys.UpdateDismissedVersion), StringComparison.OrdinalIgnoreCase);
 
@@ -186,6 +226,7 @@ public sealed partial class AppUpdateViewModel : ObservableObject
         _downloadedPath = null;
         DownloadPercent = 0;
         VersionLabel = string.Empty;
+        ReleaseNotes = string.Empty;
     }
 
     private void ResolveAsset(JsonElement root)
@@ -234,7 +275,7 @@ public sealed partial class AppUpdateViewModel : ObservableObject
 
         if (_assetUrl is not null)
         {
-            var message = $"Доступна версия {_latestTag}.{Environment.NewLine}{Environment.NewLine}Скачать «{_assetName}» рядом с программой?";
+            var message = $"Доступна версия {_latestTag}.{Environment.NewLine}{ReleaseNotesBlock()}{Environment.NewLine}Скачать «{_assetName}» рядом с программой?";
 
             if (_dialogs.Confirm("Доступно обновление", message))
             {
@@ -244,7 +285,7 @@ public sealed partial class AppUpdateViewModel : ObservableObject
             return;
         }
 
-        var browse = $"Доступна версия {_latestTag}.{Environment.NewLine}{Environment.NewLine}Открыть страницу загрузки в браузере?";
+        var browse = $"Доступна версия {_latestTag}.{Environment.NewLine}{ReleaseNotesBlock()}{Environment.NewLine}Открыть страницу загрузки в браузере?";
 
         if (_dialogs.Confirm("Доступно обновление", browse))
         {
@@ -338,6 +379,17 @@ public sealed partial class AppUpdateViewModel : ObservableObject
         {
             IsDownloading = false;
         }
+    }
+
+    private string ReleaseNotesBlock()
+    {
+        if (string.IsNullOrWhiteSpace(ReleaseNotes))
+        {
+            return Environment.NewLine;
+        }
+
+        var notes = ReleaseNotes.Length <= 1200 ? ReleaseNotes : ReleaseNotes[..1200] + "…";
+        return $"{Environment.NewLine}Изменения:{Environment.NewLine}{notes}{Environment.NewLine}";
     }
 
     private void OpenFolder(string filePath)

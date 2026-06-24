@@ -9,6 +9,7 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 
 namespace SpaceSnoop.Wpf.Views.Scan;
 
@@ -233,13 +234,15 @@ public sealed class TreemapView : FrameworkElement
 
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
-        var node = HitTest(e.GetPosition(this));
+        var point = e.GetPosition(this);
+        var node = HitTest(point);
 
         if (node is null)
         {
             return;
         }
 
+        _cursor = point;
         SelectedItem = node;
 
         if (e.ClickCount == 2 && node is { IsDirectory: true, HasChildren: true } && DrillCommand?.CanExecute(node) == true)
@@ -331,6 +334,7 @@ public sealed class TreemapView : FrameworkElement
     {
         Resubscribe();
         InvalidateVisual();
+        Dispatcher.InvokeAsync(RefreshHover, DispatcherPriority.ContextIdle);
     }
 
     private void OnItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -368,6 +372,7 @@ public sealed class TreemapView : FrameworkElement
         }
 
         view.InvalidateVisual();
+        view.Dispatcher.InvokeAsync(view.RefreshHover, DispatcherPriority.ContextIdle);
     }
 
     private static void DrawIcon(DrawingContext context, Geometry geometry, Rect target)
@@ -523,6 +528,26 @@ public sealed class TreemapView : FrameworkElement
         }
 
         _toolTip.IsOpen = true;
+    }
+
+    private void RefreshHover()
+    {
+        if (!IsMouseOver)
+        {
+            return;
+        }
+
+        _cursor = Mouse.GetPosition(this);
+        var node = HitTest(_cursor);
+
+        if (ReferenceEquals(node, _hover))
+        {
+            Reposition();
+            return;
+        }
+
+        _hover = node;
+        ShowTooltip(node);
     }
 
     private void Reposition()

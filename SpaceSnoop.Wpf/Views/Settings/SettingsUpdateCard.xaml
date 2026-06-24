@@ -75,6 +75,26 @@
                            Margin="12,0,0,0"
                            VerticalAlignment="Center" />
             </StackPanel>
+
+            <Border Style="{StaticResource Card.Inset}"
+                    Margin="0,12,0,0"
+                    Padding="12"
+                    Visibility="{Binding Updater.HasReleaseNotes, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Text="Изменения"
+                               Style="{StaticResource Setting.Label}" />
+                    <ScrollViewer MaxHeight="220"
+                                  Margin="0,8,0,0"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <TextBlock Text="{Binding Updater.ReleaseNotes}"
+                                   TextWrapping="Wrap"
+                                   FontFamily="{DynamicResource Font.Mono}"
+                                   FontSize="{DynamicResource Font.Size.S}"
+                                   Foreground="{DynamicResource Fg.Secondary}" />
+                    </ScrollViewer>
+                </StackPanel>
+            </Border>
         </StackPanel>
     </Border>
 </UserControl>

@@ -142,12 +142,6 @@
                                     Property="Background"
                                     Value="{DynamicResource Accent.Soft}" />
                         </Trigger>
-                        <Trigger Property="IsKeyboardFocusWithin"
-                                 Value="True">
-                            <Setter TargetName="SelectionBd"
-                                    Property="BorderBrush"
-                                    Value="{DynamicResource Accent.Primary}" />
-                        </Trigger>
                         <Trigger Property="IsEnabled"
                                  Value="False">
                             <Setter Property="Opacity"

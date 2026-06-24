@@ -120,6 +120,15 @@ public class DirectorySpace : SpaceBase
         _totalFileCount = null;
     }
 
+    public FileSpace AddFile(FileInfo file)
+    {
+        var space = FileSpace.Create(file, this);
+        _files.Add(space);
+        Size += file.Length;
+        PropagateAddition(file.Length);
+        return space;
+    }
+
     /// <summary>
     /// Удаляет дочерний элемент из этой директории и вычитает его размер из TotalSize
     /// вверх по цепочке Parent. Пропагация останавливается на синтетическом родителе,
@@ -229,6 +238,18 @@ public class DirectorySpace : SpaceBase
         if (Parent is DirectorySpace parentDir && parentDir.ContainsChild(this))
         {
             parentDir.PropagateRemoval(size);
+        }
+    }
+
+    private void PropagateAddition(long size)
+    {
+        _totalSize += size;
+        _maxTotalSize = null;
+        _totalFileCount = null;
+
+        if (Parent is DirectorySpace parentDir && parentDir.ContainsChild(this))
+        {
+            parentDir.PropagateAddition(size);
         }
     }
 

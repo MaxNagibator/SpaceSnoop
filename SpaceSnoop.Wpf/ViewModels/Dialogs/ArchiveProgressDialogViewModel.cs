@@ -74,6 +74,8 @@ public sealed partial class ArchiveProgressDialogViewModel : ObservableObject, I
 
     public bool OriginalDeleted { get; private set; }
 
+    public string? CreatedArchivePath { get; private set; }
+
     public bool IsIdle => !IsRunning && !IsFinished;
 
     public bool IsIndeterminate => _total == 0;
@@ -171,6 +173,7 @@ public sealed partial class ArchiveProgressDialogViewModel : ObservableObject, I
         var compressed = new FileInfo(_request.TargetPath).Length;
         var ratio = stats.Bytes > 0 ? (1 - (double)compressed / stats.Bytes) * 100 : 0;
         _resultSummary = $"{SizeFormatter.Format(compressed)} (было {SizeFormatter.Format(stats.Bytes)}, −{ratio:F0} %)";
+        CreatedArchivePath = _request.TargetPath;
 
         if (_request.DeleteOriginal)
         {
