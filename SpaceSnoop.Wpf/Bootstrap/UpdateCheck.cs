@@ -11,6 +11,38 @@ public static class UpdateCheck
                && latest > current;
     }
 
+    public static string? PickAsset(IEnumerable<string> assetNames, string productName, bool selfContained)
+    {
+        var prefix = productName + "-v";
+
+        foreach (var name in assetNames)
+        {
+            if (!IsProduct(name))
+            {
+                continue;
+            }
+
+            var isPortable = name.EndsWith("-portable.zip", StringComparison.OrdinalIgnoreCase);
+
+            if (selfContained && isPortable)
+            {
+                return name;
+            }
+
+            if (!selfContained && !isPortable && name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            {
+                return name;
+            }
+        }
+
+        return null;
+
+        bool IsProduct(string name)
+        {
+            return name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
     private static bool TryParse(string? raw, [NotNullWhen(true)] out Version? version)
     {
         version = null;

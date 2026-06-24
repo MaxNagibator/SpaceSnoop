@@ -53,6 +53,9 @@ public static class SettingsKeys
     public const string ScheduleProfiles = "wpf.schedule.profiles";
 
     public const string UpdateDismissedVersion = "wpf.update.dismissed";
+    public const string UpdateRepository = "wpf.update.repository";
+    public const string UpdateCheckOnStartup = "wpf.update.check";
+    public const string UpdateAutoDownload = "wpf.update.auto_download";
 
     public static string Theme => ThemeManager.SettingsKeyName;
 }

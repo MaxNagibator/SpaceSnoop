@@ -138,6 +138,7 @@ public partial class App : Application
         services.AddSingleton<ShellPreferences>();
         services.AddSingleton<OperationPreferences>();
         services.AddSingleton<ScanPreferences>();
+        services.AddSingleton<UpdatePreferences>();
         services.AddSingleton<ThemeViewModel>();
 
         services.AddSingleton(new ErrorReportOptions

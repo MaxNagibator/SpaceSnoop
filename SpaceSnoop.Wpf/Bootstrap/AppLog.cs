@@ -204,4 +204,10 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 1802, Level = LogLevel.Debug, Message = "Не удалось проверить обновления")]
     public static partial void UpdateCheckFailed(this ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 1803, Level = LogLevel.Information, Message = "Обновление скачано: {Path}")]
+    public static partial void UpdateDownloaded(this ILogger logger, string path);
+
+    [LoggerMessage(EventId = 1804, Level = LogLevel.Warning, Message = "Не удалось скачать обновление: {Url}")]
+    public static partial void UpdateDownloadFailed(this ILogger logger, Exception exception, string url);
 }

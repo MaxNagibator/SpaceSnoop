@@ -23,6 +23,8 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         ShellPreferences shell,
         OperationPreferences operations,
         ScanPreferences scan,
+        UpdatePreferences update,
+        AppUpdateViewModel updater,
         ISettingsStore settings,
         ILogger<SettingsViewModel> logger)
     {
@@ -30,6 +32,8 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         Shell = shell;
         Operations = operations;
         Scan = scan;
+        Update = update;
+        Updater = updater;
         _settings = settings;
         _logger = logger;
 
@@ -43,6 +47,16 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     public OperationPreferences Operations { get; }
 
     public ScanPreferences Scan { get; }
+
+    public UpdatePreferences Update { get; }
+
+    public AppUpdateViewModel Updater { get; }
+
+    public IReadOnlyList<string> UpdateRepositoryPresets { get; } =
+    [
+        "MaxNagibator/SpaceSnoop",
+        "TheVSAKeeper/SpaceSnoop",
+    ];
 
     public string PageTitle => "Настройки";
 
@@ -227,6 +241,12 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         }
 
         Application.Current.Shutdown();
+    }
+
+    [RelayCommand]
+    private void SetUpdateRepository(string repository)
+    {
+        Update.Repository = repository;
     }
 
     [RelayCommand]
