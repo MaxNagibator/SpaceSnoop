@@ -11,6 +11,7 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
     private readonly ILogger<ScheduleViewModel> _logger;
 
     private bool _migrated;
+    private bool _persisting;
 
     public ScheduleViewModel(ISettingsStore settings, IDialogService dialogs, ILogger<ScheduleViewModel> logger)
     {
@@ -18,12 +19,9 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
         _dialogs = dialogs;
         _logger = logger;
 
-        foreach (var model in SyncProfileStore.Load(settings))
-        {
-            Profiles.Add(new(this, model));
-        }
-
+        ReloadProfiles();
         Profiles.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasProfiles));
+        Settings.Changed += OnSettingsChanged;
     }
 
     public ISettingsStore Settings { get; }
@@ -71,7 +69,16 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
 
     public void Persist()
     {
-        SyncProfileStore.Save(Settings, Profiles.Select(profile => profile.ToModel()));
+        _persisting = true;
+
+        try
+        {
+            SyncProfileStore.Save(Settings, Profiles.Select(profile => profile.ToModel()));
+        }
+        finally
+        {
+            _persisting = false;
+        }
     }
 
     public bool Confirm(string title, string message)
@@ -104,6 +111,14 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
     internal static bool LineHasErrors(string line)
     {
         return !line.Contains(", 0 ошибок", StringComparison.Ordinal);
+    }
+
+    private void OnSettingsChanged(object? sender, string key)
+    {
+        if (!_persisting && key == SettingsKeys.ScheduleProfiles)
+        {
+            ReloadProfiles();
+        }
     }
 
     [RelayCommand]
@@ -216,6 +231,18 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
         }
 
         OnPropertyChanged(nameof(HasHistory));
+    }
+
+    private void ReloadProfiles()
+    {
+        Profiles.Clear();
+
+        foreach (var model in SyncProfileStore.Load(Settings))
+        {
+            Profiles.Add(new(this, model));
+        }
+
+        OnPropertyChanged(nameof(HasProfiles));
     }
 }
 
