@@ -5,11 +5,16 @@ public sealed class SyncQuickProfileItem : ObservableObject
     private readonly Action<SyncQuickProfileItem> _requestDelete;
     private readonly Action<SyncQuickProfileItem> _confirmDelete;
     private readonly Action<SyncQuickProfileItem> _cancelDelete;
-    private readonly Action<SyncQuickProfileItem> _requestEdit;
-    private readonly Action<SyncQuickProfileItem> _confirmEdit;
-    private readonly Action<SyncQuickProfileItem> _cancelEdit;
+    private readonly Action<SyncQuickProfileItem> _requestUpdate;
+    private readonly Action<SyncQuickProfileItem> _confirmUpdate;
+    private readonly Action<SyncQuickProfileItem> _cancelUpdate;
+    private readonly Action<SyncQuickProfileItem> _requestRename;
+    private readonly Action<SyncQuickProfileItem> _confirmRename;
+    private readonly Action<SyncQuickProfileItem> _cancelRename;
     private bool _isDeleteConfirming;
-    private bool _isEditConfirming;
+    private bool _isUpdateConfirming;
+    private bool _isRenameConfirming;
+    private string _editName = string.Empty;
 
     public SyncQuickProfileItem(
         SyncProfile model,
@@ -17,24 +22,33 @@ public sealed class SyncQuickProfileItem : ObservableObject
         Action<SyncQuickProfileItem> requestDelete,
         Action<SyncQuickProfileItem> confirmDelete,
         Action<SyncQuickProfileItem> cancelDelete,
-        Action<SyncQuickProfileItem> requestEdit,
-        Action<SyncQuickProfileItem> confirmEdit,
-        Action<SyncQuickProfileItem> cancelEdit)
+        Action<SyncQuickProfileItem> requestUpdate,
+        Action<SyncQuickProfileItem> confirmUpdate,
+        Action<SyncQuickProfileItem> cancelUpdate,
+        Action<SyncQuickProfileItem> requestRename,
+        Action<SyncQuickProfileItem> confirmRename,
+        Action<SyncQuickProfileItem> cancelRename)
     {
         Model = model;
         IsDefault = isDefault;
         _requestDelete = requestDelete;
         _confirmDelete = confirmDelete;
         _cancelDelete = cancelDelete;
-        _requestEdit = requestEdit;
-        _confirmEdit = confirmEdit;
-        _cancelEdit = cancelEdit;
+        _requestUpdate = requestUpdate;
+        _confirmUpdate = confirmUpdate;
+        _cancelUpdate = cancelUpdate;
+        _requestRename = requestRename;
+        _confirmRename = confirmRename;
+        _cancelRename = cancelRename;
         RequestDeleteCommand = new RelayCommand(() => _requestDelete(this));
         ConfirmDeleteCommand = new RelayCommand(() => _confirmDelete(this));
         CancelDeleteCommand = new RelayCommand(() => _cancelDelete(this));
-        RequestEditCommand = new RelayCommand(() => _requestEdit(this));
-        ConfirmEditCommand = new RelayCommand(() => _confirmEdit(this));
-        CancelEditCommand = new RelayCommand(() => _cancelEdit(this));
+        RequestUpdateCommand = new RelayCommand(() => _requestUpdate(this));
+        ConfirmUpdateCommand = new RelayCommand(() => _confirmUpdate(this));
+        CancelUpdateCommand = new RelayCommand(() => _cancelUpdate(this));
+        RequestRenameCommand = new RelayCommand(() => _requestRename(this));
+        ConfirmRenameCommand = new RelayCommand(() => _confirmRename(this));
+        CancelRenameCommand = new RelayCommand(() => _cancelRename(this));
     }
 
     public IRelayCommand RequestDeleteCommand { get; }
@@ -43,11 +57,17 @@ public sealed class SyncQuickProfileItem : ObservableObject
 
     public IRelayCommand CancelDeleteCommand { get; }
 
-    public IRelayCommand RequestEditCommand { get; }
+    public IRelayCommand RequestUpdateCommand { get; }
 
-    public IRelayCommand ConfirmEditCommand { get; }
+    public IRelayCommand ConfirmUpdateCommand { get; }
 
-    public IRelayCommand CancelEditCommand { get; }
+    public IRelayCommand CancelUpdateCommand { get; }
+
+    public IRelayCommand RequestRenameCommand { get; }
+
+    public IRelayCommand ConfirmRenameCommand { get; }
+
+    public IRelayCommand CancelRenameCommand { get; }
 
     public SyncProfile Model { get; }
 
@@ -57,11 +77,19 @@ public sealed class SyncQuickProfileItem : ObservableObject
 
     public string Name => string.IsNullOrWhiteSpace(Model.Name) ? "Без названия" : Model.Name;
 
-    public bool CanShowActions => !IsDefault && !IsDeleteConfirming && !IsEditConfirming;
+    public string EditName
+    {
+        get => _editName;
+        set => SetProperty(ref _editName, value);
+    }
+
+    public bool CanShowActions => !IsDefault && !IsDeleteConfirming && !IsUpdateConfirming && !IsRenameConfirming;
 
     public bool CanConfirmDelete => !IsDefault && IsDeleteConfirming;
 
-    public bool CanConfirmEdit => !IsDefault && IsEditConfirming;
+    public bool CanConfirmUpdate => !IsDefault && IsUpdateConfirming;
+
+    public bool CanConfirmRename => !IsDefault && IsRenameConfirming;
 
     public bool IsDeleteConfirming
     {
@@ -76,15 +104,28 @@ public sealed class SyncQuickProfileItem : ObservableObject
         }
     }
 
-    public bool IsEditConfirming
+    public bool IsUpdateConfirming
     {
-        get => _isEditConfirming;
+        get => _isUpdateConfirming;
         set
         {
-            if (SetProperty(ref _isEditConfirming, value))
+            if (SetProperty(ref _isUpdateConfirming, value))
             {
                 OnPropertyChanged(nameof(CanShowActions));
-                OnPropertyChanged(nameof(CanConfirmEdit));
+                OnPropertyChanged(nameof(CanConfirmUpdate));
+            }
+        }
+    }
+
+    public bool IsRenameConfirming
+    {
+        get => _isRenameConfirming;
+        set
+        {
+            if (SetProperty(ref _isRenameConfirming, value))
+            {
+                OnPropertyChanged(nameof(CanShowActions));
+                OnPropertyChanged(nameof(CanConfirmRename));
             }
         }
     }

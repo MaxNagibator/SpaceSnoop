@@ -211,7 +211,7 @@
             </Grid>
 
             <WrapPanel Margin="0,12,0,0">
-                <Grid Width="232"
+                <Grid Width="248"
                       VerticalAlignment="Center"
                       Margin="0,0,16,8">
                     <Grid.ColumnDefinitions>
@@ -221,7 +221,7 @@
 
                     <Button Grid.Column="0"
                             Style="{StaticResource Button.Ghost}"
-                            Command="{Binding SaveProfileCommand}"
+                            Command="{Binding Profiles.SaveProfileCommand}"
                             Width="32"
                             MinHeight="{DynamicResource Control.Height.Default}"
                             Padding="0"
@@ -234,9 +234,9 @@
                                                   Height="14" />
                     </Button>
 
-                    <ComboBox ItemsSource="{Binding QuickProfiles}"
+                    <ComboBox ItemsSource="{Binding Profiles.Items}"
                               Grid.Column="1"
-                              SelectedItem="{Binding SelectedProfile}"
+                              SelectedItem="{Binding Profiles.SelectedProfile}"
                               Style="{StaticResource ComboBox.Toolbar}"
                               VerticalAlignment="Center"
                               ToolTip="Профиль синхронизации">
@@ -252,7 +252,17 @@
                                                Text="{Binding Name}"
                                                VerticalAlignment="Center"
                                                TextTrimming="CharacterEllipsis"
-                                               Margin="0,0,12,0" />
+                                               Margin="0,0,12,0"
+                                               Visibility="{Binding CanConfirmRename, Converter={StaticResource InverseBoolToVisibility}}" />
+
+                                    <TextBox Grid.Column="0"
+                                             Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{StaticResource TextBox.Toolbar}"
+                                             MinWidth="128"
+                                             Margin="0,0,8,0"
+                                             ToolTip="Имя профиля"
+                                             AutomationProperties.Name="Имя профиля"
+                                             Visibility="{Binding CanConfirmRename, Converter={StaticResource BoolToVisibility}}" />
 
                                     <StackPanel Grid.Column="1"
                                                 Orientation="Horizontal">
@@ -274,11 +284,22 @@
                                         <StackPanel Orientation="Horizontal"
                                                     Visibility="{Binding CanShowActions, Converter={StaticResource BoolToVisibility}}">
                                             <Button Style="{StaticResource Button.Ghost}"
-                                                    Command="{Binding RequestEditCommand}"
+                                                    Command="{Binding RequestUpdateCommand}"
                                                     Padding="6,3"
                                                     MinHeight="24"
                                                     ToolTip="Обновить профиль текущими параметрами"
                                                     AutomationProperties.Name="Обновить профиль текущими параметрами">
+                                                <iconPacks:PackIconLucide
+                                                    Kind="{x:Static iconPacks:PackIconLucideKind.Save}"
+                                                    Width="13"
+                                                    Height="13" />
+                                            </Button>
+                                            <Button Style="{StaticResource Button.Ghost}"
+                                                    Command="{Binding RequestRenameCommand}"
+                                                    Padding="6,3"
+                                                    MinHeight="24"
+                                                    ToolTip="Переименовать профиль"
+                                                    AutomationProperties.Name="Переименовать профиль">
                                                 <iconPacks:PackIconLucide
                                                     Kind="{x:Static iconPacks:PackIconLucideKind.Pencil}"
                                                     Width="13"
@@ -298,9 +319,9 @@
                                         </StackPanel>
 
                                         <StackPanel Orientation="Horizontal"
-                                                    Visibility="{Binding CanConfirmEdit, Converter={StaticResource BoolToVisibility}}">
+                                                    Visibility="{Binding CanConfirmUpdate, Converter={StaticResource BoolToVisibility}}">
                                             <Button Style="{StaticResource Button.Ghost}"
-                                                    Command="{Binding ConfirmEditCommand}"
+                                                    Command="{Binding ConfirmUpdateCommand}"
                                                     Padding="6,3"
                                                     MinHeight="24"
                                                     ToolTip="Подтвердить обновление"
@@ -311,11 +332,37 @@
                                                     Height="13" />
                                             </Button>
                                             <Button Style="{StaticResource Button.Ghost}"
-                                                    Command="{Binding CancelEditCommand}"
+                                                    Command="{Binding CancelUpdateCommand}"
                                                     Padding="6,3"
                                                     MinHeight="24"
                                                     ToolTip="Отменить обновление"
                                                     AutomationProperties.Name="Отменить обновление">
+                                                <iconPacks:PackIconLucide
+                                                    Kind="{x:Static iconPacks:PackIconLucideKind.X}"
+                                                    Width="13"
+                                                    Height="13" />
+                                            </Button>
+                                        </StackPanel>
+
+                                        <StackPanel Orientation="Horizontal"
+                                                    Visibility="{Binding CanConfirmRename, Converter={StaticResource BoolToVisibility}}">
+                                            <Button Style="{StaticResource Button.Ghost}"
+                                                    Command="{Binding ConfirmRenameCommand}"
+                                                    Padding="6,3"
+                                                    MinHeight="24"
+                                                    ToolTip="Сохранить имя"
+                                                    AutomationProperties.Name="Сохранить имя">
+                                                <iconPacks:PackIconLucide
+                                                    Kind="{x:Static iconPacks:PackIconLucideKind.Check}"
+                                                    Width="13"
+                                                    Height="13" />
+                                            </Button>
+                                            <Button Style="{StaticResource Button.Ghost}"
+                                                    Command="{Binding CancelRenameCommand}"
+                                                    Padding="6,3"
+                                                    MinHeight="24"
+                                                    ToolTip="Отменить переименование"
+                                                    AutomationProperties.Name="Отменить переименование">
                                                 <iconPacks:PackIconLucide
                                                     Kind="{x:Static iconPacks:PackIconLucideKind.X}"
                                                     Width="13"

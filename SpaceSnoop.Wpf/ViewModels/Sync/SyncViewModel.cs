@@ -11,8 +11,6 @@ namespace SpaceSnoop.Wpf.ViewModels.Sync;
 public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPageStatus
 {
     private const long MaxDiffBytes = 5 * 1024 * 1024;
-    private const string CurrentProfileId = "__current";
-
     private static readonly SyncMode[] ModeOrder = [SyncMode.LeftToRight, SyncMode.RightToLeft, SyncMode.Bidirectional];
     private readonly ISettingsStore _settings;
     private readonly IDialogService _dialogs;
@@ -27,8 +25,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private Dictionary<DirectoryComparison, (long Left, long Right)>? _dirSizeCache;
     private CancellationTokenSource? _cts;
     private bool _suppressPersist;
-    private bool _loadingProfiles;
-    private bool _applyingProfile;
     private bool _gitPromptDeclined;
     private bool _isIndeterminate = true;
     private double _progressValue;
@@ -89,15 +85,11 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private string _searchText = string.Empty;
 
     [ObservableProperty]
-    private SyncQuickProfileItem? _selectedProfile;
-
-    [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CompareCommand))]
     [NotifyCanExecuteChangedFor(nameof(HashCommand))]
     [NotifyCanExecuteChangedFor(nameof(SyncCommand))]
     [NotifyCanExecuteChangedFor(nameof(BrowseLeftCommand))]
     [NotifyCanExecuteChangedFor(nameof(BrowseRightCommand))]
-    [NotifyCanExecuteChangedFor(nameof(SaveProfileCommand))]
     private bool _isBusy;
 
     [ObservableProperty]
@@ -123,8 +115,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _logger = logger;
         _engineLogger = engineLogger;
         _comparerLogger = comparerLogger;
+        Profiles = new(settings, dialogs, BuildCurrentProfile, ApplyProfile, () => !IsBusy, message => StatusCaption = message);
         LoadSettings();
-        LoadProfiles();
+        Profiles.Load();
         _settings.Changed += OnSettingsChanged;
     }
 
@@ -132,7 +125,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public RangeObservableCollection<SyncNodeViewModel> Rows { get; } = [];
 
-    public RangeObservableCollection<SyncQuickProfileItem> QuickProfiles { get; } = [];
+    public SyncQuickProfilesViewModel Profiles { get; }
 
     public IReadOnlyList<string> Modes { get; } = ["Слева направо", "Справа налево", "Двусторонний"];
 
@@ -432,7 +425,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     {
         if (key == SettingsKeys.ScheduleProfiles)
         {
-            LoadProfiles();
+            Profiles.Load();
         }
     }
 
@@ -580,30 +573,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         return count;
     }
 
-    [RelayCommand]
-    private static void CancelEditProfile(SyncQuickProfileItem profile)
-    {
-        profile.IsEditConfirming = false;
-    }
-
-    [RelayCommand]
-    private static void CancelDeleteProfile(SyncQuickProfileItem profile)
-    {
-        profile.IsDeleteConfirming = false;
-    }
-
-    private static string BuildProfileName(string left, string right)
-    {
-        return $"{PathName(left)} → {PathName(right)}";
-
-        static string PathName(string path)
-        {
-            var trimmed = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            var name = Path.GetFileName(trimmed);
-            return string.IsNullOrWhiteSpace(name) ? trimmed : name;
-        }
-    }
-
     private void HashModifiedFiles(DirectoryComparison dir, string leftBase, string rightBase, IProgress<OperationProgress> progress, ref int done, CancellationToken token)
     {
         foreach (var file in dir.Files.Where(static f => f.Status == ComparisonStatus.Modified))
@@ -672,81 +641,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private void BrowseRight()
     {
         Browse(path => RightPath = path);
-    }
-
-    [RelayCommand(CanExecute = nameof(CanSaveProfile))]
-    private void SaveProfile()
-    {
-        if (!TryBuildProfile(null, out var profile))
-        {
-            return;
-        }
-
-        var profiles = SyncProfileStore.Load(_settings);
-        profiles.Add(profile);
-        SyncProfileStore.Save(_settings, profiles);
-        LoadProfiles(profile.Id);
-        StatusCaption = $"Профиль сохранён: {profile.Name}.";
-    }
-
-    [RelayCommand]
-    private void RequestEditProfile(SyncQuickProfileItem profile)
-    {
-        foreach (var item in QuickProfiles)
-        {
-            item.IsDeleteConfirming = false;
-            item.IsEditConfirming = false;
-        }
-
-        profile.IsEditConfirming = true;
-    }
-
-    [RelayCommand]
-    private void ConfirmEditProfile(SyncQuickProfileItem profile)
-    {
-        if (!TryBuildProfile(profile.Model, out var updated))
-        {
-            return;
-        }
-
-        var profiles = SyncProfileStore.Load(_settings);
-        var index = profiles.FindIndex(model => string.Equals(model.Id, profile.Id, StringComparison.Ordinal));
-
-        if (index < 0)
-        {
-            profiles.Add(updated);
-        }
-        else
-        {
-            profiles[index] = updated;
-        }
-
-        SyncProfileStore.Save(_settings, profiles);
-        LoadProfiles(updated.Id);
-        StatusCaption = $"Профиль обновлён: {updated.Name}.";
-    }
-
-    [RelayCommand]
-    private void RequestDeleteProfile(SyncQuickProfileItem profile)
-    {
-        foreach (var item in QuickProfiles)
-        {
-            item.IsDeleteConfirming = false;
-            item.IsEditConfirming = false;
-        }
-
-        profile.IsDeleteConfirming = true;
-    }
-
-    [RelayCommand]
-    private void ConfirmDeleteProfile(SyncQuickProfileItem profile)
-    {
-        var profiles = SyncProfileStore.Load(_settings);
-        profiles.RemoveAll(model => string.Equals(model.Id, profile.Id, StringComparison.Ordinal));
-        SyncProfileStore.Save(_settings, profiles);
-        SyncScheduler.Remove(SyncScheduler.TaskNameFor(profile.Id), out _);
-        LoadProfiles();
-        StatusCaption = $"Профиль удалён: {profile.Name}.";
     }
 
     [RelayCommand(CanExecute = nameof(CanRun))]
@@ -1075,7 +969,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     partial void OnSelectedModeIndexChanged(int value)
     {
         Persist(SettingsKeys.SyncMode, value.ToString());
-        MarkCurrentProfile();
+        Profiles.MarkCurrent();
         OnPropertyChanged(nameof(DirectionIconKind));
         OnPropertyChanged(nameof(DirectionHint));
         OnPropertyChanged(nameof(MirrorApplicable));
@@ -1088,10 +982,15 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     partial void OnMirrorChanged(bool value)
     {
         Persist(SettingsKeys.SyncMirror, value ? "true" : "false");
-        MarkCurrentProfile();
+        Profiles.MarkCurrent();
         OnPropertyChanged(nameof(MirrorHint));
         OnPropertyChanged(nameof(MirrorDeletes));
         ReapplyMode();
+    }
+
+    partial void OnIsBusyChanged(bool value)
+    {
+        Profiles.NotifyCanSaveChanged();
     }
 
     private void ReapplyMode()
@@ -1192,35 +1091,25 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
     }
 
-    partial void OnSelectedProfileChanged(SyncQuickProfileItem? value)
-    {
-        if (_loadingProfiles || value is null || value.IsDefault)
-        {
-            return;
-        }
-
-        ApplyProfile(value.Model);
-    }
-
     partial void OnLeftPathChanged(string value)
     {
         Persist(SettingsKeys.SyncLeft, value);
         LeftPathInvalid = PathMissing(value);
-        MarkCurrentProfile();
+        Profiles.MarkCurrent();
     }
 
     partial void OnRightPathChanged(string value)
     {
         Persist(SettingsKeys.SyncRight, value);
         RightPathInvalid = PathMissing(value);
-        MarkCurrentProfile();
+        Profiles.MarkCurrent();
     }
 
     partial void OnExclusionsChanged(string value)
     {
         OnPropertyChanged(nameof(ExclusionsEmpty));
         Persist(SettingsKeys.SyncExclusions, value);
-        MarkCurrentProfile();
+        Profiles.MarkCurrent();
     }
 
     private void Browse(Action<string> assign)
@@ -1330,38 +1219,13 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     private void ApplyProfile(SyncProfile profile)
     {
-        _applyingProfile = true;
-
-        try
-        {
-            ClearComparison();
-            LeftPath = profile.Left;
-            RightPath = profile.Right;
-            Exclusions = profile.Exclusions;
-            SelectedModeIndex = Math.Clamp(profile.Mode, 0, ModeOrder.Length - 1);
-            Mirror = profile.Mirror;
-            StatusCaption = $"Профиль применён: {profile.Name}.";
-        }
-        finally
-        {
-            _applyingProfile = false;
-        }
-    }
-
-    private void MarkCurrentProfile()
-    {
-        if (_loadingProfiles || _applyingProfile || QuickProfiles.Count == 0)
-        {
-            return;
-        }
-
-        var current = QuickProfiles[0].Model;
-        current.Left = LeftPath.Trim();
-        current.Right = RightPath.Trim();
-        current.Mode = SelectedModeIndex;
-        current.Mirror = Mirror;
-        current.Exclusions = Exclusions.Trim();
-        SelectedProfile = QuickProfiles[0];
+        ClearComparison();
+        LeftPath = profile.Left;
+        RightPath = profile.Right;
+        Exclusions = profile.Exclusions;
+        SelectedModeIndex = Math.Clamp(profile.Mode, 0, ModeOrder.Length - 1);
+        Mirror = profile.Mirror;
+        StatusCaption = $"Профиль применён: {profile.Name}.";
     }
 
     private void AddCollapsed(DirectoryComparison dir)
@@ -1599,71 +1463,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private bool HasActionableChanges()
     {
         return _result is not null && _result.CountPlannedActions().Total > 0;
-    }
-
-    private bool CanSaveProfile()
-    {
-        return !IsBusy;
-    }
-
-    private void LoadProfiles(string? selectedId = null)
-    {
-        selectedId ??= SelectedProfile?.Id;
-
-        var profiles = SyncProfileStore.Load(_settings)
-            .OrderBy(profile => profile.Name, StringComparer.CurrentCultureIgnoreCase)
-            .Select(profile => new SyncQuickProfileItem(profile,
-                false,
-                RequestDeleteProfile,
-                ConfirmDeleteProfile,
-                CancelDeleteProfile,
-                RequestEditProfile,
-                ConfirmEditProfile,
-                CancelEditProfile))
-            .ToList();
-
-        profiles.Insert(0,
-            new(BuildCurrentProfile(CurrentProfileId, "Текущие поля"),
-                true,
-                RequestDeleteProfile,
-                ConfirmDeleteProfile,
-                CancelDeleteProfile,
-                RequestEditProfile,
-                ConfirmEditProfile,
-                CancelEditProfile));
-
-        _loadingProfiles = true;
-        QuickProfiles.ReplaceAll(profiles);
-        SelectedProfile = QuickProfiles.FirstOrDefault(profile => string.Equals(profile.Id, selectedId, StringComparison.Ordinal))
-                          ?? QuickProfiles.FirstOrDefault();
-
-        _loadingProfiles = false;
-    }
-
-    private bool TryBuildProfile(SyncProfile? existing, out SyncProfile profile)
-    {
-        var left = LeftPath.Trim();
-        var right = RightPath.Trim();
-
-        if (left.Length == 0 || right.Length == 0)
-        {
-            _dialogs.Warning("Профиль синхронизации", "Укажите оба каталога.");
-            profile = new();
-            return false;
-        }
-
-        if (SyncProfile.PathsOverlap(left, right))
-        {
-            _dialogs.Warning("Профиль синхронизации", "Каталоги совпадают или вложены друг в друга – такой профиль опасен.");
-            profile = new();
-            return false;
-        }
-
-        profile = BuildCurrentProfile(existing?.Id ?? Guid.NewGuid().ToString("N")[..8],
-            (existing?.Name ?? string.Empty).Trim() is { Length: > 0 } name ? name : BuildProfileName(left, right),
-            existing);
-
-        return true;
     }
 
     private SyncProfile BuildCurrentProfile(string id, string name, SyncProfile? existing = null)

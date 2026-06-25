@@ -22,20 +22,21 @@ public class SyncQuickProfileTests
         vm.Mirror = true;
         vm.Exclusions = "bin,obj";
 
-        vm.SaveProfileCommand.Execute(null);
+        vm.Profiles.SaveProfileCommand.Execute(null);
 
         var profile = SyncProfileStore.Load(settings).Single();
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
+            Assert.That(profile.Name, Is.EqualTo("Left → Right"));
             Assert.That(profile.Left, Is.EqualTo(@"C:\Left"));
             Assert.That(profile.Right, Is.EqualTo(@"C:\Right"));
             Assert.That(profile.Mode, Is.EqualTo(1));
             Assert.That(profile.Mirror, Is.True);
             Assert.That(profile.Exclusions, Is.EqualTo("bin,obj"));
             Assert.That(profile.Enabled, Is.False);
-            Assert.That(vm.SelectedProfile?.Id, Is.EqualTo(profile.Id));
-        });
+            Assert.That(vm.Profiles.SelectedProfile?.Id, Is.EqualTo(profile.Id));
+        }
     }
 
     [Test]
@@ -66,13 +67,13 @@ public class SyncQuickProfileTests
         vm.Mirror = true;
         vm.Exclusions = "new";
 
-        var profileItem = vm.QuickProfiles.Single(profile => profile.Id == "abc");
-        profileItem.RequestEditCommand.Execute(null);
-        profileItem.ConfirmEditCommand.Execute(null);
+        var profileItem = vm.Profiles.Items.Single(profile => profile.Id == "abc");
+        profileItem.RequestUpdateCommand.Execute(null);
+        profileItem.ConfirmUpdateCommand.Execute(null);
 
         var profile = SyncProfileStore.Load(settings).Single();
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(profile.Id, Is.EqualTo("abc"));
             Assert.That(profile.Name, Is.EqualTo("Backup"));
@@ -84,7 +85,50 @@ public class SyncQuickProfileTests
             Assert.That(profile.Interval, Is.EqualTo(ScheduleInterval.Hourly));
             Assert.That(profile.Time, Is.EqualTo("11:00"));
             Assert.That(profile.Enabled, Is.True);
-        });
+        }
+    }
+
+    [Test]
+    public void Переименование_профиля_меняет_только_имя()
+    {
+        var settings = new MemorySettings();
+        SyncProfileStore.Save(settings,
+        [
+            new()
+            {
+                Id = "abc",
+                Name = "Backup",
+                Left = @"C:\Left",
+                Right = @"C:\Right",
+                Mode = 1,
+                Mirror = true,
+                Exclusions = "bin",
+                Interval = ScheduleInterval.Hourly,
+                Time = "11:00",
+                Enabled = true,
+            },
+        ]);
+
+        var vm = Create(settings);
+        var profileItem = vm.Profiles.Items.Single(profile => profile.Id == "abc");
+        profileItem.RequestRenameCommand.Execute(null);
+        profileItem.EditName = "Docs";
+        profileItem.ConfirmRenameCommand.Execute(null);
+
+        var profile = SyncProfileStore.Load(settings).Single();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(profile.Name, Is.EqualTo("Docs"));
+            Assert.That(profile.Left, Is.EqualTo(@"C:\Left"));
+            Assert.That(profile.Right, Is.EqualTo(@"C:\Right"));
+            Assert.That(profile.Mode, Is.EqualTo(1));
+            Assert.That(profile.Mirror, Is.True);
+            Assert.That(profile.Exclusions, Is.EqualTo("bin"));
+            Assert.That(profile.Interval, Is.EqualTo(ScheduleInterval.Hourly));
+            Assert.That(profile.Time, Is.EqualTo("11:00"));
+            Assert.That(profile.Enabled, Is.True);
+        }
     }
 
     [Test]
@@ -107,9 +151,9 @@ public class SyncQuickProfileTests
 
         var vm = Create(settings);
 
-        vm.SelectedProfile = vm.QuickProfiles.Single(profile => profile.Id == "abc");
+        vm.Profiles.SelectedProfile = vm.Profiles.Items.Single(profile => profile.Id == "abc");
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(vm.LeftPath, Is.EqualTo(@"C:\Left"));
             Assert.That(vm.RightPath, Is.EqualTo(@"C:\Right"));
@@ -121,7 +165,7 @@ public class SyncQuickProfileTests
             Assert.That(settings.GetStringValue(SettingsKeys.SyncMode), Is.EqualTo("1"));
             Assert.That(settings.GetStringValue(SettingsKeys.SyncMirror), Is.EqualTo("true"));
             Assert.That(settings.GetStringValue(SettingsKeys.SyncExclusions), Is.EqualTo("bin,obj"));
-        });
+        }
     }
 
     [Test]
@@ -140,17 +184,17 @@ public class SyncQuickProfileTests
         ]);
 
         var vm = Create(settings);
-        var profile = vm.QuickProfiles.Single(profile => profile.Id == "abc");
+        var profile = vm.Profiles.Items.Single(profile => profile.Id == "abc");
 
-        vm.RequestDeleteProfileCommand.Execute(profile);
-        vm.ConfirmDeleteProfileCommand.Execute(profile);
+        profile.RequestDeleteCommand.Execute(null);
+        profile.ConfirmDeleteCommand.Execute(null);
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
-            Assert.That(vm.QuickProfiles.Select(profile => profile.Id), Is.EqualTo(new[] { "__current" }));
+            Assert.That(vm.Profiles.Items.Select(profile => profile.Id), Is.EqualTo(new[] { SyncQuickProfilesViewModel.CurrentProfileId }));
             Assert.That(SyncProfileStore.Load(settings), Is.Empty);
-            Assert.That(vm.SelectedProfile?.Id, Is.EqualTo("__current"));
-        });
+            Assert.That(vm.Profiles.SelectedProfile?.Id, Is.EqualTo(SyncQuickProfilesViewModel.CurrentProfileId));
+        }
     }
 
     private static SyncViewModel Create(ISettingsStore settings)
