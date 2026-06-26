@@ -116,9 +116,10 @@ public sealed partial class AppUpdateViewModel : ObservableObject
 
             using var json = await GetReleasesAsync(repo);
             var releases = json.RootElement;
+            var entries = releases.ValueKind == JsonValueKind.Array ? BuildChangelogEntries(releases) : [];
 
-            ChangelogEntries = releases.ValueKind == JsonValueKind.Array ? BuildChangelogEntries(releases) : [];
-            Changelog = releases.ValueKind == JsonValueKind.Array ? BuildChangelog(releases) : string.Empty;
+            ChangelogEntries = entries;
+            Changelog = BuildChangelog(entries);
             ChangelogStatus = HasChangelog ? string.Empty : "Релизы не найдены";
         }
         catch (Exception ex)
@@ -166,8 +167,7 @@ public sealed partial class AppUpdateViewModel : ObservableObject
             return [];
         }
 
-        var items = new List<ReleaseChangeViewModel>();
-        List<string>? details = null;
+        var items = new List<(string Summary, List<string> Details)>();
 
         foreach (var line in changes.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
         {
@@ -178,8 +178,7 @@ public sealed partial class AppUpdateViewModel : ObservableObject
 
             if (line.StartsWith("- ", StringComparison.Ordinal) || line.StartsWith("* ", StringComparison.Ordinal))
             {
-                details = [];
-                items.Add(new(line[2..].Trim(), details));
+                items.Add((line[2..].Trim(), []));
                 continue;
             }
 
@@ -190,18 +189,17 @@ public sealed partial class AppUpdateViewModel : ObservableObject
                 continue;
             }
 
-            if (details is null)
+            if (items.Count == 0)
             {
-                details = [];
-                items.Add(new(detail, details));
+                items.Add((detail, []));
             }
             else
             {
-                details.Add(detail);
+                items[^1].Details.Add(detail);
             }
         }
 
-        return items;
+        return items.Select(static item => new ReleaseChangeViewModel(item.Summary, item.Details)).ToList();
     }
 
     private void OnPreferencesChanged(object? sender, PropertyChangedEventArgs e)
@@ -271,9 +269,9 @@ public sealed partial class AppUpdateViewModel : ObservableObject
         return string.Join($"{Environment.NewLine}{Environment.NewLine}", notes);
     }
 
-    private static string BuildChangelog(JsonElement releases)
+    private static string BuildChangelog(IReadOnlyList<ReleaseNoteViewModel> entries)
     {
-        return string.Join($"{Environment.NewLine}{Environment.NewLine}", BuildChangelogEntries(releases)
+        return string.Join($"{Environment.NewLine}{Environment.NewLine}", entries
             .Select(static entry =>
                 $"## {entry.Title} · {entry.PublishedDate}{Environment.NewLine}{string.Join(Environment.NewLine, entry.Changes.Select(static change => FormatChange(change)))}"));
     }
@@ -285,7 +283,7 @@ public sealed partial class AppUpdateViewModel : ObservableObject
         return string.Join(Environment.NewLine, lines);
     }
 
-    private static IReadOnlyList<ReleaseNoteViewModel> BuildChangelogEntries(JsonElement releases)
+    internal static IReadOnlyList<ReleaseNoteViewModel> BuildChangelogEntries(JsonElement releases)
     {
         var entries = new List<ReleaseNoteViewModel>();
 
@@ -313,16 +311,19 @@ public sealed partial class AppUpdateViewModel : ObservableObject
         return entries;
     }
 
-    private static string? ExtractCompareUrl(string? body)
+    internal static string? ExtractCompareUrl(string? body)
     {
         if (string.IsNullOrWhiteSpace(body))
         {
             return null;
         }
 
-        var match = Regex.Match(body, @"https://\S+/compare/\S+");
+        var match = CompareUrlRegex().Match(body);
         return match.Success ? match.Value.TrimEnd('.') : null;
     }
+
+    [GeneratedRegex(@"https://\S+/compare/\S+")]
+    private static partial Regex CompareUrlRegex();
 
     private static async Task<JsonDocument> GetReleasesAsync(string repo)
     {
@@ -360,9 +361,10 @@ public sealed partial class AppUpdateViewModel : ObservableObject
             var latest = releases.EnumerateArray().FirstOrDefault();
             _latestTag = latest.TryGetProperty("tag_name", out var tag) ? tag.GetString() : null;
             _releaseUrl = latest.TryGetProperty("html_url", out var url) ? url.GetString() : null;
+            var entries = BuildChangelogEntries(releases);
             ReleaseNotes = BuildReleaseNotes(releases);
-            ChangelogEntries = BuildChangelogEntries(releases);
-            Changelog = BuildChangelog(releases);
+            ChangelogEntries = entries;
+            Changelog = BuildChangelog(entries);
             ChangelogStatus = HasChangelog ? string.Empty : "Релизы не найдены";
 
             if (!UpdateCheck.IsNewer(_latestTag, AppInfo.Version))
