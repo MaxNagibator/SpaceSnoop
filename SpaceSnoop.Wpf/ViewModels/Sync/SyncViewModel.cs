@@ -31,6 +31,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private double _progressMax = 1;
     private Dictionary<ComparisonStatus, int> _stats = NewZeroStats();
     private Dictionary<ComparisonStatus, int> _dirStats = NewZeroStats();
+    private FreshnessSummary _freshness;
     private int _total;
 
     [ObservableProperty]
@@ -187,6 +188,32 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     };
 
     public bool MirrorDeletes => Mirror && MirrorApplicable;
+
+    public bool ShowNewerBadge => _result is not null && _freshness.Verdict != NewerSide.None;
+
+    public PackIconLucideKind NewerBadgeIconKind => _freshness.Verdict switch
+    {
+        NewerSide.Left => PackIconLucideKind.ArrowLeft,
+        NewerSide.Right => PackIconLucideKind.ArrowRight,
+        _ => PackIconLucideKind.ArrowRightLeft,
+    };
+
+    public bool NewerIsLeft => _freshness.Verdict == NewerSide.Left;
+
+    public bool NewerIsRight => _freshness.Verdict == NewerSide.Right;
+
+    public string NewerBadgeText => _freshness.Verdict switch
+    {
+        NewerSide.Left => "СЛЕВА",
+        NewerSide.Right => "СПРАВА",
+        NewerSide.Tie => "ПОРОВНУ",
+        _ => string.Empty,
+    };
+
+    public string NewerBadgeTooltip =>
+        $"Свежее по изменённым файлам: слева {_freshness.LeftNewer:N0}, справа {_freshness.RightNewer:N0}.{Environment.NewLine}"
+        + $"Новейший файл слева: {FormatStamp(_freshness.LeftMax)}, справа: {FormatStamp(_freshness.RightMax)}.{Environment.NewLine}"
+        + $"Только слева: {_freshness.LeftOnly:N0}, только справа: {_freshness.RightOnly:N0}.";
 
     public bool ExclusionsEmpty => string.IsNullOrWhiteSpace(Exclusions);
 
@@ -573,6 +600,11 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         return count;
     }
 
+    private static string FormatStamp(DateTime? value)
+    {
+        return value is { } stamp ? stamp.ToString("yyyy-MM-dd HH:mm") : "–";
+    }
+
     private void HashModifiedFiles(DirectoryComparison dir, string leftBase, string rightBase, IProgress<OperationProgress> progress, ref int done, CancellationToken token)
     {
         foreach (var file in dir.Files.Where(static f => f.Status == ComparisonStatus.Modified))
@@ -822,6 +854,17 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         {
             lines.Add(string.Empty);
             lines.Add("Изменённые отличаются размером или датой – кнопка «Хеши» сверит содержимым.");
+        }
+
+        if (planned.Deletes + planned.DirDeletes > 0)
+        {
+            var (_, newest) = SyncFreshness.DeletionRecency(_result.Root);
+
+            if (newest is { } when)
+            {
+                lines.Add(string.Empty);
+                lines.Add($"Новейшее из удаляемого: {FormatStamp(when)} – убедитесь, что зеркалите не более свежую папку.");
+            }
         }
 
         lines.Add(string.Empty);
@@ -1348,6 +1391,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             SummaryText = "Сравнение не выполнялось.";
             _stats = NewZeroStats();
             _dirStats = NewZeroStats();
+            _freshness = default;
             _total = 0;
             NotifyLedgerChanged();
             HasPending = false;
@@ -1367,6 +1411,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         _stats = stats;
         _dirStats = _result.GetDirectoryStatistics();
+        _freshness = SyncFreshness.Compute(_result.Root);
         _total = stats.Values.Sum();
         NotifyLedgerChanged();
 
@@ -1458,6 +1503,12 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         OnPropertyChanged(nameof(ModifiedHint));
         OnPropertyChanged(nameof(ConflictHint));
         OnPropertyChanged(nameof(IdenticalHint));
+        OnPropertyChanged(nameof(ShowNewerBadge));
+        OnPropertyChanged(nameof(NewerBadgeIconKind));
+        OnPropertyChanged(nameof(NewerBadgeText));
+        OnPropertyChanged(nameof(NewerBadgeTooltip));
+        OnPropertyChanged(nameof(NewerIsLeft));
+        OnPropertyChanged(nameof(NewerIsRight));
     }
 
     private bool HasActionableChanges()

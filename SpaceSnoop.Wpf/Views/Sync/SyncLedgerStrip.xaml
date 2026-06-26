@@ -77,6 +77,43 @@
             <Setter Property="VerticalAlignment"
                     Value="Center" />
         </Style>
+
+        <Style x:Key="FreshIcon"
+               TargetType="iconPacks:PackIconLucide">
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Muted}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding NewerIsLeft}"
+                             Value="True">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.Success}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding NewerIsRight}"
+                             Value="True">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.Info}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="FreshValue"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource TallyValue}">
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Muted}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding NewerIsLeft}"
+                             Value="True">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.Success}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding NewerIsRight}"
+                             Value="True">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.Info}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
 
     <Border Style="{StaticResource LedgerStrip}"
@@ -274,6 +311,24 @@
                         <TextBlock Text="{Binding IdenticalDirCount}"
                                    Style="{StaticResource DirTallyValue}" />
                     </StackPanel>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="20,0,0,0"
+                            Visibility="{Binding ShowNewerBadge, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}"
+                            ToolTip="{Binding NewerBadgeTooltip}">
+                    <iconPacks:PackIconLucide Kind="{Binding NewerBadgeIconKind}"
+                                              Width="12"
+                                              Height="12"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,7,0"
+                                              Style="{StaticResource FreshIcon}" />
+                    <TextBlock Text="СВЕЖЕЕ"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding NewerBadgeText}"
+                               Style="{StaticResource FreshValue}" />
                 </StackPanel>
             </WrapPanel>
 
