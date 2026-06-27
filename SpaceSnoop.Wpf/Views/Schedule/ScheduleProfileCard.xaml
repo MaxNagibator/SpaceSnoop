@@ -199,20 +199,48 @@
                             <TextBlock Text="Изменить" />
                         </StackPanel>
                     </Button>
-                    <Button Style="{StaticResource Button.Ghost}"
-                            Command="{Binding DeleteCommand}"
-                            Foreground="{DynamicResource State.Error}"
-                            MinHeight="{DynamicResource Control.Height.Default}"
-                            Padding="12,6">
-                        <StackPanel Orientation="Horizontal">
-                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
-                                                      Width="13"
-                                                      Height="13"
-                                                      VerticalAlignment="Center"
-                                                      Margin="0,0,6,0" />
-                            <TextBlock Text="Удалить" />
+                    <Grid VerticalAlignment="Center">
+                        <Button Style="{StaticResource Button.Ghost}"
+                                Command="{Binding ArmDeleteCommand}"
+                                Foreground="{DynamicResource State.Error}"
+                                MinHeight="{DynamicResource Control.Height.Default}"
+                                Padding="12,6"
+                                Visibility="{Binding ConfirmingDelete, Converter={StaticResource InverseBoolToVisibility}}">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                                          Width="13"
+                                                          Height="13"
+                                                          VerticalAlignment="Center"
+                                                          Margin="0,0,6,0" />
+                                <TextBlock Text="Удалить" />
+                            </StackPanel>
+                        </Button>
+                        <StackPanel Orientation="Horizontal"
+                                    Visibility="{Binding ConfirmingDelete, Converter={StaticResource BoolToVisibility}}">
+                            <Button Style="{StaticResource Button.Icon}"
+                                    Command="{Binding DeleteCommand}"
+                                    AutomationProperties.Name="Подтвердить удаление профиля"
+                                    ToolTip="Удалить профиль и его задачу в Планировщике">
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Check}"
+                                                          Width="15"
+                                                          Height="15"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"
+                                                          Foreground="{DynamicResource State.Success}" />
+                            </Button>
+                            <Button Style="{StaticResource Button.Icon}"
+                                    Command="{Binding CancelDeleteCommand}"
+                                    AutomationProperties.Name="Отменить удаление"
+                                    ToolTip="Отмена">
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.X}"
+                                                          Width="15"
+                                                          Height="15"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"
+                                                          Foreground="{DynamicResource State.Error}" />
+                            </Button>
                         </StackPanel>
-                    </Button>
+                    </Grid>
                 </StackPanel>
             </StackPanel>
 

@@ -81,11 +81,6 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
         }
     }
 
-    public bool Confirm(string title, string message)
-    {
-        return _dialogs.Confirm(title, message);
-    }
-
     public void RemoveProfile(SyncProfileViewModel profile)
     {
         Profiles.Remove(profile);

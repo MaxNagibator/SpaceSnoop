@@ -53,6 +53,9 @@ public sealed partial class SyncProfileViewModel : ObservableObject
     private bool _isEditing;
 
     [ObservableProperty]
+    private bool _confirmingDelete;
+
+    [ObservableProperty]
     private string _message = string.Empty;
 
     [ObservableProperty]
@@ -221,6 +224,7 @@ public sealed partial class SyncProfileViewModel : ObservableObject
     private void Edit()
     {
         Message = string.Empty;
+        ConfirmingDelete = false;
         IsEditing = true;
     }
 
@@ -268,13 +272,20 @@ public sealed partial class SyncProfileViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void ArmDelete()
+    {
+        ConfirmingDelete = true;
+    }
+
+    [RelayCommand]
+    private void CancelDelete()
+    {
+        ConfirmingDelete = false;
+    }
+
+    [RelayCommand]
     private void Delete()
     {
-        if (!_parent.Confirm("Удаление профиля", $"Удалить профиль «{DisplayName}» и его задачу в Планировщике?"))
-        {
-            return;
-        }
-
         SyncScheduler.Remove(TaskName, out _);
         _parent.RemoveProfile(this);
     }
