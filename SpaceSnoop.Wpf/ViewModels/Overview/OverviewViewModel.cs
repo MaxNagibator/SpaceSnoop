@@ -110,6 +110,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
 
                     rowStopwatch.Stop();
                     row.ApplyStatistics(result.GetStatistics(), result.GetDirectoryStatistics());
+                    row.ApplyFreshness(SyncFreshness.Compute(result.Root));
                     row.ElapsedMs = (long)rowStopwatch.Elapsed.TotalMilliseconds;
                     row.Error = null;
                     row.Status = OverviewRunStatus.Compared;

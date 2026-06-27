@@ -9,6 +9,46 @@
              d:DataContext="{d:DesignInstance overview:OverviewRowViewModel}"
              d:DesignWidth="860">
 
+    <UserControl.Resources>
+        <Style x:Key="FreshIcon"
+               TargetType="iconPacks:PackIconLucide">
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Muted}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding NewerIsLeft}"
+                             Value="True">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.Success}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding NewerIsRight}"
+                             Value="True">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.Info}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="FreshValue"
+               TargetType="TextBlock">
+            <Setter Property="FontWeight"
+                    Value="{DynamicResource Font.Weight.SemiBold}" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Muted}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding NewerIsLeft}"
+                             Value="True">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.Success}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding NewerIsRight}"
+                             Value="True">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.Info}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
     <Border Style="{StaticResource Card.Inset}"
             Margin="0,0,0,8"
             Padding="14,10">
@@ -76,6 +116,25 @@
                            Style="{StaticResource TextBlock.Subtle}"
                            Margin="0,1,0,0"
                            Visibility="{Binding HasCounts, Converter={StaticResource BoolToVisibility}}" />
+
+                <StackPanel Orientation="Horizontal"
+                            Margin="0,4,0,0"
+                            Visibility="{Binding ShowNewerBadge, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}"
+                            ToolTip="{Binding NewerBadgeTooltip}">
+                    <iconPacks:PackIconLucide Kind="{Binding NewerBadgeIconKind}"
+                                              Width="12"
+                                              Height="12"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,7,0"
+                                              Style="{StaticResource FreshIcon}" />
+                    <TextBlock Text="СВЕЖЕЕ"
+                               Style="{StaticResource TextBlock.Subtle}"
+                               VerticalAlignment="Center"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding NewerBadgeText}"
+                               VerticalAlignment="Center"
+                               Style="{StaticResource FreshValue}" />
+                </StackPanel>
             </StackPanel>
 
             <Button Grid.Column="2"

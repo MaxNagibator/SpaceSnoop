@@ -6,8 +6,10 @@ public sealed partial class OverviewRowViewModel : ObservableObject
 {
     private readonly Action<SyncProfile> _openInSync;
 
+    private FreshnessSummary _freshness;
+
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(StatusText), nameof(StatusIconKind), nameof(HasCounts))]
+    [NotifyPropertyChangedFor(nameof(StatusText), nameof(StatusIconKind), nameof(HasCounts), nameof(ShowNewerBadge))]
     private OverviewRunStatus _status;
 
     [ObservableProperty]
@@ -53,6 +55,32 @@ public sealed partial class OverviewRowViewModel : ObservableObject
 
     public bool HasCounts => Status == OverviewRunStatus.Compared;
 
+    public bool ShowNewerBadge => Status == OverviewRunStatus.Compared && _freshness.Verdict != NewerSide.None;
+
+    public PackIconLucideKind NewerBadgeIconKind => _freshness.Verdict switch
+    {
+        NewerSide.Left => PackIconLucideKind.ArrowLeft,
+        NewerSide.Right => PackIconLucideKind.ArrowRight,
+        _ => PackIconLucideKind.ArrowRightLeft,
+    };
+
+    public bool NewerIsLeft => _freshness.Verdict == NewerSide.Left;
+
+    public bool NewerIsRight => _freshness.Verdict == NewerSide.Right;
+
+    public string NewerBadgeText => _freshness.Verdict switch
+    {
+        NewerSide.Left => "СЛЕВА",
+        NewerSide.Right => "СПРАВА",
+        NewerSide.Tie => "ПОРОВНУ",
+        _ => string.Empty,
+    };
+
+    public string NewerBadgeTooltip =>
+        $"Свежее по изменённым файлам: слева {_freshness.LeftNewer:N0}, справа {_freshness.RightNewer:N0}.{Environment.NewLine}"
+        + $"Новейший файл слева: {FormatStamp(_freshness.LeftMax)}, справа: {FormatStamp(_freshness.RightMax)}.{Environment.NewLine}"
+        + $"Только слева: {_freshness.LeftOnly:N0}, только справа: {_freshness.RightOnly:N0}.";
+
     public string BreakdownText =>
         $"слева {LeftOnlyCount} · справа {RightOnlyCount} · изм {ModifiedCount}"
         + (ConflictCount > 0 ? $" · конфл {ConflictCount}" : string.Empty)
@@ -93,6 +121,23 @@ public sealed partial class OverviewRowViewModel : ObservableObject
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(StatusIconKind));
         OnPropertyChanged(nameof(BreakdownText));
+    }
+
+    internal void ApplyFreshness(FreshnessSummary freshness)
+    {
+        _freshness = freshness;
+
+        OnPropertyChanged(nameof(ShowNewerBadge));
+        OnPropertyChanged(nameof(NewerBadgeIconKind));
+        OnPropertyChanged(nameof(NewerBadgeText));
+        OnPropertyChanged(nameof(NewerBadgeTooltip));
+        OnPropertyChanged(nameof(NewerIsLeft));
+        OnPropertyChanged(nameof(NewerIsRight));
+    }
+
+    private static string FormatStamp(DateTime? value)
+    {
+        return value is { } stamp ? stamp.ToString("yyyy-MM-dd HH:mm") : "–";
     }
 
     [RelayCommand]
