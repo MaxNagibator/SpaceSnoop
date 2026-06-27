@@ -210,4 +210,13 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 1804, Level = LogLevel.Warning, Message = "Не удалось скачать обновление: {Url}")]
     public static partial void UpdateDownloadFailed(this ILogger logger, Exception exception, string url);
+
+    [LoggerMessage(EventId = 1900, Level = LogLevel.Information, Message = "Пакетное сравнение начато: пар {Total}")]
+    public static partial void OverviewCompareStarted(this ILogger logger, int total);
+
+    [LoggerMessage(EventId = 1901, Level = LogLevel.Information, Message = "Пакетное сравнение завершено: сравнено {Compared}, ошибок {Failed}, за {ElapsedMs} мс")]
+    public static partial void OverviewCompareFinished(this ILogger logger, int compared, int failed, long elapsedMs);
+
+    [LoggerMessage(EventId = 1902, Level = LogLevel.Information, Message = "Пакетное сравнение отменено")]
+    public static partial void OverviewCompareCancelled(this ILogger logger);
 }

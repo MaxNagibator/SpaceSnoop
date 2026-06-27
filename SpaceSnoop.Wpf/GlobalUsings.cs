@@ -12,6 +12,7 @@ global using SpaceSnoop.Wpf.ViewModels;
 global using SpaceSnoop.Wpf.ViewModels.About;
 global using SpaceSnoop.Wpf.ViewModels.Dialogs;
 global using SpaceSnoop.Wpf.ViewModels.Docker;
+global using SpaceSnoop.Wpf.ViewModels.Overview;
 global using SpaceSnoop.Wpf.ViewModels.Scan;
 global using SpaceSnoop.Wpf.ViewModels.Schedule;
 global using SpaceSnoop.Wpf.ViewModels.Settings;

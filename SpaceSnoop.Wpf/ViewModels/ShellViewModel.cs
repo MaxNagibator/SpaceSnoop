@@ -24,6 +24,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         ThemeViewModel theme,
         ScanViewModel scan,
         SyncViewModel sync,
+        OverviewViewModel overview,
         ScheduleViewModel schedule,
         DockerViewModel docker,
         LogsViewModel logs,
@@ -42,6 +43,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
 
         var scanItem = new NavigationItem("Сканирование", PackIconLucideKind.HardDrive, scan);
         var syncItem = new NavigationItem("Синхронизация", PackIconLucideKind.FolderSync, sync);
+        var overviewItem = new NavigationItem("Обзор", PackIconLucideKind.LayoutGrid, overview);
         var scheduleItem = new NavigationItem("Расписание", PackIconLucideKind.CalendarClock, schedule);
         var dockerItem = new NavigationItem("Docker", PackIconLucideKind.Container, docker);
         var logsItem = new NavigationItem("Логи", PackIconLucideKind.ScrollText, logs);
@@ -49,6 +51,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
 
         Sections.Add(scanItem);
         Sections.Add(syncItem);
+        Sections.Add(overviewItem);
         Sections.Add(scheduleItem);
         Sections.Add(dockerItem);
         Sections.Add(logsItem);
@@ -58,10 +61,17 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         {
             [SectionKey.Scan] = scanItem,
             [SectionKey.Sync] = syncItem,
+            [SectionKey.Overview] = overviewItem,
             [SectionKey.Schedule] = scheduleItem,
             [SectionKey.Docker] = dockerItem,
             [SectionKey.Logs] = logsItem,
             [SectionKey.About] = aboutItem,
+        };
+
+        overview.OpenInSyncRequested += profile =>
+        {
+            sync.ApplyProfile(profile);
+            Selected = syncItem;
         };
 
         _settingsItem = new("Настройки", PackIconLucideKind.Settings, settingsPage);

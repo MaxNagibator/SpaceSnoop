@@ -364,6 +364,17 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         await _dialogs.ShowAsync(dialog);
     }
 
+    public void ApplyProfile(SyncProfile profile)
+    {
+        ClearComparison();
+        LeftPath = profile.Left;
+        RightPath = profile.Right;
+        Exclusions = profile.Exclusions;
+        SelectedModeIndex = Math.Clamp(profile.Mode, 0, ModeOrder.Length - 1);
+        Mirror = profile.Mirror;
+        StatusCaption = $"Профиль применён: {profile.Name}.";
+    }
+
     internal static IEnumerable<FileComparison> SortFlatFiles(IEnumerable<FileComparison> files, SyncFlatSortField field, bool descending)
     {
         return field switch
@@ -1258,17 +1269,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _collapsed.Clear();
         Rows.ReplaceAll([]);
         UpdateSummary();
-    }
-
-    private void ApplyProfile(SyncProfile profile)
-    {
-        ClearComparison();
-        LeftPath = profile.Left;
-        RightPath = profile.Right;
-        Exclusions = profile.Exclusions;
-        SelectedModeIndex = Math.Clamp(profile.Mode, 0, ModeOrder.Length - 1);
-        Mirror = profile.Mirror;
-        StatusCaption = $"Профиль применён: {profile.Name}.";
     }
 
     private void AddCollapsed(DirectoryComparison dir)

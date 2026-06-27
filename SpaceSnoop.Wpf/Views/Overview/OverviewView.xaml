@@ -1,0 +1,109 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Overview.OverviewView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Overview"
+             xmlns:views="clr-namespace:SpaceSnoop.Wpf.Views.Overview"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:OverviewViewModel}"
+             d:DesignHeight="640"
+             d:DesignWidth="900">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  Padding="0,0,12,0">
+        <StackPanel>
+
+            <Border Style="{StaticResource Card.Inset}"
+                    Margin="0,0,0,12">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Row="0"
+                                Grid.Column="0"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="Сравнение всех профилей"
+                                   FontWeight="{DynamicResource Font.Weight.SemiBold}"
+                                   FontSize="{DynamicResource Font.Size.L}"
+                                   Foreground="{DynamicResource Fg.Primary}" />
+                        <TextBlock Text="{Binding StatusCaption}"
+                                   Style="{StaticResource TextBlock.Subtle}"
+                                   TextTrimming="CharacterEllipsis"
+                                   Margin="0,4,0,0" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="0"
+                                Grid.Column="1"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <Button Style="{StaticResource Button.Ghost}"
+                                Command="{Binding CancelCommand}"
+                                Content="Отмена"
+                                MinHeight="{DynamicResource Control.Height.Default}"
+                                Padding="14,6"
+                                Margin="0,0,8,0"
+                                Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+                        <Button Style="{StaticResource Button.Primary}"
+                                Command="{Binding CompareAllCommand}"
+                                MinHeight="{DynamicResource Control.Height.Default}"
+                                Padding="14,6">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconLucide
+                                    Kind="{x:Static iconPacks:PackIconLucideKind.GitCompareArrows}"
+                                    Width="14"
+                                    Height="14"
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,6,0" />
+                                <TextBlock Text="Сравнить все" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+
+                    <ProgressBar Grid.Row="1"
+                                 Grid.Column="0"
+                                 Grid.ColumnSpan="2"
+                                 Height="6"
+                                 Minimum="0"
+                                 Maximum="{Binding ProgressMax}"
+                                 Value="{Binding ProgressValue}"
+                                 IsIndeterminate="{Binding IsIndeterminate}"
+                                 Margin="0,12,0,0"
+                                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource Card.Inset}"
+                    Margin="0,0,0,10"
+                    Visibility="{Binding HasRows, Converter={StaticResource InverseBoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Text="Профилей пока нет."
+                               Foreground="{DynamicResource Fg.Primary}" />
+                    <TextBlock
+                        Text="Создайте профили на странице «Расписание» – здесь их можно будет сравнить пакетно."
+                        Style="{StaticResource TextBlock.Subtle}"
+                        TextWrapping="Wrap"
+                        Margin="0,4,0,0" />
+                </StackPanel>
+            </Border>
+
+            <ItemsControl ItemsSource="{Binding Rows}"
+                          Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <views:OverviewRow />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
