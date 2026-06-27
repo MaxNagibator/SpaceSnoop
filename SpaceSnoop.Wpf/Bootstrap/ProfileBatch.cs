@@ -76,6 +76,18 @@ public static class ProfileBatch
         return rows;
     }
 
+    public static IReadOnlyList<BatchPairRow> Sort(IReadOnlyList<BatchPairRow> rows, int mode)
+    {
+        IEnumerable<BatchPairRow> ordered = mode switch
+        {
+            1 => rows.OrderByDescending(row => row.Name, StringComparer.OrdinalIgnoreCase),
+            2 => rows.OrderBy(row => row.AlreadyExists).ThenBy(row => row.Name, StringComparer.OrdinalIgnoreCase),
+            _ => rows.OrderBy(row => row.Name, StringComparer.OrdinalIgnoreCase),
+        };
+
+        return ordered.ToList();
+    }
+
     private static string Key(string left, string right)
     {
         return $"{Normalize(left)}|{Normalize(right)}";

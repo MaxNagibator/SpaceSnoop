@@ -1,4 +1,5 @@
 ﻿using KeepShell.Services.Modal;
+using MahApps.Metro.IconPacks;
 using Microsoft.Win32;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -8,6 +9,7 @@ namespace SpaceSnoop.Wpf.ViewModels.Schedule;
 public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObject, IDialogViewModel
 {
     private readonly IReadOnlyList<SyncProfile> _existing;
+    private readonly ISettingsStore _settings;
 
     [ObservableProperty]
     private string _sourceParent = string.Empty;
@@ -24,27 +26,48 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
     [ObservableProperty]
     private string _exclusions = string.Empty;
 
+    [ObservableProperty]
+    private int _selectedSort;
+
     public BatchCreateProfilesDialogViewModel(ISettingsStore settings)
     {
+        _settings = settings;
         _existing = SyncProfileStore.Load(settings);
-        _selectedModeIndex = Math.Clamp(settings.GetInt(SettingsKeys.SyncMode), 0, Modes.Count - 1);
-        _mirror = settings.GetBool(SettingsKeys.SyncMirror);
+        PathSuggest = settings.GetBool(SettingsKeys.SyncPathSuggest, AppDefaults.SyncPathSuggestDefault);
 
-        var exclusions = (settings.GetStringValue(SettingsKeys.SyncExclusions) ?? string.Empty).Trim();
+        _sourceParent = settings.GetStringValue(SettingsKeys.BatchSource) ?? string.Empty;
+        _destParent = settings.GetStringValue(SettingsKeys.BatchDest) ?? string.Empty;
+        _selectedModeIndex = Math.Clamp(settings.GetInt(SettingsKeys.BatchMode, settings.GetInt(SettingsKeys.SyncMode)), 0, Modes.Count - 1);
+        _mirror = settings.GetBool(SettingsKeys.BatchMirror, settings.GetBool(SettingsKeys.SyncMirror));
+        _selectedSort = Math.Clamp(settings.GetInt(SettingsKeys.BatchSort), 0, SortOptions.Count - 1);
+        _exclusions = settings.GetStringValue(SettingsKeys.BatchExclusions) ?? FallbackExclusions(settings);
 
-        if (exclusions.Length == 0)
-        {
-            exclusions = (settings.GetStringValue(SettingsKeys.DefaultExclusions) ?? string.Empty).Trim();
-        }
-
-        _exclusions = exclusions;
+        Rebuild();
     }
 
     public event EventHandler<bool>? RequestClose;
 
     public string Title => "Создать пачку профилей";
 
+    public bool PathSuggest { get; }
+
     public IReadOnlyList<string> Modes { get; } = ["Слева направо", "Справа налево", "Двусторонний"];
+
+    public IReadOnlyList<string> SortOptions { get; } = ["Имя (А–Я)", "Имя (Я–А)", "Сначала новые"];
+
+    public PackIconLucideKind DirectionIconKind => SelectedModeIndex switch
+    {
+        1 => PackIconLucideKind.ArrowLeft,
+        2 => PackIconLucideKind.ArrowRightLeft,
+        _ => PackIconLucideKind.ArrowRight,
+    };
+
+    public string DirectionHint => SelectedModeIndex switch
+    {
+        1 => "Направление: справа налево. Клик – сменить, ПКМ – поменять каталоги местами.",
+        2 => "Направление: двустороннее. Клик – сменить, ПКМ – поменять каталоги местами.",
+        _ => "Направление: слева направо. Клик – сменить, ПКМ – поменять каталоги местами.",
+    };
 
     public ObservableCollection<BatchPairRow> Rows { get; } = [];
 
@@ -53,6 +76,33 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
     public int SelectedCount => Rows.Count(row => row.Include);
 
     public bool HasRows => Rows.Count > 0;
+
+    public string SelectionSummary => $"Отмечено: {SelectedCount} из {Rows.Count}";
+
+    public bool? AllSelected
+    {
+        get
+        {
+            if (Rows.Count == 0 || SelectedCount == 0)
+            {
+                return false;
+            }
+
+            return SelectedCount == Rows.Count ? true : null;
+        }
+        set
+        {
+            if (value is not bool target)
+            {
+                return;
+            }
+
+            foreach (var row in Rows)
+            {
+                row.Include = target;
+            }
+        }
+    }
 
     public bool MirrorApplicable => SelectedModeIndex != 2;
 
@@ -63,8 +113,19 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
             return;
         }
 
-        OnPropertyChanged(nameof(SelectedCount));
-        CreateCommand.NotifyCanExecuteChanged();
+        NotifySelectionChanged();
+    }
+
+    private static string FallbackExclusions(ISettingsStore settings)
+    {
+        var exclusions = (settings.GetStringValue(SettingsKeys.SyncExclusions) ?? string.Empty).Trim();
+
+        if (exclusions.Length == 0)
+        {
+            exclusions = (settings.GetStringValue(SettingsKeys.DefaultExclusions) ?? string.Empty).Trim();
+        }
+
+        return exclusions;
     }
 
     private static void Browse(Action<string> assign)
@@ -75,6 +136,14 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
         {
             assign(dialog.FolderName);
         }
+    }
+
+    private void NotifySelectionChanged()
+    {
+        OnPropertyChanged(nameof(SelectedCount));
+        OnPropertyChanged(nameof(SelectionSummary));
+        OnPropertyChanged(nameof(AllSelected));
+        CreateCommand.NotifyCanExecuteChanged();
     }
 
     [RelayCommand]
@@ -115,19 +184,46 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
         RequestClose?.Invoke(this, false);
     }
 
+    [RelayCommand]
+    private void CycleMode()
+    {
+        SelectedModeIndex = (SelectedModeIndex + 1) % Modes.Count;
+    }
+
+    [RelayCommand]
+    private void SwapPaths()
+    {
+        (SourceParent, DestParent) = (DestParent, SourceParent);
+    }
+
     partial void OnSourceParentChanged(string value)
     {
+        _settings.SetValue(SettingsKeys.BatchSource, value);
         Rebuild();
     }
 
     partial void OnDestParentChanged(string value)
     {
+        _settings.SetValue(SettingsKeys.BatchDest, value);
         Rebuild();
     }
 
     partial void OnSelectedModeIndexChanged(int value)
     {
+        _settings.SetInt(SettingsKeys.BatchMode, value);
         OnPropertyChanged(nameof(MirrorApplicable));
+        OnPropertyChanged(nameof(DirectionIconKind));
+        OnPropertyChanged(nameof(DirectionHint));
+    }
+
+    partial void OnMirrorChanged(bool value)
+    {
+        _settings.SetBool(SettingsKeys.BatchMirror, value);
+    }
+
+    partial void OnExclusionsChanged(string value)
+    {
+        _settings.SetValue(SettingsKeys.BatchExclusions, value);
     }
 
     private void Rebuild()
@@ -139,15 +235,33 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
 
         Rows.Clear();
 
-        foreach (var row in ProfileBatch.BuildPairs(SourceParent, DestParent, _existing))
+        var pairs = ProfileBatch.BuildPairs(SourceParent, DestParent, _existing);
+
+        foreach (var row in ProfileBatch.Sort(pairs, SelectedSort))
         {
             row.PropertyChanged += OnRowChanged;
             Rows.Add(row);
         }
 
         OnPropertyChanged(nameof(HasRows));
-        OnPropertyChanged(nameof(SelectedCount));
-        CreateCommand.NotifyCanExecuteChanged();
+        NotifySelectionChanged();
+    }
+
+    partial void OnSelectedSortChanged(int value)
+    {
+        _settings.SetInt(SettingsKeys.BatchSort, value);
+
+        var sorted = ProfileBatch.Sort(Rows, value);
+
+        for (var index = 0; index < sorted.Count; index++)
+        {
+            var current = Rows.IndexOf(sorted[index]);
+
+            if (current != index)
+            {
+                Rows.Move(current, index);
+            }
+        }
     }
 
     private bool CanCreate()

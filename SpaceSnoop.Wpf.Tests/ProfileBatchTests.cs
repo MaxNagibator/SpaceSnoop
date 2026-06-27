@@ -76,6 +76,23 @@ public class ProfileBatchTests
         }
     }
 
+    [TestCase(0, "A,B,C")]
+    [TestCase(1, "C,B,A")]
+    [TestCase(2, "B,C,A")]
+    public void Сортировка_пар_по_режиму(int mode, string expected)
+    {
+        var rows = new List<BatchPairRow>
+        {
+            new("B", "l", "r", false, true),
+            new("A", "l", "r", true, true),
+            new("C", "l", "r", false, true),
+        };
+
+        var sorted = ProfileBatch.Sort(rows, mode);
+
+        Assert.That(string.Join(",", sorted.Select(row => row.Name)), Is.EqualTo(expected));
+    }
+
     private string Make(string name, params string[] subdirectories)
     {
         var parent = Path.Combine(_root, name);

@@ -56,6 +56,13 @@ public static class SettingsKeys
 
     public const string ScheduleProfiles = "wpf.schedule.profiles";
 
+    public const string BatchSource = "wpf.batch.source";
+    public const string BatchDest = "wpf.batch.dest";
+    public const string BatchMode = "wpf.batch.mode";
+    public const string BatchMirror = "wpf.batch.mirror";
+    public const string BatchExclusions = "wpf.batch.exclusions";
+    public const string BatchSort = "wpf.batch.sort";
+
     public const string UpdateDismissedVersion = "wpf.update.dismissed";
     public const string UpdateRepository = "wpf.update.repository";
     public const string UpdateCheckOnStartup = "wpf.update.check";

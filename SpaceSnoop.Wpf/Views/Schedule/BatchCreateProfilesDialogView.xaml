@@ -2,6 +2,8 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Schedule"
+             xmlns:views="clr-namespace:SpaceSnoop.Wpf.Views"
+             xmlns:behaviors="clr-namespace:SpaceSnoop.Wpf.Views.Behaviors"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -10,6 +12,24 @@
              d:DesignHeight="560"
              d:DesignWidth="720"
              Width="720">
+
+    <UserControl.Resources>
+        <Style x:Key="EndpointChip"
+               TargetType="Border">
+            <Setter Property="Width"
+                    Value="22" />
+            <Setter Property="Height"
+                    Value="22" />
+            <Setter Property="CornerRadius"
+                    Value="11" />
+            <Setter Property="BorderThickness"
+                    Value="1" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Setter Property="HorizontalAlignment"
+                    Value="Center" />
+        </Style>
+    </UserControl.Resources>
 
     <Grid Margin="22">
         <Grid.RowDefinitions>
@@ -40,46 +60,127 @@
                        TextWrapping="Wrap"
                        Margin="0,0,0,12" />
 
-            <TextBlock Text="Родитель-источник"
-                       Foreground="{DynamicResource Fg.Primary}"
-                       Margin="0,0,0,4" />
-            <Grid>
+            <Grid Margin="0,4,0,0">
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBox Grid.Column="0"
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0"
+                            Grid.RowSpan="2"
+                            Grid.Column="0"
+                            VerticalAlignment="Center"
+                            Margin="0,0,8,0">
+                    <Border Style="{StaticResource EndpointChip}"
+                            Background="{DynamicResource State.SuccessSoft}"
+                            BorderBrush="{DynamicResource State.Success}"
+                            ToolTip="Родитель-источник">
+                        <TextBlock Text="Л"
+                                   FontWeight="Bold"
+                                   FontSize="{DynamicResource Font.Size.XS}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource State.Success}" />
+                    </Border>
+
+                    <Button HorizontalAlignment="Center"
+                            Cursor="Hand"
+                            Margin="0,5"
+                            Command="{Binding CycleModeCommand}"
+                            ToolTip="{Binding DirectionHint}"
+                            AutomationProperties.Name="{Binding DirectionHint}">
+                        <Button.InputBindings>
+                            <MouseBinding MouseAction="RightClick"
+                                          Command="{Binding SwapPathsCommand}" />
+                        </Button.InputBindings>
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="Circle"
+                                        Width="24"
+                                        Height="24"
+                                        CornerRadius="12"
+                                        BorderThickness="1"
+                                        Background="{DynamicResource Accent.Soft}"
+                                        BorderBrush="{DynamicResource Accent.Primary}">
+                                    <iconPacks:PackIconLucide x:Name="Arrow"
+                                                              Kind="{Binding DirectionIconKind}"
+                                                              Width="14"
+                                                              Height="14"
+                                                              HorizontalAlignment="Center"
+                                                              VerticalAlignment="Center"
+                                                              Foreground="{DynamicResource Accent.Primary}" />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver"
+                                             Value="True">
+                                        <Setter TargetName="Circle"
+                                                Property="Background"
+                                                Value="{DynamicResource Accent.Primary}" />
+                                        <Setter TargetName="Arrow"
+                                                Property="Foreground"
+                                                Value="{DynamicResource Accent.Soft}" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+
+                    <Border Style="{StaticResource EndpointChip}"
+                            Background="{DynamicResource State.InfoSoft}"
+                            BorderBrush="{DynamicResource State.Info}"
+                            ToolTip="Родитель-приёмник">
+                        <TextBlock Text="П"
+                                   FontWeight="Bold"
+                                   FontSize="{DynamicResource Font.Size.XS}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource State.Info}" />
+                    </Border>
+                </StackPanel>
+
+                <TextBox Grid.Row="0"
+                         Grid.Column="1"
                          Text="{Binding SourceParent, UpdateSourceTrigger=PropertyChanged}"
-                         Style="{StaticResource TextBox.Toolbar}" />
-                <Button Grid.Column="1"
+                         behaviors:PathSuggest.Enabled="{Binding PathSuggest}"
+                         Style="{StaticResource TextBox.Toolbar}"
+                         VerticalAlignment="Center"
+                         ToolTip="Родитель-источник" />
+                <Button Grid.Row="0"
+                        Grid.Column="2"
                         Style="{StaticResource Button.Ghost}"
                         Command="{Binding BrowseSourceCommand}"
                         MinHeight="{DynamicResource Control.Height.Default}"
                         Padding="10,6"
-                        Margin="8,0,0,0">
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center"
+                        ToolTip="Обзор">
                     <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderOpen}"
                                               Width="14"
                                               Height="14" />
                 </Button>
-            </Grid>
 
-            <TextBlock Text="Родитель-приёмник"
-                       Foreground="{DynamicResource Fg.Primary}"
-                       Margin="0,12,0,4" />
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBox Grid.Column="0"
+                <TextBox Grid.Row="1"
+                         Grid.Column="1"
                          Text="{Binding DestParent, UpdateSourceTrigger=PropertyChanged}"
-                         Style="{StaticResource TextBox.Toolbar}" />
-                <Button Grid.Column="1"
+                         behaviors:PathSuggest.Enabled="{Binding PathSuggest}"
+                         Style="{StaticResource TextBox.Toolbar}"
+                         VerticalAlignment="Center"
+                         Margin="0,16,0,0"
+                         ToolTip="Родитель-приёмник" />
+                <Button Grid.Row="1"
+                        Grid.Column="2"
                         Style="{StaticResource Button.Ghost}"
                         Command="{Binding BrowseDestCommand}"
                         MinHeight="{DynamicResource Control.Height.Default}"
                         Padding="10,6"
-                        Margin="8,0,0,0">
+                        Margin="8,16,0,0"
+                        VerticalAlignment="Center"
+                        ToolTip="Обзор">
                     <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderOpen}"
                                               Width="14"
                                               Height="14" />
@@ -87,25 +188,43 @@
             </Grid>
         </StackPanel>
 
-        <StackPanel Grid.Row="2"
-                    Orientation="Horizontal"
-                    Margin="0,14,0,0">
-            <ComboBox Width="170"
-                      Style="{StaticResource ComboBox.Form}"
+        <views:StretchWrapPanel Grid.Row="2"
+                                Margin="0,14,0,0"
+                                ItemWidth="240">
+            <ComboBox Style="{StaticResource ComboBox.Form}"
                       ItemsSource="{Binding Modes}"
-                      SelectedIndex="{Binding SelectedModeIndex}" />
+                      SelectedIndex="{Binding SelectedModeIndex}"
+                      MinWidth="170"
+                      VerticalAlignment="Center"
+                      Margin="0,0,16,8"
+                      ToolTip="Направление синхронизации" />
             <CheckBox Content="Зеркало"
                       IsChecked="{Binding Mirror}"
                       IsEnabled="{Binding MirrorApplicable}"
                       VerticalAlignment="Center"
-                      Margin="14,0,0,0" />
-            <TextBox Width="220"
+                      Margin="0,0,16,8" />
+            <CheckBox Content="Выбрать все"
+                      IsChecked="{Binding AllSelected}"
+                      VerticalAlignment="Center"
+                      Margin="0,0,16,8"
+                      Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}" />
+            <ComboBox views:StretchWrapPanel.Stretch="True"
+                      views:StretchWrapPanel.StretchWidth="150"
+                      MinWidth="150"
+                      Style="{StaticResource ComboBox.Form}"
+                      ItemsSource="{Binding SortOptions}"
+                      SelectedIndex="{Binding SelectedSort}"
+                      VerticalAlignment="Center"
+                      Margin="0,0,16,8"
+                      ToolTip="Сортировка пар"
+                      Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}" />
+            <TextBox views:StretchWrapPanel.Stretch="True"
                      Text="{Binding Exclusions, UpdateSourceTrigger=PropertyChanged}"
                      Style="{StaticResource TextBox.Toolbar}"
                      VerticalAlignment="Center"
-                     Margin="14,0,0,0"
+                     Margin="0,0,0,8"
                      ToolTip="Исключения (через запятую)" />
-        </StackPanel>
+        </views:StretchWrapPanel>
 
         <Border Grid.Row="3"
                 Margin="0,14,0,0"
@@ -172,7 +291,8 @@
             <TextBlock Grid.Column="0"
                        VerticalAlignment="Center"
                        Style="{StaticResource TextBlock.Subtle}"
-                       Text="{Binding SelectedCount, StringFormat='Отмечено: {0}'}" />
+                       Text="{Binding SelectionSummary}"
+                       Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}" />
 
             <StackPanel Grid.Column="1"
                         Orientation="Horizontal"
