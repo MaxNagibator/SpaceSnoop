@@ -141,6 +141,25 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
     }
 
     [RelayCommand]
+    private async Task CreateBatch()
+    {
+        var dialog = new BatchCreateProfilesDialogViewModel(Settings);
+
+        if (!await _dialogs.ShowAsync(dialog) || dialog.CreatedProfiles.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var model in dialog.CreatedProfiles)
+        {
+            Profiles.Add(new(this, model));
+        }
+
+        Persist();
+        _logger.ScheduleBatchCreated(dialog.CreatedProfiles.Count);
+    }
+
+    [RelayCommand]
     private Task RefreshStatuses()
     {
         return RefreshAsync();

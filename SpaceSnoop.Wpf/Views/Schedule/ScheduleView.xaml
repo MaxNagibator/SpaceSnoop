@@ -68,20 +68,36 @@
                            FontWeight="{DynamicResource Font.Weight.SemiBold}"
                            FontSize="{DynamicResource Font.Size.L}"
                            Foreground="{DynamicResource Fg.Primary}" />
-                <Button Grid.Column="1"
-                        Style="{StaticResource Button.Primary}"
-                        Command="{Binding AddProfileCommand}"
-                        MinHeight="{DynamicResource Control.Height.Default}"
-                        Padding="14,6">
-                    <StackPanel Orientation="Horizontal">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Plus}"
-                                                  Width="14"
-                                                  Height="14"
-                                                  VerticalAlignment="Center"
-                                                  Margin="0,0,6,0" />
-                        <TextBlock Text="Добавить профиль" />
-                    </StackPanel>
-                </Button>
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal">
+                    <Button Style="{StaticResource Button.Ghost}"
+                            Command="{Binding CreateBatchCommand}"
+                            MinHeight="{DynamicResource Control.Height.Default}"
+                            Padding="14,6"
+                            Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.CopyPlus}"
+                                                      Width="14"
+                                                      Height="14"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,6,0" />
+                            <TextBlock Text="Создать пачку…" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource Button.Primary}"
+                            Command="{Binding AddProfileCommand}"
+                            MinHeight="{DynamicResource Control.Height.Default}"
+                            Padding="14,6">
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Plus}"
+                                                      Width="14"
+                                                      Height="14"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,6,0" />
+                            <TextBlock Text="Добавить профиль" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
             </Grid>
 
             <Border Style="{StaticResource Card.Inset}"

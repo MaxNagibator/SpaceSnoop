@@ -1,0 +1,198 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Schedule.BatchCreateProfilesDialogView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Schedule"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:BatchCreateProfilesDialogViewModel}"
+             d:DesignHeight="560"
+             d:DesignWidth="720"
+             Width="720">
+
+    <Grid Margin="22">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0"
+                    Orientation="Horizontal">
+            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.CopyPlus}"
+                                      Width="20"
+                                      Height="20"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,10,0"
+                                      Foreground="{DynamicResource Accent.Primary}" />
+            <TextBlock Text="{Binding Title}"
+                       Style="{StaticResource TextBlock.Heading}"
+                       VerticalAlignment="Center" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="1"
+                    Margin="0,16,0,0">
+            <TextBlock Text="Каждая подпапка источника превращается в профиль с зеркальным приёмником."
+                       Style="{StaticResource TextBlock.Subtle}"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,12" />
+
+            <TextBlock Text="Родитель-источник"
+                       Foreground="{DynamicResource Fg.Primary}"
+                       Margin="0,0,0,4" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0"
+                         Text="{Binding SourceParent, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource TextBox.Toolbar}" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Button.Ghost}"
+                        Command="{Binding BrowseSourceCommand}"
+                        MinHeight="{DynamicResource Control.Height.Default}"
+                        Padding="10,6"
+                        Margin="8,0,0,0">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderOpen}"
+                                              Width="14"
+                                              Height="14" />
+                </Button>
+            </Grid>
+
+            <TextBlock Text="Родитель-приёмник"
+                       Foreground="{DynamicResource Fg.Primary}"
+                       Margin="0,12,0,4" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0"
+                         Text="{Binding DestParent, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource TextBox.Toolbar}" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Button.Ghost}"
+                        Command="{Binding BrowseDestCommand}"
+                        MinHeight="{DynamicResource Control.Height.Default}"
+                        Padding="10,6"
+                        Margin="8,0,0,0">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderOpen}"
+                                              Width="14"
+                                              Height="14" />
+                </Button>
+            </Grid>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    Margin="0,14,0,0">
+            <ComboBox Width="170"
+                      Style="{StaticResource ComboBox.Form}"
+                      ItemsSource="{Binding Modes}"
+                      SelectedIndex="{Binding SelectedModeIndex}" />
+            <CheckBox Content="Зеркало"
+                      IsChecked="{Binding Mirror}"
+                      IsEnabled="{Binding MirrorApplicable}"
+                      VerticalAlignment="Center"
+                      Margin="14,0,0,0" />
+            <TextBox Width="220"
+                     Text="{Binding Exclusions, UpdateSourceTrigger=PropertyChanged}"
+                     Style="{StaticResource TextBox.Toolbar}"
+                     VerticalAlignment="Center"
+                     Margin="14,0,0,0"
+                     ToolTip="Исключения (через запятую)" />
+        </StackPanel>
+
+        <Border Grid.Row="3"
+                Margin="0,14,0,0"
+                MinHeight="120"
+                MaxHeight="280">
+            <Grid>
+                <TextBlock Text="Укажите родительские каталоги – ниже появятся пары."
+                           Style="{StaticResource TextBlock.Subtle}"
+                           TextWrapping="Wrap"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Center"
+                           Visibility="{Binding HasRows, Converter={StaticResource InverseBoolToVisibility}}" />
+
+                <ListBox ItemsSource="{Binding Rows}"
+                         HorizontalContentAlignment="Stretch"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,3">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <CheckBox Grid.Column="0"
+                                          IsChecked="{Binding Include}"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,10,0" />
+
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="{Binding Name}"
+                                               Foreground="{DynamicResource Fg.Primary}"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Style="{StaticResource TextBlock.Subtle}"
+                                               TextTrimming="CharacterEllipsis">
+                                        <Run Text="{Binding Left, Mode=OneWay}" />
+                                        <Run Text="→" />
+                                        <Run Text="{Binding Right, Mode=OneWay}" />
+                                    </TextBlock>
+                                </StackPanel>
+
+                                <TextBlock Grid.Column="2"
+                                           Text="уже есть"
+                                           VerticalAlignment="Center"
+                                           Margin="10,0,0,0"
+                                           Foreground="{DynamicResource State.Warning}"
+                                           Visibility="{Binding AlreadyExists, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="4"
+              Margin="0,18,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0"
+                       VerticalAlignment="Center"
+                       Style="{StaticResource TextBlock.Subtle}"
+                       Text="{Binding SelectedCount, StringFormat='Отмечено: {0}'}" />
+
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right">
+                <Button Style="{StaticResource Button.Ghost}"
+                        Command="{Binding CancelCommand}"
+                        Content="Отмена"
+                        MinWidth="96"
+                        MinHeight="{DynamicResource Control.Height.Default}"
+                        Padding="14,6"
+                        Margin="0,0,8,0"
+                        IsCancel="True" />
+                <Button Style="{StaticResource Button.Primary}"
+                        Command="{Binding CreateCommand}"
+                        Content="{Binding SelectedCount, StringFormat='Создать ({0})'}"
+                        MinWidth="120"
+                        MinHeight="{DynamicResource Control.Height.Default}"
+                        Padding="14,6"
+                        IsDefault="True" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

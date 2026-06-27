@@ -118,6 +118,9 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1254, Level = LogLevel.Information, Message = "Расписание перенесено в профиль: «{Name}»")]
     public static partial void ScheduleProfileMigrated(this ILogger logger, string name);
 
+    [LoggerMessage(EventId = 1255, Level = LogLevel.Information, Message = "Создана пачка профилей: {Count}")]
+    public static partial void ScheduleBatchCreated(this ILogger logger, int count);
+
     [LoggerMessage(EventId = 1300, Level = LogLevel.Warning, Message = "Не удалось положить лог-секцию в буфер обмена")]
     public static partial void ClipboardLogSectionFailed(this ILogger logger, Exception exception);
 
