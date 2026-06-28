@@ -17,6 +17,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private readonly ILogger<SyncViewModel> _logger;
     private readonly ILogger<SyncEngine> _engineLogger;
     private readonly ILogger<DirectoryComparer> _comparerLogger;
+    private readonly ToastNotifier _notifier;
     private readonly HashSet<DirectoryComparison> _collapsed = [];
 
     private ComparisonResult? _result;
@@ -108,7 +109,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     [NotifyCanExecuteChangedFor(nameof(ResolveAllSkipCommand))]
     private bool _hasPending;
 
-    public SyncViewModel(ISettingsStore settings, IDialogService dialogs, OperationPreferences operations, ILogger<SyncViewModel> logger, ILogger<SyncEngine> engineLogger, ILogger<DirectoryComparer> comparerLogger)
+    public SyncViewModel(ISettingsStore settings, IDialogService dialogs, OperationPreferences operations, ILogger<SyncViewModel> logger, ILogger<SyncEngine> engineLogger, ILogger<DirectoryComparer> comparerLogger, ToastNotifier notifier)
     {
         _settings = settings;
         _dialogs = dialogs;
@@ -116,6 +117,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _logger = logger;
         _engineLogger = engineLogger;
         _comparerLogger = comparerLogger;
+        _notifier = notifier;
         Profiles = new(settings, dialogs, BuildCurrentProfile, ApplyProfile, () => !IsBusy, message => StatusCaption = message);
         LoadSettings();
         Profiles.Load();
@@ -928,6 +930,18 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         SummaryText = $"Готово за {stopwatch.Elapsed.TotalSeconds:F2} с. Успешно: {report.SuccessCount:N0}, ошибок: {report.Errors.Count:N0}{verifyText}";
         StatusCaption = SummaryText;
 
+        var syncToastMessage = report.Errors.Count > 0
+            ? $"Синхронизация: применено {report.SuccessCount:N0}, ошибок: {report.Errors.Count:N0}"
+            : report.Mismatches.Count > 0
+                ? $"Синхронизация: применено {report.SuccessCount:N0} · расхождений: {report.Mismatches.Count:N0}"
+                : $"Синхронизация завершена: применено {report.SuccessCount:N0}";
+
+        var syncToastSeverity = report.Errors.Count > 0 ? StatusSeverity.Error
+            : report.Mismatches.Count > 0 ? StatusSeverity.Warning
+            : StatusSeverity.Success;
+
+        _notifier.Notify(syncToastMessage, syncToastSeverity);
+
         if (report.Errors.Count > 0)
         {
             const int MaxShown = 20;
@@ -1240,6 +1254,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         {
             var cause = exception.Unwrap();
             _logger.SyncOperationFailed(cause, operation);
+            _notifier.Notify($"Ошибка: {operation}", StatusSeverity.Error);
             _dialogs.Error("Ошибка", cause.Message);
             SummaryText = $"Ошибка: {cause.Message}";
             StatusCaption = SummaryText;

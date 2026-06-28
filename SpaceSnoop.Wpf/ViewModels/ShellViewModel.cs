@@ -32,9 +32,11 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         SettingsViewModel settingsPage,
         ModalHostViewModel modal,
         ShellPreferences preferences,
-        AppUpdateViewModel appUpdate)
+        AppUpdateViewModel appUpdate,
+        ToastHostViewModel toasts)
         : base(modal)
     {
+        Toasts = toasts;
         Theme = theme;
         Theme.PropertyChanged += OnThemePropertyChanged;
         Preferences = preferences;
@@ -81,6 +83,8 @@ public sealed partial class ShellViewModel : ShellViewModelBase
 
         AppUpdate.Start();
     }
+
+    public ToastHostViewModel Toasts { get; }
 
     public ThemeViewModel Theme { get; }
 

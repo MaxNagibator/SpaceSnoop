@@ -21,6 +21,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     private readonly DeleteProgressDialogFactory _deleteDialogFactory;
     private readonly ArchiveProgressDialogFactory _archiveDialogFactory;
     private readonly ILogger<ScanViewModel> _logger;
+    private readonly ToastNotifier _notifier;
     private readonly DispatcherTimer _progressTimer;
 
     private readonly ScanSortState _sortState = new();
@@ -144,7 +145,8 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         ScanNodeFactory nodeFactory,
         DeleteProgressDialogFactory deleteDialogFactory,
         ArchiveProgressDialogFactory archiveDialogFactory,
-        ILogger<ScanViewModel> logger)
+        ILogger<ScanViewModel> logger,
+        ToastNotifier notifier)
     {
         _calculator = calculator;
         _dialogs = dialogs;
@@ -154,6 +156,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         _deleteDialogFactory = deleteDialogFactory;
         _archiveDialogFactory = archiveDialogFactory;
         _logger = logger;
+        _notifier = notifier;
 
         Inspector = inspector;
         Preferences = preferences;
@@ -773,6 +776,8 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
                 result.TotalFileCount,
                 result.TotalDirectoryCount,
                 (long)_scanStopwatch.Elapsed.TotalMilliseconds);
+
+            _notifier.Notify($"Сканирование завершено: {result.AbsolutePath} · {result.TotalSizeText}", StatusSeverity.Success);
         }
         catch (OperationCanceledException)
         {
@@ -783,6 +788,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         {
             var cause = exception.Unwrap();
             _logger.ScanFailed(cause, path);
+            _notifier.Notify($"Ошибка сканирования: {cause.Message}", StatusSeverity.Error);
             _dialogs.Error("Ошибка сканирования", cause.Message);
         }
         finally

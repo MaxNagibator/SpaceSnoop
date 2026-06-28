@@ -199,12 +199,14 @@ public class SyncQuickProfileTests
 
     private static SyncViewModel Create(ISettingsStore settings)
     {
+        var notifier = new ToastNotifier(new(), new(new MemorySettings()));
         return new(settings,
             new Dialogs(),
             new(settings),
             NullLogger<SyncViewModel>.Instance,
             NullLogger<SyncEngine>.Instance,
-            NullLogger<DirectoryComparer>.Instance);
+            NullLogger<DirectoryComparer>.Instance,
+            notifier);
     }
 
     private sealed class MemorySettings : ISettingsStore

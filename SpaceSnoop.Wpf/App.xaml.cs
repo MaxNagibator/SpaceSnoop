@@ -135,6 +135,8 @@ public partial class App : Application
         services.AddSingleton<ArchiveService>();
 
         services.AddKeepShell();
+        services.AddKeepShellToasts();
+        services.AddSingleton<ToastNotifier>();
         services.AddSingleton<ShellPreferences>();
         services.AddSingleton<OperationPreferences>();
         services.AddSingleton<ScanPreferences>();
