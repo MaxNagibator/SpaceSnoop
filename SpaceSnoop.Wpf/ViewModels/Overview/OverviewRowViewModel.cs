@@ -5,6 +5,7 @@ namespace SpaceSnoop.Wpf.ViewModels.Overview;
 public sealed partial class OverviewRowViewModel : ObservableObject
 {
     private readonly Action<SyncProfile> _openInSync;
+    private readonly Action _onDirectionChanged;
 
     private FreshnessSummary _freshness;
 
@@ -49,10 +50,11 @@ public sealed partial class OverviewRowViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(StatusText))]
     private string? _error;
 
-    public OverviewRowViewModel(SyncProfile profile, Action<SyncProfile> openInSync)
+    public OverviewRowViewModel(SyncProfile profile, Action<SyncProfile> openInSync, Action onDirectionChanged)
     {
         Profile = profile;
         _openInSync = openInSync;
+        _onDirectionChanged = onDirectionChanged;
     }
 
     public SyncProfile Profile { get; }
@@ -62,6 +64,27 @@ public sealed partial class OverviewRowViewModel : ObservableObject
     public string Left => Profile.Left;
 
     public string Right => Profile.Right;
+
+    public PackIconLucideKind DirectionIconKind => Profile.Mode switch
+    {
+        1 => PackIconLucideKind.ArrowLeft,
+        2 => PackIconLucideKind.ArrowRightLeft,
+        _ => PackIconLucideKind.ArrowRight,
+    };
+
+    public string DirectionArrow => Profile.Mode switch
+    {
+        1 => "←",
+        2 => "↔",
+        _ => "→",
+    };
+
+    public string DirectionTooltip => Profile.Mode switch
+    {
+        1 => "Направление: справа налево. Клик – сменить.",
+        2 => "Направление: двустороннее. Клик – сменить.",
+        _ => "Направление: слева направо. Клик – сменить.",
+    };
 
     public int DiffCount => LeftOnlyCount + RightOnlyCount + ModifiedCount + ConflictCount;
 
@@ -188,9 +211,24 @@ public sealed partial class OverviewRowViewModel : ObservableObject
         return parts.Count > 0 ? $"Синхронизировано: {string.Join(" · ", parts)}" : "Синхронизировано: изменений не потребовалось";
     }
 
+    internal void AdvanceDirection()
+    {
+        Profile.Mode = (Profile.Mode + 1) % 3;
+        OnPropertyChanged(nameof(DirectionIconKind));
+        OnPropertyChanged(nameof(DirectionArrow));
+        OnPropertyChanged(nameof(DirectionTooltip));
+    }
+
     [RelayCommand]
     private void OpenInSync()
     {
         _openInSync(Profile);
+    }
+
+    [RelayCommand]
+    private void CycleDirection()
+    {
+        AdvanceDirection();
+        _onDirectionChanged();
     }
 }

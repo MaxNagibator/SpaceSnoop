@@ -52,6 +52,23 @@
                                 Padding="14,6"
                                 Margin="0,0,8,0"
                                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+                        <Button Style="{StaticResource Button.Ghost}"
+                                Command="{Binding CycleAllDirectionsCommand}"
+                                MinHeight="{DynamicResource Control.Height.Default}"
+                                Padding="14,6"
+                                Margin="0,0,8,0"
+                                ToolTip="Сменить направление синхронизации у всех профилей"
+                                AutomationProperties.Name="Сменить направление всем">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconLucide
+                                    Kind="{x:Static iconPacks:PackIconLucideKind.ArrowRightLeft}"
+                                    Width="14"
+                                    Height="14"
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,6,0" />
+                                <TextBlock Text="Направление всем" />
+                            </StackPanel>
+                        </Button>
                         <Button Style="{StaticResource Button.Secondary}"
                                 Command="{Binding CompareAllCommand}"
                                 MinHeight="{DynamicResource Control.Height.Default}"

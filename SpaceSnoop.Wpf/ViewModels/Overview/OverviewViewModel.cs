@@ -16,9 +16,10 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
     private readonly ILogger<SyncEngine> _engineLogger;
 
     private CancellationTokenSource? _cts;
+    private bool _suppressReload;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(CompareAllCommand), nameof(SyncRowCommand), nameof(SyncAllCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CompareAllCommand), nameof(SyncRowCommand), nameof(SyncAllCommand), nameof(CycleAllDirectionsCommand))]
     private bool _isBusy;
 
     [ObservableProperty]
@@ -64,7 +65,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
 
     private void OnSettingsChanged(object? sender, string key)
     {
-        if (key == SettingsKeys.ScheduleProfiles && !IsBusy)
+        if (key == SettingsKeys.ScheduleProfiles && !IsBusy && !_suppressReload)
         {
             ReloadRows();
         }
@@ -304,6 +305,36 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         _cts?.Cancel();
     }
 
+    [RelayCommand(CanExecute = nameof(CanCycleAllDirections))]
+    private void CycleAllDirections()
+    {
+        foreach (var row in Rows)
+        {
+            row.AdvanceDirection();
+        }
+
+        PersistProfiles();
+    }
+
+    private bool CanCycleAllDirections()
+    {
+        return !IsBusy && Rows.Count > 0;
+    }
+
+    private void PersistProfiles()
+    {
+        _suppressReload = true;
+
+        try
+        {
+            SyncProfileStore.Save(_settings, Rows.Select(static row => row.Profile));
+        }
+        finally
+        {
+            _suppressReload = false;
+        }
+    }
+
     [RelayCommand]
     private void Reload()
     {
@@ -417,12 +448,13 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
 
         foreach (var profile in SyncProfileStore.Load(_settings))
         {
-            Rows.Add(new(profile, RaiseOpenInSync));
+            Rows.Add(new(profile, RaiseOpenInSync, PersistProfiles));
         }
 
         OnPropertyChanged(nameof(HasRows));
         CompareAllCommand.NotifyCanExecuteChanged();
         SyncAllCommand.NotifyCanExecuteChanged();
+        CycleAllDirectionsCommand.NotifyCanExecuteChanged();
     }
 
     private void RaiseOpenInSync(SyncProfile profile)
