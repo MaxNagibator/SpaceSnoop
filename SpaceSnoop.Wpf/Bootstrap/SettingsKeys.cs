@@ -54,6 +54,10 @@ public static class SettingsKeys
     public const string SyncGitFolders = "wpf.sync.git_folders";
     public const string SyncGitHistoryCount = "wpf.sync.git_history_count";
 
+    public const string OverviewSort = "wpf.overview.sort";
+    public const string OverviewSortDesc = "wpf.overview.sort_desc";
+    public const string OverviewGroupUnchanged = "wpf.overview.group_unchanged";
+
     public const string ScheduleProfiles = "wpf.schedule.profiles";
 
     public const string BatchSource = "wpf.batch.source";

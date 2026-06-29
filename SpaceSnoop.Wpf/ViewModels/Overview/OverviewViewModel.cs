@@ -1,7 +1,9 @@
 ﻿using KeepShell.Services;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Windows.Data;
 using System.Windows.Input;
 
 namespace SpaceSnoop.Wpf.ViewModels.Overview;
@@ -17,10 +19,23 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
 
     private CancellationTokenSource? _cts;
     private bool _suppressReload;
+    private readonly bool _suppressPersist;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CompareAllCommand), nameof(SyncRowCommand), nameof(SyncAllCommand), nameof(CycleAllDirectionsCommand))]
     private bool _isBusy;
+
+    [ObservableProperty]
+    private string _searchText = string.Empty;
+
+    [ObservableProperty]
+    private OverviewSortField _sortField = AppDefaults.OverviewSortDefault;
+
+    [ObservableProperty]
+    private bool _sortDescending;
+
+    [ObservableProperty]
+    private bool _groupUnchanged = AppDefaults.OverviewGroupUnchangedDefault;
 
     [ObservableProperty]
     private string _statusCaption = string.Empty;
@@ -43,6 +58,16 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         _comparerLogger = comparerLogger;
         _engineLogger = engineLogger;
 
+        RowsView = CollectionViewSource.GetDefaultView(Rows);
+        RowsView.Filter = FilterRow;
+
+        _suppressPersist = true;
+        SortField = _settings.GetEnum(SettingsKeys.OverviewSort, AppDefaults.OverviewSortDefault);
+        SortDescending = _settings.GetBool(SettingsKeys.OverviewSortDesc);
+        GroupUnchanged = _settings.GetBool(SettingsKeys.OverviewGroupUnchanged, AppDefaults.OverviewGroupUnchangedDefault);
+        _suppressPersist = false;
+
+        UpdateSortAndGroup();
         ReloadRows();
         _settings.Changed += OnSettingsChanged;
     }
@@ -51,7 +76,15 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
 
     public ObservableCollection<OverviewRowViewModel> Rows { get; } = [];
 
+    public ICollectionView RowsView { get; }
+
     public bool HasRows => Rows.Count > 0;
+
+    public bool SearchTextEmpty => string.IsNullOrWhiteSpace(SearchText);
+
+    public bool NoMatches => Rows.Count > 0 && RowsView.IsEmpty;
+
+    public double ScrollOffset { get; set; }
 
     public string PageTitle => "Обзор";
 
@@ -167,6 +200,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         {
             IsBusy = false;
             IsIndeterminate = false;
+            RefreshView();
             _cts.Dispose();
             _cts = null;
         }
@@ -225,6 +259,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         {
             IsBusy = false;
             IsIndeterminate = false;
+            RefreshView();
             _cts.Dispose();
             _cts = null;
         }
@@ -296,6 +331,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         {
             IsBusy = false;
             IsIndeterminate = false;
+            RefreshView();
             _cts.Dispose();
             _cts = null;
         }
@@ -455,6 +491,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         }
 
         OnPropertyChanged(nameof(HasRows));
+        OnPropertyChanged(nameof(NoMatches));
         CompareAllCommand.NotifyCanExecuteChanged();
         SyncAllCommand.NotifyCanExecuteChanged();
         CycleAllDirectionsCommand.NotifyCanExecuteChanged();
@@ -463,5 +500,103 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
     private void RaiseOpenInSync(SyncProfile profile, ComparisonResult? comparison)
     {
         OpenInSyncRequested?.Invoke(profile, comparison);
+    }
+
+    private bool FilterRow(object item)
+    {
+        if (item is not OverviewRowViewModel row)
+        {
+            return false;
+        }
+
+        var query = SearchText.Trim();
+
+        if (query.Length == 0)
+        {
+            return true;
+        }
+
+        return row.Name.Contains(query, StringComparison.OrdinalIgnoreCase)
+               || row.Left.Contains(query, StringComparison.OrdinalIgnoreCase)
+               || row.Right.Contains(query, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void UpdateSortAndGroup()
+    {
+        using (RowsView.DeferRefresh())
+        {
+            RowsView.GroupDescriptions.Clear();
+            RowsView.SortDescriptions.Clear();
+
+            if (GroupUnchanged)
+            {
+                RowsView.GroupDescriptions.Add(new PropertyGroupDescription(nameof(OverviewRowViewModel.GroupKey)));
+                RowsView.SortDescriptions.Add(new(nameof(OverviewRowViewModel.GroupOrder), ListSortDirection.Ascending));
+            }
+
+            var direction = SortDescending ? ListSortDirection.Descending : ListSortDirection.Ascending;
+
+            switch (SortField)
+            {
+                case OverviewSortField.Name:
+                    RowsView.SortDescriptions.Add(new(nameof(OverviewRowViewModel.Name), direction));
+                    break;
+
+                case OverviewSortField.Differences:
+                    RowsView.SortDescriptions.Add(new(nameof(OverviewRowViewModel.DiffCount), direction));
+                    break;
+
+                case OverviewSortField.Date:
+                    RowsView.SortDescriptions.Add(new(nameof(OverviewRowViewModel.NewestModified), direction));
+                    break;
+
+                case OverviewSortField.Freshness:
+                    RowsView.SortDescriptions.Add(new(nameof(OverviewRowViewModel.FreshnessSkew), direction));
+                    break;
+            }
+        }
+
+        OnPropertyChanged(nameof(NoMatches));
+    }
+
+    private void Persist(string key, string value)
+    {
+        if (_suppressPersist)
+        {
+            return;
+        }
+
+        _settings.SetValue(key, value);
+    }
+
+    private void RefreshView()
+    {
+        RowsView.Refresh();
+        OnPropertyChanged(nameof(NoMatches));
+    }
+
+    partial void OnSearchTextChanged(string value)
+    {
+        RowsView.Refresh();
+        OnPropertyChanged(nameof(SearchTextEmpty));
+        OnPropertyChanged(nameof(NoMatches));
+    }
+
+    partial void OnSortFieldChanged(OverviewSortField value)
+    {
+        Persist(SettingsKeys.OverviewSort, value.ToString());
+        UpdateSortAndGroup();
+    }
+
+    partial void OnSortDescendingChanged(bool value)
+    {
+        Persist(SettingsKeys.OverviewSortDesc, value ? "true" : "false");
+        UpdateSortAndGroup();
+    }
+
+    partial void OnGroupUnchangedChanged(bool value)
+    {
+        Persist(SettingsKeys.OverviewGroupUnchanged, value ? "true" : "false");
+        UpdateSortAndGroup();
     }
 }

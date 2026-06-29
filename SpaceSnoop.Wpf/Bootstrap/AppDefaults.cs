@@ -38,6 +38,9 @@ public static class AppDefaults
 
     public const bool SyncPathSuggestDefault = true;
 
+    public const OverviewSortField OverviewSortDefault = OverviewSortField.None;
+    public const bool OverviewGroupUnchangedDefault = true;
+
     public const string UpdateRepositoryDefault = AppInfo.RepoSlug;
     public const bool UpdateCheckOnStartupDefault = true;
     public const bool UpdateAutoDownloadDefault = false;

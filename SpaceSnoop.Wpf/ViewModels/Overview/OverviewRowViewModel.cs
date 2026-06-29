@@ -10,7 +10,7 @@ public sealed partial class OverviewRowViewModel : ObservableObject
     private FreshnessSummary _freshness;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(StatusText), nameof(StatusIconKind), nameof(HasCounts), nameof(ShowNewerBadge), nameof(SyncHadErrors))]
+    [NotifyPropertyChangedFor(nameof(StatusText), nameof(StatusIconKind), nameof(HasCounts), nameof(ShowNewerBadge), nameof(SyncHadErrors), nameof(IsUnchanged), nameof(GroupOrder), nameof(GroupKey))]
     private OverviewRunStatus _status;
 
     [ObservableProperty]
@@ -90,6 +90,24 @@ public sealed partial class OverviewRowViewModel : ObservableObject
 
     public int DiffCount => LeftOnlyCount + RightOnlyCount + ModifiedCount + ConflictCount;
 
+    public bool IsUnchanged =>
+        Status == OverviewRunStatus.Compared && DiffCount == 0
+        || Status == OverviewRunStatus.Synced && SyncErrors == 0 && SyncCopied == 0 && SyncDeleted == 0;
+
+    public int GroupOrder => IsUnchanged ? 1 : 0;
+
+    public string GroupKey => IsUnchanged ? "Без изменений" : "Профили";
+
+    public DateTime? NewestModified => (_freshness.LeftMax, _freshness.RightMax) switch
+    {
+        ({ } left, { } right) => left > right ? left : right,
+        ({ } left, null) => left,
+        (null, { } right) => right,
+        _ => null,
+    };
+
+    public int FreshnessSkew => _freshness.LeftNewer - _freshness.RightNewer;
+
     public bool HasCounts => Status == OverviewRunStatus.Compared;
 
     public bool SyncHadErrors => Status == OverviewRunStatus.Synced && SyncErrors > 0;
@@ -161,6 +179,9 @@ public sealed partial class OverviewRowViewModel : ObservableObject
                        + directories.GetValueOrDefault(ComparisonStatus.Modified);
 
         OnPropertyChanged(nameof(DiffCount));
+        OnPropertyChanged(nameof(IsUnchanged));
+        OnPropertyChanged(nameof(GroupOrder));
+        OnPropertyChanged(nameof(GroupKey));
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(StatusIconKind));
         OnPropertyChanged(nameof(BreakdownText));
@@ -184,6 +205,16 @@ public sealed partial class OverviewRowViewModel : ObservableObject
         OnPropertyChanged(nameof(NewerBadgeTooltip));
         OnPropertyChanged(nameof(NewerIsLeft));
         OnPropertyChanged(nameof(NewerIsRight));
+        OnPropertyChanged(nameof(NewestModified));
+        OnPropertyChanged(nameof(FreshnessSkew));
+    }
+
+    internal void AdvanceDirection()
+    {
+        Profile.Mode = (Profile.Mode + 1) % 3;
+        OnPropertyChanged(nameof(DirectionIconKind));
+        OnPropertyChanged(nameof(DirectionArrow));
+        OnPropertyChanged(nameof(DirectionTooltip));
     }
 
     private static string FormatStamp(DateTime? value)
@@ -211,14 +242,6 @@ public sealed partial class OverviewRowViewModel : ObservableObject
         }
 
         return parts.Count > 0 ? $"Синхронизировано: {string.Join(" · ", parts)}" : "Синхронизировано: изменений не потребовалось";
-    }
-
-    internal void AdvanceDirection()
-    {
-        Profile.Mode = (Profile.Mode + 1) % 3;
-        OnPropertyChanged(nameof(DirectionIconKind));
-        OnPropertyChanged(nameof(DirectionArrow));
-        OnPropertyChanged(nameof(DirectionTooltip));
     }
 
     [RelayCommand]
