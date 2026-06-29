@@ -85,7 +85,7 @@
                                Margin="0,8,0,0"
                                Visibility="{Binding Updater.HasChangelogStatus, Converter={StaticResource BoolToVisibility}}" />
 
-                    <ScrollViewer MaxHeight="360"
+                    <ScrollViewer MaxHeight="560"
                                   Margin="0,8,0,0"
                                   VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled"

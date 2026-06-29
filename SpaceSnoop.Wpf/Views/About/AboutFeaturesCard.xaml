@@ -27,12 +27,14 @@
                          Margin="0,14,-10,0">
                 <Border Style="{StaticResource About.FeatureCard}">
                     <StackPanel>
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.HardDrive}"
-                                                  Style="{StaticResource About.FeatureIcon}"
-                                                  HorizontalAlignment="Left" />
-                        <TextBlock Text="Сканирование"
-                                   Style="{StaticResource About.SectionTitle}"
-                                   Margin="0,10,0,0" />
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.HardDrive}"
+                                                      Style="{StaticResource About.FeatureIcon}"
+                                                      Margin="0,0,10,0" />
+                            <TextBlock Text="Сканирование"
+                                       Style="{StaticResource About.SectionTitle}"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
                         <TextBlock
                             Text="Дерево занятого места, где жирные папки краснеют от стыда по доле размера, или карта-treemap – те же тяжёлые ветки плитками по площади. Помечаешь хлам – и он улетает в корзину, без членовредительства."
                             Style="{StaticResource TextBlock.Subtle}"
@@ -43,12 +45,14 @@
 
                 <Border Style="{StaticResource About.FeatureCard}">
                     <StackPanel>
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ArrowRightLeft}"
-                                                  Style="{StaticResource About.FeatureIcon}"
-                                                  HorizontalAlignment="Left" />
-                        <TextBlock Text="Синхронизация"
-                                   Style="{StaticResource About.SectionTitle}"
-                                   Margin="0,10,0,0" />
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ArrowRightLeft}"
+                                                      Style="{StaticResource About.FeatureIcon}"
+                                                      Margin="0,0,10,0" />
+                            <TextBlock Text="Синхронизация"
+                                       Style="{StaticResource About.SectionTitle}"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
                         <TextBlock
                             Text="Сводит две папки лицом к лицу: цветом видно, кто где лишний, изменённые сверяются по хешу, а перенос – в любую из трёх сторон."
                             Style="{StaticResource TextBlock.Subtle}"
@@ -59,12 +63,14 @@
 
                 <Border Style="{StaticResource About.FeatureCard}">
                     <StackPanel>
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Container}"
-                                                  Style="{StaticResource About.FeatureIcon}"
-                                                  HorizontalAlignment="Left" />
-                        <TextBlock Text="Docker"
-                                   Style="{StaticResource About.SectionTitle}"
-                                   Margin="0,10,0,0" />
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Container}"
+                                                      Style="{StaticResource About.FeatureIcon}"
+                                                      Margin="0,0,10,0" />
+                            <TextBlock Text="Docker"
+                                       Style="{StaticResource About.SectionTitle}"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
                         <TextBlock
                             Text="Показывает, сколько диска отъел Docker – образы, контейнеры, тома, кэш сборки – и чистит лишнее: прунит мусор, сносит объекты по одному, жмёт VHDX. Безвозвратно, мимо корзины."
                             Style="{StaticResource TextBlock.Subtle}"
@@ -75,12 +81,14 @@
 
                 <Border Style="{StaticResource About.FeatureCard}">
                     <StackPanel>
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ScrollText}"
-                                                  Style="{StaticResource About.FeatureIcon}"
-                                                  HorizontalAlignment="Left" />
-                        <TextBlock Text="Логи"
-                                   Style="{StaticResource About.SectionTitle}"
-                                   Margin="0,10,0,0" />
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ScrollText}"
+                                                      Style="{StaticResource About.FeatureIcon}"
+                                                      Margin="0,0,10,0" />
+                            <TextBlock Text="Логи"
+                                       Style="{StaticResource About.SectionTitle}"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
                         <TextBlock
                             Text="Живой поток событий с фильтрами по уровню, источнику и подстроке. Что-то пошло не так – собери отчёт об ошибке одной кнопкой."
                             Style="{StaticResource TextBlock.Subtle}"
