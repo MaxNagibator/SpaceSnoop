@@ -225,8 +225,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public string NewerBadgeTooltip =>
         $"Свежее по изменённым файлам: слева {_freshness.LeftNewer:N0}, справа {_freshness.RightNewer:N0}.{Environment.NewLine}"
-        + $"Новейший файл слева: {FormatStamp(_freshness.LeftMax)}, справа: {FormatStamp(_freshness.RightMax)}.{Environment.NewLine}"
-        + $"Только слева: {_freshness.LeftOnly:N0}, только справа: {_freshness.RightOnly:N0}.";
+        + $"Новейший файл слева: {FormatStamp(_freshness.LeftMax)}, справа: {FormatStamp(_freshness.RightMax)}.";
 
     public bool HasGit => _leftGit is not null || _rightGit is not null;
 
@@ -324,34 +323,19 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public string RightGitLogEmptyText => _rightGit is null ? "не репозиторий" : "нет коммитов";
 
-    public string GitTooltip
+    public string? GitTooltip
     {
         get
         {
-            var lines = new List<string>();
-
-            if (_leftGit is { } left)
+            if (_leftGit is not { HasCommits: true } left
+                || _rightGit is not { HasCommits: true } right
+                || string.Equals(left.Oid, right.Oid, StringComparison.OrdinalIgnoreCase))
             {
-                lines.Add($"Слева: {FormatBranch(left)} · {FormatHead(left)} · {FormatDirty(left)}");
-                lines.Add($"  коммит: {FormatStamp(left.CommittedAt?.LocalDateTime)}");
+                return null;
             }
 
-            if (_rightGit is { } right)
-            {
-                lines.Add($"Справа: {FormatBranch(right)} · {FormatHead(right)} · {FormatDirty(right)}");
-                lines.Add($"  коммит: {FormatStamp(right.CommittedAt?.LocalDateTime)}");
-            }
-
-            lines.Add($"Итог: {GitVerdictText}.");
-
-            if (_leftGit is { HasCommits: true } l
-                && _rightGit is { HasCommits: true } r
-                && !string.Equals(l.Oid, r.Oid, StringComparison.OrdinalIgnoreCase))
-            {
-                lines.Add("«новее» – по дате коммита, не по истории веток.");
-            }
-
-            return string.Join(Environment.NewLine, lines);
+            return $"Коммит слева: {FormatStamp(left.CommittedAt?.LocalDateTime)}, справа: {FormatStamp(right.CommittedAt?.LocalDateTime)}.{Environment.NewLine}"
+                + "«Новее» – по дате коммита, не по истории веток.";
         }
     }
 
@@ -362,16 +346,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     public string CompositionHint =>
         $"Файлы: только слева {LeftOnlyCount:N0}, только справа {RightOnlyCount:N0}, изменены {ModifiedCount:N0}, конфликты {ConflictCount:N0}, одинаковые {IdenticalCount:N0}.{Environment.NewLine}"
         + $"Каталоги: только слева {LeftOnlyDirCount:N0}, только справа {RightOnlyDirCount:N0}, изменены {ModifiedDirCount:N0}, одинаковые {IdenticalDirCount:N0}.";
-
-    public string LeftOnlyHint => $"Файлов: {LeftOnlyCount:N0}; каталогов: {LeftOnlyDirCount:N0}";
-
-    public string RightOnlyHint => $"Файлов: {RightOnlyCount:N0}; каталогов: {RightOnlyDirCount:N0}";
-
-    public string ModifiedHint => $"Файлов: {ModifiedCount:N0}; каталогов: {ModifiedDirCount:N0}";
-
-    public string ConflictHint => $"Файлов: {ConflictCount:N0}";
-
-    public string IdenticalHint => $"Файлов: {IdenticalCount:N0}; каталогов: {IdenticalDirCount:N0}";
 
     public bool ShowApplied
     {
@@ -2012,11 +1986,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         OnPropertyChanged(nameof(ConflictFraction));
         OnPropertyChanged(nameof(HasConflicts));
         OnPropertyChanged(nameof(CompositionHint));
-        OnPropertyChanged(nameof(LeftOnlyHint));
-        OnPropertyChanged(nameof(RightOnlyHint));
-        OnPropertyChanged(nameof(ModifiedHint));
-        OnPropertyChanged(nameof(ConflictHint));
-        OnPropertyChanged(nameof(IdenticalHint));
         OnPropertyChanged(nameof(ShowNewerBadge));
         OnPropertyChanged(nameof(NewerBadgeIconKind));
         OnPropertyChanged(nameof(NewerBadgeText));

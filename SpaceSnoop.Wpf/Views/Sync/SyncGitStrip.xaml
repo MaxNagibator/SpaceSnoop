@@ -96,11 +96,9 @@
                 <Grid.ToolTip>
                     <TextBlock>
                         <TextBlock.Text>
-                            <MultiBinding StringFormat="{}{0} · {1} · {2:yyyy-MM-dd HH:mm}&#x0a;{3}">
-                                <Binding Path="ShortHash" />
-                                <Binding Path="Author" />
-                                <Binding Path="CommittedAt" />
+                            <MultiBinding StringFormat="{}{0}&#x0a;{1}">
                                 <Binding Path="Subject" />
+                                <Binding Path="Author" />
                             </MultiBinding>
                         </TextBlock.Text>
                     </TextBlock>
@@ -127,6 +125,7 @@
             ToolTip="{Binding GitTooltip}">
         <StackPanel VerticalAlignment="Center">
             <Border Background="Transparent"
+                    MinHeight="28"
                     Cursor="Hand">
                 <Border.InputBindings>
                     <MouseBinding MouseAction="LeftClick"
@@ -254,9 +253,6 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0">
-                        <TextBlock Text="СЛЕВА · ПОСЛЕДНИЕ КОММИТЫ"
-                                   Style="{StaticResource Caption}"
-                                   Margin="0,0,0,6" />
                         <ItemsControl ItemsSource="{Binding LeftGitLog}"
                                       ItemTemplate="{StaticResource GitCommitTemplate}" />
                         <TextBlock Text="{Binding LeftGitLogEmptyText}"
@@ -265,9 +261,6 @@
                     </StackPanel>
 
                     <StackPanel Grid.Column="2">
-                        <TextBlock Text="СПРАВА · ПОСЛЕДНИЕ КОММИТЫ"
-                                   Style="{StaticResource Caption}"
-                                   Margin="0,0,0,6" />
                         <ItemsControl ItemsSource="{Binding RightGitLog}"
                                       ItemTemplate="{StaticResource GitCommitTemplate}" />
                         <TextBlock Text="{Binding RightGitLogEmptyText}"

@@ -137,8 +137,7 @@
                        Margin="14,8,0,8">
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center"
-                            Margin="0,0,20,0"
-                            ToolTip="{Binding LeftOnlyHint}">
+                            Margin="0,0,20,0">
                     <Ellipse Width="8"
                              Height="8"
                              VerticalAlignment="Center"
@@ -175,8 +174,7 @@
 
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center"
-                            Margin="0,0,20,0"
-                            ToolTip="{Binding RightOnlyHint}">
+                            Margin="0,0,20,0">
                     <Ellipse Width="8"
                              Height="8"
                              VerticalAlignment="Center"
@@ -213,8 +211,7 @@
 
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center"
-                            Margin="0,0,20,0"
-                            ToolTip="{Binding ModifiedHint}">
+                            Margin="0,0,20,0">
                     <Ellipse Width="8"
                              Height="8"
                              VerticalAlignment="Center"
@@ -251,8 +248,7 @@
 
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center"
-                            Margin="0,0,20,0"
-                            ToolTip="{Binding ConflictHint}">
+                            Margin="0,0,20,0">
                     <Ellipse Width="8"
                              Height="8"
                              VerticalAlignment="Center"
@@ -278,8 +274,7 @@
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal"
-                            VerticalAlignment="Center"
-                            ToolTip="{Binding IdenticalHint}">
+                            VerticalAlignment="Center">
                     <Ellipse Width="8"
                              Height="8"
                              VerticalAlignment="Center"
