@@ -1,6 +1,7 @@
 ﻿using KeepShell.Services;
 using MahApps.Metro.IconPacks;
 using Microsoft.Win32;
+using SpaceSnoop.Core.Git;
 using SpaceSnoop.Wpf.Diff;
 using System.Diagnostics;
 using System.IO;
@@ -18,15 +19,17 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private readonly ILogger<SyncEngine> _engineLogger;
     private readonly ILogger<DirectoryComparer> _comparerLogger;
     private readonly ToastNotifier _notifier;
+    private readonly GitService _git = new();
     private readonly HashSet<DirectoryComparison> _collapsed = [];
 
     private ComparisonResult? _result;
+    private GitRepoState? _leftGit;
+    private GitRepoState? _rightGit;
 
     private Dictionary<object, SyncOutcome> _outcomes = [];
     private Dictionary<DirectoryComparison, (long Left, long Right)>? _dirSizeCache;
     private CancellationTokenSource? _cts;
     private bool _suppressPersist;
-    private bool _gitPromptDeclined;
     private bool _gitGroupExpanded;
     private bool _isIndeterminate = true;
     private double _progressValue;
@@ -217,6 +220,86 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         $"Свежее по изменённым файлам: слева {_freshness.LeftNewer:N0}, справа {_freshness.RightNewer:N0}.{Environment.NewLine}"
         + $"Новейший файл слева: {FormatStamp(_freshness.LeftMax)}, справа: {FormatStamp(_freshness.RightMax)}.{Environment.NewLine}"
         + $"Только слева: {_freshness.LeftOnly:N0}, только справа: {_freshness.RightOnly:N0}.";
+
+    public bool HasGit => _leftGit is not null || _rightGit is not null;
+
+    public bool LeftIsRepo => _leftGit is not null;
+
+    public bool RightIsRepo => _rightGit is not null;
+
+    public string LeftGitBranch => FormatBranch(_leftGit);
+
+    public string RightGitBranch => FormatBranch(_rightGit);
+
+    public string LeftGitHead => FormatHead(_leftGit);
+
+    public string RightGitHead => FormatHead(_rightGit);
+
+    public string LeftGitDirty => FormatDirty(_leftGit);
+
+    public string RightGitDirty => FormatDirty(_rightGit);
+
+    public bool LeftGitIsDirty => _leftGit?.IsDirty == true;
+
+    public bool RightGitIsDirty => _rightGit?.IsDirty == true;
+
+    public string LeftGitUpstream => FormatUpstream(_leftGit);
+
+    public string RightGitUpstream => FormatUpstream(_rightGit);
+
+    public bool GitInSync =>
+        _leftGit is not null && _rightGit is not null
+        && _leftGit.HasCommits && _rightGit.HasCommits
+        && string.Equals(_leftGit.ShortHash, _rightGit.ShortHash, StringComparison.OrdinalIgnoreCase)
+        && !_leftGit.IsDirty && !_rightGit.IsDirty;
+
+    public PackIconLucideKind GitVerdictIconKind => GitInSync ? PackIconLucideKind.Check : PackIconLucideKind.GitCompareArrows;
+
+    public string GitVerdictText
+    {
+        get
+        {
+            if (_leftGit is null || _rightGit is null)
+            {
+                return "одна сторона не репозиторий";
+            }
+
+            if (!_leftGit.HasCommits || !_rightGit.HasCommits)
+            {
+                return "нет коммитов";
+            }
+
+            if (!string.Equals(_leftGit.ShortHash, _rightGit.ShortHash, StringComparison.OrdinalIgnoreCase))
+            {
+                return "разные коммиты";
+            }
+
+            return _leftGit.IsDirty || _rightGit.IsDirty ? "тот же коммит, есть изменения" : "синхронны";
+        }
+    }
+
+    public string GitTooltip
+    {
+        get
+        {
+            var lines = new List<string>();
+
+            if (_leftGit is { } left)
+            {
+                lines.Add($"Слева: {FormatBranch(left)} · {FormatHead(left)} · {FormatDirty(left)}");
+                lines.Add($"  коммит: {FormatStamp(left.CommittedAt?.LocalDateTime)}");
+            }
+
+            if (_rightGit is { } right)
+            {
+                lines.Add($"Справа: {FormatBranch(right)} · {FormatHead(right)} · {FormatDirty(right)}");
+                lines.Add($"  коммит: {FormatStamp(right.CommittedAt?.LocalDateTime)}");
+            }
+
+            lines.Add($"Итог: {GitVerdictText}. Каталоги .git исключены из файлового сравнения.");
+            return string.Join(Environment.NewLine, lines);
+        }
+    }
 
     public bool ExclusionsEmpty => string.IsNullOrWhiteSpace(Exclusions);
 
@@ -791,57 +874,143 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         _logger.CompareFinished(_total, (long)stopwatch.Elapsed.TotalMilliseconds);
 
-        await OfferToSkipGitAsync();
+        await ResolveGitAsync();
     }
 
-    private async Task OfferToSkipGitAsync()
+    private async Task ResolveGitAsync()
     {
-        if (_result is null || _gitPromptDeclined)
+        if (_result is null)
         {
+            return;
+        }
+
+        if (!_settings.GetBool(SettingsKeys.SyncGit, AppDefaults.SyncGitDefault))
+        {
+            ClearGit();
             return;
         }
 
         var gitFolders = CountGitDirectories(_result.Root);
 
-        if (gitFolders == 0)
+        if (gitFolders > 0)
         {
-            return;
-        }
+            var updated = AddGitExclusion(Exclusions);
 
-        var choice = _settings.GetEnum(SettingsKeys.SyncGitFolders, GitFolderPromptChoice.Ask);
-
-        if (choice == GitFolderPromptChoice.Keep)
-        {
-            return;
-        }
-
-        if (choice == GitFolderPromptChoice.Ask)
-        {
-            var prompt = new GitFolderPromptViewModel(gitFolders);
-            var skip = await _dialogs.ShowAsync(prompt);
-
-            if (prompt.Choice != GitFolderPromptChoice.Ask)
+            if (!string.Equals(updated, Exclusions, StringComparison.Ordinal))
             {
-                _settings.SetEnum(SettingsKeys.SyncGitFolders, prompt.Choice);
-            }
-
-            if (!skip)
-            {
-                _gitPromptDeclined = true;
+                _logger.SyncGitFoldersSkipped(gitFolders);
+                _notifier.Notify($"Каталоги .git исключены из сравнения ({gitFolders})", StatusSeverity.Info);
+                Exclusions = updated;
+                await CompareAsync();
                 return;
             }
         }
 
-        var updatedExclusions = AddGitExclusion(Exclusions);
+        await ReadGitStateAsync();
+    }
 
-        if (string.Equals(updatedExclusions, Exclusions, StringComparison.Ordinal))
+    private async Task ReadGitStateAsync()
+    {
+        if (_result is null)
         {
             return;
         }
 
-        _logger.SyncGitFoldersSkipped(gitFolders);
-        Exclusions = updatedExclusions;
-        await CompareAsync();
+        var left = _result.LeftPath;
+        var right = _result.RightPath;
+
+        try
+        {
+            (_leftGit, _rightGit) = await Task.Run(async () => (await _git.ReadAsync(left), await _git.ReadAsync(right)));
+        }
+        catch (Exception ex)
+        {
+            _logger.GitStateFailed(ex.Unwrap());
+            ClearGit();
+            return;
+        }
+
+        if (_leftGit is not null || _rightGit is not null)
+        {
+            _logger.GitStateRead(FormatBranch(_leftGit), FormatBranch(_rightGit));
+        }
+
+        NotifyGitChanged();
+    }
+
+    private void ClearGit()
+    {
+        _leftGit = null;
+        _rightGit = null;
+        NotifyGitChanged();
+    }
+
+    private static string FormatBranch(GitRepoState? git)
+    {
+        return git is null ? string.Empty : git.IsDetached ? "detached" : git.Branch;
+    }
+
+    private static string FormatHead(GitRepoState? git)
+    {
+        if (git is null)
+        {
+            return string.Empty;
+        }
+
+        if (!git.HasCommits)
+        {
+            return "нет коммитов";
+        }
+
+        return string.IsNullOrEmpty(git.Subject) ? git.ShortHash : $"{git.ShortHash} · {git.Subject}";
+    }
+
+    private static string FormatDirty(GitRepoState? git)
+    {
+        return git is null ? string.Empty : git.IsDirty ? $"{git.DirtyCount} изм." : "чисто";
+    }
+
+    private static string FormatUpstream(GitRepoState? git)
+    {
+        if (git is null || !git.HasUpstream)
+        {
+            return string.Empty;
+        }
+
+        var parts = new List<string>(2);
+
+        if (git.Ahead > 0)
+        {
+            parts.Add($"↑{git.Ahead}");
+        }
+
+        if (git.Behind > 0)
+        {
+            parts.Add($"↓{git.Behind}");
+        }
+
+        return parts.Count == 0 ? "синхр." : string.Join(" ", parts);
+    }
+
+    private void NotifyGitChanged()
+    {
+        OnPropertyChanged(nameof(HasGit));
+        OnPropertyChanged(nameof(LeftIsRepo));
+        OnPropertyChanged(nameof(RightIsRepo));
+        OnPropertyChanged(nameof(LeftGitBranch));
+        OnPropertyChanged(nameof(RightGitBranch));
+        OnPropertyChanged(nameof(LeftGitHead));
+        OnPropertyChanged(nameof(RightGitHead));
+        OnPropertyChanged(nameof(LeftGitDirty));
+        OnPropertyChanged(nameof(RightGitDirty));
+        OnPropertyChanged(nameof(LeftGitIsDirty));
+        OnPropertyChanged(nameof(RightGitIsDirty));
+        OnPropertyChanged(nameof(LeftGitUpstream));
+        OnPropertyChanged(nameof(RightGitUpstream));
+        OnPropertyChanged(nameof(GitInSync));
+        OnPropertyChanged(nameof(GitVerdictIconKind));
+        OnPropertyChanged(nameof(GitVerdictText));
+        OnPropertyChanged(nameof(GitTooltip));
     }
 
     private bool CanHash()
@@ -1329,6 +1498,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _outcomes = [];
         _collapsed.Clear();
         Rows.ReplaceAll([]);
+        ClearGit();
         UpdateSummary();
     }
 

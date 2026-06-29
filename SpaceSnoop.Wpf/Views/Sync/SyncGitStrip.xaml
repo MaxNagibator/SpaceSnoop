@@ -1,0 +1,179 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Sync.SyncGitStrip"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Sync"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:SyncViewModel}"
+             d:DesignWidth="1040">
+
+    <UserControl.Resources>
+        <Style x:Key="GitBranchText"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource StatValue}">
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Setter Property="Margin"
+                    Value="8,0,0,0" />
+        </Style>
+
+        <Style x:Key="GitHeadText"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource Caption}">
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Muted}" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Setter Property="Margin"
+                    Value="8,0,0,0" />
+            <Setter Property="TextTrimming"
+                    Value="CharacterEllipsis" />
+            <Setter Property="MaxWidth"
+                    Value="280" />
+        </Style>
+
+        <Style x:Key="GitDirtyText"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource Caption}">
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Muted}" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Setter Property="Margin"
+                    Value="8,0,0,0" />
+        </Style>
+
+        <Style x:Key="GitUpstreamText"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource Caption}">
+            <Setter Property="Foreground"
+                    Value="{DynamicResource State.Info}" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Setter Property="Margin"
+                    Value="8,0,0,0" />
+        </Style>
+
+        <Style x:Key="GitStrip"
+               TargetType="Border"
+               BasedOn="{StaticResource Card.Inset}">
+            <Setter Property="Padding"
+                    Value="14,8" />
+            <Setter Property="Margin"
+                    Value="0,0,0,10" />
+            <Setter Property="Visibility"
+                    Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasGit}"
+                             Value="True">
+                    <Setter Property="Visibility"
+                            Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Border Style="{StaticResource GitStrip}"
+            ToolTip="{Binding GitTooltip}">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center">
+                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderGit2}"
+                                          Width="13"
+                                          Height="13"
+                                          VerticalAlignment="Center"
+                                          Foreground="{DynamicResource Fg.Muted}" />
+                <TextBlock Text="СЛЕВА"
+                           Style="{StaticResource Caption}"
+                           VerticalAlignment="Center"
+                           Margin="8,0,0,0" />
+                <TextBlock Text="{Binding LeftGitBranch}"
+                           Style="{StaticResource GitBranchText}" />
+                <TextBlock Text="{Binding LeftGitHead}"
+                           Style="{StaticResource GitHeadText}" />
+                <TextBlock Text="{Binding LeftGitDirty}">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock"
+                               BasedOn="{StaticResource GitDirtyText}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding LeftGitIsDirty}"
+                                             Value="True">
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource State.Warning}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <TextBlock Text="{Binding LeftGitUpstream}"
+                           Style="{StaticResource GitUpstreamText}" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        Margin="16,0">
+                <iconPacks:PackIconLucide Kind="{Binding GitVerdictIconKind}"
+                                          Width="13"
+                                          Height="13"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,7,0">
+                    <iconPacks:PackIconLucide.Style>
+                        <Style TargetType="iconPacks:PackIconLucide">
+                            <Setter Property="Foreground"
+                                    Value="{DynamicResource Fg.Muted}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding GitInSync}"
+                                             Value="True">
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource State.Success}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </iconPacks:PackIconLucide.Style>
+                </iconPacks:PackIconLucide>
+                <TextBlock Text="{Binding GitVerdictText}"
+                           Style="{StaticResource Caption}"
+                           VerticalAlignment="Center" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="2"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Right">
+                <TextBlock Text="СПРАВА"
+                           Style="{StaticResource Caption}"
+                           VerticalAlignment="Center" />
+                <TextBlock Text="{Binding RightGitBranch}"
+                           Style="{StaticResource GitBranchText}" />
+                <TextBlock Text="{Binding RightGitHead}"
+                           Style="{StaticResource GitHeadText}" />
+                <TextBlock Text="{Binding RightGitDirty}">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock"
+                               BasedOn="{StaticResource GitDirtyText}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding RightGitIsDirty}"
+                                             Value="True">
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource State.Warning}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <TextBlock Text="{Binding RightGitUpstream}"
+                           Style="{StaticResource GitUpstreamText}" />
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

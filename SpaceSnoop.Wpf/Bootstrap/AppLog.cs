@@ -103,6 +103,12 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1217, Level = LogLevel.Information, Message = "Проверка синхронизации: проверено {Checked}, расхождений {Mismatches}")]
     public static partial void SyncVerified(this ILogger logger, int @checked, int mismatches);
 
+    [LoggerMessage(EventId = 1218, Level = LogLevel.Information, Message = "Состояние Git прочитано: слева «{Left}», справа «{Right}»")]
+    public static partial void GitStateRead(this ILogger logger, string left, string right);
+
+    [LoggerMessage(EventId = 1219, Level = LogLevel.Warning, Message = "Не удалось прочитать состояние Git")]
+    public static partial void GitStateFailed(this ILogger logger, Exception exception);
+
     [LoggerMessage(EventId = 1250, Level = LogLevel.Information, Message = "Профиль расписания сохранён: «{Name}» (активно: {Enabled})")]
     public static partial void ScheduleProfileSaved(this ILogger logger, string name, bool enabled);
 

@@ -36,6 +36,7 @@ public static class AppDefaults
     public const int DiffContextLines = 3;
 
     public const bool SyncPathSuggestDefault = true;
+    public const bool SyncGitDefault = true;
 
     public const string UpdateRepositoryDefault = AppInfo.RepoSlug;
     public const bool UpdateCheckOnStartupDefault = true;

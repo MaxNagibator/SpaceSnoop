@@ -29,25 +29,12 @@
             <TextBlock Style="{StaticResource Setting.Hint}"
                        Text="Подсказывает существующие каталоги при вводе пути; перебор вариантов – стрелками ↑/↓." />
 
-            <Grid Margin="0,16,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="240" />
-                </Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0">
-                    <TextBlock Text="Git-папки (.git)"
-                               Style="{StaticResource Setting.Label}" />
-                    <TextBlock Text="Что делать, если при сравнении найдены служебные каталоги репозитория."
-                               Style="{StaticResource Setting.Hint}"
-                               Margin="0,2,0,0" />
-                </StackPanel>
-                <ComboBox Grid.Column="1"
-                          Style="{StaticResource ComboBox.Form}"
-                          ItemsSource="{Binding GitFolderOptions}"
-                          SelectedItem="{Binding SelectedGitFolderOption}"
-                          DisplayMemberPath="Label"
-                          VerticalAlignment="Center" />
-            </Grid>
+            <CheckBox Content="Git-репозитории: показывать состояние, исключать .git"
+                      IsChecked="{Binding SyncGitEnabled, Mode=TwoWay}"
+                      Margin="0,16,0,0"
+                      VerticalAlignment="Center" />
+            <TextBlock Style="{StaticResource Setting.Hint}"
+                       Text="Если каталоги сравнения – репозитории, над списком показывается ветка, коммит и состояние; служебные .git исключаются из файлового сравнения. Выключите, чтобы сравнивать .git как обычные папки." />
 
             <TextBlock Text="Исключения по умолчанию"
                        Style="{StaticResource Setting.Label}"

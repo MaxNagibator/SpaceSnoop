@@ -15,12 +15,14 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <sync:SyncToolbar Grid.Row="0" />
         <sync:SyncLedgerStrip Grid.Row="1" />
-        <sync:SyncProgressStrip Grid.Row="2" />
-        <sync:SyncDiffPanel Grid.Row="3" />
+        <sync:SyncGitStrip Grid.Row="2" />
+        <sync:SyncProgressStrip Grid.Row="3" />
+        <sync:SyncDiffPanel Grid.Row="4" />
     </Grid>
 </UserControl>
