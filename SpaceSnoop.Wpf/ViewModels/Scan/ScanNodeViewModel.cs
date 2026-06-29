@@ -229,7 +229,7 @@ public sealed partial class ScanNodeViewModel : ObservableObject
 
         try
         {
-            Process.Start("explorer.exe", Space.AbsolutePath);
+            Process.Start(new ProcessStartInfo(Space.AbsolutePath) { UseShellExecute = true });
         }
         catch (Exception ex)
         {
