@@ -22,9 +22,15 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private readonly GitService _git = new();
     private readonly HashSet<DirectoryComparison> _collapsed = [];
 
+    public static int[] GitHistoryCounts { get; } = [4, 8, 16, 32];
+
     private ComparisonResult? _result;
     private GitRepoState? _leftGit;
     private GitRepoState? _rightGit;
+    private IReadOnlyList<GitCommit> _leftGitLog = [];
+    private IReadOnlyList<GitCommit> _rightGitLog = [];
+    private bool _gitHistoryExpanded;
+    private bool _gitHistoryLoaded;
 
     private Dictionary<object, SyncOutcome> _outcomes = [];
     private Dictionary<DirectoryComparison, (long Left, long Right)>? _dirSizeCache;
@@ -75,6 +81,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     [ObservableProperty]
     private bool _verify = AppDefaults.SyncVerifyDefault;
+
+    [ObservableProperty]
+    private int _gitHistoryCount = AppDefaults.GitHistoryCountDefault;
 
     [ObservableProperty]
     private bool _hideApplied;
@@ -279,6 +288,22 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
     }
 
+    public IReadOnlyList<GitCommit> LeftGitLog => _leftGitLog;
+
+    public IReadOnlyList<GitCommit> RightGitLog => _rightGitLog;
+
+    public bool GitHistoryExpanded => _gitHistoryExpanded;
+
+    public PackIconLucideKind GitHistoryIconKind => _gitHistoryExpanded ? PackIconLucideKind.ChevronUp : PackIconLucideKind.ChevronDown;
+
+    public bool LeftGitLogEmpty => _gitHistoryLoaded && _leftGitLog.Count == 0;
+
+    public bool RightGitLogEmpty => _gitHistoryLoaded && _rightGitLog.Count == 0;
+
+    public string LeftGitLogEmptyText => _leftGit is null ? "не репозиторий" : "нет коммитов";
+
+    public string RightGitLogEmptyText => _rightGit is null ? "не репозиторий" : "нет коммитов";
+
     public string GitTooltip
     {
         get
@@ -378,6 +403,19 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     {
         _gitGroupExpanded = !_gitGroupExpanded;
         RebuildRows();
+    }
+
+    [RelayCommand]
+    private async Task ToggleGitHistoryAsync()
+    {
+        _gitHistoryExpanded = !_gitHistoryExpanded;
+        OnPropertyChanged(nameof(GitHistoryExpanded));
+        OnPropertyChanged(nameof(GitHistoryIconKind));
+
+        if (_gitHistoryExpanded && !_gitHistoryLoaded)
+        {
+            await LoadGitHistoryAsync();
+        }
     }
 
     public void CollapseSubtree(DirectoryComparison dir)
@@ -955,13 +993,55 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             _logger.GitStateRead(FormatBranch(_leftGit), FormatBranch(_rightGit));
         }
 
+        ResetGitHistory();
         NotifyGitChanged();
+
+        if (_gitHistoryExpanded)
+        {
+            await LoadGitHistoryAsync();
+        }
+    }
+
+    private async Task LoadGitHistoryAsync()
+    {
+        if (_result is null)
+        {
+            return;
+        }
+
+        var left = _result.LeftPath;
+        var right = _result.RightPath;
+        var count = GitHistoryCount;
+
+        try
+        {
+            (_leftGitLog, _rightGitLog) = await Task.Run(async () =>
+                (await _git.ReadHistoryAsync(left, count), await _git.ReadHistoryAsync(right, count)));
+        }
+        catch (Exception ex)
+        {
+            _logger.GitStateFailed(ex.Unwrap());
+            _leftGitLog = [];
+            _rightGitLog = [];
+        }
+
+        _gitHistoryLoaded = true;
+        NotifyGitChanged();
+    }
+
+    private void ResetGitHistory()
+    {
+        _leftGitLog = [];
+        _rightGitLog = [];
+        _gitHistoryLoaded = false;
     }
 
     private void ClearGit()
     {
         _leftGit = null;
         _rightGit = null;
+        _gitHistoryExpanded = false;
+        ResetGitHistory();
         NotifyGitChanged();
     }
 
@@ -1009,7 +1089,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             parts.Add($"↓{git.Behind}");
         }
 
-        return parts.Count == 0 ? "синхр." : string.Join(" ", parts);
+        return string.Join(" ", parts);
     }
 
     private void NotifyGitChanged()
@@ -1031,6 +1111,14 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         OnPropertyChanged(nameof(GitVerdictIconKind));
         OnPropertyChanged(nameof(GitVerdictText));
         OnPropertyChanged(nameof(GitTooltip));
+        OnPropertyChanged(nameof(LeftGitLog));
+        OnPropertyChanged(nameof(RightGitLog));
+        OnPropertyChanged(nameof(GitHistoryExpanded));
+        OnPropertyChanged(nameof(GitHistoryIconKind));
+        OnPropertyChanged(nameof(LeftGitLogEmpty));
+        OnPropertyChanged(nameof(RightGitLogEmpty));
+        OnPropertyChanged(nameof(LeftGitLogEmptyText));
+        OnPropertyChanged(nameof(RightGitLogEmptyText));
     }
 
     private bool CanHash()
@@ -1341,6 +1429,18 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     partial void OnVerifyChanged(bool value)
     {
         Persist(SettingsKeys.SyncVerify, value ? "true" : "false");
+    }
+
+    partial void OnGitHistoryCountChanged(int value)
+    {
+        Persist(SettingsKeys.SyncGitHistoryCount, value.ToString());
+
+        _gitHistoryLoaded = false;
+
+        if (_gitHistoryExpanded && HasGit)
+        {
+            _ = LoadGitHistoryAsync();
+        }
     }
 
     partial void OnHideAppliedChanged(bool value)
@@ -1886,6 +1986,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         ShowModified = _settings.GetBool(SettingsKeys.SyncShowModified);
         BlankAbsent = _settings.GetBool(SettingsKeys.SyncBlankAbsent);
         Verify = _settings.GetBool(SettingsKeys.SyncVerify, AppDefaults.SyncVerifyDefault);
+        GitHistoryCount = _settings.GetInt(SettingsKeys.SyncGitHistoryCount, AppDefaults.GitHistoryCountDefault);
         HideApplied = _settings.GetBool(SettingsKeys.SyncHideApplied);
         FlatView = _settings.GetBool(SettingsKeys.SyncFlatView);
         FlatSort = _settings.GetEnum(SettingsKeys.SyncFlatSort, AppDefaults.SyncFlatSortDefault);

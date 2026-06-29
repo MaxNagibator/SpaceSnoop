@@ -25,6 +25,18 @@ public sealed class GitService
         return GitRepoState.Parse(status.StdOut, log.Failed ? string.Empty : log.StdOut);
     }
 
+    public async Task<IReadOnlyList<GitCommit>> ReadHistoryAsync(string path, int count, CancellationToken cancel = default)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path) || count <= 0)
+        {
+            return [];
+        }
+
+        var log = await RunAsync(path, $"log -{count} --format=%h%x09%cI%x09%an%x09%s", cancel);
+
+        return log.Failed ? [] : GitCommit.ParseLog(log.StdOut);
+    }
+
     private static async Task<ProcessRun> RunAsync(string workingDirectory, string arguments, CancellationToken cancel)
     {
         var psi = new ProcessStartInfo("git", arguments)

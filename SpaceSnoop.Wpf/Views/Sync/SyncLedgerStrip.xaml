@@ -36,6 +36,8 @@
                BasedOn="{StaticResource Card.Inset}">
             <Setter Property="Padding"
                     Value="0" />
+            <Setter Property="MinHeight"
+                    Value="44" />
             <Setter Property="Visibility"
                     Value="Collapsed" />
             <Setter Property="Opacity"
