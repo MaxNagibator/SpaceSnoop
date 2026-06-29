@@ -90,6 +90,16 @@
                                 <Setter Property="Foreground"
                                         Value="{DynamicResource State.Error}" />
                             </DataTrigger>
+                            <DataTrigger Binding="{Binding Status}"
+                                         Value="{x:Static overview:OverviewRunStatus.Synced}">
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource State.Success}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding SyncHadErrors}"
+                                         Value="True">
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource State.Warning}" />
+                            </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </iconPacks:PackIconLucide.Style>
@@ -137,23 +147,41 @@
                 </StackPanel>
             </StackPanel>
 
-            <Button Grid.Column="2"
-                    Style="{StaticResource Button.Ghost}"
-                    Command="{Binding OpenInSyncCommand}"
-                    VerticalAlignment="Center"
-                    MinHeight="{DynamicResource Control.Height.Default}"
-                    Padding="12,6"
-                    Margin="12,0,0,0"
-                    ToolTip="Открыть пару на странице «Синхронизация»">
-                <StackPanel Orientation="Horizontal">
-                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderSync}"
-                                              Width="14"
-                                              Height="14"
-                                              VerticalAlignment="Center"
-                                              Margin="0,0,6,0" />
-                    <TextBlock Text="Открыть" />
-                </StackPanel>
-            </Button>
+            <StackPanel Grid.Column="2"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        Margin="12,0,0,0">
+                <Button Style="{StaticResource Button.Ghost}"
+                        Command="{Binding DataContext.SyncRowCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                        CommandParameter="{Binding}"
+                        MinHeight="{DynamicResource Control.Height.Default}"
+                        Padding="12,6"
+                        Margin="0,0,8,0"
+                        ToolTip="Синхронизировать этот профиль (удаления – в корзину)">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.RefreshCw}"
+                                                  Width="14"
+                                                  Height="14"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,6,0" />
+                        <TextBlock Text="Синхр." />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource Button.Ghost}"
+                        Command="{Binding OpenInSyncCommand}"
+                        MinHeight="{DynamicResource Control.Height.Default}"
+                        Padding="12,6"
+                        ToolTip="Открыть пару на странице «Синхронизация»">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderSync}"
+                                                  Width="14"
+                                                  Height="14"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,6,0" />
+                        <TextBlock Text="Открыть" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
         </Grid>
     </Border>
 </UserControl>

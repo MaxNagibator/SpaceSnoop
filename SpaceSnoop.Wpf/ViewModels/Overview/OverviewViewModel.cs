@@ -1,5 +1,7 @@
-﻿using System.Collections.ObjectModel;
+﻿using KeepShell.Services;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.IO;
 using System.Windows.Input;
 
 namespace SpaceSnoop.Wpf.ViewModels.Overview;
@@ -7,13 +9,15 @@ namespace SpaceSnoop.Wpf.ViewModels.Overview;
 public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, IPageStatus, IPageRefresh
 {
     private readonly ISettingsStore _settings;
+    private readonly IDialogService _dialogs;
     private readonly ILogger<OverviewViewModel> _logger;
     private readonly ILogger<DirectoryComparer> _comparerLogger;
+    private readonly ILogger<SyncEngine> _engineLogger;
 
     private CancellationTokenSource? _cts;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(CompareAllCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CompareAllCommand), nameof(SyncRowCommand), nameof(SyncAllCommand))]
     private bool _isBusy;
 
     [ObservableProperty]
@@ -28,11 +32,13 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
     [ObservableProperty]
     private double _progressMax;
 
-    public OverviewViewModel(ISettingsStore settings, ILogger<OverviewViewModel> logger, ILogger<DirectoryComparer> comparerLogger)
+    public OverviewViewModel(ISettingsStore settings, IDialogService dialogs, ILogger<OverviewViewModel> logger, ILogger<DirectoryComparer> comparerLogger, ILogger<SyncEngine> engineLogger)
     {
         _settings = settings;
+        _dialogs = dialogs;
         _logger = logger;
         _comparerLogger = comparerLogger;
+        _engineLogger = engineLogger;
 
         ReloadRows();
         _settings.Changed += OnSettingsChanged;
@@ -148,6 +154,136 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         }
     }
 
+    [RelayCommand(CanExecute = nameof(CanSyncRow))]
+    private async Task SyncRow(OverviewRowViewModel? row)
+    {
+        if (row is null)
+        {
+            return;
+        }
+
+        var lines = new[]
+        {
+            $"Профиль: {row.Name}",
+            $"{row.Left} → {row.Right}",
+            string.Empty,
+            "Файлы будут скопированы по направлению профиля, удаления – в корзину.",
+            string.Empty,
+            "Продолжить?",
+        };
+
+        if (!_dialogs.Confirm("Синхронизация профиля", string.Join(Environment.NewLine, lines)))
+        {
+            return;
+        }
+
+        _cts = new();
+        var token = _cts.Token;
+
+        IsBusy = true;
+        IsIndeterminate = true;
+        ProgressMax = 0;
+        ProgressValue = 0;
+        StatusCaption = $"Синхронизация · {row.Name}";
+
+        var stopwatch = Stopwatch.StartNew();
+        _logger.OverviewSyncStarted(1);
+
+        try
+        {
+            await SyncRowCore(row, token);
+            stopwatch.Stop();
+            var failed = row.Status == OverviewRunStatus.Error || row.SyncErrors > 0 ? 1 : 0;
+            StatusCaption = row.StatusText;
+            _logger.OverviewSyncFinished(failed == 0 ? 1 : 0, failed, (long)stopwatch.Elapsed.TotalMilliseconds);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusCaption = "Синхронизация отменена.";
+            _logger.OverviewSyncCancelled();
+        }
+        finally
+        {
+            IsBusy = false;
+            IsIndeterminate = false;
+            _cts.Dispose();
+            _cts = null;
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanSyncAll))]
+    private async Task SyncAll()
+    {
+        var lines = new[]
+        {
+            $"Синхронизировать все профили: {Rows.Count}.",
+            string.Empty,
+            "Файлы будут скопированы по направлению каждого профиля, удаления – в корзину.",
+            string.Empty,
+            "Продолжить?",
+        };
+
+        if (!_dialogs.Confirm("Синхронизация всех профилей", string.Join(Environment.NewLine, lines)))
+        {
+            return;
+        }
+
+        _cts = new();
+        var token = _cts.Token;
+
+        IsBusy = true;
+        IsIndeterminate = false;
+        ProgressMax = Rows.Count;
+        ProgressValue = 0;
+
+        var total = Rows.Count;
+        var synced = 0;
+        var failed = 0;
+        var stopwatch = Stopwatch.StartNew();
+
+        _logger.OverviewSyncStarted(total);
+
+        try
+        {
+            for (var i = 0; i < Rows.Count; i++)
+            {
+                token.ThrowIfCancellationRequested();
+
+                var row = Rows[i];
+                ProgressValue = i;
+                StatusCaption = $"Пара {i + 1} из {total} · {row.Name}";
+
+                await SyncRowCore(row, token);
+
+                if (row.Status == OverviewRunStatus.Synced && row.SyncErrors == 0)
+                {
+                    synced++;
+                }
+                else if (row.Status is OverviewRunStatus.Error or OverviewRunStatus.Synced)
+                {
+                    failed++;
+                }
+            }
+
+            ProgressValue = total;
+            stopwatch.Stop();
+            StatusCaption = $"Синхронизировано профилей: {synced}, c ошибками: {failed}";
+            _logger.OverviewSyncFinished(synced, failed, (long)stopwatch.Elapsed.TotalMilliseconds);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusCaption = "Синхронизация отменена.";
+            _logger.OverviewSyncCancelled();
+        }
+        finally
+        {
+            IsBusy = false;
+            IsIndeterminate = false;
+            _cts.Dispose();
+            _cts = null;
+        }
+    }
+
     [RelayCommand]
     private void CancelOperation()
     {
@@ -160,7 +296,94 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         ReloadRows();
     }
 
+    private async Task SyncRowCore(OverviewRowViewModel row, CancellationToken token)
+    {
+        var preflight = OverviewPipeline.Classify(row.Profile);
+
+        if (preflight is not null)
+        {
+            row.Error = null;
+            row.Status = preflight.Value;
+            return;
+        }
+
+        var profile = row.Profile;
+        var left = profile.Left.Trim();
+        var right = profile.Right.Trim();
+        var mode = HeadlessSync.MapMode(profile.Mode);
+        var mirror = profile.Mirror;
+
+        if (mirror && mode != SyncMode.Bidirectional)
+        {
+            var source = mode == SyncMode.RightToLeft ? right : left;
+
+            if (!Directory.EnumerateFileSystemEntries(source).Any())
+            {
+                row.Error = "Зеркало отменено: источник пуст.";
+                row.Status = OverviewRunStatus.Error;
+                return;
+            }
+        }
+
+        row.Status = OverviewRunStatus.Syncing;
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            var report = await Task.Run(() =>
+                {
+                    var filter = new ExclusionFilter(profile.Exclusions);
+                    var result = new DirectoryComparer(filter, _comparerLogger).Compare(left, right, token);
+                    result.ApplyMode(mode, mirror);
+                    result.ResolveAllConflicts(SyncAction.Skip);
+                    return new SyncEngine(_engineLogger, false).Execute(result, token);
+                },
+                token);
+
+            stopwatch.Stop();
+            row.ApplySyncReport(report);
+            row.ElapsedMs = (long)stopwatch.Elapsed.TotalMilliseconds;
+            row.Error = null;
+            WriteSyncLog(profile.Name, report);
+        }
+        catch (OperationCanceledException)
+        {
+            row.Status = OverviewRunStatus.None;
+            throw;
+        }
+        catch (Exception exception)
+        {
+            row.Error = exception.Unwrap().Message;
+            row.Status = OverviewRunStatus.Error;
+        }
+    }
+
+    private void WriteSyncLog(string name, SyncReport report)
+    {
+        try
+        {
+            var path = Path.Combine(AppStorage.DataDirectory, AppInfo.SyncLogFileName);
+            using var writer = new StreamWriter(path, true);
+            writer.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Обзор [{name}]: {report.SuccessCount} успешно, {report.Errors.Count} ошибок");
+            report.WriteDetails(writer);
+        }
+        catch (Exception exception)
+        {
+            _logger.SyncLogWriteFailed(exception);
+        }
+    }
+
     private bool CanCompareAll()
+    {
+        return !IsBusy && Rows.Count > 0;
+    }
+
+    private bool CanSyncRow(OverviewRowViewModel? row)
+    {
+        return !IsBusy && row is not null;
+    }
+
+    private bool CanSyncAll()
     {
         return !IsBusy && Rows.Count > 0;
     }
@@ -176,6 +399,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
 
         OnPropertyChanged(nameof(HasRows));
         CompareAllCommand.NotifyCanExecuteChanged();
+        SyncAllCommand.NotifyCanExecuteChanged();
     }
 
     private void RaiseOpenInSync(SyncProfile profile)

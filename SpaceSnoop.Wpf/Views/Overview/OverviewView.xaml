@@ -52,10 +52,11 @@
                                 Padding="14,6"
                                 Margin="0,0,8,0"
                                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
-                        <Button Style="{StaticResource Button.Primary}"
+                        <Button Style="{StaticResource Button.Secondary}"
                                 Command="{Binding CompareAllCommand}"
                                 MinHeight="{DynamicResource Control.Height.Default}"
-                                Padding="14,6">
+                                Padding="14,6"
+                                Margin="0,0,8,0">
                             <StackPanel Orientation="Horizontal">
                                 <iconPacks:PackIconLucide
                                     Kind="{x:Static iconPacks:PackIconLucideKind.GitCompareArrows}"
@@ -64,6 +65,20 @@
                                     VerticalAlignment="Center"
                                     Margin="0,0,6,0" />
                                 <TextBlock Text="Сравнить все" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource Button.Primary}"
+                                Command="{Binding SyncAllCommand}"
+                                MinHeight="{DynamicResource Control.Height.Default}"
+                                Padding="14,6"
+                                ToolTip="Синхронизировать все профили (удаления – в корзину)">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderSync}"
+                                                          Width="14"
+                                                          Height="14"
+                                                          VerticalAlignment="Center"
+                                                          Margin="0,0,6,0" />
+                                <TextBlock Text="Синхронизировать всё" />
                             </StackPanel>
                         </Button>
                     </StackPanel>

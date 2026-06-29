@@ -8,4 +8,6 @@ public enum OverviewRunStatus
     Unavailable = 3,
     Overlap = 4,
     Error = 5,
+    Syncing = 6,
+    Synced = 7,
 }

@@ -9,7 +9,7 @@ public sealed partial class OverviewRowViewModel : ObservableObject
     private FreshnessSummary _freshness;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(StatusText), nameof(StatusIconKind), nameof(HasCounts), nameof(ShowNewerBadge))]
+    [NotifyPropertyChangedFor(nameof(StatusText), nameof(StatusIconKind), nameof(HasCounts), nameof(ShowNewerBadge), nameof(SyncHadErrors))]
     private OverviewRunStatus _status;
 
     [ObservableProperty]
@@ -35,6 +35,18 @@ public sealed partial class OverviewRowViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StatusText))]
+    private int _syncCopied;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatusText))]
+    private int _syncDeleted;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatusText), nameof(StatusIconKind), nameof(SyncHadErrors))]
+    private int _syncErrors;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatusText))]
     private string? _error;
 
     public OverviewRowViewModel(SyncProfile profile, Action<SyncProfile> openInSync)
@@ -54,6 +66,8 @@ public sealed partial class OverviewRowViewModel : ObservableObject
     public int DiffCount => LeftOnlyCount + RightOnlyCount + ModifiedCount + ConflictCount;
 
     public bool HasCounts => Status == OverviewRunStatus.Compared;
+
+    public bool SyncHadErrors => Status == OverviewRunStatus.Synced && SyncErrors > 0;
 
     public bool ShowNewerBadge => Status == OverviewRunStatus.Compared && _freshness.Verdict != NewerSide.None;
 
@@ -90,6 +104,8 @@ public sealed partial class OverviewRowViewModel : ObservableObject
     {
         OverviewRunStatus.Comparing => "Сравнение…",
         OverviewRunStatus.Compared => DiffCount == 0 ? "Идентичны" : $"Различий: {DiffCount}",
+        OverviewRunStatus.Syncing => "Синхронизация…",
+        OverviewRunStatus.Synced => SyncSummary(),
         OverviewRunStatus.Unavailable => "Каталог недоступен",
         OverviewRunStatus.Overlap => "Пути пересекаются или вложены",
         OverviewRunStatus.Error => Error ?? "Ошибка",
@@ -100,6 +116,8 @@ public sealed partial class OverviewRowViewModel : ObservableObject
     {
         OverviewRunStatus.Comparing => PackIconLucideKind.Loader,
         OverviewRunStatus.Compared => DiffCount == 0 ? PackIconLucideKind.Check : PackIconLucideKind.GitCompareArrows,
+        OverviewRunStatus.Syncing => PackIconLucideKind.RefreshCw,
+        OverviewRunStatus.Synced => SyncErrors > 0 ? PackIconLucideKind.TriangleAlert : PackIconLucideKind.FolderCheck,
         OverviewRunStatus.Unavailable => PackIconLucideKind.FolderX,
         OverviewRunStatus.Overlap => PackIconLucideKind.TriangleAlert,
         OverviewRunStatus.Error => PackIconLucideKind.CircleX,
@@ -123,6 +141,14 @@ public sealed partial class OverviewRowViewModel : ObservableObject
         OnPropertyChanged(nameof(BreakdownText));
     }
 
+    public void ApplySyncReport(SyncReport report)
+    {
+        SyncCopied = report.CopiedCount;
+        SyncDeleted = report.DeletedCount;
+        SyncErrors = report.Errors.Count;
+        Status = OverviewRunStatus.Synced;
+    }
+
     internal void ApplyFreshness(FreshnessSummary freshness)
     {
         _freshness = freshness;
@@ -138,6 +164,28 @@ public sealed partial class OverviewRowViewModel : ObservableObject
     private static string FormatStamp(DateTime? value)
     {
         return value is { } stamp ? stamp.ToString("yyyy-MM-dd HH:mm") : "–";
+    }
+
+    private string SyncSummary()
+    {
+        var parts = new List<string>();
+
+        if (SyncCopied > 0)
+        {
+            parts.Add($"скопировано {SyncCopied}");
+        }
+
+        if (SyncDeleted > 0)
+        {
+            parts.Add($"удалено {SyncDeleted}");
+        }
+
+        if (SyncErrors > 0)
+        {
+            parts.Add($"ошибок {SyncErrors}");
+        }
+
+        return parts.Count > 0 ? $"Синхронизировано: {string.Join(" · ", parts)}" : "Синхронизировано: изменений не потребовалось";
     }
 
     [RelayCommand]
