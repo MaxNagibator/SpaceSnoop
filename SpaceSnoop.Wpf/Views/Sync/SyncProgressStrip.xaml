@@ -9,10 +9,45 @@
              d:DataContext="{d:DesignInstance vm:SyncViewModel}"
              d:DesignWidth="1040">
 
-    <Border Style="{StaticResource Card.Inset}"
-            Margin="0,0,0,10"
-            Padding="16,12"
-            Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+    <Border Margin="0,0,0,10"
+            Padding="16,12">
+        <Border.Style>
+            <Style TargetType="Border"
+                   BasedOn="{StaticResource Card.Inset}">
+                <Setter Property="Visibility"
+                        Value="Collapsed" />
+                <Setter Property="Opacity"
+                        Value="0" />
+                <Setter Property="RenderTransform">
+                    <Setter.Value>
+                        <TranslateTransform Y="8" />
+                    </Setter.Value>
+                </Setter>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsBusy}"
+                                 Value="True">
+                        <Setter Property="Visibility"
+                                Value="Visible" />
+                        <DataTrigger.EnterActions>
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                     To="1"
+                                                     Duration="0:0:0.24" />
+                                    <DoubleAnimation Storyboard.TargetProperty="RenderTransform.(TranslateTransform.Y)"
+                                                     To="0"
+                                                     Duration="0:0:0.30">
+                                        <DoubleAnimation.EasingFunction>
+                                            <CubicEase EasingMode="EaseOut" />
+                                        </DoubleAnimation.EasingFunction>
+                                    </DoubleAnimation>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </DataTrigger.EnterActions>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Border.Style>
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />

@@ -44,6 +44,54 @@
             </Style.Triggers>
         </Style>
 
+        <Storyboard x:Key="LabelShow">
+            <DoubleAnimation Storyboard.TargetProperty="(FrameworkElement.LayoutTransform).(ScaleTransform.ScaleX)"
+                             To="1"
+                             Duration="0:0:0.18" />
+            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                             To="1"
+                             Duration="0:0:0.18" />
+        </Storyboard>
+
+        <Storyboard x:Key="LabelHide">
+            <DoubleAnimation Storyboard.TargetProperty="(FrameworkElement.LayoutTransform).(ScaleTransform.ScaleX)"
+                             To="0"
+                             Duration="0:0:0.18" />
+            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                             To="0"
+                             Duration="0:0:0.18" />
+        </Storyboard>
+
+        <Style x:Key="CompareLabel"
+               TargetType="TextBlock">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding SyncIsPrimary}"
+                             Value="True">
+                    <DataTrigger.EnterActions>
+                        <BeginStoryboard Storyboard="{StaticResource LabelHide}" />
+                    </DataTrigger.EnterActions>
+                    <DataTrigger.ExitActions>
+                        <BeginStoryboard Storyboard="{StaticResource LabelShow}" />
+                    </DataTrigger.ExitActions>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SyncLabel"
+               TargetType="TextBlock">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding SyncIsPrimary}"
+                             Value="True">
+                    <DataTrigger.EnterActions>
+                        <BeginStoryboard Storyboard="{StaticResource LabelShow}" />
+                    </DataTrigger.EnterActions>
+                    <DataTrigger.ExitActions>
+                        <BeginStoryboard Storyboard="{StaticResource LabelHide}" />
+                    </DataTrigger.ExitActions>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
     </UserControl.Resources>
 
     <Border Style="{StaticResource Card.Inset}"
@@ -194,27 +242,40 @@
                 <Button Style="{StaticResource Button.Primary}"
                         Command="{Binding CompareCommand}"
                         VerticalAlignment="Center"
-                        Margin="0,0,8,8">
+                        Margin="0,0,8,8"
+                        ToolTip="Сравнить">
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.GitCompare}"
                                                   Width="15"
                                                   Height="15"
-                                                  VerticalAlignment="Center"
-                                                  Margin="0,0,6,0" />
-                        <TextBlock Text="Сравнить" />
+                                                  VerticalAlignment="Center" />
+                        <TextBlock Text="Сравнить"
+                                   Padding="6,0,0,0"
+                                   Style="{StaticResource CompareLabel}">
+                            <TextBlock.LayoutTransform>
+                                <ScaleTransform ScaleX="1" />
+                            </TextBlock.LayoutTransform>
+                        </TextBlock>
                     </StackPanel>
                 </Button>
                 <Button Style="{StaticResource Button.Primary}"
                         Command="{Binding SyncCommand}"
                         VerticalAlignment="Center"
-                        Margin="0,0,16,8">
+                        Margin="0,0,16,8"
+                        ToolTip="Синхронизировать">
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ArrowRightLeft}"
                                                   Width="15"
                                                   Height="15"
-                                                  VerticalAlignment="Center"
-                                                  Margin="0,0,6,0" />
-                        <TextBlock Text="Синхронизировать" />
+                                                  VerticalAlignment="Center" />
+                        <TextBlock Text="Синхронизировать"
+                                   Padding="6,0,0,0"
+                                   Opacity="0"
+                                   Style="{StaticResource SyncLabel}">
+                            <TextBlock.LayoutTransform>
+                                <ScaleTransform ScaleX="0" />
+                            </TextBlock.LayoutTransform>
+                        </TextBlock>
                     </StackPanel>
                 </Button>
                 <ToggleButton Style="{StaticResource MirrorToggle}"
@@ -243,6 +304,24 @@
                                                   Visibility="{Binding MirrorDeletes, Converter={StaticResource BoolToVisibility}}" />
                     </StackPanel>
                 </ToggleButton>
+                <Button Style="{StaticResource Button.Secondary}"
+                        Command="{Binding HashCommand}"
+                        MinWidth="0"
+                        Padding="9,0"
+                        VerticalAlignment="Center"
+                        Margin="0,0,16,8"
+                        ToolTip="Сверить изменённые файлы по содержимому"
+                        AutomationProperties.Name="Сверить хеши изменённых файлов">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Fingerprint}"
+                                                  Width="14"
+                                                  Height="14"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,6,0" />
+                        <TextBlock Text="Хеши"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
                 <ToggleButton x:Name="MoreToggle"
                               Style="{StaticResource ToggleButton.Toolbar}"
                               MinWidth="0"
@@ -537,20 +616,6 @@
                                   Style="{StaticResource ComboBox.Toolbar}"
                                   HorizontalAlignment="Stretch"
                                   ToolTip="Направление синхронизации" />
-                        <Button Style="{StaticResource Button.Secondary}"
-                                Command="{Binding HashCommand}"
-                                HorizontalAlignment="Stretch"
-                                Margin="0,12,0,0"
-                                ToolTip="Сверить изменённые файлы по содержимому">
-                            <StackPanel Orientation="Horizontal">
-                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Fingerprint}"
-                                                          Width="15"
-                                                          Height="15"
-                                                          VerticalAlignment="Center"
-                                                          Margin="0,0,6,0" />
-                                <TextBlock Text="Хеши" />
-                            </StackPanel>
-                        </Button>
                         <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
                                       IsChecked="{Binding Verify}"
                                       MinWidth="0"

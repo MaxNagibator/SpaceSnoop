@@ -55,11 +55,34 @@
                     Value="0,0,0,10" />
             <Setter Property="Visibility"
                     Value="Collapsed" />
+            <Setter Property="Opacity"
+                    Value="0" />
+            <Setter Property="RenderTransform">
+                <Setter.Value>
+                    <TranslateTransform Y="8" />
+                </Setter.Value>
+            </Setter>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding HasGit}"
                              Value="True">
                     <Setter Property="Visibility"
                             Value="Visible" />
+                    <DataTrigger.EnterActions>
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                 To="1"
+                                                 Duration="0:0:0.24" />
+                                <DoubleAnimation Storyboard.TargetProperty="RenderTransform.(TranslateTransform.Y)"
+                                                 To="0"
+                                                 Duration="0:0:0.30">
+                                    <DoubleAnimation.EasingFunction>
+                                        <CubicEase EasingMode="EaseOut" />
+                                    </DoubleAnimation.EasingFunction>
+                                </DoubleAnimation>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </DataTrigger.EnterActions>
                 </DataTrigger>
             </Style.Triggers>
         </Style>

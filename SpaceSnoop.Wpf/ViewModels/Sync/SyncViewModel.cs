@@ -146,6 +146,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public bool HasResult => _result is not null;
 
+    public bool SyncIsPrimary => HasActionableChanges();
+
     public int IdenticalCount => _stats[ComparisonStatus.Identical];
 
     public int LeftOnlyCount => _stats[ComparisonStatus.LeftOnly];
@@ -228,10 +230,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         ? $"Свежее по коммитам git: слева {FormatStamp(_leftGit?.CommittedAt?.LocalDateTime)}, справа {FormatStamp(_rightGit?.CommittedAt?.LocalDateTime)}."
         : $"Свежее по новейшему изменённому файлу: слева {FormatStamp(_freshness.LeftChangedMax)}, справа {FormatStamp(_freshness.RightChangedMax)}.{Environment.NewLine}"
           + $"Изменённых новее: слева {_freshness.LeftNewer:N0}, справа {_freshness.RightNewer:N0}.";
-
-    private NewerSide EffectiveNewerSide => CombineNewer(_freshness.Verdict, GitInSync, GitNewerSign);
-
-    private bool GitDecidesNewer => GitInSync || GitNewerSign != 0;
 
     public bool HasGit => _leftGit is not null || _rightGit is not null;
 
@@ -382,6 +380,10 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     }
 
     public ICommand CancelCommand => CancelOperationCommand;
+
+    private NewerSide EffectiveNewerSide => CombineNewer(_freshness.Verdict, GitInSync, GitNewerSign);
+
+    private bool GitDecidesNewer => GitInSync || GitNewerSign != 0;
 
     private int GitNewerSign
     {
@@ -1959,6 +1961,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             HasPending = false;
             SyncCommand.NotifyCanExecuteChanged();
             HashCommand.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(SyncIsPrimary));
             return;
         }
 
@@ -1980,6 +1983,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         HasPending = _result.HasPendingResolution();
         SyncCommand.NotifyCanExecuteChanged();
         HashCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(SyncIsPrimary));
     }
 
     private void RefreshLedgerAfterSync()

@@ -116,6 +116,36 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+
+        <Style x:Key="NewerBadge"
+               TargetType="StackPanel">
+            <Setter Property="Orientation"
+                    Value="Horizontal" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Setter Property="Margin"
+                    Value="20,0,0,0" />
+            <Setter Property="Visibility"
+                    Value="Collapsed" />
+            <Setter Property="Opacity"
+                    Value="0" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ShowNewerBadge}"
+                             Value="True">
+                    <Setter Property="Visibility"
+                            Value="Visible" />
+                    <DataTrigger.EnterActions>
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                 To="1"
+                                                 Duration="0:0:0.24" />
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </DataTrigger.EnterActions>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
 
     <Border Style="{StaticResource LedgerStrip}"
@@ -310,10 +340,7 @@
                     </StackPanel>
                 </StackPanel>
 
-                <StackPanel Orientation="Horizontal"
-                            VerticalAlignment="Center"
-                            Margin="20,0,0,0"
-                            Visibility="{Binding ShowNewerBadge, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}"
+                <StackPanel Style="{StaticResource NewerBadge}"
                             ToolTip="{Binding NewerBadgeTooltip}">
                     <iconPacks:PackIconLucide Kind="{Binding NewerBadgeIconKind}"
                                               Width="12"
