@@ -925,6 +925,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         WriteSyncLog(report);
         _outcomes = SyncOutcomes.Build(result, report.Errors, report.Mismatches);
         RebuildRows();
+        RefreshLedgerAfterSync();
 
         var verifyText = verify ? $", расхождений: {report.Mismatches.Count:N0}" : string.Empty;
         SummaryText = $"Готово за {stopwatch.Elapsed.TotalSeconds:F2} с. Успешно: {report.SuccessCount:N0}, ошибок: {report.Errors.Count:N0}{verifyText}";
@@ -1433,6 +1434,68 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         HasPending = _result.HasPendingResolution();
         SyncCommand.NotifyCanExecuteChanged();
         HashCommand.NotifyCanExecuteChanged();
+    }
+
+    internal static (Dictionary<ComparisonStatus, int> Files, Dictionary<ComparisonStatus, int> Dirs) CountRemaining(
+        DirectoryComparison root,
+        IReadOnlyDictionary<object, SyncOutcome> outcomes)
+    {
+        var files = NewZeroStats();
+        var dirs = NewZeroStats();
+        Walk(root, outcomes, files, dirs);
+        return (files, dirs);
+
+        static void Walk(DirectoryComparison dir, IReadOnlyDictionary<object, SyncOutcome> outcomes, Dictionary<ComparisonStatus, int> files, Dictionary<ComparisonStatus, int> dirs)
+        {
+            foreach (var file in dir.Files)
+            {
+                if (outcomes.GetValueOrDefault(file) == SyncOutcome.Applied)
+                {
+                    if (file.Action is not (SyncAction.DeleteLeft or SyncAction.DeleteRight))
+                    {
+                        files[ComparisonStatus.Identical]++;
+                    }
+
+                    continue;
+                }
+
+                files[file.Status]++;
+            }
+
+            foreach (var sub in dir.SubDirectories)
+            {
+                if (outcomes.GetValueOrDefault(sub) == SyncOutcome.Applied)
+                {
+                    if (sub.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
+                    {
+                        continue;
+                    }
+
+                    dirs[ComparisonStatus.Identical]++;
+                }
+                else
+                {
+                    dirs[sub.Status]++;
+                }
+
+                Walk(sub, outcomes, files, dirs);
+            }
+        }
+    }
+
+    private void RefreshLedgerAfterSync()
+    {
+        if (_result is null)
+        {
+            return;
+        }
+
+        var (files, dirs) = CountRemaining(_result.Root, _outcomes);
+        _stats = files;
+        _dirStats = dirs;
+        _total = files.Values.Sum();
+        _freshness = default;
+        NotifyLedgerChanged();
     }
 
     private string DirectionText()
