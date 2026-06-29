@@ -207,4 +207,47 @@ public class UpdateCheckTests
             Assert.That(entries[2].Changes[0].Summary, Is.EqualTo("Изменения не описаны."));
         }
     }
+
+    [Test]
+    public void Заметки_одного_релиза_без_дубля_версии_и_без_markdown()
+    {
+        const string json = """
+            [
+              {
+                "tag_name": "v99.9.0",
+                "body": "## Изменения\n\n- Первый пункт\n\n**Полный список:** https://github.com/x/y/compare/v99.8.0...v99.9.0"
+              }
+            ]
+            """;
+
+        using var document = JsonDocument.Parse(json);
+        var notes = AppUpdateViewModel.BuildReleaseNotes(document.RootElement);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(notes, Does.Not.Contain("**"));
+            Assert.That(notes, Does.StartWith("- Первый пункт"));
+            Assert.That(notes, Does.Contain("Полный список:"));
+        }
+    }
+
+    [Test]
+    public void Заметки_нескольких_релизов_префиксятся_тегом()
+    {
+        const string json = """
+            [
+              { "tag_name": "v99.9.0", "body": "## Изменения\n\n- Новее" },
+              { "tag_name": "v99.8.0", "body": "## Изменения\n\n- Старее" }
+            ]
+            """;
+
+        using var document = JsonDocument.Parse(json);
+        var notes = AppUpdateViewModel.BuildReleaseNotes(document.RootElement);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(notes, Does.Contain("v99.9.0"));
+            Assert.That(notes, Does.Contain("v99.8.0"));
+        }
+    }
 }

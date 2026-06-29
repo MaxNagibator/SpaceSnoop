@@ -261,9 +261,9 @@ public sealed partial class AppUpdateViewModel : ObservableObject
         }
     }
 
-    private static string BuildReleaseNotes(JsonElement releases)
+    internal static string BuildReleaseNotes(JsonElement releases)
     {
-        var notes = new List<string>();
+        var notes = new List<(string Tag, string Changes)>();
 
         foreach (var release in releases.EnumerateArray())
         {
@@ -275,17 +275,19 @@ public sealed partial class AppUpdateViewModel : ObservableObject
             }
 
             var body = release.TryGetProperty("body", out var bodyProperty) ? bodyProperty.GetString() : null;
-            var changes = ExtractChanges(body);
+            var changes = ExtractChanges(body).Replace("**", string.Empty, StringComparison.Ordinal);
 
             if (string.IsNullOrWhiteSpace(changes))
             {
                 continue;
             }
 
-            notes.Add($"{tag}{Environment.NewLine}{changes}");
+            notes.Add((tag ?? string.Empty, changes));
         }
 
-        return string.Join($"{Environment.NewLine}{Environment.NewLine}", notes);
+        return notes.Count == 1
+            ? notes[0].Changes
+            : string.Join($"{Environment.NewLine}{Environment.NewLine}", notes.Select(static note => $"{note.Tag}{Environment.NewLine}{note.Changes}"));
     }
 
     private static string BuildChangelog(IReadOnlyList<ReleaseNoteViewModel> entries)
