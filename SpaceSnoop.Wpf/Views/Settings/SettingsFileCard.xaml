@@ -27,7 +27,7 @@
                       Margin="0,14,0,0"
                       VerticalAlignment="Center" />
             <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="По умолчанию настройки, логи и журналы лежат рядом с программой. Включите, чтобы хранить их в %LOCALAPPDATA%\SpaceSnoop. Смена расположения перезапустит приложение." />
+                       Text="По умолчанию настройки, логи и журналы хранятся в %LOCALAPPDATA%\SpaceSnoop. Выключите, чтобы держать их рядом с программой (portable-режим). Смена расположения перезапустит приложение." />
             <TextBlock Text="{Binding DataDirectory}"
                        Style="{StaticResource TextBlock.Mono}"
                        Margin="0,8,0,0"
