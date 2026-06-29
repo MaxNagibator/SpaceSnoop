@@ -52,6 +52,7 @@ public class GitRepoStateTests
             Assert.That(state.Ahead, Is.EqualTo(0));
             Assert.That(state.Behind, Is.EqualTo(0));
             Assert.That(state.ShortHash, Is.EqualTo("a1b2c3d"));
+            Assert.That(state.Oid, Is.EqualTo("a1b2c3d4e5"));
             Assert.That(state.Subject, Is.EqualTo("Initial commit"));
             Assert.That(state.CommittedAt, Is.Not.Null);
         }
@@ -96,6 +97,7 @@ public class GitRepoStateTests
         {
             Assert.That(state.HasCommits, Is.False);
             Assert.That(state.ShortHash, Is.Empty);
+            Assert.That(state.Oid, Is.Empty);
             Assert.That(state.DirtyCount, Is.Zero);
         }
     }

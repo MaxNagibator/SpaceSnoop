@@ -13,8 +13,6 @@
         <Style x:Key="GitBranchText"
                TargetType="TextBlock"
                BasedOn="{StaticResource StatValue}">
-            <Setter Property="VerticalAlignment"
-                    Value="Center" />
             <Setter Property="Margin"
                     Value="8,0,0,0" />
         </Style>
@@ -22,10 +20,6 @@
         <Style x:Key="GitHeadText"
                TargetType="TextBlock"
                BasedOn="{StaticResource Caption}">
-            <Setter Property="Foreground"
-                    Value="{DynamicResource Fg.Muted}" />
-            <Setter Property="VerticalAlignment"
-                    Value="Center" />
             <Setter Property="Margin"
                     Value="8,0,0,0" />
             <Setter Property="TextTrimming"
@@ -37,10 +31,6 @@
         <Style x:Key="GitDirtyText"
                TargetType="TextBlock"
                BasedOn="{StaticResource Caption}">
-            <Setter Property="Foreground"
-                    Value="{DynamicResource Fg.Muted}" />
-            <Setter Property="VerticalAlignment"
-                    Value="Center" />
             <Setter Property="Margin"
                     Value="8,0,0,0" />
         </Style>
@@ -50,8 +40,6 @@
                BasedOn="{StaticResource Caption}">
             <Setter Property="Foreground"
                     Value="{DynamicResource State.Info}" />
-            <Setter Property="VerticalAlignment"
-                    Value="Center" />
             <Setter Property="Margin"
                     Value="8,0,0,0" />
         </Style>
@@ -83,8 +71,6 @@
                     Value="{DynamicResource Font.Mono}" />
             <Setter Property="Foreground"
                     Value="{DynamicResource Accent.Primary}" />
-            <Setter Property="VerticalAlignment"
-                    Value="Center" />
         </Style>
 
         <Style x:Key="GitLogSubject"
@@ -92,8 +78,6 @@
                BasedOn="{StaticResource Caption}">
             <Setter Property="Foreground"
                     Value="{DynamicResource Fg.Primary}" />
-            <Setter Property="VerticalAlignment"
-                    Value="Center" />
             <Setter Property="Margin"
                     Value="8,0,0,0" />
             <Setter Property="TextTrimming"
@@ -103,17 +87,24 @@
         <Style x:Key="GitLogDate"
                TargetType="TextBlock"
                BasedOn="{StaticResource Caption}">
-            <Setter Property="Foreground"
-                    Value="{DynamicResource Fg.Muted}" />
-            <Setter Property="VerticalAlignment"
-                    Value="Center" />
             <Setter Property="Margin"
                     Value="10,0,0,0" />
         </Style>
 
         <DataTemplate x:Key="GitCommitTemplate">
-            <Grid Margin="0,3"
-                  ToolTip="{Binding Subject}">
+            <Grid Margin="0,3">
+                <Grid.ToolTip>
+                    <TextBlock>
+                        <TextBlock.Text>
+                            <MultiBinding StringFormat="{}{0} · {1} · {2:yyyy-MM-dd HH:mm}&#x0a;{3}">
+                                <Binding Path="ShortHash" />
+                                <Binding Path="Author" />
+                                <Binding Path="CommittedAt" />
+                                <Binding Path="Subject" />
+                            </MultiBinding>
+                        </TextBlock.Text>
+                    </TextBlock>
+                </Grid.ToolTip>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
@@ -191,13 +182,17 @@
                                             <Setter Property="Foreground"
                                                     Value="{DynamicResource State.Success}" />
                                         </DataTrigger>
+                                        <DataTrigger Binding="{Binding GitShowsNewer}"
+                                                     Value="True">
+                                            <Setter Property="Foreground"
+                                                    Value="{DynamicResource Accent.Primary}" />
+                                        </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
                             </iconPacks:PackIconLucide.Style>
                         </iconPacks:PackIconLucide>
                         <TextBlock Text="{Binding GitVerdictText}"
-                                   Style="{StaticResource Caption}"
-                                   VerticalAlignment="Center" />
+                                   Style="{StaticResource Caption}" />
                         <iconPacks:PackIconLucide Kind="{Binding GitHistoryIconKind}"
                                                   Width="13"
                                                   Height="13"
@@ -266,7 +261,6 @@
                                       ItemTemplate="{StaticResource GitCommitTemplate}" />
                         <TextBlock Text="{Binding LeftGitLogEmptyText}"
                                    Style="{StaticResource Caption}"
-                                   Foreground="{DynamicResource Fg.Muted}"
                                    Visibility="{Binding LeftGitLogEmpty, Converter={StaticResource BoolToVisibility}}" />
                     </StackPanel>
 
@@ -278,7 +272,6 @@
                                       ItemTemplate="{StaticResource GitCommitTemplate}" />
                         <TextBlock Text="{Binding RightGitLogEmptyText}"
                                    Style="{StaticResource Caption}"
-                                   Foreground="{DynamicResource Fg.Muted}"
                                    Visibility="{Binding RightGitLogEmpty, Converter={StaticResource BoolToVisibility}}" />
                     </StackPanel>
                 </Grid>

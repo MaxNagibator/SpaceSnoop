@@ -7,6 +7,7 @@ public sealed record GitRepoState(
     bool IsDetached,
     bool HasCommits,
     string ShortHash,
+    string Oid,
     string Subject,
     DateTimeOffset? CommittedAt,
     int DirtyCount,
@@ -24,6 +25,7 @@ public sealed record GitRepoState(
     public static GitRepoState Parse(string statusOutput, string logOutput)
     {
         var branch = string.Empty;
+        var oid = string.Empty;
         var detached = false;
         var hasCommits = true;
         int? ahead = null;
@@ -47,7 +49,16 @@ public sealed record GitRepoState(
 
             if (line.StartsWith(OidPrefix, StringComparison.Ordinal))
             {
-                hasCommits = !line[OidPrefix.Length..].Trim().Equals("(initial)", StringComparison.Ordinal);
+                var value = line[OidPrefix.Length..].Trim();
+
+                if (value.Equals("(initial)", StringComparison.Ordinal))
+                {
+                    hasCommits = false;
+                }
+                else
+                {
+                    oid = value;
+                }
             }
             else if (line.StartsWith(HeadPrefix, StringComparison.Ordinal))
             {
@@ -67,7 +78,8 @@ public sealed record GitRepoState(
             hasCommits = false;
         }
 
-        return new(branch, detached, hasCommits, hash, subject, committedAt, dirty, ahead, behind);
+        return new(branch, detached, hasCommits, hash, oid, subject, committedAt, dirty,
+            ahead, behind);
     }
 
     private static (int? Ahead, int? Behind) ParseAheadBehind(string text)
@@ -108,9 +120,9 @@ public sealed record GitRepoState(
         var hash = parts.Length > 0 ? parts[0].Trim() : string.Empty;
 
         DateTimeOffset? when = parts.Length > 1
-            && DateTimeOffset.TryParse(parts[1], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsed)
-                ? parsed
-                : null;
+                               && DateTimeOffset.TryParse(parts[1], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsed)
+            ? parsed
+            : null;
 
         var subject = parts.Length > 2 ? parts[2] : string.Empty;
 

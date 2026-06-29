@@ -13,7 +13,7 @@ public sealed class GitService
             return null;
         }
 
-        var status = await RunAsync(path, "status --porcelain=2 --branch", cancel);
+        var status = await RunAsync(path, "status --porcelain=2 --branch -- .", cancel);
 
         if (status.Failed)
         {

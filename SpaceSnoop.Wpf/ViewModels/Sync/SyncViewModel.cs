@@ -22,14 +22,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private readonly GitService _git = new();
     private readonly HashSet<DirectoryComparison> _collapsed = [];
 
-    public static int[] GitHistoryCounts { get; } = [4, 8, 16, 32];
-
     private ComparisonResult? _result;
     private GitRepoState? _leftGit;
     private GitRepoState? _rightGit;
-    private IReadOnlyList<GitCommit> _leftGitLog = [];
-    private IReadOnlyList<GitCommit> _rightGitLog = [];
-    private bool _gitHistoryExpanded;
     private bool _gitHistoryLoaded;
 
     private Dictionary<object, SyncOutcome> _outcomes = [];
@@ -137,6 +132,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         Profiles.Load();
         _settings.Changed += OnSettingsChanged;
     }
+
+    public static int[] GitHistoryCounts { get; } = [4, 8, 16, 32];
 
     public OperationPreferences Operations { get; }
 
@@ -258,12 +255,33 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     public string RightGitUpstream => FormatUpstream(_rightGit);
 
     public bool GitInSync =>
-        _leftGit is not null && _rightGit is not null
-        && _leftGit.HasCommits && _rightGit.HasCommits
-        && string.Equals(_leftGit.ShortHash, _rightGit.ShortHash, StringComparison.OrdinalIgnoreCase)
-        && !_leftGit.IsDirty && !_rightGit.IsDirty;
+        _leftGit is not null
+        && _rightGit is not null
+        && _leftGit.HasCommits
+        && _rightGit.HasCommits
+        && string.Equals(_leftGit.Oid, _rightGit.Oid, StringComparison.OrdinalIgnoreCase)
+        && !_leftGit.IsDirty
+        && !_rightGit.IsDirty;
 
-    public PackIconLucideKind GitVerdictIconKind => GitInSync ? PackIconLucideKind.Check : PackIconLucideKind.GitCompareArrows;
+    public PackIconLucideKind GitVerdictIconKind
+    {
+        get
+        {
+            if (GitInSync)
+            {
+                return PackIconLucideKind.Check;
+            }
+
+            return GitNewerSign switch
+            {
+                < 0 => PackIconLucideKind.ArrowLeft,
+                > 0 => PackIconLucideKind.ArrowRight,
+                _ => PackIconLucideKind.GitCompareArrows,
+            };
+        }
+    }
+
+    public bool GitShowsNewer => GitNewerSign != 0;
 
     public string GitVerdictText
     {
@@ -279,26 +297,28 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
                 return "нет коммитов";
             }
 
-            if (!string.Equals(_leftGit.ShortHash, _rightGit.ShortHash, StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(_leftGit.Oid, _rightGit.Oid, StringComparison.OrdinalIgnoreCase))
             {
-                return "разные коммиты";
+                var newer = DescribeNewer(_leftGit.CommittedAt, _rightGit.CommittedAt);
+
+                return newer.Length == 0 ? "разные коммиты" : $"разные коммиты, {newer}";
             }
 
             return _leftGit.IsDirty || _rightGit.IsDirty ? "тот же коммит, есть изменения" : "синхронны";
         }
     }
 
-    public IReadOnlyList<GitCommit> LeftGitLog => _leftGitLog;
+    public IReadOnlyList<GitCommit> LeftGitLog { get; private set; } = [];
 
-    public IReadOnlyList<GitCommit> RightGitLog => _rightGitLog;
+    public IReadOnlyList<GitCommit> RightGitLog { get; private set; } = [];
 
-    public bool GitHistoryExpanded => _gitHistoryExpanded;
+    public bool GitHistoryExpanded { get; private set; }
 
-    public PackIconLucideKind GitHistoryIconKind => _gitHistoryExpanded ? PackIconLucideKind.ChevronUp : PackIconLucideKind.ChevronDown;
+    public PackIconLucideKind GitHistoryIconKind => GitHistoryExpanded ? PackIconLucideKind.ChevronUp : PackIconLucideKind.ChevronDown;
 
-    public bool LeftGitLogEmpty => _gitHistoryLoaded && _leftGitLog.Count == 0;
+    public bool LeftGitLogEmpty => _gitHistoryLoaded && LeftGitLog.Count == 0;
 
-    public bool RightGitLogEmpty => _gitHistoryLoaded && _rightGitLog.Count == 0;
+    public bool RightGitLogEmpty => _gitHistoryLoaded && RightGitLog.Count == 0;
 
     public string LeftGitLogEmptyText => _leftGit is null ? "не репозиторий" : "нет коммитов";
 
@@ -323,6 +343,14 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             }
 
             lines.Add($"Итог: {GitVerdictText}.");
+
+            if (_leftGit is { HasCommits: true } l
+                && _rightGit is { HasCommits: true } r
+                && !string.Equals(l.Oid, r.Oid, StringComparison.OrdinalIgnoreCase))
+            {
+                lines.Add("«новее» – по дате коммита, не по истории веток.");
+            }
+
             return string.Join(Environment.NewLine, lines);
         }
     }
@@ -375,6 +403,24 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public ICommand CancelCommand => CancelOperationCommand;
 
+    private int GitNewerSign
+    {
+        get
+        {
+            if (_leftGit is not { HasCommits: true } left
+                || _rightGit is not { HasCommits: true } right
+                || string.Equals(left.Oid, right.Oid, StringComparison.OrdinalIgnoreCase)
+                || left.CommittedAt is not { } l
+                || right.CommittedAt is not { } r
+                || l == r)
+            {
+                return 0;
+            }
+
+            return l > r ? -1 : 1;
+        }
+    }
+
     private SyncMode CurrentMode => ModeOrder[Math.Clamp(SelectedModeIndex, 0, ModeOrder.Length - 1)];
 
     private PlannedActions CurrentPlan => _result?.CountPlannedActions() ?? new(0, 0, 0, 0, 0);
@@ -403,19 +449,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     {
         _gitGroupExpanded = !_gitGroupExpanded;
         RebuildRows();
-    }
-
-    [RelayCommand]
-    private async Task ToggleGitHistoryAsync()
-    {
-        _gitHistoryExpanded = !_gitHistoryExpanded;
-        OnPropertyChanged(nameof(GitHistoryExpanded));
-        OnPropertyChanged(nameof(GitHistoryIconKind));
-
-        if (_gitHistoryExpanded && !_gitHistoryLoaded)
-        {
-            await LoadGitHistoryAsync();
-        }
     }
 
     public void CollapseSubtree(DirectoryComparison dir)
@@ -519,18 +552,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         StatusCaption = $"Профиль применён: {profile.Name}. Результат сравнения перенесён.";
     }
 
-    private void AdoptComparison(ComparisonResult comparison)
-    {
-        _result = comparison;
-        _dirSizeCache = BuildDirSizeCache(comparison.Root);
-        _outcomes = [];
-        comparison.ApplyMode(CurrentMode, Mirror);
-        CollapseAllDirectories(comparison.Root);
-        RebuildRows();
-        UpdateSummary();
-        SummaryText = "Результат сравнения перенесён со страницы «Обзор».";
-    }
-
     internal static IEnumerable<FileComparison> SortFlatFiles(IEnumerable<FileComparison> files, SyncFlatSortField field, bool descending)
     {
         return field switch
@@ -626,6 +647,66 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             : string.IsNullOrWhiteSpace(exclusions)
                 ? ".git"
                 : $"{exclusions.TrimEnd()},.git";
+    }
+
+    // TODO: «новее» по дате коммита, не по предкам; ancestry-вердикт требует общего хранилища объектов (cross-repo merge-base)
+    internal static string DescribeNewer(DateTimeOffset? left, DateTimeOffset? right)
+    {
+        if (left is not { } l || right is not { } r || l == r)
+        {
+            return string.Empty;
+        }
+
+        var side = l > r ? "слева новее" : "справа новее";
+
+        return $"{side} на {FormatAge((l - r).Duration())}";
+    }
+
+    internal static (Dictionary<ComparisonStatus, int> Files, Dictionary<ComparisonStatus, int> Dirs) CountRemaining(
+        DirectoryComparison root,
+        IReadOnlyDictionary<object, SyncOutcome> outcomes)
+    {
+        var files = NewZeroStats();
+        var dirs = NewZeroStats();
+        Walk(root, outcomes, files, dirs);
+        return (files, dirs);
+
+        static void Walk(DirectoryComparison dir, IReadOnlyDictionary<object, SyncOutcome> outcomes, Dictionary<ComparisonStatus, int> files, Dictionary<ComparisonStatus, int> dirs)
+        {
+            foreach (var file in dir.Files)
+            {
+                if (outcomes.GetValueOrDefault(file) == SyncOutcome.Applied)
+                {
+                    if (file.Action is not (SyncAction.DeleteLeft or SyncAction.DeleteRight))
+                    {
+                        files[ComparisonStatus.Identical]++;
+                    }
+
+                    continue;
+                }
+
+                files[file.Status]++;
+            }
+
+            foreach (var sub in dir.SubDirectories)
+            {
+                if (outcomes.GetValueOrDefault(sub) == SyncOutcome.Applied)
+                {
+                    if (sub.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
+                    {
+                        continue;
+                    }
+
+                    dirs[ComparisonStatus.Identical]++;
+                }
+                else
+                {
+                    dirs[sub.Status]++;
+                }
+
+                Walk(sub, outcomes, files, dirs);
+            }
+        }
     }
 
     private void OnSettingsChanged(object? sender, string key)
@@ -783,6 +864,94 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private static string FormatStamp(DateTime? value)
     {
         return value is { } stamp ? stamp.ToString("yyyy-MM-dd HH:mm") : "–";
+    }
+
+    private static string FormatBranch(GitRepoState? git)
+    {
+        return git is null ? string.Empty : git.IsDetached ? "detached" : git.Branch;
+    }
+
+    private static string FormatHead(GitRepoState? git)
+    {
+        if (git is null)
+        {
+            return string.Empty;
+        }
+
+        if (!git.HasCommits)
+        {
+            return "нет коммитов";
+        }
+
+        return string.IsNullOrEmpty(git.Subject) ? git.ShortHash : $"{git.ShortHash} · {git.Subject}";
+    }
+
+    private static string FormatDirty(GitRepoState? git)
+    {
+        return git is null ? string.Empty : git.IsDirty ? $"{git.DirtyCount} изм." : "чисто";
+    }
+
+    private static string FormatUpstream(GitRepoState? git)
+    {
+        if (git is null || !git.HasUpstream)
+        {
+            return string.Empty;
+        }
+
+        var parts = new List<string>(2);
+
+        if (git.Ahead > 0)
+        {
+            parts.Add($"↑{git.Ahead}");
+        }
+
+        if (git.Behind > 0)
+        {
+            parts.Add($"↓{git.Behind}");
+        }
+
+        return string.Join(" ", parts);
+    }
+
+    private static string FormatAge(TimeSpan span)
+    {
+        if (span.TotalDays >= 1)
+        {
+            return $"{(int)span.TotalDays} дн.";
+        }
+
+        if (span.TotalHours >= 1)
+        {
+            return $"{(int)span.TotalHours} ч.";
+        }
+
+        return span.TotalMinutes >= 1 ? $"{(int)span.TotalMinutes} мин." : "<1 мин.";
+    }
+
+    [RelayCommand]
+    private async Task ToggleGitHistoryAsync()
+    {
+        GitHistoryExpanded = !GitHistoryExpanded;
+        OnPropertyChanged(nameof(GitHistoryExpanded));
+        OnPropertyChanged(nameof(GitHistoryIconKind));
+
+        if (GitHistoryExpanded && !_gitHistoryLoaded)
+        {
+            await LoadGitHistoryAsync();
+        }
+    }
+
+    private void AdoptComparison(ComparisonResult comparison)
+    {
+        _result = comparison;
+        _dirSizeCache = BuildDirSizeCache(comparison.Root);
+        _outcomes = [];
+        comparison.ApplyMode(CurrentMode, Mirror);
+        CollapseAllDirectories(comparison.Root);
+        RebuildRows();
+        UpdateSummary();
+        SummaryText = "Результат сравнения перенесён со страницы «Обзор».";
+        _ = ReadGitStateAsync();
     }
 
     private void HashModifiedFiles(DirectoryComparison dir, string leftBase, string rightBase, IProgress<OperationProgress> progress, ref int done, CancellationToken token)
@@ -996,7 +1165,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         ResetGitHistory();
         NotifyGitChanged();
 
-        if (_gitHistoryExpanded)
+        if (GitHistoryExpanded)
         {
             await LoadGitHistoryAsync();
         }
@@ -1015,14 +1184,14 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         try
         {
-            (_leftGitLog, _rightGitLog) = await Task.Run(async () =>
+            (LeftGitLog, RightGitLog) = await Task.Run(async () =>
                 (await _git.ReadHistoryAsync(left, count), await _git.ReadHistoryAsync(right, count)));
         }
         catch (Exception ex)
         {
             _logger.GitStateFailed(ex.Unwrap());
-            _leftGitLog = [];
-            _rightGitLog = [];
+            LeftGitLog = [];
+            RightGitLog = [];
         }
 
         _gitHistoryLoaded = true;
@@ -1031,8 +1200,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     private void ResetGitHistory()
     {
-        _leftGitLog = [];
-        _rightGitLog = [];
+        LeftGitLog = [];
+        RightGitLog = [];
         _gitHistoryLoaded = false;
     }
 
@@ -1040,56 +1209,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     {
         _leftGit = null;
         _rightGit = null;
-        _gitHistoryExpanded = false;
+        GitHistoryExpanded = false;
         ResetGitHistory();
         NotifyGitChanged();
-    }
-
-    private static string FormatBranch(GitRepoState? git)
-    {
-        return git is null ? string.Empty : git.IsDetached ? "detached" : git.Branch;
-    }
-
-    private static string FormatHead(GitRepoState? git)
-    {
-        if (git is null)
-        {
-            return string.Empty;
-        }
-
-        if (!git.HasCommits)
-        {
-            return "нет коммитов";
-        }
-
-        return string.IsNullOrEmpty(git.Subject) ? git.ShortHash : $"{git.ShortHash} · {git.Subject}";
-    }
-
-    private static string FormatDirty(GitRepoState? git)
-    {
-        return git is null ? string.Empty : git.IsDirty ? $"{git.DirtyCount} изм." : "чисто";
-    }
-
-    private static string FormatUpstream(GitRepoState? git)
-    {
-        if (git is null || !git.HasUpstream)
-        {
-            return string.Empty;
-        }
-
-        var parts = new List<string>(2);
-
-        if (git.Ahead > 0)
-        {
-            parts.Add($"↑{git.Ahead}");
-        }
-
-        if (git.Behind > 0)
-        {
-            parts.Add($"↓{git.Behind}");
-        }
-
-        return string.Join(" ", parts);
     }
 
     private void NotifyGitChanged()
@@ -1108,6 +1230,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         OnPropertyChanged(nameof(LeftGitUpstream));
         OnPropertyChanged(nameof(RightGitUpstream));
         OnPropertyChanged(nameof(GitInSync));
+        OnPropertyChanged(nameof(GitShowsNewer));
         OnPropertyChanged(nameof(GitVerdictIconKind));
         OnPropertyChanged(nameof(GitVerdictText));
         OnPropertyChanged(nameof(GitTooltip));
@@ -1437,7 +1560,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         _gitHistoryLoaded = false;
 
-        if (_gitHistoryExpanded && HasGit)
+        if (GitHistoryExpanded && HasGit)
         {
             _ = LoadGitHistoryAsync();
         }
@@ -1794,53 +1917,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         HasPending = _result.HasPendingResolution();
         SyncCommand.NotifyCanExecuteChanged();
         HashCommand.NotifyCanExecuteChanged();
-    }
-
-    internal static (Dictionary<ComparisonStatus, int> Files, Dictionary<ComparisonStatus, int> Dirs) CountRemaining(
-        DirectoryComparison root,
-        IReadOnlyDictionary<object, SyncOutcome> outcomes)
-    {
-        var files = NewZeroStats();
-        var dirs = NewZeroStats();
-        Walk(root, outcomes, files, dirs);
-        return (files, dirs);
-
-        static void Walk(DirectoryComparison dir, IReadOnlyDictionary<object, SyncOutcome> outcomes, Dictionary<ComparisonStatus, int> files, Dictionary<ComparisonStatus, int> dirs)
-        {
-            foreach (var file in dir.Files)
-            {
-                if (outcomes.GetValueOrDefault(file) == SyncOutcome.Applied)
-                {
-                    if (file.Action is not (SyncAction.DeleteLeft or SyncAction.DeleteRight))
-                    {
-                        files[ComparisonStatus.Identical]++;
-                    }
-
-                    continue;
-                }
-
-                files[file.Status]++;
-            }
-
-            foreach (var sub in dir.SubDirectories)
-            {
-                if (outcomes.GetValueOrDefault(sub) == SyncOutcome.Applied)
-                {
-                    if (sub.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
-                    {
-                        continue;
-                    }
-
-                    dirs[ComparisonStatus.Identical]++;
-                }
-                else
-                {
-                    dirs[sub.Status]++;
-                }
-
-                Walk(sub, outcomes, files, dirs);
-            }
-        }
     }
 
     private void RefreshLedgerAfterSync()

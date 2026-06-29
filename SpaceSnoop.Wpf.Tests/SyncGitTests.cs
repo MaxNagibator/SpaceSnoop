@@ -28,6 +28,39 @@ public class SyncGitTests
     }
 
     [Test]
+    public void Слева_новее_когда_левый_коммит_позже()
+    {
+        var left = new DateTimeOffset(2026, 6, 29, 12, 0, 0, TimeSpan.Zero);
+        var right = new DateTimeOffset(2026, 6, 26, 12, 0, 0, TimeSpan.Zero);
+
+        Assert.That(SyncViewModel.DescribeNewer(left, right), Is.EqualTo("слева новее на 3 дн."));
+    }
+
+    [Test]
+    public void Справа_новее_когда_правый_коммит_позже()
+    {
+        var left = new DateTimeOffset(2026, 6, 29, 10, 0, 0, TimeSpan.Zero);
+        var right = new DateTimeOffset(2026, 6, 29, 12, 30, 0, TimeSpan.Zero);
+
+        Assert.That(SyncViewModel.DescribeNewer(left, right), Is.EqualTo("справа новее на 2 ч."));
+    }
+
+    [TestCaseSource(nameof(NoNewerCases))]
+    public void Направление_пустое_когда_не_определить(DateTimeOffset? left, DateTimeOffset? right)
+    {
+        Assert.That(SyncViewModel.DescribeNewer(left, right), Is.Empty);
+    }
+
+    private static IEnumerable<TestCaseData> NoNewerCases()
+    {
+        var stamp = new DateTimeOffset(2026, 6, 29, 12, 0, 0, TimeSpan.Zero);
+
+        yield return new(stamp, stamp);
+        yield return new(null, stamp);
+        yield return new(stamp, null);
+    }
+
+    [Test]
     public void Выбор_без_чекбокса_не_запоминается()
     {
         var prompt = new GitFolderPromptViewModel(1);
