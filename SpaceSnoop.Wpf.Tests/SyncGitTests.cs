@@ -1,4 +1,5 @@
-﻿using SpaceSnoop.Wpf.ViewModels.Sync;
+﻿using SpaceSnoop.Wpf.ViewModels.Dialogs;
+using SpaceSnoop.Wpf.ViewModels.Sync;
 
 namespace SpaceSnoop.Wpf.Tests;
 
@@ -24,5 +25,25 @@ public class SyncGitTests
     public bool Git_путь_распознаётся_по_сегменту(string relativePath)
     {
         return SyncViewModel.IsGitPath(relativePath);
+    }
+
+    [Test]
+    public void Выбор_без_чекбокса_не_запоминается()
+    {
+        var prompt = new GitFolderPromptViewModel(1);
+
+        prompt.SkipCommand.Execute(null);
+
+        Assert.That(prompt.Choice, Is.EqualTo(GitFolderPromptChoice.Ask));
+    }
+
+    [Test]
+    public void Выбор_с_чекбоксом_запоминается()
+    {
+        var prompt = new GitFolderPromptViewModel(1) { RememberChoice = true };
+
+        prompt.KeepCommand.Execute(null);
+
+        Assert.That(prompt.Choice, Is.EqualTo(GitFolderPromptChoice.Keep));
     }
 }

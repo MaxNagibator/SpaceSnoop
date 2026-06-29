@@ -30,6 +30,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private Dictionary<DirectoryComparison, (long Left, long Right)>? _dirSizeCache;
     private CancellationTokenSource? _cts;
     private bool _suppressPersist;
+    private bool _gitPromptDeclined;
     private bool _gitGroupExpanded;
     private bool _isIndeterminate = true;
     private double _progressValue;
@@ -296,7 +297,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
                 lines.Add($"  коммит: {FormatStamp(right.CommittedAt?.LocalDateTime)}");
             }
 
-            lines.Add($"Итог: {GitVerdictText}. Каталоги .git исключены из файлового сравнения.");
+            lines.Add($"Итог: {GitVerdictText}.");
             return string.Join(Environment.NewLine, lines);
         }
     }
@@ -874,39 +875,58 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         _logger.CompareFinished(_total, (long)stopwatch.Elapsed.TotalMilliseconds);
 
-        await ResolveGitAsync();
+        await ReadGitStateAsync();
+        await OfferToSkipGitAsync();
     }
 
-    private async Task ResolveGitAsync()
+    private async Task OfferToSkipGitAsync()
     {
-        if (_result is null)
+        if (_result is null || _gitPromptDeclined)
         {
-            return;
-        }
-
-        if (!_settings.GetBool(SettingsKeys.SyncGit, AppDefaults.SyncGitDefault))
-        {
-            ClearGit();
             return;
         }
 
         var gitFolders = CountGitDirectories(_result.Root);
 
-        if (gitFolders > 0)
+        if (gitFolders == 0)
         {
-            var updated = AddGitExclusion(Exclusions);
+            return;
+        }
 
-            if (!string.Equals(updated, Exclusions, StringComparison.Ordinal))
+        var choice = _settings.GetEnum(SettingsKeys.SyncGitFolders, GitFolderPromptChoice.Ask);
+
+        if (choice == GitFolderPromptChoice.Keep)
+        {
+            return;
+        }
+
+        if (choice == GitFolderPromptChoice.Ask)
+        {
+            var prompt = new GitFolderPromptViewModel(gitFolders);
+            var skip = await _dialogs.ShowAsync(prompt);
+
+            if (prompt.Choice != GitFolderPromptChoice.Ask)
             {
-                _logger.SyncGitFoldersSkipped(gitFolders);
-                _notifier.Notify($"Каталоги .git исключены из сравнения ({gitFolders})", StatusSeverity.Info);
-                Exclusions = updated;
-                await CompareAsync();
+                _settings.SetEnum(SettingsKeys.SyncGitFolders, prompt.Choice);
+            }
+
+            if (!skip)
+            {
+                _gitPromptDeclined = true;
                 return;
             }
         }
 
-        await ReadGitStateAsync();
+        var updatedExclusions = AddGitExclusion(Exclusions);
+
+        if (string.Equals(updatedExclusions, Exclusions, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _logger.SyncGitFoldersSkipped(gitFolders);
+        Exclusions = updatedExclusions;
+        await CompareAsync();
     }
 
     private async Task ReadGitStateAsync()

@@ -109,6 +109,13 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         new(CompressionLevel.NoCompression, "Без сжатия (только упаковка)"),
     ];
 
+    public IReadOnlyList<EnumOption<GitFolderPromptChoice>> GitFolderOptions { get; } =
+    [
+        new(GitFolderPromptChoice.Ask, "Спрашивать"),
+        new(GitFolderPromptChoice.Skip, "Всегда пропускать"),
+        new(GitFolderPromptChoice.Keep, "Синхронизировать"),
+    ];
+
     public EnumOption<AppTheme> SelectedThemeOption
     {
         get => ThemeOptions.First(o => o.Value == Theme.Current);
@@ -160,12 +167,12 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         }
     }
 
-    public bool SyncGitEnabled
+    public EnumOption<GitFolderPromptChoice> SelectedGitFolderOption
     {
-        get => _settings.GetBool(SettingsKeys.SyncGit, AppDefaults.SyncGitDefault);
+        get => GitFolderOptions.First(o => o.Value == _settings.GetEnum(SettingsKeys.SyncGitFolders, GitFolderPromptChoice.Ask));
         set
         {
-            _settings.SetBool(SettingsKeys.SyncGit, value);
+            _settings.SetEnum(SettingsKeys.SyncGitFolders, value.Value);
             OnPropertyChanged();
         }
     }
