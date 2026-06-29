@@ -43,11 +43,19 @@ public class OverviewPipelineTests
     }
 
     [Test]
-    public void Несуществующий_каталог_даёт_Unavailable()
+    public void Несуществующий_источник_даёт_Unavailable()
     {
         var profile = new SyncProfile { Left = Path.Combine(_root, "missing"), Right = Make("right") };
 
         Assert.That(OverviewPipeline.Classify(profile), Is.EqualTo(OverviewRunStatus.Unavailable));
+    }
+
+    [Test]
+    public void Несуществующий_приёмник_при_слева_направо_не_блокирует()
+    {
+        var profile = new SyncProfile { Left = Make("left"), Right = Path.Combine(_root, "missing"), Mode = 0 };
+
+        Assert.That(OverviewPipeline.Classify(profile), Is.Null);
     }
 
     [Test]
@@ -56,6 +64,29 @@ public class OverviewPipelineTests
         var profile = new SyncProfile { Left = string.Empty, Right = Make("right") };
 
         Assert.That(OverviewPipeline.Classify(profile), Is.EqualTo(OverviewRunStatus.Unavailable));
+    }
+
+    [Test]
+    public void Тот_же_отсутствующий_каталог_как_источник_справа_налево_даёт_Unavailable()
+    {
+        var profile = new SyncProfile { Left = Make("left"), Right = Path.Combine(_root, "missing"), Mode = 1 };
+
+        Assert.That(OverviewPipeline.Classify(profile), Is.EqualTo(OverviewRunStatus.Unavailable));
+    }
+
+    [TestCase(0, true, false, ExpectedResult = false)]
+    [TestCase(0, false, true, ExpectedResult = true)]
+    [TestCase(1, false, true, ExpectedResult = false)]
+    [TestCase(1, true, false, ExpectedResult = true)]
+    [TestCase(2, true, false, ExpectedResult = false)]
+    [TestCase(2, false, true, ExpectedResult = false)]
+    [TestCase(2, false, false, ExpectedResult = true)]
+    public bool SourceMissing_зависит_от_направления(int mode, bool leftExists, bool rightExists)
+    {
+        var left = leftExists ? Make("left") : Path.Combine(_root, "noleft");
+        var right = rightExists ? Make("right") : Path.Combine(_root, "noright");
+
+        return SyncProfile.SourceMissing(left, right, HeadlessSync.MapMode(mode));
     }
 
     private string Make(string name)

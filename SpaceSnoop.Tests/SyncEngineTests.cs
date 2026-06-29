@@ -347,6 +347,30 @@ public class SyncEngineTests
     }
 
     [Test]
+    public void FullPipeline_CreatesMissingDestination_AndCopiesContent()
+    {
+        Directory.Delete(_rightDir, true);
+        File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "hello");
+        var subLeft = Path.Combine(_leftDir, "sub");
+        Directory.CreateDirectory(subLeft);
+        File.WriteAllText(Path.Combine(subLeft, "b.txt"), "world");
+
+        var comparer = new DirectoryComparer(new(string.Empty), NullLogger<DirectoryComparer>.Instance);
+        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
+        result.ApplyMode(SyncMode.LeftToRight, true);
+        result.ResolveAllConflicts(SyncAction.Skip);
+        var report = new SyncEngine(NullLogger<SyncEngine>.Instance).Execute(result, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(Directory.Exists(_rightDir), Is.True);
+            Assert.That(File.ReadAllText(Path.Combine(_rightDir, "a.txt")), Is.EqualTo("hello"));
+            Assert.That(File.ReadAllText(Path.Combine(_rightDir, "sub", "b.txt")), Is.EqualTo("world"));
+            Assert.That(report.Errors, Is.Empty);
+        }
+    }
+
+    [Test]
     public void Verify_AfterSuccessfulSync_ReportsNoMismatches()
     {
         File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "hello world");

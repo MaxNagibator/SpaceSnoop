@@ -52,9 +52,9 @@ internal sealed class HeadlessSync
             return 2;
         }
 
-        if (!Directory.Exists(left) || !Directory.Exists(right))
+        if (SyncProfile.SourceMissing(left, right, mode))
         {
-            logger.HeadlessSyncAborted("каталог недоступен");
+            logger.HeadlessSyncAborted("каталог-источник недоступен");
             return 3;
         }
 

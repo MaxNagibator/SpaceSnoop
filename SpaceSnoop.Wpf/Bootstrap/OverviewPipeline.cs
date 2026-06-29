@@ -1,6 +1,4 @@
-﻿using System.IO;
-
-namespace SpaceSnoop.Wpf.Bootstrap;
+﻿namespace SpaceSnoop.Wpf.Bootstrap;
 
 public static class OverviewPipeline
 {
@@ -9,7 +7,12 @@ public static class OverviewPipeline
         var left = profile.Left.Trim();
         var right = profile.Right.Trim();
 
-        if (left.Length == 0 || right.Length == 0 || !Directory.Exists(left) || !Directory.Exists(right))
+        if (left.Length == 0 || right.Length == 0)
+        {
+            return OverviewRunStatus.Unavailable;
+        }
+
+        if (SyncProfile.SourceMissing(left, right, HeadlessSync.MapMode(profile.Mode)))
         {
             return OverviewRunStatus.Unavailable;
         }

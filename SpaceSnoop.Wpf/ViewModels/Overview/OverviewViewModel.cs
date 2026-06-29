@@ -10,6 +10,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
 {
     private readonly ISettingsStore _settings;
     private readonly IDialogService _dialogs;
+    private readonly ToastNotifier _notifier;
     private readonly ILogger<OverviewViewModel> _logger;
     private readonly ILogger<DirectoryComparer> _comparerLogger;
     private readonly ILogger<SyncEngine> _engineLogger;
@@ -32,10 +33,11 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
     [ObservableProperty]
     private double _progressMax;
 
-    public OverviewViewModel(ISettingsStore settings, IDialogService dialogs, ILogger<OverviewViewModel> logger, ILogger<DirectoryComparer> comparerLogger, ILogger<SyncEngine> engineLogger)
+    public OverviewViewModel(ISettingsStore settings, IDialogService dialogs, ToastNotifier notifier, ILogger<OverviewViewModel> logger, ILogger<DirectoryComparer> comparerLogger, ILogger<SyncEngine> engineLogger)
     {
         _settings = settings;
         _dialogs = dialogs;
+        _notifier = notifier;
         _logger = logger;
         _comparerLogger = comparerLogger;
         _engineLogger = engineLogger;
@@ -68,6 +70,16 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         }
     }
 
+    private static (int Synced, int Failed, int Skipped) Tally(OverviewRowViewModel row)
+    {
+        return row.Status switch
+        {
+            OverviewRunStatus.Synced when row.SyncErrors == 0 => (1, 0, 0),
+            OverviewRunStatus.Synced or OverviewRunStatus.Error => (0, 1, 0),
+            _ => (0, 0, 1),
+        };
+    }
+
     [RelayCommand(CanExecute = nameof(CanCompareAll))]
     private async Task CompareAll()
     {
@@ -82,6 +94,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         var total = Rows.Count;
         var compared = 0;
         var failed = 0;
+        var skipped = 0;
         var stopwatch = Stopwatch.StartNew();
 
         _logger.OverviewCompareStarted(total);
@@ -102,6 +115,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
                 {
                     row.Error = null;
                     row.Status = preflight.Value;
+                    skipped++;
                     continue;
                 }
 
@@ -137,8 +151,9 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
 
             ProgressValue = total;
             stopwatch.Stop();
-            StatusCaption = $"Сравнено пар: {compared}, ошибок: {failed}";
-            _logger.OverviewCompareFinished(compared, failed, (long)stopwatch.Elapsed.TotalMilliseconds);
+            StatusCaption = $"Сравнено пар: {compared}, ошибок: {failed}, пропущено: {skipped}";
+            _logger.OverviewCompareFinished(compared, failed, skipped, (long)stopwatch.Elapsed.TotalMilliseconds);
+            NotifyResult(StatusCaption, compared, failed);
         }
         catch (OperationCanceledException)
         {
@@ -193,9 +208,10 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         {
             await SyncRowCore(row, token);
             stopwatch.Stop();
-            var failed = row.Status == OverviewRunStatus.Error || row.SyncErrors > 0 ? 1 : 0;
+            var (synced, failed, skipped) = Tally(row);
             StatusCaption = row.StatusText;
-            _logger.OverviewSyncFinished(failed == 0 ? 1 : 0, failed, (long)stopwatch.Elapsed.TotalMilliseconds);
+            _logger.OverviewSyncFinished(synced, failed, skipped, (long)stopwatch.Elapsed.TotalMilliseconds);
+            NotifyResult(row.StatusText, synced, failed);
         }
         catch (OperationCanceledException)
         {
@@ -239,6 +255,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         var total = Rows.Count;
         var synced = 0;
         var failed = 0;
+        var skipped = 0;
         var stopwatch = Stopwatch.StartNew();
 
         _logger.OverviewSyncStarted(total);
@@ -255,20 +272,17 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
 
                 await SyncRowCore(row, token);
 
-                if (row.Status == OverviewRunStatus.Synced && row.SyncErrors == 0)
-                {
-                    synced++;
-                }
-                else if (row.Status is OverviewRunStatus.Error or OverviewRunStatus.Synced)
-                {
-                    failed++;
-                }
+                var (rowSynced, rowFailed, rowSkipped) = Tally(row);
+                synced += rowSynced;
+                failed += rowFailed;
+                skipped += rowSkipped;
             }
 
             ProgressValue = total;
             stopwatch.Stop();
-            StatusCaption = $"Синхронизировано профилей: {synced}, c ошибками: {failed}";
-            _logger.OverviewSyncFinished(synced, failed, (long)stopwatch.Elapsed.TotalMilliseconds);
+            StatusCaption = $"Синхронизировано профилей: {synced}, c ошибками: {failed}, пропущено: {skipped}";
+            _logger.OverviewSyncFinished(synced, failed, skipped, (long)stopwatch.Elapsed.TotalMilliseconds);
+            NotifyResult(StatusCaption, synced, failed);
         }
         catch (OperationCanceledException)
         {
@@ -356,6 +370,15 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
             row.Error = exception.Unwrap().Message;
             row.Status = OverviewRunStatus.Error;
         }
+    }
+
+    private void NotifyResult(string caption, int ok, int failed)
+    {
+        var severity = failed > 0 ? StatusSeverity.Error
+            : ok == 0 ? StatusSeverity.Warning
+            : StatusSeverity.Success;
+
+        _notifier.Notify(caption, severity);
     }
 
     private void WriteSyncLog(string name, SyncReport report)
