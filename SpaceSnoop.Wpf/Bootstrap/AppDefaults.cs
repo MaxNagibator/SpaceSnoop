@@ -12,6 +12,7 @@ public static class AppDefaults
     public const ScanSortField ScanSortModeDefault = ScanSortField.Size;
     public const bool ScanSortInvertDefault = true;
     public const bool ScanTreemapDefault = false;
+    public const bool ScanRevealFilesDefault = false;
     public const int TopChildrenLimit = 7;
     public const int TreemapTileLimit = 150;
     public const int TreemapPreviewLimit = 40;

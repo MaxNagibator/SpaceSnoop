@@ -14,6 +14,9 @@ public sealed partial class ScanPreferences : ObservableObject
     [ObservableProperty]
     private double _intensity = AppDefaults.IntensityDefault;
 
+    [ObservableProperty]
+    private bool _revealFiles = AppDefaults.ScanRevealFilesDefault;
+
     public ScanPreferences(ISettingsStore settings)
     {
         _settings = settings;
@@ -22,6 +25,7 @@ public sealed partial class ScanPreferences : ObservableObject
         UseMultithreading = _settings.GetBool(SettingsKeys.ScanMultithreading, AppDefaults.ScanMultithreadingDefault);
         MaxParallelism = Math.Clamp(_settings.GetInt(SettingsKeys.ScanParallelism, ProcessorCount), 1, ProcessorCount);
         Intensity = _settings.GetDouble(SettingsKeys.ScanIntensity, AppDefaults.IntensityDefault);
+        RevealFiles = _settings.GetBool(SettingsKeys.ScanRevealFiles, AppDefaults.ScanRevealFilesDefault);
         _suppressPersist = false;
     }
 
@@ -53,6 +57,14 @@ public sealed partial class ScanPreferences : ObservableObject
         if (!_suppressPersist)
         {
             _settings.SetDouble(SettingsKeys.ScanIntensity, value);
+        }
+    }
+
+    partial void OnRevealFilesChanged(bool value)
+    {
+        if (!_suppressPersist)
+        {
+            _settings.SetBool(SettingsKeys.ScanRevealFiles, value);
         }
     }
 }

@@ -76,6 +76,13 @@
                         IsSnapToTickEnabled="True"
                         Margin="0,6,0,0" />
             </StackPanel>
+
+            <CheckBox Content="Выделять файлы в проводнике, не запускать"
+                      IsChecked="{Binding Scan.RevealFiles, Mode=TwoWay}"
+                      Margin="0,16,0,0"
+                      VerticalAlignment="Center" />
+            <TextBlock Style="{StaticResource Setting.Hint}"
+                       Text="При открытии файла из дерева проводник подсвечивает его в папке. Выключите, чтобы файл открывался программой по умолчанию (исполняемые при этом запускаются)." />
         </StackPanel>
     </Border>
 </UserControl>

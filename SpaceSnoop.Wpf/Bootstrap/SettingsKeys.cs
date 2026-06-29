@@ -23,6 +23,7 @@ public static class SettingsKeys
     public const string ScanSortMode = "wpf.scan.sort_mode";
     public const string ScanSortInvert = "wpf.scan.sort_invert";
     public const string ScanTreemap = "wpf.scan.treemap";
+    public const string ScanRevealFiles = "wpf.scan.reveal_files";
 
     public const string ScanInspectorCollapsed = "wpf.scan.inspector.collapsed";
     public const string ScanInspectorWidth = "wpf.scan.inspector.width";
