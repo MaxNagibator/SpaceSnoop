@@ -43,27 +43,6 @@
                           VerticalAlignment="Center" />
             </Grid>
 
-            <Grid Margin="0,16,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="240" />
-                </Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0">
-                    <TextBlock Text="Системный фон окна"
-                               Style="{StaticResource Setting.Label}" />
-                    <TextBlock
-                        Text="DWM-подложка: Mica (приглушённая по обоям), Acrylic (полупрозрачное размытие) или Mica Alt. Требует Windows 11 22H2+; на старых системах – без эффекта."
-                        Style="{StaticResource Setting.Hint}"
-                        Margin="0,2,0,0" />
-                </StackPanel>
-                <ComboBox Grid.Column="1"
-                          Style="{StaticResource ComboBox.Form}"
-                          ItemsSource="{Binding BackdropOptions}"
-                          SelectedItem="{Binding SelectedBackdropOption}"
-                          DisplayMemberPath="Label"
-                          VerticalAlignment="Center" />
-            </Grid>
-
             <StackPanel Margin="0,16,0,0">
                 <Grid>
                     <Grid.ColumnDefinitions>

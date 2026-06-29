@@ -9,9 +9,6 @@ public sealed partial class ShellPreferences : ShellPreferencesBase
     private bool _navCollapsed;
 
     [ObservableProperty]
-    private BackdropKind _backdrop = AppDefaults.BackdropDefault;
-
-    [ObservableProperty]
     private bool _warnIfNotAdministrator = AppDefaults.WarnIfNotAdminDefault;
 
     public ShellPreferences(ISettingsStore settings)
@@ -20,7 +17,6 @@ public sealed partial class ShellPreferences : ShellPreferencesBase
         SuppressPersist = true;
         StartupPage = Settings.GetEnum(SettingsKeys.StartupPage, AppDefaults.StartupPageDefault);
         NavCollapsed = Settings.GetBool(SettingsKeys.NavCollapsed);
-        Backdrop = Settings.GetEnum(SettingsKeys.Backdrop, AppDefaults.BackdropDefault);
         WarnIfNotAdministrator = Settings.GetBool(SettingsKeys.WarnIfNotAdmin, AppDefaults.WarnIfNotAdminDefault);
         SuppressPersist = false;
     }
@@ -42,14 +38,6 @@ public sealed partial class ShellPreferences : ShellPreferencesBase
     partial void OnNavCollapsedChanged(bool value)
     {
         PersistBool(SettingsKeys.NavCollapsed, value);
-    }
-
-    partial void OnBackdropChanged(BackdropKind value)
-    {
-        if (!SuppressPersist)
-        {
-            Settings.SetEnum(SettingsKeys.Backdrop, value);
-        }
     }
 
     partial void OnWarnIfNotAdministratorChanged(bool value)

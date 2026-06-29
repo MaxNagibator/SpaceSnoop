@@ -25,7 +25,6 @@ public static class AppDefaults
 
     public const bool WarnIfNotAdminDefault = true;
     public const StartupPage StartupPageDefault = StartupPage.Scan;
-    public const BackdropKind BackdropDefault = BackdropKind.None;
 
     public const bool SyncShowSizesDefault = true;
     public const bool SyncShowModifiedDefault = false;

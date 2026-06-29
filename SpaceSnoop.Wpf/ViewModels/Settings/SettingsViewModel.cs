@@ -87,14 +87,6 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         new(AppTheme.Tarkov, "Tarkov"),
     ];
 
-    public IReadOnlyList<EnumOption<BackdropKind>> BackdropOptions { get; } =
-    [
-        new(BackdropKind.None, "Нет"),
-        new(BackdropKind.Mica, "Mica"),
-        new(BackdropKind.Acrylic, "Acrylic"),
-        new(BackdropKind.MicaAlt, "Mica Alt"),
-    ];
-
     public IReadOnlyList<EnumOption<StartupPage>> StartupOptions { get; } =
     [
         new(StartupPage.LastUsed, "Последняя активная"),
@@ -132,19 +124,6 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
             if (value.Value != Theme.Current)
             {
                 Theme.ApplyCommand.Execute(value.Value);
-            }
-        }
-    }
-
-    public EnumOption<BackdropKind> SelectedBackdropOption
-    {
-        get => BackdropOptions.First(o => o.Value == Shell.Backdrop);
-        set
-        {
-            if (value.Value != Shell.Backdrop)
-            {
-                Shell.Backdrop = value.Value;
-                OnPropertyChanged();
             }
         }
     }
