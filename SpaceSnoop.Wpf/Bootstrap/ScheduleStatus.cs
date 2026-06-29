@@ -8,14 +8,15 @@ public sealed record ScheduleStatus
     public const int NeverRun = 267011;
     public const int Running = 267009;
 
+    public static ScheduleStatus Missing { get; } = new();
+
     public bool Exists { get; init; }
     public bool Enabled { get; init; } = true;
     public string NextRun { get; init; } = "–";
     public string LastRun { get; init; } = "–";
     public int LastResult { get; init; }
     public string LastResultText { get; init; } = "–";
-
-    public static ScheduleStatus Missing { get; } = new();
+    public string Action { get; init; } = string.Empty;
 
     public static ScheduleStatus Parse(string csv)
     {
@@ -43,6 +44,7 @@ public sealed record ScheduleStatus
             LastRun = Clean(fields[5]),
             LastResult = result,
             LastResultText = hasResult ? DecodeResult(result) : Clean(fields[6]),
+            Action = fields.Count >= 9 ? fields[8].Trim() : string.Empty,
         };
     }
 

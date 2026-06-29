@@ -73,6 +73,8 @@ public partial class App : Application
                 ShutdownMode = ShutdownMode.OnMainWindowClose;
             }
 
+            _ = Task.Run(() => ScheduleReconciler.Reconcile(settings, _logging.CreateLogger<ScheduleViewModel>()));
+
             splash.Dispose();
             splash = null;
         }

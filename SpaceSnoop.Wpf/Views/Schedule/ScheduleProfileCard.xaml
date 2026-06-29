@@ -139,6 +139,28 @@
                     </StackPanel>
                 </Border>
 
+                <Border Background="{DynamicResource State.WarningSoft}"
+                        CornerRadius="{DynamicResource Radius.M}"
+                        Padding="10,6"
+                        Margin="0,8,0,0"
+                        Visibility="{Binding IsStale, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
+                                                  Width="15"
+                                                  Height="15"
+                                                  VerticalAlignment="Top"
+                                                  Margin="0,1,9,0"
+                                                  Foreground="{DynamicResource State.Warning}" />
+                        <TextBlock
+                            Text="Задача указывает на другой файл программы (вероятно, старую версию). Откройте профиль и сохраните, чтобы привязать к текущей."
+                            TextWrapping="Wrap"
+                            MaxWidth="520"
+                            HorizontalAlignment="Left"
+                            FontSize="{DynamicResource Font.Size.S}"
+                            Foreground="{DynamicResource Fg.Secondary}" />
+                    </StackPanel>
+                </Border>
+
                 <StackPanel Orientation="Horizontal"
                             Margin="0,10,0,0"
                             Visibility="{Binding IsScheduled, Converter={StaticResource BoolToVisibility}}">

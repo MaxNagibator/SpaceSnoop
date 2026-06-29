@@ -127,6 +127,12 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1255, Level = LogLevel.Information, Message = "Создана пачка профилей: {Count}")]
     public static partial void ScheduleBatchCreated(this ILogger logger, int count);
 
+    [LoggerMessage(EventId = 1256, Level = LogLevel.Information, Message = "Задача расписания привязана к текущему пути: «{Name}» → {Exe}")]
+    public static partial void ScheduleTaskReconciled(this ILogger logger, string name, string exe);
+
+    [LoggerMessage(EventId = 1257, Level = LogLevel.Warning, Message = "Не удалось обновить путь задачи «{Name}»: {Error}")]
+    public static partial void ScheduleReconcileFailed(this ILogger logger, string name, string error);
+
     [LoggerMessage(EventId = 1300, Level = LogLevel.Warning, Message = "Не удалось положить лог-секцию в буфер обмена")]
     public static partial void ClipboardLogSectionFailed(this ILogger logger, Exception exception);
 

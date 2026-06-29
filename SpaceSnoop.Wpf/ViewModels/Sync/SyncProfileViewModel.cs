@@ -75,6 +75,9 @@ public sealed partial class SyncProfileViewModel : ObservableObject
     [ObservableProperty]
     private string _lastResult = "–";
 
+    [ObservableProperty]
+    private bool _isStale;
+
     public SyncProfileViewModel(ScheduleViewModel parent, SyncProfile model)
     {
         _parent = parent;
@@ -177,6 +180,7 @@ public sealed partial class SyncProfileViewModel : ObservableObject
         NextRun = status.Exists ? status.NextRun : "–";
         LastRun = status.Exists ? status.LastRun : "–";
         LastResult = status.Exists ? status.LastResultText : "–";
+        IsStale = status.Exists && SyncScheduler.IsStale(status.Action, Environment.ProcessPath ?? string.Empty);
     }
 
     private static void Browse(Action<string> assign)

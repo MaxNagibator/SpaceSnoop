@@ -16,6 +16,14 @@ public static class SyncScheduler
         return Run(["/query", "/tn", taskName], out _) == 0;
     }
 
+    // TODO: устаревание ловим по подстроке-пути, а не по всей команде – schtasks нормализует кавычки «Task To Run»; потолок – ложно-свежо при 8.3-имени или перемещённой копии с тем же путём
+    public static bool IsStale(string action, string exePath)
+    {
+        return !string.IsNullOrEmpty(action)
+               && !string.IsNullOrEmpty(exePath)
+               && !action.Contains(exePath, StringComparison.OrdinalIgnoreCase);
+    }
+
     public static bool Create(string taskName, ScheduleInterval interval, TimeSpan time, string argument, out string error)
     {
         var exe = Environment.ProcessPath;
