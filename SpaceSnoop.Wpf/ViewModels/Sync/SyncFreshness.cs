@@ -14,13 +14,31 @@ internal readonly record struct FreshnessSummary(
     DateTime? LeftMax,
     DateTime? RightMax,
     int LeftOnly,
-    int RightOnly)
+    int RightOnly,
+    DateTime? LeftChangedMax,
+    DateTime? RightChangedMax)
 {
-    public NewerSide Verdict =>
-        LeftNewer == 0 && RightNewer == 0 ? NewerSide.None
-        : LeftNewer > RightNewer ? NewerSide.Left
-        : RightNewer > LeftNewer ? NewerSide.Right
-        : NewerSide.Tie;
+    public NewerSide Verdict
+    {
+        get
+        {
+            if (LeftChangedMax is not { } left)
+            {
+                return RightChangedMax is null ? NewerSide.None : NewerSide.Right;
+            }
+
+            if (RightChangedMax is not { } right)
+            {
+                return NewerSide.Left;
+            }
+
+            var delta = left - right;
+
+            return delta.Duration() <= DirectoryComparer.FatTimestampTolerance ? NewerSide.Tie
+                : delta > TimeSpan.Zero ? NewerSide.Left
+                : NewerSide.Right;
+        }
+    }
 }
 
 internal static class SyncFreshness
@@ -33,33 +51,33 @@ internal static class SyncFreshness
         DateTime? rightMax = null;
         var leftOnly = 0;
         var rightOnly = 0;
+        DateTime? leftChangedMax = null;
+        DateTime? rightChangedMax = null;
         var tolerance = DirectoryComparer.FatTimestampTolerance;
 
         void Walk(DirectoryComparison dir)
         {
             foreach (var file in dir.Files)
             {
-                if (file.LeftModified is { } left && (leftMax is null || left > leftMax))
-                {
-                    leftMax = left;
-                }
-
-                if (file.RightModified is { } right && (rightMax is null || right > rightMax))
-                {
-                    rightMax = right;
-                }
+                Bump(ref leftMax, file.LeftModified);
+                Bump(ref rightMax, file.RightModified);
 
                 switch (file.Status)
                 {
                     case ComparisonStatus.LeftOnly:
                         leftOnly++;
+                        Bump(ref leftChangedMax, file.LeftModified);
                         break;
 
                     case ComparisonStatus.RightOnly:
                         rightOnly++;
+                        Bump(ref rightChangedMax, file.RightModified);
                         break;
 
                     case ComparisonStatus.Modified or ComparisonStatus.Conflict:
+                        Bump(ref leftChangedMax, file.LeftModified);
+                        Bump(ref rightChangedMax, file.RightModified);
+
                         if (file.LeftModified is { } l && file.RightModified is { } r)
                         {
                             var delta = l - r;
@@ -88,7 +106,15 @@ internal static class SyncFreshness
         }
 
         Walk(root);
-        return new(leftNewer, rightNewer, leftMax, rightMax, leftOnly, rightOnly);
+        return new(leftNewer, rightNewer, leftMax, rightMax, leftOnly, rightOnly, leftChangedMax, rightChangedMax);
+
+        static void Bump(ref DateTime? max, DateTime? value)
+        {
+            if (value is { } v && (max is null || v > max))
+            {
+                max = v;
+            }
+        }
     }
 
     internal static (int Count, DateTime? Newest) DeletionRecency(DirectoryComparison root)

@@ -694,13 +694,14 @@
                         <Grid>
                             <Button x:Name="GitHeader"
                                     Style="{StaticResource Button.Ghost}"
-                                    Command="{Binding ToggleGitGroupCommand}"
+                                    Command="{Binding ToggleGroupCommand}"
+                                    Margin="{Binding IndentMargin}"
                                     HorizontalAlignment="Stretch"
                                     HorizontalContentAlignment="Left"
                                     Padding="4,3"
                                     Cursor="Hand"
                                     Visibility="Collapsed"
-                                    ToolTip="Файлы из каталогов .git – клик разворачивает или сворачивает группу">
+                                    ToolTip="Файлы из служебных каталогов (список в настройках) – клик разворачивает или сворачивает группу">
                                 <StackPanel Orientation="Horizontal"
                                             VerticalAlignment="Center">
                                     <iconPacks:PackIconLucide Kind="{Binding ExpandIconKind}"
@@ -709,7 +710,7 @@
                                                               VerticalAlignment="Center"
                                                               Margin="2,0,8,0"
                                                               Foreground="{DynamicResource Fg.Muted}" />
-                                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderGit2}"
+                                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Folder}"
                                                               Width="14"
                                                               Height="14"
                                                               VerticalAlignment="Center"
@@ -722,147 +723,147 @@
                                 </StackPanel>
                             </Button>
                             <Grid x:Name="DiffContent">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="60" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-
-                            <Grid Grid.Column="0"
-                                  Margin="{Binding IndentMargin}"
-                                  VerticalAlignment="Center">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="{Binding ExpanderColumnWidth}" />
-                                    <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Button Grid.Column="0"
-                                        Style="{StaticResource ChevronToggle}"
-                                        Command="{Binding ToggleExpandCommand}"
-                                        Visibility="{Binding LeftExpanderVisible, Converter={StaticResource BoolToVisibility}}">
-                                    <iconPacks:PackIconLucide Kind="{Binding ExpandIconKind}"
-                                                              Width="12"
-                                                              Height="12" />
-                                </Button>
-                                <iconPacks:PackIconLucide Grid.Column="1"
-                                                          Style="{StaticResource NodeIcon}"
-                                                          Visibility="{Binding LeftContentVisible, Converter={StaticResource BoolToVisibility}}" />
-                                <TextBlock Grid.Column="2"
-                                           Text="{Binding DisplayName}"
-                                           Style="{StaticResource NodeNameLeft}"
-                                           Visibility="{Binding LeftContentVisible, Converter={StaticResource BoolToVisibility}}" />
-                                <iconPacks:PackIconLucide Grid.Column="3"
-                                                          Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
-                                                          Width="12"
-                                                          Height="12"
-                                                          VerticalAlignment="Center"
-                                                          Margin="4,0,4,0"
-                                                          Foreground="{DynamicResource State.Error}"
-                                                          ToolTip="Конфликт – требуется разрешение">
-                                    <iconPacks:PackIconLucide.Style>
-                                        <Style TargetType="iconPacks:PackIconLucide">
-                                            <Setter Property="Visibility"
-                                                    Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Status}"
-                                                             Value="Conflict">
-                                                    <Setter Property="Visibility"
-                                                            Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </iconPacks:PackIconLucide.Style>
-                                </iconPacks:PackIconLucide>
-                                <TextBlock Grid.Column="4"
-                                           Text="{Binding LeftModifiedText}"
-                                           Style="{StaticResource SideModifiedLeft}"
-                                           Margin="8,0,0,0"
-                                           ToolTip="Последнее изменение"
-                                           Visibility="{Binding DataContext.ShowModified, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}" />
-                                <TextBlock Grid.Column="5"
-                                           Text="{Binding LeftSizeText}"
-                                           Style="{StaticResource SideSize}"
-                                           Margin="8,0,6,0"
-                                           Visibility="{Binding DataContext.ShowSizes, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}" />
-                            </Grid>
-
-                            <Button Grid.Column="1"
-                                    Style="{StaticResource ActionPill}"
-                                    Command="{Binding CycleActionCommand}"
-                                    IsEnabled="{Binding CanCycle}"
-                                    VerticalAlignment="Center"
-                                    HorizontalAlignment="Center"
-                                    ToolTip="{Binding ActionHint}"
-                                    AutomationProperties.Name="{Binding ActionHint}"
-                                    Visibility="{Binding ShowAction, Converter={StaticResource BoolToVisibility}}">
-                                <iconPacks:PackIconLucide Kind="{Binding ActionIconKind}"
-                                                          Width="15"
-                                                          Height="15" />
-                            </Button>
-
-                            <Grid Grid.Column="2"
-                                  Margin="{Binding IndentMargin}"
-                                  VerticalAlignment="Center">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="{Binding ExpanderColumnWidth}" />
-                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="60" />
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <Button Grid.Column="0"
-                                        Style="{StaticResource ChevronToggle}"
-                                        Command="{Binding ToggleExpandCommand}"
-                                        Visibility="{Binding RightExpanderVisible, Converter={StaticResource BoolToVisibility}}">
-                                    <iconPacks:PackIconLucide Kind="{Binding ExpandIconKind}"
+
+                                <Grid Grid.Column="0"
+                                      Margin="{Binding IndentMargin}"
+                                      VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="{Binding ExpanderColumnWidth}" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0"
+                                            Style="{StaticResource ChevronToggle}"
+                                            Command="{Binding ToggleExpandCommand}"
+                                            Visibility="{Binding LeftExpanderVisible, Converter={StaticResource BoolToVisibility}}">
+                                        <iconPacks:PackIconLucide Kind="{Binding ExpandIconKind}"
+                                                                  Width="12"
+                                                                  Height="12" />
+                                    </Button>
+                                    <iconPacks:PackIconLucide Grid.Column="1"
+                                                              Style="{StaticResource NodeIcon}"
+                                                              Visibility="{Binding LeftContentVisible, Converter={StaticResource BoolToVisibility}}" />
+                                    <TextBlock Grid.Column="2"
+                                               Text="{Binding DisplayName}"
+                                               Style="{StaticResource NodeNameLeft}"
+                                               Visibility="{Binding LeftContentVisible, Converter={StaticResource BoolToVisibility}}" />
+                                    <iconPacks:PackIconLucide Grid.Column="3"
+                                                              Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
                                                               Width="12"
-                                                              Height="12" />
+                                                              Height="12"
+                                                              VerticalAlignment="Center"
+                                                              Margin="4,0,4,0"
+                                                              Foreground="{DynamicResource State.Error}"
+                                                              ToolTip="Конфликт – требуется разрешение">
+                                        <iconPacks:PackIconLucide.Style>
+                                            <Style TargetType="iconPacks:PackIconLucide">
+                                                <Setter Property="Visibility"
+                                                        Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Status}"
+                                                                 Value="Conflict">
+                                                        <Setter Property="Visibility"
+                                                                Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </iconPacks:PackIconLucide.Style>
+                                    </iconPacks:PackIconLucide>
+                                    <TextBlock Grid.Column="4"
+                                               Text="{Binding LeftModifiedText}"
+                                               Style="{StaticResource SideModifiedLeft}"
+                                               Margin="8,0,0,0"
+                                               ToolTip="Последнее изменение"
+                                               Visibility="{Binding DataContext.ShowModified, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}" />
+                                    <TextBlock Grid.Column="5"
+                                               Text="{Binding LeftSizeText}"
+                                               Style="{StaticResource SideSize}"
+                                               Margin="8,0,6,0"
+                                               Visibility="{Binding DataContext.ShowSizes, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}" />
+                                </Grid>
+
+                                <Button Grid.Column="1"
+                                        Style="{StaticResource ActionPill}"
+                                        Command="{Binding CycleActionCommand}"
+                                        IsEnabled="{Binding CanCycle}"
+                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Center"
+                                        ToolTip="{Binding ActionHint}"
+                                        AutomationProperties.Name="{Binding ActionHint}"
+                                        Visibility="{Binding ShowAction, Converter={StaticResource BoolToVisibility}}">
+                                    <iconPacks:PackIconLucide Kind="{Binding ActionIconKind}"
+                                                              Width="15"
+                                                              Height="15" />
                                 </Button>
-                                <iconPacks:PackIconLucide Grid.Column="1"
-                                                          Style="{StaticResource NodeIcon}"
-                                                          Visibility="{Binding RightContentVisible, Converter={StaticResource BoolToVisibility}}" />
-                                <TextBlock Grid.Column="2"
-                                           Text="{Binding DisplayName}"
-                                           Style="{StaticResource NodeNameRight}"
-                                           Visibility="{Binding RightContentVisible, Converter={StaticResource BoolToVisibility}}" />
-                                <iconPacks:PackIconLucide Grid.Column="3"
-                                                          Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
-                                                          Width="12"
-                                                          Height="12"
-                                                          VerticalAlignment="Center"
-                                                          Margin="4,0,4,0"
-                                                          Foreground="{DynamicResource State.Error}"
-                                                          ToolTip="Конфликт – требуется разрешение">
-                                    <iconPacks:PackIconLucide.Style>
-                                        <Style TargetType="iconPacks:PackIconLucide">
-                                            <Setter Property="Visibility"
-                                                    Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Status}"
-                                                             Value="Conflict">
-                                                    <Setter Property="Visibility"
-                                                            Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </iconPacks:PackIconLucide.Style>
-                                </iconPacks:PackIconLucide>
-                                <TextBlock Grid.Column="4"
-                                           Text="{Binding RightModifiedText}"
-                                           Style="{StaticResource SideModifiedRight}"
-                                           Margin="8,0,0,0"
-                                           ToolTip="Последнее изменение"
-                                           Visibility="{Binding DataContext.ShowModified, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}" />
-                                <TextBlock Grid.Column="5"
-                                           Text="{Binding RightSizeText}"
-                                           Style="{StaticResource SideSize}"
-                                           Margin="8,0,6,0"
-                                           Visibility="{Binding DataContext.ShowSizes, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}" />
-                            </Grid>
+
+                                <Grid Grid.Column="2"
+                                      Margin="{Binding IndentMargin}"
+                                      VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="{Binding ExpanderColumnWidth}" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0"
+                                            Style="{StaticResource ChevronToggle}"
+                                            Command="{Binding ToggleExpandCommand}"
+                                            Visibility="{Binding RightExpanderVisible, Converter={StaticResource BoolToVisibility}}">
+                                        <iconPacks:PackIconLucide Kind="{Binding ExpandIconKind}"
+                                                                  Width="12"
+                                                                  Height="12" />
+                                    </Button>
+                                    <iconPacks:PackIconLucide Grid.Column="1"
+                                                              Style="{StaticResource NodeIcon}"
+                                                              Visibility="{Binding RightContentVisible, Converter={StaticResource BoolToVisibility}}" />
+                                    <TextBlock Grid.Column="2"
+                                               Text="{Binding DisplayName}"
+                                               Style="{StaticResource NodeNameRight}"
+                                               Visibility="{Binding RightContentVisible, Converter={StaticResource BoolToVisibility}}" />
+                                    <iconPacks:PackIconLucide Grid.Column="3"
+                                                              Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
+                                                              Width="12"
+                                                              Height="12"
+                                                              VerticalAlignment="Center"
+                                                              Margin="4,0,4,0"
+                                                              Foreground="{DynamicResource State.Error}"
+                                                              ToolTip="Конфликт – требуется разрешение">
+                                        <iconPacks:PackIconLucide.Style>
+                                            <Style TargetType="iconPacks:PackIconLucide">
+                                                <Setter Property="Visibility"
+                                                        Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Status}"
+                                                                 Value="Conflict">
+                                                        <Setter Property="Visibility"
+                                                                Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </iconPacks:PackIconLucide.Style>
+                                    </iconPacks:PackIconLucide>
+                                    <TextBlock Grid.Column="4"
+                                               Text="{Binding RightModifiedText}"
+                                               Style="{StaticResource SideModifiedRight}"
+                                               Margin="8,0,0,0"
+                                               ToolTip="Последнее изменение"
+                                               Visibility="{Binding DataContext.ShowModified, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}" />
+                                    <TextBlock Grid.Column="5"
+                                               Text="{Binding RightSizeText}"
+                                               Style="{StaticResource SideSize}"
+                                               Margin="8,0,6,0"
+                                               Visibility="{Binding DataContext.ShowSizes, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}" />
+                                </Grid>
                             </Grid>
                         </Grid>
                         <DataTemplate.Triggers>

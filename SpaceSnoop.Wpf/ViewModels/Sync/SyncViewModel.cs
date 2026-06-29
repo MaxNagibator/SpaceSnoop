@@ -21,6 +21,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private readonly ToastNotifier _notifier;
     private readonly GitService _git = new();
     private readonly HashSet<DirectoryComparison> _collapsed = [];
+    private readonly HashSet<string> _collapsedSubGroups = new(StringComparer.OrdinalIgnoreCase);
 
     private ComparisonResult? _result;
     private GitRepoState? _leftGit;
@@ -202,20 +203,20 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public bool MirrorDeletes => Mirror && MirrorApplicable;
 
-    public bool ShowNewerBadge => _result is not null && _freshness.Verdict != NewerSide.None;
+    public bool ShowNewerBadge => _result is not null && EffectiveNewerSide != NewerSide.None;
 
-    public PackIconLucideKind NewerBadgeIconKind => _freshness.Verdict switch
+    public PackIconLucideKind NewerBadgeIconKind => EffectiveNewerSide switch
     {
         NewerSide.Left => PackIconLucideKind.ArrowLeft,
         NewerSide.Right => PackIconLucideKind.ArrowRight,
         _ => PackIconLucideKind.ArrowRightLeft,
     };
 
-    public bool NewerIsLeft => _freshness.Verdict == NewerSide.Left;
+    public bool NewerIsLeft => EffectiveNewerSide == NewerSide.Left;
 
-    public bool NewerIsRight => _freshness.Verdict == NewerSide.Right;
+    public bool NewerIsRight => EffectiveNewerSide == NewerSide.Right;
 
-    public string NewerBadgeText => _freshness.Verdict switch
+    public string NewerBadgeText => EffectiveNewerSide switch
     {
         NewerSide.Left => "СЛЕВА",
         NewerSide.Right => "СПРАВА",
@@ -223,9 +224,14 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _ => string.Empty,
     };
 
-    public string NewerBadgeTooltip =>
-        $"Свежее по изменённым файлам: слева {_freshness.LeftNewer:N0}, справа {_freshness.RightNewer:N0}.{Environment.NewLine}"
-        + $"Новейший файл слева: {FormatStamp(_freshness.LeftMax)}, справа: {FormatStamp(_freshness.RightMax)}.";
+    public string NewerBadgeTooltip => GitDecidesNewer
+        ? $"Свежее по коммитам git: слева {FormatStamp(_leftGit?.CommittedAt?.LocalDateTime)}, справа {FormatStamp(_rightGit?.CommittedAt?.LocalDateTime)}."
+        : $"Свежее по новейшему изменённому файлу: слева {FormatStamp(_freshness.LeftChangedMax)}, справа {FormatStamp(_freshness.RightChangedMax)}.{Environment.NewLine}"
+          + $"Изменённых новее: слева {_freshness.LeftNewer:N0}, справа {_freshness.RightNewer:N0}.";
+
+    private NewerSide EffectiveNewerSide => CombineNewer(_freshness.Verdict, GitInSync, GitNewerSign);
+
+    private bool GitDecidesNewer => GitInSync || GitNewerSign != 0;
 
     public bool HasGit => _leftGit is not null || _rightGit is not null;
 
@@ -335,7 +341,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             }
 
             return $"Коммит слева: {FormatStamp(left.CommittedAt?.LocalDateTime)}, справа: {FormatStamp(right.CommittedAt?.LocalDateTime)}.{Environment.NewLine}"
-                + "«Новее» – по дате коммита, не по истории веток.";
+                   + "«Новее» – по дате коммита, не по истории веток.";
         }
     }
 
@@ -419,9 +425,17 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         RebuildRows();
     }
 
-    public void ToggleGitGroup()
+    public void ToggleGroup(string? key)
     {
-        _gitGroupExpanded = !_gitGroupExpanded;
+        if (key is null)
+        {
+            _gitGroupExpanded = !_gitGroupExpanded;
+        }
+        else if (!_collapsedSubGroups.Remove(key))
+        {
+            _collapsedSubGroups.Add(key);
+        }
+
         RebuildRows();
     }
 
@@ -599,17 +613,35 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
     }
 
-    internal static bool IsGitPath(string relativePath)
+    internal static string[] ParseGroupFolders(string folders)
     {
+        return folders.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
+
+    internal static string? GroupedKey(string relativePath, IReadOnlyCollection<string> folders)
+    {
+        if (folders.Count == 0)
+        {
+            return null;
+        }
+
         foreach (var segment in relativePath.Split('/', '\\'))
         {
-            if (string.Equals(segment, ".git", StringComparison.OrdinalIgnoreCase))
+            foreach (var folder in folders)
             {
-                return true;
+                if (string.Equals(segment, folder, StringComparison.OrdinalIgnoreCase))
+                {
+                    return folder;
+                }
             }
         }
 
-        return false;
+        return null;
+    }
+
+    internal static bool IsGroupedPath(string relativePath, IReadOnlyCollection<string> folders)
+    {
+        return GroupedKey(relativePath, folders) is not null;
     }
 
     internal static string AddGitExclusion(string exclusions)
@@ -634,6 +666,21 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         var side = l > r ? "слева новее" : "справа новее";
 
         return $"{side} на {FormatAge((l - r).Duration())}";
+    }
+
+    internal static NewerSide CombineNewer(NewerSide freshness, bool gitInSync, int gitNewerSign)
+    {
+        if (gitInSync)
+        {
+            return NewerSide.Tie;
+        }
+
+        return gitNewerSign switch
+        {
+            < 0 => NewerSide.Left,
+            > 0 => NewerSide.Right,
+            _ => freshness,
+        };
     }
 
     internal static (Dictionary<ComparisonStatus, int> Files, Dictionary<ComparisonStatus, int> Dirs) CountRemaining(
@@ -688,6 +735,10 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         if (key == SettingsKeys.ScheduleProfiles)
         {
             Profiles.Load();
+        }
+        else if (key == SettingsKeys.SyncGroupFolders && _result is not null && FlatView)
+        {
+            RebuildRows();
         }
     }
 
@@ -1216,6 +1267,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         OnPropertyChanged(nameof(RightGitLogEmpty));
         OnPropertyChanged(nameof(LeftGitLogEmptyText));
         OnPropertyChanged(nameof(RightGitLogEmptyText));
+        NotifyNewerBadgeChanged();
     }
 
     private bool CanHash()
@@ -1345,6 +1397,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _outcomes = SyncOutcomes.Build(result, report.Errors, report.Mismatches);
         RebuildRows();
         RefreshLedgerAfterSync();
+        await ReadGitStateAsync();
 
         var verifyText = verify ? $", расхождений: {report.Mismatches.Count:N0}" : string.Empty;
         SummaryText = $"Готово за {stopwatch.Elapsed.TotalSeconds:F2} с. Успешно: {report.SuccessCount:N0}, ошибок: {report.Errors.Count:N0}{verifyText}";
@@ -1596,6 +1649,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         Persist(SettingsKeys.SyncLeft, value);
         LeftPathInvalid = PathMissing(value);
         Profiles.MarkCurrent();
+        DiscardComparisonIfPathChanged();
     }
 
     partial void OnRightPathChanged(string value)
@@ -1603,6 +1657,21 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         Persist(SettingsKeys.SyncRight, value);
         RightPathInvalid = PathMissing(value);
         Profiles.MarkCurrent();
+        DiscardComparisonIfPathChanged();
+    }
+
+    private void DiscardComparisonIfPathChanged()
+    {
+        if (_result is null)
+        {
+            return;
+        }
+
+        if (!string.Equals(LeftPath.Trim(), _result.LeftPath, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(RightPath.Trim(), _result.RightPath, StringComparison.OrdinalIgnoreCase))
+        {
+            ClearComparison();
+        }
     }
 
     partial void OnExclusionsChanged(string value)
@@ -1773,34 +1842,54 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             }
 
             var sortedDirs = dirs.OrderBy(dir => dir.RelativePath, StringComparer.OrdinalIgnoreCase).ToList();
+            var groupFolders = ParseGroupFolders(Operations.GroupFolders);
 
-            foreach (var file in sortedFiles.Where(f => !IsGitPath(f.RelativePath)))
+            foreach (var file in sortedFiles.Where(f => !IsGroupedPath(f.RelativePath, groupFolders)))
             {
                 buffer.Add(new(file, 0, this, true) { Outcome = _outcomes.GetValueOrDefault(file) });
             }
 
-            foreach (var dir in sortedDirs.Where(d => !IsGitPath(d.RelativePath)))
+            foreach (var dir in sortedDirs.Where(d => !IsGroupedPath(d.RelativePath, groupFolders)))
             {
                 buffer.Add(new(dir, 0, false, 0, 0, this, true) { Outcome = _outcomes.GetValueOrDefault(dir) });
             }
 
-            var gitFiles = sortedFiles.Where(f => IsGitPath(f.RelativePath)).ToList();
-            var gitDirs = sortedDirs.Where(d => IsGitPath(d.RelativePath)).ToList();
+            var groupedFiles = sortedFiles.Where(f => IsGroupedPath(f.RelativePath, groupFolders)).ToList();
+            var groupedDirs = sortedDirs.Where(d => IsGroupedPath(d.RelativePath, groupFolders)).ToList();
 
-            if (gitFiles.Count + gitDirs.Count > 0)
+            if (groupedFiles.Count + groupedDirs.Count > 0)
             {
-                buffer.Add(SyncNodeViewModel.CreateGitHeader(gitFiles.Count + gitDirs.Count, _gitGroupExpanded, this));
+                buffer.Add(SyncNodeViewModel.CreateGroupHeader(groupedFiles.Count + groupedDirs.Count, _gitGroupExpanded, this));
 
                 if (_gitGroupExpanded)
                 {
-                    foreach (var file in gitFiles)
+                    foreach (var folder in groupFolders.Distinct(StringComparer.OrdinalIgnoreCase))
                     {
-                        buffer.Add(new(file, 0, this, true) { Outcome = _outcomes.GetValueOrDefault(file) });
-                    }
+                        var subFiles = groupedFiles.Where(f => string.Equals(GroupedKey(f.RelativePath, groupFolders), folder, StringComparison.OrdinalIgnoreCase)).ToList();
+                        var subDirs = groupedDirs.Where(d => string.Equals(GroupedKey(d.RelativePath, groupFolders), folder, StringComparison.OrdinalIgnoreCase)).ToList();
 
-                    foreach (var dir in gitDirs)
-                    {
-                        buffer.Add(new(dir, 0, false, 0, 0, this, true) { Outcome = _outcomes.GetValueOrDefault(dir) });
+                        if (subFiles.Count + subDirs.Count == 0)
+                        {
+                            continue;
+                        }
+
+                        var expanded = !_collapsedSubGroups.Contains(folder);
+                        buffer.Add(SyncNodeViewModel.CreateSubGroupHeader(folder, subFiles.Count + subDirs.Count, expanded, this));
+
+                        if (!expanded)
+                        {
+                            continue;
+                        }
+
+                        foreach (var file in subFiles)
+                        {
+                            buffer.Add(new(file, 2, this, true) { Outcome = _outcomes.GetValueOrDefault(file) });
+                        }
+
+                        foreach (var dir in subDirs)
+                        {
+                            buffer.Add(new(dir, 2, false, 0, 0, this, true) { Outcome = _outcomes.GetValueOrDefault(dir) });
+                        }
                     }
                 }
             }
@@ -1986,6 +2075,11 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         OnPropertyChanged(nameof(ConflictFraction));
         OnPropertyChanged(nameof(HasConflicts));
         OnPropertyChanged(nameof(CompositionHint));
+        NotifyNewerBadgeChanged();
+    }
+
+    private void NotifyNewerBadgeChanged()
+    {
         OnPropertyChanged(nameof(ShowNewerBadge));
         OnPropertyChanged(nameof(NewerBadgeIconKind));
         OnPropertyChanged(nameof(NewerBadgeText));

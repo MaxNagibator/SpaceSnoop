@@ -22,6 +22,7 @@ public sealed partial class SyncNodeViewModel : ObservableObject
     private readonly FileComparison? _file;
     private readonly SyncViewModel _owner;
     private readonly bool _flat;
+    private readonly string? _groupKey;
     private bool _subtreeActionable;
     private SyncAction? _subtreeAction;
 
@@ -66,18 +67,15 @@ public sealed partial class SyncNodeViewModel : ObservableObject
         }
     }
 
-    private SyncNodeViewModel(SyncViewModel owner, int gitCount, bool expanded)
+    private SyncNodeViewModel(SyncViewModel owner, string? groupKey, string headerText, int indent, bool expanded)
     {
         _owner = owner;
         _flat = true;
+        _groupKey = groupKey;
         IsGroupHeader = true;
         IsExpanded = expanded;
-        GroupHeaderText = $"Git-файлы ({gitCount})";
-    }
-
-    public static SyncNodeViewModel CreateGitHeader(int gitCount, bool expanded, SyncViewModel owner)
-    {
-        return new(owner, gitCount, expanded);
+        Indent = indent;
+        GroupHeaderText = headerText;
     }
 
     public int Indent { get; }
@@ -163,7 +161,7 @@ public sealed partial class SyncNodeViewModel : ObservableObject
 
     public bool RightExpanderVisible => IsDirectory && RightContentVisible && !_flat;
 
-    public GridLength ExpanderColumnWidth => _flat ? new GridLength(0) : new GridLength(14);
+    public GridLength ExpanderColumnWidth => _flat ? new(0) : new GridLength(14);
 
     public bool CanCompareContent => _file is not null && Status is not (ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly);
 
@@ -239,6 +237,16 @@ public sealed partial class SyncNodeViewModel : ObservableObject
         ComparisonStatus.RightOnly => RightOnlyActions,
         _ => BothSidesActions,
     };
+
+    public static SyncNodeViewModel CreateGroupHeader(int groupedCount, bool expanded, SyncViewModel owner)
+    {
+        return new(owner, null, $"Служебные файлы ({groupedCount})", 0, expanded);
+    }
+
+    public static SyncNodeViewModel CreateSubGroupHeader(string folder, int count, bool expanded, SyncViewModel owner)
+    {
+        return new(owner, folder, $"{folder} ({count})", 1, expanded);
+    }
 
     public static string DescribeDiff(FileComparison file)
     {
@@ -357,9 +365,9 @@ public sealed partial class SyncNodeViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void ToggleGitGroup()
+    private void ToggleGroup()
     {
-        _owner.ToggleGitGroup();
+        _owner.ToggleGroup(_groupKey);
     }
 
     [RelayCommand]

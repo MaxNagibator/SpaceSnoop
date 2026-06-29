@@ -134,8 +134,8 @@ public sealed partial class OverviewRowViewModel : ObservableObject
     };
 
     public string NewerBadgeTooltip =>
-        $"Свежее по изменённым файлам: слева {_freshness.LeftNewer:N0}, справа {_freshness.RightNewer:N0}.{Environment.NewLine}"
-        + $"Новейший файл слева: {FormatStamp(_freshness.LeftMax)}, справа: {FormatStamp(_freshness.RightMax)}.{Environment.NewLine}"
+        $"Свежее по новейшему изменённому файлу: слева {FormatStamp(_freshness.LeftChangedMax)}, справа {FormatStamp(_freshness.RightChangedMax)}.{Environment.NewLine}"
+        + $"Изменённых новее: слева {_freshness.LeftNewer:N0}, справа {_freshness.RightNewer:N0}.{Environment.NewLine}"
         + $"Только слева: {_freshness.LeftOnly:N0}, только справа: {_freshness.RightOnly:N0}.";
 
     public string BreakdownText =>

@@ -37,6 +37,7 @@ public static class AppDefaults
     public const int DiffContextLines = 3;
 
     public const bool SyncPathSuggestDefault = true;
+    public const string SyncGroupFoldersDefault = ".git,bin,obj";
 
     public const OverviewSortField OverviewSortDefault = OverviewSortField.None;
     public const bool OverviewGroupUnchangedDefault = true;

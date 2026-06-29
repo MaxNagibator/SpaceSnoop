@@ -20,11 +20,31 @@ public class SyncGitTests
     [TestCase(".git/config", ExpectedResult = true)]
     [TestCase(@"sub\.git\HEAD", ExpectedResult = true)]
     [TestCase(".GIT/objects", ExpectedResult = true)]
+    [TestCase("src/bin/app.dll", ExpectedResult = true)]
+    [TestCase(@"proj\obj\Debug\x.cache", ExpectedResult = true)]
     [TestCase("src/.gitignore", ExpectedResult = false)]
+    [TestCase("src/binaries/main.cs", ExpectedResult = false)]
     [TestCase("src/main.cs", ExpectedResult = false)]
-    public bool Git_путь_распознаётся_по_сегменту(string relativePath)
+    public bool Группируемый_путь_распознаётся_по_сегменту(string relativePath)
     {
-        return SyncViewModel.IsGitPath(relativePath);
+        return SyncViewModel.IsGroupedPath(relativePath, SyncViewModel.ParseGroupFolders(".git,bin,obj"));
+    }
+
+    [TestCase("", ExpectedResult = false)]
+    [TestCase("  ,  ", ExpectedResult = false)]
+    public bool Пустой_список_не_группирует(string folders)
+    {
+        return SyncViewModel.IsGroupedPath(".git/config", SyncViewModel.ParseGroupFolders(folders));
+    }
+
+    [TestCase(".git/config", ExpectedResult = ".git")]
+    [TestCase(@"src\bin\app.dll", ExpectedResult = "bin")]
+    [TestCase("proj/obj/x.cache", ExpectedResult = "obj")]
+    [TestCase(@"bin\.git\HEAD", ExpectedResult = "bin")]
+    [TestCase("src/main.cs", ExpectedResult = null)]
+    public string? Ключ_подгруппы_это_первый_совпавший_каталог(string relativePath)
+    {
+        return SyncViewModel.GroupedKey(relativePath, SyncViewModel.ParseGroupFolders(".git,bin,obj"));
     }
 
     [Test]
@@ -49,6 +69,19 @@ public class SyncGitTests
     public void Направление_пустое_когда_не_определить(DateTimeOffset? left, DateTimeOffset? right)
     {
         Assert.That(SyncViewModel.DescribeNewer(left, right), Is.Empty);
+    }
+
+    [Test]
+    public void Git_коммиты_перебивают_свежесть_по_файлам()
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(SyncViewModel.CombineNewer(NewerSide.Left, false, 1), Is.EqualTo(NewerSide.Right));
+            Assert.That(SyncViewModel.CombineNewer(NewerSide.Right, false, -1), Is.EqualTo(NewerSide.Left));
+            Assert.That(SyncViewModel.CombineNewer(NewerSide.Left, true, 0), Is.EqualTo(NewerSide.Tie));
+            Assert.That(SyncViewModel.CombineNewer(NewerSide.Left, false, 0), Is.EqualTo(NewerSide.Left));
+            Assert.That(SyncViewModel.CombineNewer(NewerSide.None, false, 0), Is.EqualTo(NewerSide.None));
+        }
     }
 
     private static IEnumerable<TestCaseData> NoNewerCases()
