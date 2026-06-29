@@ -37,9 +37,23 @@ public sealed class GitService
         return log.Failed ? [] : GitCommit.ParseLog(log.StdOut);
     }
 
+    private static readonly string Executable = ResolveExecutable();
+
+    private static string ResolveExecutable()
+    {
+        string[] candidates =
+        [
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Git", "cmd", "git.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Git", "cmd", "git.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Git", "cmd", "git.exe"),
+        ];
+
+        return Array.Find(candidates, File.Exists) ?? "git";
+    }
+
     private static async Task<ProcessRun> RunAsync(string workingDirectory, string arguments, CancellationToken cancel)
     {
-        var psi = new ProcessStartInfo("git", arguments)
+        var psi = new ProcessStartInfo(Executable, arguments)
         {
             WorkingDirectory = workingDirectory,
             RedirectStandardOutput = true,

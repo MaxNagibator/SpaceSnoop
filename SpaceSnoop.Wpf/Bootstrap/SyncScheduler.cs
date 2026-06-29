@@ -106,7 +106,7 @@ public static class SyncScheduler
     {
         try
         {
-            var info = new ProcessStartInfo("schtasks.exe")
+            var info = new ProcessStartInfo(SystemExecutable.SchTasks)
             {
                 UseShellExecute = false,
                 RedirectStandardOutput = true,

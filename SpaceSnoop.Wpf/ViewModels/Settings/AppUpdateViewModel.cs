@@ -607,7 +607,7 @@ public sealed partial class AppUpdateViewModel : ObservableObject
         {
             Process.Start(new ProcessStartInfo
             {
-                FileName = "explorer.exe",
+                FileName = SystemExecutable.Explorer,
                 Arguments = $"/select,\"{filePath}\"",
                 UseShellExecute = true,
             });

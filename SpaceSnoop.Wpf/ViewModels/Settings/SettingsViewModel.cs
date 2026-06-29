@@ -254,7 +254,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
 
             Process.Start(new ProcessStartInfo
             {
-                FileName = "explorer.exe",
+                FileName = SystemExecutable.Explorer,
                 Arguments = $"/select,\"{SettingsFilePath}\"",
                 UseShellExecute = true,
             });

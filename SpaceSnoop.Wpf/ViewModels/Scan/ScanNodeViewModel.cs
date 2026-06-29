@@ -235,7 +235,7 @@ public sealed partial class ScanNodeViewModel : ObservableObject
             }
             else
             {
-                Process.Start("explorer.exe", $"/select,\"{Space.AbsolutePath}\"");
+                Process.Start(SystemExecutable.Explorer, $"/select,\"{Space.AbsolutePath}\"");
             }
         }
         catch (Exception ex)
