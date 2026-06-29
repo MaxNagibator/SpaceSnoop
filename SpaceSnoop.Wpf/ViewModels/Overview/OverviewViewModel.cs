@@ -47,7 +47,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         _settings.Changed += OnSettingsChanged;
     }
 
-    public event Action<SyncProfile>? OpenInSyncRequested;
+    public event Action<SyncProfile, ComparisonResult?>? OpenInSyncRequested;
 
     public ObservableCollection<OverviewRowViewModel> Rows { get; } = [];
 
@@ -120,6 +120,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
                     continue;
                 }
 
+                row.Comparison = null;
                 row.Status = OverviewRunStatus.Comparing;
                 var rowStopwatch = Stopwatch.StartNew();
 
@@ -134,6 +135,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
                     row.ApplyFreshness(SyncFreshness.Compute(result.Root));
                     row.ElapsedMs = (long)rowStopwatch.Elapsed.TotalMilliseconds;
                     row.Error = null;
+                    row.Comparison = result;
                     row.Status = OverviewRunStatus.Compared;
                     compared++;
                 }
@@ -370,6 +372,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
             }
         }
 
+        row.Comparison = null;
         row.Status = OverviewRunStatus.Syncing;
         var stopwatch = Stopwatch.StartNew();
 
@@ -457,8 +460,8 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         CycleAllDirectionsCommand.NotifyCanExecuteChanged();
     }
 
-    private void RaiseOpenInSync(SyncProfile profile)
+    private void RaiseOpenInSync(SyncProfile profile, ComparisonResult? comparison)
     {
-        OpenInSyncRequested?.Invoke(profile);
+        OpenInSyncRequested?.Invoke(profile, comparison);
     }
 }

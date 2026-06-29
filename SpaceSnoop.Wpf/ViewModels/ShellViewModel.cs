@@ -70,9 +70,9 @@ public sealed partial class ShellViewModel : ShellViewModelBase
             [SectionKey.About] = aboutItem,
         };
 
-        overview.OpenInSyncRequested += profile =>
+        overview.OpenInSyncRequested += (profile, comparison) =>
         {
-            sync.ApplyProfile(profile);
+            sync.ApplyProfile(profile, comparison);
             Selected = syncItem;
         };
 

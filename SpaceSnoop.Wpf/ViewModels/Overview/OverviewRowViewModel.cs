@@ -4,7 +4,7 @@ namespace SpaceSnoop.Wpf.ViewModels.Overview;
 
 public sealed partial class OverviewRowViewModel : ObservableObject
 {
-    private readonly Action<SyncProfile> _openInSync;
+    private readonly Action<SyncProfile, ComparisonResult?> _openInSync;
     private readonly Action _onDirectionChanged;
 
     private FreshnessSummary _freshness;
@@ -50,7 +50,7 @@ public sealed partial class OverviewRowViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(StatusText))]
     private string? _error;
 
-    public OverviewRowViewModel(SyncProfile profile, Action<SyncProfile> openInSync, Action onDirectionChanged)
+    public OverviewRowViewModel(SyncProfile profile, Action<SyncProfile, ComparisonResult?> openInSync, Action onDirectionChanged)
     {
         Profile = profile;
         _openInSync = openInSync;
@@ -58,6 +58,8 @@ public sealed partial class OverviewRowViewModel : ObservableObject
     }
 
     public SyncProfile Profile { get; }
+
+    public ComparisonResult? Comparison { get; set; }
 
     public string Name => Profile.Name;
 
@@ -222,7 +224,7 @@ public sealed partial class OverviewRowViewModel : ObservableObject
     [RelayCommand]
     private void OpenInSync()
     {
-        _openInSync(Profile);
+        _openInSync(Profile, Status == OverviewRunStatus.Compared ? Comparison : null);
     }
 
     [RelayCommand]

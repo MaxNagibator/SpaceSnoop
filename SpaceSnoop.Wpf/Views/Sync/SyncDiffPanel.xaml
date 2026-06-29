@@ -390,6 +390,13 @@
                     <Setter Property="Background"
                             Value="{DynamicResource Bg.SurfaceMute}" />
                 </DataTrigger>
+                <DataTrigger Binding="{Binding IsGroupHeader}"
+                             Value="True">
+                    <Setter Property="Background"
+                            Value="{DynamicResource Bg.SurfaceMute}" />
+                    <Setter Property="ContextMenu"
+                            Value="{x:Null}" />
+                </DataTrigger>
             </Style.Triggers>
         </Style>
 
@@ -685,6 +692,36 @@
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <Grid>
+                            <Button x:Name="GitHeader"
+                                    Style="{StaticResource Button.Ghost}"
+                                    Command="{Binding ToggleGitGroupCommand}"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Left"
+                                    Padding="4,3"
+                                    Cursor="Hand"
+                                    Visibility="Collapsed"
+                                    ToolTip="Файлы из каталогов .git – клик разворачивает или сворачивает группу">
+                                <StackPanel Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                    <iconPacks:PackIconLucide Kind="{Binding ExpandIconKind}"
+                                                              Width="13"
+                                                              Height="13"
+                                                              VerticalAlignment="Center"
+                                                              Margin="2,0,8,0"
+                                                              Foreground="{DynamicResource Fg.Muted}" />
+                                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderGit2}"
+                                                              Width="14"
+                                                              Height="14"
+                                                              VerticalAlignment="Center"
+                                                              Margin="0,0,8,0"
+                                                              Foreground="{DynamicResource Fg.Muted}" />
+                                    <TextBlock Text="{Binding GroupHeaderText}"
+                                               VerticalAlignment="Center"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource Fg.Secondary}" />
+                                </StackPanel>
+                            </Button>
+                            <Grid x:Name="DiffContent">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="60" />
@@ -826,7 +863,19 @@
                                            Margin="8,0,6,0"
                                            Visibility="{Binding DataContext.ShowSizes, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}" />
                             </Grid>
+                            </Grid>
                         </Grid>
+                        <DataTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsGroupHeader}"
+                                         Value="True">
+                                <Setter TargetName="GitHeader"
+                                        Property="Visibility"
+                                        Value="Visible" />
+                                <Setter TargetName="DiffContent"
+                                        Property="Visibility"
+                                        Value="Collapsed" />
+                            </DataTrigger>
+                        </DataTemplate.Triggers>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>

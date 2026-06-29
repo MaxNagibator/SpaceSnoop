@@ -27,6 +27,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private CancellationTokenSource? _cts;
     private bool _suppressPersist;
     private bool _gitPromptDeclined;
+    private bool _gitGroupExpanded;
     private bool _isIndeterminate = true;
     private double _progressValue;
     private double _progressMax = 1;
@@ -289,6 +290,12 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         RebuildRows();
     }
 
+    public void ToggleGitGroup()
+    {
+        _gitGroupExpanded = !_gitGroupExpanded;
+        RebuildRows();
+    }
+
     public void CollapseSubtree(DirectoryComparison dir)
     {
         AddCollapsed(dir);
@@ -368,13 +375,38 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public void ApplyProfile(SyncProfile profile)
     {
+        ApplyProfile(profile, null);
+    }
+
+    public void ApplyProfile(SyncProfile profile, ComparisonResult? comparison)
+    {
         ClearComparison();
         LeftPath = profile.Left;
         RightPath = profile.Right;
         Exclusions = profile.Exclusions;
         SelectedModeIndex = Math.Clamp(profile.Mode, 0, ModeOrder.Length - 1);
         Mirror = profile.Mirror;
-        StatusCaption = $"Профиль применён: {profile.Name}.";
+
+        if (comparison is null)
+        {
+            StatusCaption = $"Профиль применён: {profile.Name}.";
+            return;
+        }
+
+        AdoptComparison(comparison);
+        StatusCaption = $"Профиль применён: {profile.Name}. Результат сравнения перенесён.";
+    }
+
+    private void AdoptComparison(ComparisonResult comparison)
+    {
+        _result = comparison;
+        _dirSizeCache = BuildDirSizeCache(comparison.Root);
+        _outcomes = [];
+        comparison.ApplyMode(CurrentMode, Mirror);
+        CollapseAllDirectories(comparison.Root);
+        RebuildRows();
+        UpdateSummary();
+        SummaryText = "Результат сравнения перенесён со страницы «Обзор».";
     }
 
     internal static IEnumerable<FileComparison> SortFlatFiles(IEnumerable<FileComparison> files, SyncFlatSortField field, bool descending)
@@ -448,6 +480,19 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
             yield return file;
         }
+    }
+
+    internal static bool IsGitPath(string relativePath)
+    {
+        foreach (var segment in relativePath.Split('/', '\\'))
+        {
+            if (string.Equals(segment, ".git", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     internal static string AddGitExclusion(string exclusions)
@@ -1331,10 +1376,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
                 files = files.Where(file => file.RelativePath.Contains(search, StringComparison.OrdinalIgnoreCase));
             }
 
-            foreach (var file in SortFlatFiles(files, FlatSort, FlatSortDescending))
-            {
-                buffer.Add(new(file, 0, this, true) { Outcome = _outcomes.GetValueOrDefault(file) });
-            }
+            var sortedFiles = SortFlatFiles(files, FlatSort, FlatSortDescending).ToList();
 
             var dirs = CollectEmptyDirs(_result.Root, HideApplied, _outcomes);
 
@@ -1343,9 +1385,37 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
                 dirs = dirs.Where(dir => dir.RelativePath.Contains(search, StringComparison.OrdinalIgnoreCase));
             }
 
-            foreach (var dir in dirs.OrderBy(dir => dir.RelativePath, StringComparer.OrdinalIgnoreCase))
+            var sortedDirs = dirs.OrderBy(dir => dir.RelativePath, StringComparer.OrdinalIgnoreCase).ToList();
+
+            foreach (var file in sortedFiles.Where(f => !IsGitPath(f.RelativePath)))
+            {
+                buffer.Add(new(file, 0, this, true) { Outcome = _outcomes.GetValueOrDefault(file) });
+            }
+
+            foreach (var dir in sortedDirs.Where(d => !IsGitPath(d.RelativePath)))
             {
                 buffer.Add(new(dir, 0, false, 0, 0, this, true) { Outcome = _outcomes.GetValueOrDefault(dir) });
+            }
+
+            var gitFiles = sortedFiles.Where(f => IsGitPath(f.RelativePath)).ToList();
+            var gitDirs = sortedDirs.Where(d => IsGitPath(d.RelativePath)).ToList();
+
+            if (gitFiles.Count + gitDirs.Count > 0)
+            {
+                buffer.Add(SyncNodeViewModel.CreateGitHeader(gitFiles.Count + gitDirs.Count, _gitGroupExpanded, this));
+
+                if (_gitGroupExpanded)
+                {
+                    foreach (var file in gitFiles)
+                    {
+                        buffer.Add(new(file, 0, this, true) { Outcome = _outcomes.GetValueOrDefault(file) });
+                    }
+
+                    foreach (var dir in gitDirs)
+                    {
+                        buffer.Add(new(dir, 0, false, 0, 0, this, true) { Outcome = _outcomes.GetValueOrDefault(dir) });
+                    }
+                }
             }
         }
         else

@@ -66,9 +66,27 @@ public sealed partial class SyncNodeViewModel : ObservableObject
         }
     }
 
+    private SyncNodeViewModel(SyncViewModel owner, int gitCount, bool expanded)
+    {
+        _owner = owner;
+        _flat = true;
+        IsGroupHeader = true;
+        IsExpanded = expanded;
+        GroupHeaderText = $"Git-файлы ({gitCount})";
+    }
+
+    public static SyncNodeViewModel CreateGitHeader(int gitCount, bool expanded, SyncViewModel owner)
+    {
+        return new(owner, gitCount, expanded);
+    }
+
     public int Indent { get; }
 
     public bool IsExpanded { get; }
+
+    public bool IsGroupHeader { get; }
+
+    public string GroupHeaderText { get; } = string.Empty;
 
     public SyncOutcome Outcome { get; init; }
 
@@ -90,9 +108,9 @@ public sealed partial class SyncNodeViewModel : ObservableObject
 
     public bool RightAbsent => Status == ComparisonStatus.LeftOnly;
 
-    public string LeftSizeText { get; }
+    public string LeftSizeText { get; } = string.Empty;
 
-    public string RightSizeText { get; }
+    public string RightSizeText { get; } = string.Empty;
 
     public string LeftModifiedText { get; } = string.Empty;
 
@@ -336,6 +354,12 @@ public sealed partial class SyncNodeViewModel : ObservableObject
         {
             _owner.ToggleExpand(_dir);
         }
+    }
+
+    [RelayCommand]
+    private void ToggleGitGroup()
+    {
+        _owner.ToggleGitGroup();
     }
 
     [RelayCommand]
