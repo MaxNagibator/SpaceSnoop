@@ -204,20 +204,6 @@
                         <TextBlock Text="Сравнить" />
                     </StackPanel>
                 </Button>
-                <Button Style="{StaticResource Button.Secondary}"
-                        Command="{Binding HashCommand}"
-                        VerticalAlignment="Center"
-                        Margin="0,0,8,8"
-                        ToolTip="Сверить изменённые файлы по содержимому">
-                    <StackPanel Orientation="Horizontal">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Fingerprint}"
-                                                  Width="15"
-                                                  Height="15"
-                                                  VerticalAlignment="Center"
-                                                  Margin="0,0,6,0" />
-                        <TextBlock Text="Хеши" />
-                    </StackPanel>
-                </Button>
                 <Button Style="{StaticResource Button.Primary}"
                         Command="{Binding SyncCommand}"
                         VerticalAlignment="Center"
@@ -231,14 +217,6 @@
                         <TextBlock Text="Синхронизировать" />
                     </StackPanel>
                 </Button>
-
-                <ComboBox ItemsSource="{Binding Modes}"
-                          SelectedIndex="{Binding SelectedModeIndex}"
-                          Style="{StaticResource ComboBox.Toolbar}"
-                          MinWidth="172"
-                          VerticalAlignment="Center"
-                          Margin="0,0,16,8"
-                          ToolTip="Направление синхронизации" />
                 <ToggleButton Style="{StaticResource MirrorToggle}"
                               IsChecked="{Binding Mirror}"
                               IsEnabled="{Binding MirrorApplicable}"
@@ -265,50 +243,32 @@
                                                   Visibility="{Binding MirrorDeletes, Converter={StaticResource BoolToVisibility}}" />
                     </StackPanel>
                 </ToggleButton>
-                <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
-                              IsChecked="{Binding Verify}"
+                <ToggleButton x:Name="MoreToggle"
+                              Style="{StaticResource ToggleButton.Toolbar}"
                               MinWidth="0"
                               Padding="9,0"
                               VerticalAlignment="Center"
-                              Margin="0,0,16,8"
-                              ToolTip="После синхронизации сверять затронутые файлы (размер + дата) без полного пересравнения"
-                              AutomationProperties.Name="Проверять результат после синхронизации">
+                              Margin="0,0,16,8">
                     <StackPanel Orientation="Horizontal">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ShieldCheck}"
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Ellipsis}"
                                                   Width="14"
                                                   Height="14"
                                                   VerticalAlignment="Center"
                                                   Margin="0,0,6,0" />
-                        <TextBlock Text="Проверять"
+                        <TextBlock Text="Ещё"
                                    VerticalAlignment="Center" />
                     </StackPanel>
                 </ToggleButton>
                 <Grid views:StretchWrapPanel.Stretch="True"
-                      views:StretchWrapPanel.StretchWidth="480"
+                      views:StretchWrapPanel.StretchWidth="360"
                       VerticalAlignment="Center"
                       Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <Grid Grid.Column="0"
-                          VerticalAlignment="Center"
-                          Margin="0,0,16,0">
-                        <TextBox Text="{Binding Exclusions, UpdateSourceTrigger=PropertyChanged}"
-                                 Style="{StaticResource TextBox.IconField}"
-                                 Tag="{x:Static iconPacks:PackIconLucideKind.Funnel}"
-                                 ToolTip="Исключения: глоб-шаблоны через запятую, напр. bin,obj,*.tmp" />
-                        <TextBlock Text="bin,obj,*.tmp"
-                                   Margin="36,0,8,0"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource Fg.Muted}"
-                                   IsHitTestVisible="False"
-                                   Visibility="{Binding ExclusionsEmpty, Converter={StaticResource BoolToVisibility}}" />
-                    </Grid>
-
-                    <Border Grid.Column="1"
+                    <Border Grid.Column="0"
                             Padding="6,3"
                             CornerRadius="{DynamicResource Radius.M}"
                             Background="{DynamicResource Bg.Surface}"
@@ -361,7 +321,7 @@
                         </StackPanel>
                     </Border>
 
-                    <Grid Grid.Column="2"
+                    <Grid Grid.Column="1"
                           VerticalAlignment="Center"
                           Margin="0,0,0,0">
                         <Grid.ColumnDefinitions>
@@ -553,6 +513,81 @@
                     </Grid>
                 </Grid>
             </views:StretchWrapPanel>
+
+            <Popup PlacementTarget="{Binding ElementName=MoreToggle}"
+                   Placement="Bottom"
+                   IsOpen="{Binding IsChecked, ElementName=MoreToggle, Mode=TwoWay}"
+                   StaysOpen="False"
+                   AllowsTransparency="True"
+                   PopupAnimation="Fade"
+                   HorizontalOffset="0"
+                   VerticalOffset="4">
+                <Border Background="{DynamicResource Bg.Surface}"
+                        BorderBrush="{DynamicResource Border.Subtle}"
+                        BorderThickness="1"
+                        CornerRadius="{DynamicResource Radius.M}"
+                        Padding="12"
+                        MinWidth="300">
+                    <StackPanel>
+                        <TextBlock Text="Направление"
+                                   Style="{StaticResource TextBlock.Subtle}"
+                                   Margin="0,0,0,4" />
+                        <ComboBox ItemsSource="{Binding Modes}"
+                                  SelectedIndex="{Binding SelectedModeIndex}"
+                                  Style="{StaticResource ComboBox.Toolbar}"
+                                  HorizontalAlignment="Stretch"
+                                  ToolTip="Направление синхронизации" />
+                        <Button Style="{StaticResource Button.Secondary}"
+                                Command="{Binding HashCommand}"
+                                HorizontalAlignment="Stretch"
+                                Margin="0,12,0,0"
+                                ToolTip="Сверить изменённые файлы по содержимому">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Fingerprint}"
+                                                          Width="15"
+                                                          Height="15"
+                                                          VerticalAlignment="Center"
+                                                          Margin="0,0,6,0" />
+                                <TextBlock Text="Хеши" />
+                            </StackPanel>
+                        </Button>
+                        <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
+                                      IsChecked="{Binding Verify}"
+                                      MinWidth="0"
+                                      Padding="9,0"
+                                      HorizontalAlignment="Stretch"
+                                      VerticalAlignment="Center"
+                                      Margin="0,12,0,0"
+                                      ToolTip="После синхронизации сверять затронутые файлы (размер + дата) без полного пересравнения"
+                                      AutomationProperties.Name="Проверять результат после синхронизации">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ShieldCheck}"
+                                                          Width="14"
+                                                          Height="14"
+                                                          VerticalAlignment="Center"
+                                                          Margin="0,0,6,0" />
+                                <TextBlock Text="Проверять"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <TextBlock Text="Исключения"
+                                   Style="{StaticResource TextBlock.Subtle}"
+                                   Margin="0,12,0,4" />
+                        <Grid HorizontalAlignment="Stretch">
+                            <TextBox Text="{Binding Exclusions, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource TextBox.IconField}"
+                                     Tag="{x:Static iconPacks:PackIconLucideKind.Funnel}"
+                                     ToolTip="Исключения: глоб-шаблоны через запятую, напр. bin,obj,*.tmp" />
+                            <TextBlock Text="bin,obj,*.tmp"
+                                       Margin="36,0,8,0"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Fg.Muted}"
+                                       IsHitTestVisible="False"
+                                       Visibility="{Binding ExclusionsEmpty, Converter={StaticResource BoolToVisibility}}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Popup>
         </StackPanel>
     </Border>
 </UserControl>
