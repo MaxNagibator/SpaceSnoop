@@ -5,6 +5,7 @@
              xmlns:conv="clr-namespace:SpaceSnoop.Wpf.Converters"
              xmlns:controls="clr-namespace:SpaceSnoop.Wpf.Views.Scan"
              xmlns:bootstrap="clr-namespace:SpaceSnoop.Wpf.Bootstrap"
+             xmlns:behaviors="clr-namespace:SpaceSnoop.Wpf.Views.Behaviors"
              xmlns:keepshell="https://schemas.keepshell.dev/wpf"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -446,6 +447,7 @@
                       Foreground="{DynamicResource Fg.Primary}"
                       PreviewMouseRightButtonDown="OnTreeRightButtonDown"
                       SelectedItemChanged="OnTreeSelectedItemChanged"
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                       Visibility="{Binding TreeVisible, Converter={StaticResource BoolToVisibility}, FallbackValue=Visible}"
                       VirtualizingStackPanel.IsVirtualizing="True"
                       VirtualizingStackPanel.VirtualizationMode="Recycling">
@@ -474,11 +476,16 @@
                                 <ColumnDefinition Width="172" />
                             </Grid.ColumnDefinitions>
 
-                            <StackPanel Grid.Column="0"
-                                        Orientation="Horizontal"
-                                        VerticalAlignment="Center">
-                                <iconPacks:PackIconLucide Style="{StaticResource NodeIcon}" />
-                                <TextBlock Text="{Binding Name}"
+                            <Grid Grid.Column="0"
+                                  VerticalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <iconPacks:PackIconLucide Grid.Column="0"
+                                                          Style="{StaticResource NodeIcon}" />
+                                <TextBlock Grid.Column="1"
+                                           behaviors:PathTrimmer.FullPath="{Binding Name}"
                                            VerticalAlignment="Center"
                                            TextTrimming="CharacterEllipsis">
                                     <TextBlock.Style>
@@ -495,7 +502,7 @@
                                         </Style>
                                     </TextBlock.Style>
                                 </TextBlock>
-                            </StackPanel>
+                            </Grid>
 
                             <StackPanel Grid.Column="1"
                                         Orientation="Horizontal"
