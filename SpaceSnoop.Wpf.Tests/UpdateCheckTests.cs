@@ -114,6 +114,25 @@ public class UpdateCheckTests
     }
 
     [Test]
+    public void Тело_без_секции_изменений_не_тащит_таблицу_скачивания_и_статистику_в_пункты()
+    {
+        var body = """
+                   ## Скачать
+
+                   | Редакция | EXE |
+                   |----------|-----|
+                   | WPF | [![EXE](badge)](url) |
+
+                   ## Статистика
+
+                   Скачиваний: [![всего](badge)](url)
+                   """;
+
+        Assert.That(AppUpdateViewModel.ExtractChanges(body), Is.Empty);
+        Assert.That(AppUpdateViewModel.ExtractChangeItems(body), Is.Empty);
+    }
+
+    [Test]
     public void Строка_полного_списка_пропускается_в_пунктах_изменений()
     {
         var body = """

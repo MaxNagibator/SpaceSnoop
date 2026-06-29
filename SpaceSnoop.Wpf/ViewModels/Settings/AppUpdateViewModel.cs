@@ -154,8 +154,26 @@ public sealed partial class AppUpdateViewModel : ObservableObject
                 text = text[..next].Trim();
             }
         }
+        else
+        {
+            text = RemoveSection(text, "## Скачать");
+            text = RemoveSection(text, "## Статистика");
+        }
 
         return text.Replace("\n", Environment.NewLine, StringComparison.Ordinal).Trim();
+    }
+
+    private static string RemoveSection(string text, string heading)
+    {
+        var start = text.IndexOf(heading, StringComparison.OrdinalIgnoreCase);
+
+        if (start < 0)
+        {
+            return text;
+        }
+
+        var end = text.IndexOf("\n## ", start + heading.Length, StringComparison.Ordinal);
+        return (end < 0 ? text[..start] : text[..start] + text[(end + 1)..]).Trim();
     }
 
     internal static IReadOnlyList<ReleaseChangeViewModel> ExtractChangeItems(string? body)
@@ -256,14 +274,15 @@ public sealed partial class AppUpdateViewModel : ObservableObject
                 continue;
             }
 
-            var body = release.TryGetProperty("body", out var bodyProperty) ? bodyProperty.GetString()?.Trim() : null;
+            var body = release.TryGetProperty("body", out var bodyProperty) ? bodyProperty.GetString() : null;
+            var changes = ExtractChanges(body);
 
-            if (string.IsNullOrWhiteSpace(body))
+            if (string.IsNullOrWhiteSpace(changes))
             {
                 continue;
             }
 
-            notes.Add($"{tag}{Environment.NewLine}{body}");
+            notes.Add($"{tag}{Environment.NewLine}{changes}");
         }
 
         return string.Join($"{Environment.NewLine}{Environment.NewLine}", notes);
