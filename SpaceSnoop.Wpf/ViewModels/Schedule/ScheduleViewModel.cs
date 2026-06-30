@@ -1,6 +1,5 @@
 ﻿using KeepShell.Services;
 using System.Collections.ObjectModel;
-using System.IO;
 using System.Windows.Input;
 
 namespace SpaceSnoop.Wpf.ViewModels.Schedule;
@@ -219,29 +218,13 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
     {
         History.Clear();
 
-        var path = Path.Combine(AppStorage.DataDirectory, AppInfo.SyncLogFileName);
+        var lines = SyncLog.ReadTail(
+            static line => line.StartsWith('[') && line.Contains("Автосинхронизация"),
+            40);
 
-        if (!File.Exists(path))
+        foreach (var line in lines)
         {
-            OnPropertyChanged(nameof(HasHistory));
-            return;
-        }
-
-        try
-        {
-            var lines = File.ReadLines(path)
-                .Where(static line => line.StartsWith('[') && line.Contains("Автосинхронизация"))
-                .Reverse()
-                .Take(40);
-
-            foreach (var line in lines)
-            {
-                History.Add(new(line, LineHasErrors(line)));
-            }
-        }
-        catch (IOException)
-        {
-            // TODO: журнал может быть занят пишущим процессом – пропускаем, обновится позже
+            History.Add(new(line, LineHasErrors(line)));
         }
 
         OnPropertyChanged(nameof(HasHistory));

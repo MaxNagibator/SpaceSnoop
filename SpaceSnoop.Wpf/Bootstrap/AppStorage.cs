@@ -73,7 +73,6 @@ public static class AppStorage
         [
             TomlSettingsFile.PrimaryFileName,
             AppInfo.DeletionLogFileName,
-            AppInfo.SyncLogFileName,
         ];
 
         var copied = new List<string>();
@@ -87,6 +86,12 @@ public static class AppStorage
                 File.Copy(from, Path.Combine(destination, name), true);
                 copied.Add(from);
             }
+        }
+
+        foreach (var from in Directory.EnumerateFiles(source, SyncLog.FileGlob))
+        {
+            File.Copy(from, Path.Combine(destination, Path.GetFileName(from)), true);
+            copied.Add(from);
         }
 
         var logsSource = Path.Combine(source, LogsFolderName);
