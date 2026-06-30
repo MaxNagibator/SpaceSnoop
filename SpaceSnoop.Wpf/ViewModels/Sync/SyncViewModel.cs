@@ -500,11 +500,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         {
             built = await Task.Run(() => BuildContentDiff(leftPath, rightPath));
         }
-        catch (InvalidOperationException ex)
-        {
-            _dialogs.Warning("Сравнение содержимого", ex.Message);
-            return;
-        }
         catch (Exception ex)
         {
             _logger.ContentCompareFailed(ex, file.RelativePath);
@@ -514,7 +509,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         _logger.ContentCompareOpened(file.RelativePath, built.Added, built.Removed);
 
-        var dialog = new FileDiffDialogViewModel(_settings, file.Name, leftPath, rightPath, built.Lines, built.Added, built.Removed);
+        var dialog = new FileDiffDialogViewModel(_settings, file, leftPath, rightPath, built.Lines, built.Added, built.Removed, built.Unavailable);
         await _dialogs.ShowAsync(dialog);
     }
 
@@ -834,35 +829,47 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     private static FileDiffResult BuildContentDiff(string leftPath, string rightPath)
     {
-        var left = ReadTextLines(leftPath);
-        var right = ReadTextLines(rightPath);
-        var lines = TextDiff.Compute(left, right);
+        var leftInfo = new FileInfo(leftPath);
+        var rightInfo = new FileInfo(rightPath);
+
+        if (!leftInfo.Exists)
+        {
+            throw new InvalidOperationException($"Файл не найден: {leftPath}");
+        }
+
+        if (!rightInfo.Exists)
+        {
+            throw new InvalidOperationException($"Файл не найден: {rightPath}");
+        }
+
+        if (DiffUnavailable(leftInfo, out var reason) || DiffUnavailable(rightInfo, out reason))
+        {
+            return FileDiffResult.Unreadable(reason);
+        }
+
+        var lines = TextDiff.Compute(File.ReadAllLines(leftPath), File.ReadAllLines(rightPath));
         var added = lines.Count(static l => l.Kind == DiffLineKind.Added);
         var removed = lines.Count(static l => l.Kind == DiffLineKind.Removed);
-        return new(lines, added, removed);
+        return new(lines, added, removed, null);
     }
 
-    private static string[] ReadTextLines(string path)
+    // TODO: бинарь определяем по NUL-байту; кодировку доверяем File.ReadAllLines (BOM → UTF-8)
+    private static bool DiffUnavailable(FileInfo info, out string reason)
     {
-        var info = new FileInfo(path);
-
-        if (!info.Exists)
-        {
-            throw new InvalidOperationException($"Файл не найден: {path}");
-        }
-
         if (info.Length > MaxDiffBytes)
         {
-            throw new InvalidOperationException("Файл слишком велик для построчного сравнения (> 5 МБ).");
+            reason = "Файл велик для построчного сравнения (> 5 МБ) – показано только сводное различие.";
+            return true;
         }
 
-        // TODO: бинарь определяем по NUL-байту; кодировку доверяем File.ReadAllLines (BOM → UTF-8)
-        if (Array.IndexOf(File.ReadAllBytes(path), (byte)0) >= 0)
+        if (Array.IndexOf(File.ReadAllBytes(info.FullName), (byte)0) >= 0)
         {
-            throw new InvalidOperationException("Файл выглядит двоичным – построчное сравнение недоступно.");
+            reason = "Файл выглядит двоичным – построчное сравнение недоступно, показано сводное различие.";
+            return true;
         }
 
-        return File.ReadAllLines(path);
+        reason = string.Empty;
+        return false;
     }
 
     private static bool PathMissing(string path)
@@ -2147,5 +2154,11 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     private sealed record ComparePreparation(ComparisonResult Result, Dictionary<DirectoryComparison, (long Left, long Right)> Sizes);
 
-    private sealed record FileDiffResult(IReadOnlyList<DiffLine> Lines, int Added, int Removed);
+    private sealed record FileDiffResult(IReadOnlyList<DiffLine> Lines, int Added, int Removed, string? Unavailable)
+    {
+        public static FileDiffResult Unreadable(string reason)
+        {
+            return new([], 0, 0, reason);
+        }
+    }
 }

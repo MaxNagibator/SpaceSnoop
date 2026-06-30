@@ -9,25 +9,33 @@ public sealed partial class FileDiffDialogViewModel : ObservableObject, IDialogV
 {
     private readonly ISettingsStore _settings;
     private readonly IReadOnlyList<DiffLine> _lines;
+    private readonly FileComparison _file;
+    private readonly string? _unavailable;
     private readonly HashSet<int> _expanded = [];
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowSideBySideHeaders))]
+    [NotifyPropertyChangedFor(nameof(UnifiedHint))]
     private bool _unified;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CollapseAllText))]
     [NotifyPropertyChangedFor(nameof(CollapseAllIconKind))]
+    [NotifyPropertyChangedFor(nameof(CollapseAllHint))]
     private bool _collapseUnchanged;
 
-    public FileDiffDialogViewModel(ISettingsStore settings, string name, string leftPath, string rightPath, IReadOnlyList<DiffLine> lines, int added, int removed)
+    public FileDiffDialogViewModel(ISettingsStore settings, FileComparison file, string leftPath, string rightPath, IReadOnlyList<DiffLine> lines, int added, int removed, string? unavailable)
     {
         _settings = settings;
-        Name = name;
+        _file = file;
+        _unavailable = unavailable;
+        Name = file.Name;
         LeftPath = leftPath;
         RightPath = rightPath;
         _lines = lines;
         Added = added;
         Removed = removed;
+        Summary = BuildSummary(file, unavailable, Added > 0 || Removed > 0);
 
         _unified = settings.GetBool(SettingsKeys.SyncDiffUnified);
         _collapseUnchanged = settings.GetBool(SettingsKeys.SyncDiffCollapse, AppDefaults.SyncDiffCollapseDefault);
@@ -51,11 +59,71 @@ public sealed partial class FileDiffDialogViewModel : ObservableObject, IDialogV
 
     public bool HasChanges => Added > 0 || Removed > 0;
 
+    public bool LinesUnavailable => _unavailable is not null;
+
+    public bool HasLineView => !LinesUnavailable;
+
+    public bool ShowSideBySideHeaders => !Unified && !LinesUnavailable;
+
+    public bool IsIdentical => !HasChanges && !LinesUnavailable && _file.Status == ComparisonStatus.Identical;
+
+    public string Summary { get; }
+
+    public bool HasSummary => Summary.Length > 0;
+
     public ObservableCollection<object> Items { get; } = [];
 
     public string CollapseAllText => CollapseUnchanged ? "Развернуть всё" : "Свернуть всё";
 
+    public string CollapseAllHint => CollapseUnchanged
+        ? "Показать все скрытые неизменные строки целиком"
+        : "Свернуть неизменные строки, оставив контекст вокруг изменений";
+
+    public string UnifiedHint => Unified
+        ? "Вернуться к двум колонкам – слева и справа"
+        : "Объединить в один столбец с пометками «+/−» (unified diff)";
+
     public PackIconLucideKind CollapseAllIconKind => CollapseUnchanged ? PackIconLucideKind.UnfoldVertical : PackIconLucideKind.FoldVertical;
+
+    public static string DescribeHiddenDifference(FileComparison file)
+    {
+        var sizeDelta = Math.Abs((file.LeftSize ?? 0) - (file.RightSize ?? 0));
+        var timeDelta = file is { LeftModified: { } left, RightModified: { } right } ? (left - right).Duration() : TimeSpan.Zero;
+        var timeDiffers = timeDelta > DirectoryComparer.FatTimestampTolerance;
+
+        if (sizeDelta > 0 && timeDiffers)
+        {
+            return $"Размер отличается на {SizeFormatter.Format(sizeDelta)}, время – на {SyncNodeViewModel.FormatDelta(timeDelta)}.";
+        }
+
+        if (sizeDelta > 0)
+        {
+            return $"Размер отличается на {SizeFormatter.Format(sizeDelta)} при совпадающих строках – вероятно, разные переводы строк (CRLF/LF), BOM или кодировка.";
+        }
+
+        if (timeDiffers)
+        {
+            return $"Размер совпадает, отличается только время изменения (Δ {SyncNodeViewModel.FormatDelta(timeDelta)}) – копирование меняет метку, на содержимое не влияет.";
+        }
+
+        return "Размер и строки совпадают – различие в служебных метаданных файла.";
+    }
+
+    private static string BuildSummary(FileComparison file, string? unavailable, bool hasChanges)
+    {
+        if (unavailable is not null)
+        {
+            var reason = DescribeHiddenDifference(file);
+            return reason.Length == 0 ? unavailable : $"{unavailable} {reason}";
+        }
+
+        if (!hasChanges && file.Status != ComparisonStatus.Identical)
+        {
+            return DescribeHiddenDifference(file);
+        }
+
+        return string.Empty;
+    }
 
     [RelayCommand]
     private void ToggleCollapseAll()

@@ -72,6 +72,34 @@ public static class TextDiff
         return segments;
     }
 
+    public static (IReadOnlyList<DiffSpan> Left, IReadOnlyList<DiffSpan> Right) HighlightInline(DiffRow row)
+    {
+        if (row.LeftKind != DiffLineKind.Removed || row.RightKind != DiffLineKind.Added)
+        {
+            return (Whole(row.LeftText), Whole(row.RightText));
+        }
+
+        var left = row.LeftText;
+        var right = row.RightText;
+        var min = Math.Min(left.Length, right.Length);
+
+        var prefix = 0;
+
+        while (prefix < min && left[prefix] == right[prefix])
+        {
+            prefix++;
+        }
+
+        var suffix = 0;
+
+        while (suffix < min - prefix && left[left.Length - 1 - suffix] == right[right.Length - 1 - suffix])
+        {
+            suffix++;
+        }
+
+        return (BuildSpans(left, prefix, suffix), BuildSpans(right, prefix, suffix));
+    }
+
     public static IReadOnlyList<DiffRow> ToSideBySide(IReadOnlyList<DiffLine> lines)
     {
         var rows = new List<DiffRow>(lines.Count);
@@ -120,6 +148,40 @@ public static class TextDiff
 
         Flush();
         return rows;
+    }
+
+    private static IReadOnlyList<DiffSpan> Whole(string text)
+    {
+        return [new(text, false)];
+    }
+
+    private static IReadOnlyList<DiffSpan> BuildSpans(string text, int prefix, int suffix)
+    {
+        var spans = new List<DiffSpan>(3);
+
+        if (prefix > 0)
+        {
+            spans.Add(new(text[..prefix], false));
+        }
+
+        var midLength = text.Length - prefix - suffix;
+
+        if (midLength > 0)
+        {
+            spans.Add(new(text.Substring(prefix, midLength), true));
+        }
+
+        if (suffix > 0)
+        {
+            spans.Add(new(text[^suffix..], false));
+        }
+
+        if (spans.Count == 0)
+        {
+            spans.Add(new(string.Empty, false));
+        }
+
+        return spans;
     }
 
     private static void AddContextRun(List<DiffSegment> segments, int start, int end, int total, int context, IReadOnlySet<int> expanded)

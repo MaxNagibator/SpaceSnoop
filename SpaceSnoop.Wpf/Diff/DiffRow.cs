@@ -6,4 +6,9 @@ public sealed record DiffRow(
     string LeftText,
     DiffLineKind RightKind,
     string RightNumberText,
-    string RightText);
+    string RightText)
+{
+    public IReadOnlyList<DiffSpan> LeftSpans => TextDiff.HighlightInline(this).Left;
+
+    public IReadOnlyList<DiffSpan> RightSpans => TextDiff.HighlightInline(this).Right;
+}

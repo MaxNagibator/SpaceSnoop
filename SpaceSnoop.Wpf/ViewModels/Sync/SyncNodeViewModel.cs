@@ -281,6 +281,23 @@ public sealed partial class SyncNodeViewModel : ObservableObject
         OnPropertyChanged(nameof(ActionHint));
     }
 
+    internal static string FormatDelta(TimeSpan delta)
+    {
+        var d = delta.Duration();
+
+        if (d.TotalSeconds < 60)
+        {
+            return $"{(int)Math.Round(d.TotalSeconds)} с";
+        }
+
+        if (d.TotalMinutes < 60)
+        {
+            return $"{(int)Math.Round(d.TotalMinutes)} мин";
+        }
+
+        return $"{d.TotalHours:0.#} ч";
+    }
+
     private static PackIconLucideKind IconFor(SyncAction action)
     {
         return action switch
@@ -336,23 +353,6 @@ public sealed partial class SyncNodeViewModel : ObservableObject
     private static string FormatModified(DateTime? value)
     {
         return value is { } dt ? dt.ToString("yyyy-MM-dd HH:mm:ss") : string.Empty;
-    }
-
-    private static string FormatDelta(TimeSpan delta)
-    {
-        var d = delta.Duration();
-
-        if (d.TotalSeconds < 60)
-        {
-            return $"{(int)Math.Round(d.TotalSeconds)} с";
-        }
-
-        if (d.TotalMinutes < 60)
-        {
-            return $"{(int)Math.Round(d.TotalMinutes)} мин";
-        }
-
-        return $"{d.TotalHours:0.#} ч";
     }
 
     [RelayCommand]

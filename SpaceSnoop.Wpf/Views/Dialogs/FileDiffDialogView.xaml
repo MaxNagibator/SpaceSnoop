@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Dialogs"
              xmlns:diff="clr-namespace:SpaceSnoop.Wpf.Diff"
+             xmlns:behaviors="clr-namespace:SpaceSnoop.Wpf.Behaviors"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -14,13 +15,17 @@
              MinHeight="560">
 
     <UserControl.Resources>
-        <!-- TODO: фиксированные тинты – в теме нет subtle-фон токенов для +/−; апгрейд на токены KeepShell, если появятся -->
+        <!-- TODO: фиксированные тинты под схему направлений дерева (левое/удалено = зелёный Success как LeftOnly, правое/добавлено = синий Info как RightOnly); в теме нет subtle-фон токенов для +/−, апгрейд на токены KeepShell, если появятся -->
         <SolidColorBrush x:Key="Diff.AddedBg"
-                         Color="#3327C93F" />
+                         Color="#333B82F6" />
         <SolidColorBrush x:Key="Diff.RemovedBg"
-                         Color="#33F04438" />
+                         Color="#3327C93F" />
         <SolidColorBrush x:Key="Diff.EmptyBg"
                          Color="#14808080" />
+        <SolidColorBrush x:Key="Diff.AddedStrong"
+                         Color="#663B82F6" />
+        <SolidColorBrush x:Key="Diff.RemovedStrong"
+                         Color="#6627C93F" />
 
         <Style x:Key="DiffNum"
                TargetType="TextBlock">
@@ -60,6 +65,8 @@
                     Value="{DynamicResource Font.Mono}" />
             <Setter Property="FontSize"
                     Value="{DynamicResource Font.Size.S}" />
+            <Setter Property="FontWeight"
+                    Value="Bold" />
             <Setter Property="Foreground"
                     Value="{DynamicResource Fg.Muted}" />
             <Setter Property="TextAlignment"
@@ -70,12 +77,12 @@
                 <DataTrigger Binding="{Binding Kind}"
                              Value="Added">
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Success}" />
+                            Value="{DynamicResource State.Info}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Kind}"
                              Value="Removed">
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Error}" />
+                            Value="{DynamicResource State.Success}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -185,26 +192,27 @@
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center"
                             Margin="14,0,0,0"
+                            ToolTip="«−N» – строки есть слева, но нет справа; «+N» – есть справа, но нет слева. Показана разница сторон, а не направление синхронизации."
                             Visibility="{Binding HasChanges, Converter={StaticResource BoolToVisibility}}">
-                    <TextBlock Text="{Binding Added, StringFormat=+{0}}"
+                    <TextBlock Text="{Binding Removed, StringFormat=−{0}}"
                                FontFamily="{DynamicResource Font.Mono}"
                                FontSize="{DynamicResource Font.Size.S}"
                                FontWeight="Medium"
                                VerticalAlignment="Center"
                                Margin="0,0,8,0"
                                Foreground="{DynamicResource State.Success}" />
-                    <TextBlock Text="{Binding Removed, StringFormat=−{0}}"
+                    <TextBlock Text="{Binding Added, StringFormat=+{0}}"
                                FontFamily="{DynamicResource Font.Mono}"
                                FontSize="{DynamicResource Font.Size.S}"
                                FontWeight="Medium"
                                VerticalAlignment="Center"
-                               Foreground="{DynamicResource State.Error}" />
+                               Foreground="{DynamicResource State.Info}" />
                 </StackPanel>
                 <TextBlock Text="Файлы идентичны"
                            Style="{StaticResource TextBlock.Subtle}"
                            VerticalAlignment="Center"
                            Margin="14,0,0,0"
-                           Visibility="{Binding HasChanges, Converter={StaticResource InverseBoolToVisibility}}" />
+                           Visibility="{Binding IsIdentical, Converter={StaticResource BoolToVisibility}}" />
             </StackPanel>
 
             <StackPanel Grid.Column="1"
@@ -216,7 +224,7 @@
                         Padding="9,0"
                         Margin="0,0,8,0"
                         VerticalAlignment="Center"
-                        ToolTip="Развернуть или свернуть все неизменные области"
+                        ToolTip="{Binding CollapseAllHint}"
                         AutomationProperties.Name="{Binding CollapseAllText}">
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Kind="{Binding CollapseAllIconKind}"
@@ -234,7 +242,7 @@
                               MinWidth="0"
                               Padding="9,0"
                               VerticalAlignment="Center"
-                              ToolTip="Объединённый вид (unified diff)"
+                              ToolTip="{Binding UnifiedHint}"
                               AutomationProperties.Name="Объединённый вид">
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Rows3}"
@@ -249,35 +257,58 @@
             </StackPanel>
         </Grid>
 
-        <Grid Grid.Row="1"
-              Margin="0,12,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-            <TextBlock Grid.Column="0"
-                       Text="{Binding LeftPath}"
-                       Style="{StaticResource TextBlock.Subtle}"
-                       TextTrimming="CharacterEllipsis"
-                       ToolTip="{Binding LeftPath}" />
-            <iconPacks:PackIconLucide Grid.Column="1"
-                                      Kind="{x:Static iconPacks:PackIconLucideKind.ArrowRight}"
-                                      Width="13"
-                                      Height="13"
-                                      VerticalAlignment="Center"
-                                      Margin="10,0"
-                                      Foreground="{DynamicResource Fg.Muted}" />
-            <TextBlock Grid.Column="2"
-                       Text="{Binding RightPath}"
-                       Style="{StaticResource TextBlock.Subtle}"
-                       TextTrimming="CharacterEllipsis"
-                       ToolTip="{Binding RightPath}" />
-        </Grid>
+        <StackPanel Grid.Row="1"
+                    Margin="0,12,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           Text="{Binding LeftPath}"
+                           Style="{StaticResource TextBlock.Subtle}"
+                           TextTrimming="CharacterEllipsis"
+                           ToolTip="{Binding LeftPath, StringFormat='Левая сторона: {0}'}" />
+                <iconPacks:PackIconLucide Grid.Column="1"
+                                          Kind="{x:Static iconPacks:PackIconLucideKind.ArrowRight}"
+                                          Width="13"
+                                          Height="13"
+                                          VerticalAlignment="Center"
+                                          Margin="10,0"
+                                          Foreground="{DynamicResource Fg.Muted}" />
+                <TextBlock Grid.Column="2"
+                           Text="{Binding RightPath}"
+                           Style="{StaticResource TextBlock.Subtle}"
+                           TextTrimming="CharacterEllipsis"
+                           ToolTip="{Binding RightPath, StringFormat='Правая сторона: {0}'}" />
+            </Grid>
+
+            <Border Margin="0,12,0,0"
+                    Padding="10,7"
+                    CornerRadius="{DynamicResource Radius.S}"
+                    Background="{DynamicResource Bg.SurfaceAlt}"
+                    BorderBrush="{DynamicResource Border.Subtle}"
+                    BorderThickness="1"
+                    Visibility="{Binding HasSummary, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Info}"
+                                              Width="14"
+                                              Height="14"
+                                              VerticalAlignment="Top"
+                                              Margin="0,1,8,0"
+                                              Foreground="{DynamicResource State.Info}" />
+                    <TextBlock Text="{Binding Summary}"
+                               Style="{StaticResource TextBlock.Subtle}"
+                               TextWrapping="Wrap"
+                               MaxWidth="860" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
 
         <Grid Grid.Row="2"
               Margin="0,14,0,0"
-              Visibility="{Binding Unified, Converter={StaticResource InverseBoolToVisibility}}">
+              Visibility="{Binding ShowSideBySideHeaders, Converter={StaticResource BoolToVisibility}}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="44" />
                 <ColumnDefinition Width="*" />
@@ -299,108 +330,132 @@
                 Style="{StaticResource Card.Inset}"
                 Padding="0"
                 Margin="0,6,0,0">
-            <ListBox ItemsSource="{Binding Items}"
-                     Background="Transparent"
-                     BorderThickness="0"
-                     Padding="0,4"
-                     Foreground="{DynamicResource Fg.Primary}"
-                     ItemContainerStyle="{StaticResource DiffRowContainer}"
-                     HorizontalContentAlignment="Stretch"
-                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                     ScrollViewer.VerticalScrollBarVisibility="Auto"
-                     VirtualizingStackPanel.IsVirtualizing="True"
-                     VirtualizingStackPanel.VirtualizationMode="Recycling">
-                <ListBox.Resources>
-                    <DataTemplate DataType="{x:Type diff:DiffRow}">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="44" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="1" />
-                                <ColumnDefinition Width="44" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
+            <Grid>
+                <StackPanel VerticalAlignment="Center"
+                            HorizontalAlignment="Center"
+                            Margin="24"
+                            Visibility="{Binding LinesUnavailable, Converter={StaticResource BoolToVisibility}}">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FileQuestionMark}"
+                                              Width="28"
+                                              Height="28"
+                                              HorizontalAlignment="Center"
+                                              Margin="0,0,0,10"
+                                              Foreground="{DynamicResource Fg.Muted}" />
+                    <TextBlock Text="Построчное сравнение недоступно"
+                               Style="{StaticResource TextBlock.Subtle}"
+                               HorizontalAlignment="Center" />
+                </StackPanel>
+                <ListBox ItemsSource="{Binding Items}"
+                         Visibility="{Binding HasLineView, Converter={StaticResource BoolToVisibility}}"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         Padding="0,4"
+                         Foreground="{DynamicResource Fg.Primary}"
+                         ItemContainerStyle="{StaticResource DiffRowContainer}"
+                         HorizontalContentAlignment="Stretch"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         VirtualizingStackPanel.IsVirtualizing="True"
+                         VirtualizingStackPanel.VirtualizationMode="Recycling">
+                    <ListBox.Resources>
+                        <DataTemplate DataType="{x:Type diff:DiffRow}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="44" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="1" />
+                                    <ColumnDefinition Width="44" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
 
-                            <Border Grid.Column="0"
-                                    Grid.ColumnSpan="2"
-                                    Style="{StaticResource LeftCell}" />
-                            <Border Grid.Column="3"
-                                    Grid.ColumnSpan="2"
-                                    Style="{StaticResource RightCell}" />
+                                <Border Grid.Column="0"
+                                        Grid.ColumnSpan="2"
+                                        Style="{StaticResource LeftCell}" />
+                                <Border Grid.Column="3"
+                                        Grid.ColumnSpan="2"
+                                        Style="{StaticResource RightCell}" />
 
-                            <TextBlock Grid.Column="0"
-                                       Text="{Binding LeftNumberText}"
-                                       Style="{StaticResource DiffNum}" />
-                            <TextBlock Grid.Column="1"
-                                       Text="{Binding LeftText}"
-                                       Style="{StaticResource DiffText}"
-                                       ToolTip="{Binding LeftText}" />
-                            <Border Grid.Column="2"
-                                    Background="{DynamicResource Border.Subtle}" />
-                            <TextBlock Grid.Column="3"
-                                       Text="{Binding RightNumberText}"
-                                       Style="{StaticResource DiffNum}" />
-                            <TextBlock Grid.Column="4"
-                                       Text="{Binding RightText}"
-                                       Style="{StaticResource DiffText}"
-                                       ToolTip="{Binding RightText}" />
-                        </Grid>
-                    </DataTemplate>
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding LeftNumberText}"
+                                           Style="{StaticResource DiffNum}" />
+                                <TextBlock Grid.Column="1"
+                                           behaviors:DiffInline.Spans="{Binding LeftSpans}"
+                                           behaviors:DiffInline.ChangedBrush="{StaticResource Diff.RemovedStrong}"
+                                           Style="{StaticResource DiffText}"
+                                           ToolTip="{Binding LeftText}" />
+                                <Border Grid.Column="2"
+                                        Background="{DynamicResource Border.Subtle}" />
+                                <TextBlock Grid.Column="3"
+                                           Text="{Binding RightNumberText}"
+                                           Style="{StaticResource DiffNum}" />
+                                <TextBlock Grid.Column="4"
+                                           behaviors:DiffInline.Spans="{Binding RightSpans}"
+                                           behaviors:DiffInline.ChangedBrush="{StaticResource Diff.AddedStrong}"
+                                           Style="{StaticResource DiffText}"
+                                           ToolTip="{Binding RightText}" />
+                            </Grid>
+                        </DataTemplate>
 
-                    <DataTemplate DataType="{x:Type diff:DiffLine}">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="40" />
-                                <ColumnDefinition Width="40" />
-                                <ColumnDefinition Width="16" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
+                        <DataTemplate DataType="{x:Type diff:DiffLine}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="40" />
+                                    <ColumnDefinition Width="40" />
+                                    <ColumnDefinition Width="22" />
+                                    <ColumnDefinition Width="1" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
 
-                            <Border Grid.Column="0"
-                                    Grid.ColumnSpan="4"
-                                    Style="{StaticResource UnifiedCell}" />
+                                <Border Grid.Column="0"
+                                        Grid.ColumnSpan="5"
+                                        Style="{StaticResource UnifiedCell}" />
 
-                            <TextBlock Grid.Column="0"
-                                       Text="{Binding LeftNumberText}"
-                                       Style="{StaticResource DiffNum}" />
-                            <TextBlock Grid.Column="1"
-                                       Text="{Binding RightNumberText}"
-                                       Style="{StaticResource DiffNum}" />
-                            <TextBlock Grid.Column="2"
-                                       Text="{Binding Sign}"
-                                       Style="{StaticResource DiffSign}" />
-                            <TextBlock Grid.Column="3"
-                                       Text="{Binding Text}"
-                                       Style="{StaticResource DiffText}"
-                                       ToolTip="{Binding Text}" />
-                        </Grid>
-                    </DataTemplate>
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding LeftNumberText}"
+                                           Style="{StaticResource DiffNum}" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding RightNumberText}"
+                                           Style="{StaticResource DiffNum}" />
+                                <TextBlock Grid.Column="2"
+                                           Text="{Binding Sign}"
+                                           Style="{StaticResource DiffSign}" />
+                                <Border Grid.Column="3"
+                                        Background="{DynamicResource Border.Subtle}" />
+                                <TextBlock Grid.Column="4"
+                                           Text="{Binding Text}"
+                                           Style="{StaticResource DiffText}"
+                                           Margin="6,0,0,0"
+                                           ToolTip="{Binding Text}" />
+                            </Grid>
+                        </DataTemplate>
 
-                    <DataTemplate DataType="{x:Type diff:DiffGap}">
-                        <Button Style="{StaticResource Button.Ghost}"
-                                HorizontalAlignment="Stretch"
-                                HorizontalContentAlignment="Center"
-                                Padding="0,3"
-                                Command="{Binding DataContext.ExpandGapCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
-                                CommandParameter="{Binding}"
-                                ToolTip="Показать скрытые строки">
-                            <StackPanel Orientation="Horizontal"
-                                        HorizontalAlignment="Center">
-                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.UnfoldVertical}"
-                                                          Width="13"
-                                                          Height="13"
-                                                          VerticalAlignment="Center"
-                                                          Margin="0,0,6,0"
-                                                          Foreground="{DynamicResource Fg.Muted}" />
-                                <TextBlock Text="{Binding Count, StringFormat='Скрыто строк: {0}'}"
-                                           FontSize="{DynamicResource Font.Size.Caption}"
-                                           Foreground="{DynamicResource Fg.Muted}"
-                                           VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Button>
-                    </DataTemplate>
-                </ListBox.Resources>
-            </ListBox>
+                        <DataTemplate DataType="{x:Type diff:DiffGap}">
+                            <Button Style="{StaticResource Button.Ghost}"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Center"
+                                    Padding="0,3"
+                                    Command="{Binding DataContext.ExpandGapCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                    CommandParameter="{Binding}"
+                                    ToolTip="Нажмите, чтобы развернуть скрытый неизменный фрагмент">
+                                <StackPanel Orientation="Horizontal"
+                                            HorizontalAlignment="Center">
+                                    <iconPacks:PackIconLucide
+                                        Kind="{x:Static iconPacks:PackIconLucideKind.UnfoldVertical}"
+                                        Width="13"
+                                        Height="13"
+                                        VerticalAlignment="Center"
+                                        Margin="0,0,6,0"
+                                        Foreground="{DynamicResource Fg.Muted}" />
+                                    <TextBlock Text="{Binding Count, StringFormat='Скрыто строк: {0}'}"
+                                               FontSize="{DynamicResource Font.Size.Caption}"
+                                               Foreground="{DynamicResource Fg.Muted}"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ListBox.Resources>
+                </ListBox>
+            </Grid>
         </Border>
 
         <Grid Grid.Row="4"
