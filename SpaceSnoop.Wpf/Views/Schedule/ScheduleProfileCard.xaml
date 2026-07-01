@@ -122,21 +122,25 @@
                         Padding="10,6"
                         Margin="0,8,0,0"
                         Visibility="{Binding MirrorWarning, Converter={StaticResource BoolToVisibility}}">
-                    <StackPanel Orientation="Horizontal">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <iconPacks:PackIconLucide Grid.Column="0"
+                                                  Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
                                                   Width="15"
                                                   Height="15"
                                                   VerticalAlignment="Top"
                                                   Margin="0,1,9,0"
                                                   Foreground="{DynamicResource State.Warning}" />
                         <TextBlock
+                            Grid.Column="1"
                             Text="Включено «Зеркало»: лишние файлы на приёмнике удаляются в корзину без подтверждения."
                             TextWrapping="Wrap"
-                            MaxWidth="520"
-                            HorizontalAlignment="Left"
                             FontSize="{DynamicResource Font.Size.S}"
                             Foreground="{DynamicResource Fg.Secondary}" />
-                    </StackPanel>
+                    </Grid>
                 </Border>
 
                 <Border Background="{DynamicResource State.WarningSoft}"
@@ -144,21 +148,25 @@
                         Padding="10,6"
                         Margin="0,8,0,0"
                         Visibility="{Binding IsStale, Converter={StaticResource BoolToVisibility}}">
-                    <StackPanel Orientation="Horizontal">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <iconPacks:PackIconLucide Grid.Column="0"
+                                                  Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
                                                   Width="15"
                                                   Height="15"
                                                   VerticalAlignment="Top"
                                                   Margin="0,1,9,0"
                                                   Foreground="{DynamicResource State.Warning}" />
                         <TextBlock
+                            Grid.Column="1"
                             Text="Задача указывает на другой файл программы (вероятно, старую версию). Откройте профиль и сохраните, чтобы привязать к текущей."
                             TextWrapping="Wrap"
-                            MaxWidth="520"
-                            HorizontalAlignment="Left"
                             FontSize="{DynamicResource Font.Size.S}"
                             Foreground="{DynamicResource Fg.Secondary}" />
-                    </StackPanel>
+                    </Grid>
                 </Border>
 
                 <StackPanel Orientation="Horizontal"
