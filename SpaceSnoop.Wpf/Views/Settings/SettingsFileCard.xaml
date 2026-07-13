@@ -1,7 +1,7 @@
 ﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Settings.SettingsFileCard"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Settings"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -27,7 +27,7 @@
                       Margin="0,14,0,0"
                       VerticalAlignment="Center" />
             <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="По умолчанию настройки, логи и журналы лежат рядом с программой. Включите, чтобы хранить их в %LOCALAPPDATA%\SpaceSnoop. Смена расположения перезапустит приложение." />
+                       Text="По умолчанию настройки, логи и журналы хранятся в %LOCALAPPDATA%\SpaceSnoop. Выключите, чтобы держать их рядом с программой (portable-режим). Смена расположения перезапустит приложение." />
             <TextBlock Text="{Binding DataDirectory}"
                        Style="{StaticResource TextBlock.Mono}"
                        Margin="0,8,0,0"

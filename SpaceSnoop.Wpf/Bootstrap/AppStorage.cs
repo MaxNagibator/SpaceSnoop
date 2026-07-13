@@ -6,11 +6,18 @@ public static class AppStorage
 {
     public const string LogsFolderName = "logs";
 
-    private const string MarkerFileName = "appdata.flag";
+    private const string PortableMarkerFileName = "portable.flag";
 
-    private static readonly string MarkerPath = Path.Combine(AppContext.BaseDirectory, MarkerFileName);
+    private const string LegacyAppDataMarkerFileName = "appdata.flag";
 
-    public static bool UseAppData { get; } = File.Exists(MarkerPath);
+    private static readonly string PortableMarkerPath = Path.Combine(AppContext.BaseDirectory, PortableMarkerFileName);
+
+    private static readonly string LegacyAppDataMarkerPath = Path.Combine(AppContext.BaseDirectory, LegacyAppDataMarkerFileName);
+
+    public static bool UseAppData { get; } = Resolve(
+        File.Exists(PortableMarkerPath),
+        File.Exists(LegacyAppDataMarkerPath),
+        File.Exists(Path.Combine(AppContext.BaseDirectory, TomlSettingsFile.PrimaryFileName)));
 
     public static string PortableDirectory => AppContext.BaseDirectory;
 
@@ -24,16 +31,33 @@ public static class AppStorage
         return useAppData ? AppDataDirectory : PortableDirectory;
     }
 
+    internal static bool Resolve(bool portableMarker, bool legacyAppDataMarker, bool legacyPortableData)
+    {
+        if (portableMarker)
+        {
+            return false;
+        }
+
+        if (legacyAppDataMarker)
+        {
+            return true;
+        }
+
+        return !legacyPortableData;
+    }
+
     public static void SetUseAppData(bool useAppData)
     {
         if (useAppData)
         {
-            File.WriteAllText(MarkerPath, string.Empty);
+            File.Delete(PortableMarkerPath);
         }
-        else if (File.Exists(MarkerPath))
+        else
         {
-            File.Delete(MarkerPath);
+            File.WriteAllText(PortableMarkerPath, string.Empty);
         }
+
+        File.Delete(LegacyAppDataMarkerPath);
     }
 
     public static void Migrate(string source, string destination)
@@ -49,8 +73,9 @@ public static class AppStorage
         [
             TomlSettingsFile.PrimaryFileName,
             AppInfo.DeletionLogFileName,
-            AppInfo.SyncLogFileName,
         ];
+
+        var copied = new List<string>();
 
         foreach (var name in files)
         {
@@ -59,21 +84,46 @@ public static class AppStorage
             if (File.Exists(from))
             {
                 File.Copy(from, Path.Combine(destination, name), true);
+                copied.Add(from);
             }
+        }
+
+        foreach (var from in Directory.EnumerateFiles(source, SyncLog.FileGlob))
+        {
+            File.Copy(from, Path.Combine(destination, Path.GetFileName(from)), true);
+            copied.Add(from);
         }
 
         var logsSource = Path.Combine(source, LogsFolderName);
 
-        if (!Directory.Exists(logsSource))
+        if (Directory.Exists(logsSource))
         {
-            return;
+            var logsDestination = EnsureExists(Path.Combine(destination, LogsFolderName));
+
+            foreach (var file in Directory.GetFiles(logsSource))
+            {
+                File.Copy(file, Path.Combine(logsDestination, Path.GetFileName(file)), true);
+                copied.Add(file);
+            }
         }
 
-        var logsDestination = EnsureExists(Path.Combine(destination, LogsFolderName));
-
-        foreach (var file in Directory.GetFiles(logsSource))
+        foreach (var file in copied)
         {
-            File.Copy(file, Path.Combine(logsDestination, Path.GetFileName(file)), true);
+            TryDelete(file);
+        }
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
         }
     }
 

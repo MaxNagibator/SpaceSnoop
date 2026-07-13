@@ -4,6 +4,7 @@ public static class SectionKey
 {
     public const string Scan = "scan";
     public const string Sync = "sync";
+    public const string Overview = "overview";
     public const string Schedule = "schedule";
     public const string Docker = "docker";
     public const string Logs = "logs";

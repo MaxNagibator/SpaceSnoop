@@ -52,9 +52,9 @@ internal sealed class HeadlessSync
             return 2;
         }
 
-        if (!Directory.Exists(left) || !Directory.Exists(right))
+        if (SyncProfile.SourceMissing(left, right, mode))
         {
-            logger.HeadlessSyncAborted("каталог недоступен");
+            logger.HeadlessSyncAborted("каталог-источник недоступен");
             return 3;
         }
 
@@ -142,10 +142,7 @@ internal sealed class HeadlessSync
     {
         try
         {
-            var path = Path.Combine(AppStorage.DataDirectory, AppInfo.SyncLogFileName);
-            using var writer = new StreamWriter(path, true);
-            writer.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Автосинхронизация [{name}]: {report.SuccessCount} успешно, {report.Errors.Count} ошибок");
-            report.WriteDetails(writer);
+            SyncLog.Append($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Автосинхронизация [{name}]: {report.SuccessCount} успешно, {report.Errors.Count} ошибок", report);
         }
         catch (Exception exception)
         {

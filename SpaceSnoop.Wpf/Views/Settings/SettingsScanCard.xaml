@@ -1,7 +1,7 @@
 ﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Settings.SettingsScanCard"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Settings"
              xmlns:bootstrap="clr-namespace:SpaceSnoop.Wpf.Bootstrap"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -76,6 +76,13 @@
                         IsSnapToTickEnabled="True"
                         Margin="0,6,0,0" />
             </StackPanel>
+
+            <CheckBox Content="Выделять файлы в проводнике, не запускать"
+                      IsChecked="{Binding Scan.RevealFiles, Mode=TwoWay}"
+                      Margin="0,16,0,0"
+                      VerticalAlignment="Center" />
+            <TextBlock Style="{StaticResource Setting.Hint}"
+                       Text="При открытии файла из дерева проводник подсвечивает его в папке. Выключите, чтобы файл открывался программой по умолчанию (исполняемые при этом запускаются)." />
         </StackPanel>
     </Border>
 </UserControl>

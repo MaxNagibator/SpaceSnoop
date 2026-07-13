@@ -1,7 +1,7 @@
 ﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Schedule.ScheduleProfileCard"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Sync"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -37,7 +37,7 @@
             <Style x:Key="Schedule.StatField"
                    TargetType="StackPanel">
                 <Setter Property="Margin"
-                        Value="0,0,28,0" />
+                        Value="0,0,20,0" />
             </Style>
 
             <Style x:Key="Schedule.StatLabel"
@@ -72,7 +72,7 @@
     </UserControl.Resources>
 
     <Border Style="{StaticResource Card.Inset}"
-            Margin="0,0,0,10">
+            Margin="0,0,0,8">
         <Grid>
             <StackPanel Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVisibility}}">
                 <Grid>
@@ -84,15 +84,15 @@
                     <StackPanel Grid.Column="0"
                                 Orientation="Horizontal">
                         <iconPacks:PackIconLucide Kind="{Binding StatusIconKind}"
-                                                  Width="18"
-                                                  Height="18"
+                                                  Width="16"
+                                                  Height="16"
                                                   VerticalAlignment="Center"
                                                   Margin="0,0,10,0"
                                                   Foreground="{DynamicResource Fg.Muted}" />
                         <TextBlock Text="{Binding DisplayName}"
                                    VerticalAlignment="Center"
                                    FontWeight="{DynamicResource Font.Weight.SemiBold}"
-                                   FontSize="{DynamicResource Font.Size.L}"
+                                   FontSize="{DynamicResource Font.Size.M}"
                                    Foreground="{DynamicResource Fg.Primary}" />
                     </StackPanel>
 
@@ -104,8 +104,8 @@
 
                 <Border Background="{DynamicResource Bg.SurfaceMute}"
                         CornerRadius="{DynamicResource Radius.M}"
-                        Padding="12,9"
-                        Margin="0,12,0,0">
+                        Padding="10,6"
+                        Margin="0,8,0,0">
                     <TextBlock Text="{Binding Summary}"
                                TextWrapping="Wrap"
                                FontFamily="{DynamicResource Font.Mono}"
@@ -115,12 +115,12 @@
 
                 <TextBlock Text="{Binding ScheduleSummary}"
                            Style="{StaticResource TextBlock.Subtle}"
-                           Margin="0,10,0,0" />
+                           Margin="0,6,0,0" />
 
                 <Border Background="{DynamicResource State.WarningSoft}"
                         CornerRadius="{DynamicResource Radius.M}"
-                        Padding="12,9"
-                        Margin="0,10,0,0"
+                        Padding="10,6"
+                        Margin="0,8,0,0"
                         Visibility="{Binding MirrorWarning, Converter={StaticResource BoolToVisibility}}">
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
@@ -139,8 +139,30 @@
                     </StackPanel>
                 </Border>
 
+                <Border Background="{DynamicResource State.WarningSoft}"
+                        CornerRadius="{DynamicResource Radius.M}"
+                        Padding="10,6"
+                        Margin="0,8,0,0"
+                        Visibility="{Binding IsStale, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
+                                                  Width="15"
+                                                  Height="15"
+                                                  VerticalAlignment="Top"
+                                                  Margin="0,1,9,0"
+                                                  Foreground="{DynamicResource State.Warning}" />
+                        <TextBlock
+                            Text="Задача указывает на другой файл программы (вероятно, старую версию). Откройте профиль и сохраните, чтобы привязать к текущей."
+                            TextWrapping="Wrap"
+                            MaxWidth="520"
+                            HorizontalAlignment="Left"
+                            FontSize="{DynamicResource Font.Size.S}"
+                            Foreground="{DynamicResource Fg.Secondary}" />
+                    </StackPanel>
+                </Border>
+
                 <StackPanel Orientation="Horizontal"
-                            Margin="0,14,0,0"
+                            Margin="0,10,0,0"
                             Visibility="{Binding IsScheduled, Converter={StaticResource BoolToVisibility}}">
                     <StackPanel Style="{StaticResource Schedule.StatField}">
                         <TextBlock Text="Следующий запуск"
@@ -164,17 +186,17 @@
 
                 <TextBlock Text="Не запланировано в Планировщике."
                            Style="{StaticResource TextBlock.Subtle}"
-                           Margin="0,14,0,0"
+                           Margin="0,10,0,0"
                            Visibility="{Binding IsScheduled, Converter={StaticResource InverseBoolToVisibility}}" />
 
                 <TextBlock Style="{StaticResource Schedule.Message}" />
 
                 <StackPanel Orientation="Horizontal"
-                            Margin="0,16,0,0">
+                            Margin="0,12,0,0">
                     <Button Style="{StaticResource Button.Ghost}"
                             Command="{Binding RunNowCommand}"
                             MinHeight="{DynamicResource Control.Height.Default}"
-                            Padding="12,6"
+                            Padding="10,5"
                             Margin="0,0,8,0">
                         <StackPanel Orientation="Horizontal">
                             <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Play}"
@@ -188,7 +210,7 @@
                     <Button Style="{StaticResource Button.Ghost}"
                             Command="{Binding EditCommand}"
                             MinHeight="{DynamicResource Control.Height.Default}"
-                            Padding="12,6"
+                            Padding="10,5"
                             Margin="0,0,8,0">
                         <StackPanel Orientation="Horizontal">
                             <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Pencil}"
@@ -199,20 +221,48 @@
                             <TextBlock Text="Изменить" />
                         </StackPanel>
                     </Button>
-                    <Button Style="{StaticResource Button.Ghost}"
-                            Command="{Binding DeleteCommand}"
-                            Foreground="{DynamicResource State.Error}"
-                            MinHeight="{DynamicResource Control.Height.Default}"
-                            Padding="12,6">
-                        <StackPanel Orientation="Horizontal">
-                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
-                                                      Width="13"
-                                                      Height="13"
-                                                      VerticalAlignment="Center"
-                                                      Margin="0,0,6,0" />
-                            <TextBlock Text="Удалить" />
+                    <Grid VerticalAlignment="Center">
+                        <Button Style="{StaticResource Button.Ghost}"
+                                Command="{Binding ArmDeleteCommand}"
+                                Foreground="{DynamicResource State.Error}"
+                                MinHeight="{DynamicResource Control.Height.Default}"
+                                Padding="10,5"
+                                Visibility="{Binding ConfirmingDelete, Converter={StaticResource InverseBoolToVisibility}}">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                                          Width="13"
+                                                          Height="13"
+                                                          VerticalAlignment="Center"
+                                                          Margin="0,0,6,0" />
+                                <TextBlock Text="Удалить" />
+                            </StackPanel>
+                        </Button>
+                        <StackPanel Orientation="Horizontal"
+                                    Visibility="{Binding ConfirmingDelete, Converter={StaticResource BoolToVisibility}}">
+                            <Button Style="{StaticResource Button.Icon}"
+                                    Command="{Binding DeleteCommand}"
+                                    AutomationProperties.Name="Подтвердить удаление профиля"
+                                    ToolTip="Удалить профиль и его задачу в Планировщике">
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Check}"
+                                                          Width="15"
+                                                          Height="15"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"
+                                                          Foreground="{DynamicResource State.Success}" />
+                            </Button>
+                            <Button Style="{StaticResource Button.Icon}"
+                                    Command="{Binding CancelDeleteCommand}"
+                                    AutomationProperties.Name="Отменить удаление"
+                                    ToolTip="Отмена">
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.X}"
+                                                          Width="15"
+                                                          Height="15"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"
+                                                          Foreground="{DynamicResource State.Error}" />
+                            </Button>
                         </StackPanel>
-                    </Button>
+                    </Grid>
                 </StackPanel>
             </StackPanel>
 

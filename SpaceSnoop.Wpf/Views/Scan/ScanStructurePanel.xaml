@@ -1,10 +1,11 @@
 ﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Scan.ScanStructurePanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Scan"
              xmlns:conv="clr-namespace:SpaceSnoop.Wpf.Converters"
              xmlns:controls="clr-namespace:SpaceSnoop.Wpf.Views.Scan"
              xmlns:bootstrap="clr-namespace:SpaceSnoop.Wpf.Bootstrap"
+             xmlns:behaviors="clr-namespace:SpaceSnoop.Wpf.Views.Behaviors"
              xmlns:keepshell="https://schemas.keepshell.dev/wpf"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -262,7 +263,8 @@
 
             <MenuItem
                 Command="{Binding PlacementTarget.DataContext.MarkDeletedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                ToolTip="Пометить узел и всё вложенное на удаление">
+                ToolTip="Пометить узел и всё вложенное на удаление"
+                Visibility="{Binding PlacementTarget.DataContext.IsMarkedDeleted, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource InverseBoolToVisibility}}">
                 <MenuItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
@@ -275,7 +277,8 @@
             </MenuItem>
             <MenuItem
                 Command="{Binding PlacementTarget.DataContext.UnmarkDeletedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                ToolTip="Снять пометку с узла и всего вложенного">
+                ToolTip="Снять пометку с узла и всего вложенного"
+                Visibility="{Binding PlacementTarget.DataContext.IsMarkedDeleted, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
                 <MenuItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
@@ -292,7 +295,7 @@
             <MenuItem
                 Command="{Binding PlacementTarget.DataContext.MarkContentsDeletedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                 ToolTip="Пометить на удаление всё вложенное; сама папка останется"
-                Visibility="{Binding PlacementTarget.DataContext.IsDirectory, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+                Visibility="{Binding PlacementTarget.DataContext.CanMarkContentsDeleted, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
                 <MenuItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
@@ -306,7 +309,7 @@
             <MenuItem
                 Command="{Binding PlacementTarget.DataContext.UnmarkContentsCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                 ToolTip="Снять пометку со всего содержимого папки"
-                Visibility="{Binding PlacementTarget.DataContext.IsDirectory, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+                Visibility="{Binding PlacementTarget.DataContext.CanUnmarkContents, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
                 <MenuItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
@@ -444,6 +447,7 @@
                       Foreground="{DynamicResource Fg.Primary}"
                       PreviewMouseRightButtonDown="OnTreeRightButtonDown"
                       SelectedItemChanged="OnTreeSelectedItemChanged"
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                       Visibility="{Binding TreeVisible, Converter={StaticResource BoolToVisibility}, FallbackValue=Visible}"
                       VirtualizingStackPanel.IsVirtualizing="True"
                       VirtualizingStackPanel.VirtualizationMode="Recycling">
@@ -472,11 +476,16 @@
                                 <ColumnDefinition Width="172" />
                             </Grid.ColumnDefinitions>
 
-                            <StackPanel Grid.Column="0"
-                                        Orientation="Horizontal"
-                                        VerticalAlignment="Center">
-                                <iconPacks:PackIconLucide Style="{StaticResource NodeIcon}" />
-                                <TextBlock Text="{Binding Name}"
+                            <Grid Grid.Column="0"
+                                  VerticalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <iconPacks:PackIconLucide Grid.Column="0"
+                                                          Style="{StaticResource NodeIcon}" />
+                                <TextBlock Grid.Column="1"
+                                           behaviors:PathTrimmer.FullPath="{Binding Name}"
                                            VerticalAlignment="Center"
                                            TextTrimming="CharacterEllipsis">
                                     <TextBlock.Style>
@@ -493,7 +502,7 @@
                                         </Style>
                                     </TextBlock.Style>
                                 </TextBlock>
-                            </StackPanel>
+                            </Grid>
 
                             <StackPanel Grid.Column="1"
                                         Orientation="Horizontal"

@@ -126,7 +126,7 @@ public partial class MainForm : Form
         }
         else
         {
-            Process.Start("explorer.exe", selectedSpace.AbsolutePath);
+            Process.Start(new ProcessStartInfo(selectedSpace.AbsolutePath) { UseShellExecute = true });
         }
     }
 

@@ -1,7 +1,7 @@
 ﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Settings.SettingsUpdateCard"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Settings"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
@@ -75,6 +75,26 @@
                            Margin="12,0,0,0"
                            VerticalAlignment="Center" />
             </StackPanel>
+
+            <Border Style="{StaticResource Card.Inset}"
+                    Margin="0,12,0,0"
+                    Padding="12"
+                    Visibility="{Binding Updater.HasReleaseNotes, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Text="Изменения"
+                               Style="{StaticResource Setting.Label}" />
+                    <ScrollViewer MaxHeight="220"
+                                  Margin="0,8,0,0"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <TextBlock Text="{Binding Updater.ReleaseNotes}"
+                                   TextWrapping="Wrap"
+                                   FontFamily="{DynamicResource Font.Mono}"
+                                   FontSize="{DynamicResource Font.Size.S}"
+                                   Foreground="{DynamicResource Fg.Secondary}" />
+                    </ScrollViewer>
+                </StackPanel>
+            </Border>
         </StackPanel>
     </Border>
 </UserControl>

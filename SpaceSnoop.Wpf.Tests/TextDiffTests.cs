@@ -167,4 +167,47 @@ public class TextDiffTests
 
         Assert.That(expanded.Any(static s => s.IsGap), Is.False);
     }
+
+    [Test]
+    public void HighlightInline_подсвечивает_только_изменённую_середину()
+    {
+        var row = new DiffRow(DiffLineKind.Removed, "1", "abXcd", DiffLineKind.Added, "1", "abYcd");
+
+        var (left, right) = TextDiff.HighlightInline(row);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(left.Single(static s => s.Changed).Text, Is.EqualTo("X"));
+            Assert.That(right.Single(static s => s.Changed).Text, Is.EqualTo("Y"));
+            Assert.That(string.Concat(left.Select(static s => s.Text)), Is.EqualTo("abXcd"), "сегменты склеиваются в исходную строку");
+        }
+    }
+
+    [Test]
+    public void HighlightInline_делает_видимым_хвостовой_пробел()
+    {
+        var row = new DiffRow(DiffLineKind.Removed, "1", "foo ", DiffLineKind.Added, "1", "foo");
+
+        var (left, right) = TextDiff.HighlightInline(row);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(left.Any(static s => s is { Changed: true, Text: " " }), "хвостовой пробел слева помечен изменённым");
+            Assert.That(right.Any(static s => s.Changed), Is.False, "справа добавлять нечего");
+        }
+    }
+
+    [Test]
+    public void HighlightInline_не_трогает_неизменную_строку()
+    {
+        var row = new DiffRow(DiffLineKind.Context, "1", "same", DiffLineKind.Context, "1", "same");
+
+        var (left, _) = TextDiff.HighlightInline(row);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(left, Has.Count.EqualTo(1));
+            Assert.That(left[0].Changed, Is.False);
+        }
+    }
 }

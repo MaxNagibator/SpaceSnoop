@@ -14,4 +14,12 @@ public partial class ScheduleView : UserControl, IView<ScheduleViewModel>
             }
         };
     }
+
+    private void SuppressAutoScroll(object sender, RequestBringIntoViewEventArgs e)
+    {
+        if (e.OriginalSource is not TextBox)
+        {
+            e.Handled = true;
+        }
+    }
 }

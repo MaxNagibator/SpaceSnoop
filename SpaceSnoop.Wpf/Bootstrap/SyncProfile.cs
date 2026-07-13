@@ -15,6 +15,16 @@ public sealed class SyncProfile
     public string Time { get; set; } = "03:00";
     public bool Enabled { get; set; }
 
+    public static bool SourceMissing(string left, string right, SyncMode mode)
+    {
+        return mode switch
+        {
+            SyncMode.RightToLeft => !Directory.Exists(right),
+            SyncMode.Bidirectional => !Directory.Exists(left) && !Directory.Exists(right),
+            _ => !Directory.Exists(left),
+        };
+    }
+
     public static bool PathsOverlap(string left, string right)
     {
         string a, b;

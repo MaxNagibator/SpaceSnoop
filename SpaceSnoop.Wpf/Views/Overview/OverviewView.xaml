@@ -1,0 +1,340 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Overview.OverviewView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Overview"
+             xmlns:views="clr-namespace:SpaceSnoop.Wpf.Views.Overview"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:OverviewViewModel}"
+             d:DesignHeight="640"
+             d:DesignWidth="900"
+             Loaded="OnLoaded">
+
+    <UserControl.Resources>
+        <Style x:Key="GroupExpander"
+               TargetType="Expander">
+            <Setter Property="IsExpanded"
+                    Value="True" />
+            <Setter Property="Margin"
+                    Value="0,0,0,4" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Expander">
+                        <StackPanel>
+                            <ToggleButton
+                                IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}"
+                                Content="{TemplateBinding Header}"
+                                Focusable="False"
+                                Cursor="Hand"
+                                HorizontalContentAlignment="Stretch">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="HeaderBorder"
+                                                Background="{DynamicResource Bg.Surface}"
+                                                BorderBrush="{DynamicResource Border.Subtle}"
+                                                BorderThickness="1"
+                                                CornerRadius="{DynamicResource Radius.M}"
+                                                Padding="10,6">
+                                            <StackPanel Orientation="Horizontal"
+                                                        VerticalAlignment="Center">
+                                                <iconPacks:PackIconLucide x:Name="Chevron"
+                                                                          Kind="{x:Static iconPacks:PackIconLucideKind.ChevronDown}"
+                                                                          Width="14"
+                                                                          Height="14"
+                                                                          VerticalAlignment="Center"
+                                                                          Margin="0,0,8,0"
+                                                                          Foreground="{DynamicResource Fg.Muted}" />
+                                                <ContentPresenter VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsChecked"
+                                                     Value="False">
+                                                <Setter TargetName="Chevron"
+                                                        Property="Kind"
+                                                        Value="{x:Static iconPacks:PackIconLucideKind.ChevronRight}" />
+                                            </Trigger>
+                                            <Trigger Property="IsMouseOver"
+                                                     Value="True">
+                                                <Setter TargetName="HeaderBorder"
+                                                        Property="Background"
+                                                        Value="{DynamicResource Bg.SurfaceAlt}" />
+                                                <Setter TargetName="HeaderBorder"
+                                                        Property="BorderBrush"
+                                                        Value="{DynamicResource Border.Default}" />
+                                                <Setter TargetName="Chevron"
+                                                        Property="Foreground"
+                                                        Value="{DynamicResource Fg.Secondary}" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <ContentPresenter x:Name="ExpanderContent"
+                                              Visibility="Collapsed" />
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsExpanded"
+                                     Value="True">
+                                <Setter TargetName="ExpanderContent"
+                                        Property="Visibility"
+                                        Value="Visible" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Name}"
+                             Value="Без изменений">
+                    <Setter Property="IsExpanded"
+                            Value="False" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer x:Name="Scroller"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  Padding="0,0,12,0"
+                  ScrollChanged="OnScrollChanged">
+        <StackPanel>
+
+            <Border Style="{StaticResource Card.Inset}"
+                    Margin="0,0,0,12">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Row="0"
+                                Grid.Column="0"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="Сравнение всех профилей"
+                                   FontWeight="{DynamicResource Font.Weight.SemiBold}"
+                                   FontSize="{DynamicResource Font.Size.L}"
+                                   Foreground="{DynamicResource Fg.Primary}" />
+                        <TextBlock Text="{Binding StatusCaption}"
+                                   Style="{StaticResource TextBlock.Subtle}"
+                                   TextTrimming="CharacterEllipsis"
+                                   Margin="0,4,0,0" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="0"
+                                Grid.Column="1"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <Button Style="{StaticResource Button.Ghost}"
+                                Command="{Binding CancelCommand}"
+                                Content="Отмена"
+                                MinHeight="{DynamicResource Control.Height.Default}"
+                                Padding="14,6"
+                                Margin="0,0,8,0"
+                                Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+                        <Button Style="{StaticResource Button.Ghost}"
+                                Command="{Binding CycleAllDirectionsCommand}"
+                                MinHeight="{DynamicResource Control.Height.Default}"
+                                Padding="14,6"
+                                Margin="0,0,8,0"
+                                ToolTip="Сменить направление синхронизации у всех профилей"
+                                AutomationProperties.Name="Сменить направление всем">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ArrowRightLeft}"
+                                                          Width="14"
+                                                          Height="14"
+                                                          VerticalAlignment="Center"
+                                                          Margin="0,0,6,0" />
+                                <TextBlock Text="Направление всем" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource Button.Secondary}"
+                                Command="{Binding CompareAllCommand}"
+                                MinHeight="{DynamicResource Control.Height.Default}"
+                                Padding="14,6"
+                                Margin="0,0,8,0">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconLucide
+                                    Kind="{x:Static iconPacks:PackIconLucideKind.GitCompareArrows}"
+                                    Width="14"
+                                    Height="14"
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,6,0" />
+                                <TextBlock Text="Сравнить все" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource Button.Primary}"
+                                Command="{Binding SyncAllCommand}"
+                                MinHeight="{DynamicResource Control.Height.Default}"
+                                Padding="14,6"
+                                ToolTip="Синхронизировать все профили (удаления – в корзину)">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderSync}"
+                                                          Width="14"
+                                                          Height="14"
+                                                          VerticalAlignment="Center"
+                                                          Margin="0,0,6,0" />
+                                <TextBlock Text="Синхронизировать всё" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+
+                    <ProgressBar Grid.Row="1"
+                                 Grid.Column="0"
+                                 Grid.ColumnSpan="2"
+                                 Height="6"
+                                 Minimum="0"
+                                 Maximum="{Binding ProgressMax}"
+                                 Value="{Binding ProgressValue}"
+                                 IsIndeterminate="{Binding IsIndeterminate}"
+                                 Margin="0,12,0,0"
+                                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource Card.Inset}"
+                    Margin="0,0,0,10"
+                    Visibility="{Binding HasRows, Converter={StaticResource InverseBoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Text="Профилей пока нет."
+                               Foreground="{DynamicResource Fg.Primary}" />
+                    <TextBlock
+                        Text="Создайте профили на странице «Расписание» – здесь их можно будет сравнить пакетно."
+                        Style="{StaticResource TextBlock.Subtle}"
+                        TextWrapping="Wrap"
+                        Margin="0,4,0,0" />
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card.Inset}"
+                    Margin="0,0,0,10"
+                    Padding="14,10"
+                    Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Grid Grid.Column="0"
+                          HorizontalAlignment="Stretch">
+                        <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource TextBox.IconField}"
+                                 Tag="{x:Static iconPacks:PackIconLucideKind.Search}"
+                                 ToolTip="Фильтр профилей по имени или пути" />
+                        <TextBlock Text="Поиск профилей"
+                                   Margin="36,0,8,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Fg.Muted}"
+                                   IsHitTestVisible="False"
+                                   Visibility="{Binding SearchTextEmpty, Converter={StaticResource BoolToVisibility}}" />
+                    </Grid>
+
+                    <ComboBox Grid.Column="1"
+                              SelectedValuePath="Tag"
+                              SelectedValue="{Binding SortField}"
+                              Style="{StaticResource ComboBox.Toolbar}"
+                              MinWidth="160"
+                              Margin="8,0,0,0"
+                              HorizontalAlignment="Stretch"
+                              VerticalAlignment="Center"
+                              ToolTip="Сортировка профилей. Дата – по самому свежему файлу; свежесть – по стороне, которая свежее (слева/справа), и насколько перевес.">
+                        <ComboBoxItem Content="Исходный порядок"
+                                      Tag="{x:Static vm:OverviewSortField.None}" />
+                        <ComboBoxItem Content="По имени"
+                                      Tag="{x:Static vm:OverviewSortField.Name}" />
+                        <ComboBoxItem Content="По различиям"
+                                      Tag="{x:Static vm:OverviewSortField.Differences}" />
+                        <ComboBoxItem Content="По дате"
+                                      Tag="{x:Static vm:OverviewSortField.Date}" />
+                        <ComboBoxItem Content="По свежести"
+                                      Tag="{x:Static vm:OverviewSortField.Freshness}" />
+                    </ComboBox>
+
+                    <ToggleButton Grid.Column="2"
+                                  Style="{StaticResource ToggleButton.Toolbar}"
+                                  IsChecked="{Binding SortDescending}"
+                                  MinWidth="0"
+                                  Padding="9,0"
+                                  Margin="8,0,0,0"
+                                  VerticalAlignment="Center"
+                                  ToolTip="Сортировать по убыванию"
+                                  AutomationProperties.Name="Сортировать по убыванию">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ArrowDownUp}"
+                                                  Width="14"
+                                                  Height="14" />
+                    </ToggleButton>
+
+                    <ToggleButton Grid.Column="3"
+                                  Style="{StaticResource ToggleButton.Toolbar}"
+                                  IsChecked="{Binding GroupUnchanged}"
+                                  MinWidth="0"
+                                  Padding="9,0"
+                                  Margin="8,0,0,0"
+                                  VerticalAlignment="Center"
+                                  ToolTip="Группировать профили без изменений в отдельный сворачиваемый раздел"
+                                  AutomationProperties.Name="Группировать без изменений">
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Layers}"
+                                                      Width="14"
+                                                      Height="14"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,6,0" />
+                            <TextBlock Text="Группы"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </ToggleButton>
+                </Grid>
+            </Border>
+
+            <TextBlock Text="Ничего не найдено."
+                       Style="{StaticResource TextBlock.Subtle}"
+                       Margin="2,2,0,8"
+                       Visibility="{Binding NoMatches, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+
+            <ItemsControl ItemsSource="{Binding RowsView}"
+                          Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}">
+                <ItemsControl.GroupStyle>
+                    <GroupStyle>
+                        <GroupStyle.ContainerStyle>
+                            <Style TargetType="GroupItem">
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="GroupItem">
+                                            <Expander Style="{StaticResource GroupExpander}">
+                                                <Expander.Header>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding Name}"
+                                                                   Style="{StaticResource Caption}" />
+                                                        <TextBlock Text="{Binding ItemCount, StringFormat=' ({0})'}"
+                                                                   Style="{StaticResource Caption}" />
+                                                    </StackPanel>
+                                                </Expander.Header>
+                                                <ItemsPresenter Margin="0,6,0,0" />
+                                            </Expander>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </GroupStyle.ContainerStyle>
+                    </GroupStyle>
+                </ItemsControl.GroupStyle>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <views:OverviewRow />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

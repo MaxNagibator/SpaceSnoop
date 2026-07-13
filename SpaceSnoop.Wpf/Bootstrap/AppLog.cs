@@ -103,6 +103,12 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1217, Level = LogLevel.Information, Message = "Проверка синхронизации: проверено {Checked}, расхождений {Mismatches}")]
     public static partial void SyncVerified(this ILogger logger, int @checked, int mismatches);
 
+    [LoggerMessage(EventId = 1218, Level = LogLevel.Information, Message = "Состояние Git прочитано: слева «{Left}», справа «{Right}»")]
+    public static partial void GitStateRead(this ILogger logger, string left, string right);
+
+    [LoggerMessage(EventId = 1219, Level = LogLevel.Warning, Message = "Не удалось прочитать состояние Git")]
+    public static partial void GitStateFailed(this ILogger logger, Exception exception);
+
     [LoggerMessage(EventId = 1250, Level = LogLevel.Information, Message = "Профиль расписания сохранён: «{Name}» (активно: {Enabled})")]
     public static partial void ScheduleProfileSaved(this ILogger logger, string name, bool enabled);
 
@@ -117,6 +123,15 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 1254, Level = LogLevel.Information, Message = "Расписание перенесено в профиль: «{Name}»")]
     public static partial void ScheduleProfileMigrated(this ILogger logger, string name);
+
+    [LoggerMessage(EventId = 1255, Level = LogLevel.Information, Message = "Создана пачка профилей: {Count}")]
+    public static partial void ScheduleBatchCreated(this ILogger logger, int count);
+
+    [LoggerMessage(EventId = 1256, Level = LogLevel.Information, Message = "Задача расписания привязана к текущему пути: «{Name}» → {Exe}")]
+    public static partial void ScheduleTaskReconciled(this ILogger logger, string name, string exe);
+
+    [LoggerMessage(EventId = 1257, Level = LogLevel.Warning, Message = "Не удалось обновить путь задачи «{Name}»: {Error}")]
+    public static partial void ScheduleReconcileFailed(this ILogger logger, string name, string error);
 
     [LoggerMessage(EventId = 1300, Level = LogLevel.Warning, Message = "Не удалось положить лог-секцию в буфер обмена")]
     public static partial void ClipboardLogSectionFailed(this ILogger logger, Exception exception);
@@ -210,4 +225,22 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 1804, Level = LogLevel.Warning, Message = "Не удалось скачать обновление: {Url}")]
     public static partial void UpdateDownloadFailed(this ILogger logger, Exception exception, string url);
+
+    [LoggerMessage(EventId = 1900, Level = LogLevel.Information, Message = "Пакетное сравнение начато: пар {Total}")]
+    public static partial void OverviewCompareStarted(this ILogger logger, int total);
+
+    [LoggerMessage(EventId = 1901, Level = LogLevel.Information, Message = "Пакетное сравнение завершено: сравнено {Compared}, ошибок {Failed}, пропущено {Skipped}, за {ElapsedMs} мс")]
+    public static partial void OverviewCompareFinished(this ILogger logger, int compared, int failed, int skipped, long elapsedMs);
+
+    [LoggerMessage(EventId = 1902, Level = LogLevel.Information, Message = "Пакетное сравнение отменено")]
+    public static partial void OverviewCompareCancelled(this ILogger logger);
+
+    [LoggerMessage(EventId = 1903, Level = LogLevel.Information, Message = "Пакетная синхронизация начата: профилей {Total}")]
+    public static partial void OverviewSyncStarted(this ILogger logger, int total);
+
+    [LoggerMessage(EventId = 1904, Level = LogLevel.Information, Message = "Пакетная синхронизация завершена: успешно {Synced}, с ошибками {Failed}, пропущено {Skipped}, за {ElapsedMs} мс")]
+    public static partial void OverviewSyncFinished(this ILogger logger, int synced, int failed, int skipped, long elapsedMs);
+
+    [LoggerMessage(EventId = 1905, Level = LogLevel.Information, Message = "Пакетная синхронизация отменена")]
+    public static partial void OverviewSyncCancelled(this ILogger logger);
 }

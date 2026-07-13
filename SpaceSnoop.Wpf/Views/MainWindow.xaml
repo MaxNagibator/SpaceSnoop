@@ -46,6 +46,9 @@
         <keepshell:ShellLayout.StatusBar>
             <views:StatusBarView />
         </keepshell:ShellLayout.StatusBar>
+        <keepshell:ShellLayout.ContentOverlay>
+            <keepshell:ToastHost DataContext="{Binding Toasts}" />
+        </keepshell:ShellLayout.ContentOverlay>
         <keepshell:ShellLayout.WindowOverlay>
             <tarkov:TarkovBootOverlay IsActive="{Binding IsTarkovBootPlaying, Mode=TwoWay}" />
         </keepshell:ShellLayout.WindowOverlay>

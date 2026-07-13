@@ -1,7 +1,7 @@
 ﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Settings.SettingsExclusionsCard"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Settings"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
@@ -29,6 +29,27 @@
             <TextBlock Style="{StaticResource Setting.Hint}"
                        Text="Подсказывает существующие каталоги при вводе пути; перебор вариантов – стрелками ↑/↓." />
 
+            <Grid Margin="0,16,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="240" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Git-папки (.git)"
+                               Style="{StaticResource Setting.Label}" />
+                    <TextBlock
+                        Text="Что делать, если при сравнении найдены служебные каталоги репозитория. Состояние репозитория (ветка, коммит) показывается над списком в любом случае."
+                        Style="{StaticResource Setting.Hint}"
+                        Margin="0,2,0,0" />
+                </StackPanel>
+                <ComboBox Grid.Column="1"
+                          Style="{StaticResource ComboBox.Form}"
+                          ItemsSource="{Binding GitFolderOptions}"
+                          SelectedItem="{Binding SelectedGitFolderOption}"
+                          DisplayMemberPath="Label"
+                          VerticalAlignment="Center" />
+            </Grid>
+
             <TextBlock Text="Исключения по умолчанию"
                        Style="{StaticResource Setting.Label}"
                        Margin="0,16,0,0" />
@@ -36,6 +57,16 @@
                        Text="Glob-паттерны через запятую (напр. bin,obj,*.tmp). Подставляются в «Синхронизацию» при пустом поле исключений." />
             <TextBox Style="{StaticResource TextBox.Form}"
                      Text="{Binding Operations.DefaultExclusions, UpdateSourceTrigger=PropertyChanged}"
+                     FontFamily="{DynamicResource Font.Mono}"
+                     Margin="0,10,0,0" />
+
+            <TextBlock Text="Группировать каталоги (плоский вид)"
+                       Style="{StaticResource Setting.Label}"
+                       Margin="0,16,0,0" />
+            <TextBlock Style="{StaticResource Setting.Hint}"
+                       Text="Имена каталогов через запятую (напр. .git,bin,obj). В плоском виде «Синхронизации» их файлы собираются в свёрнутую группу «Служебные файлы» внизу списка. Пусто – без группировки." />
+            <TextBox Style="{StaticResource TextBox.Form}"
+                     Text="{Binding Operations.GroupFolders, UpdateSourceTrigger=PropertyChanged}"
                      FontFamily="{DynamicResource Font.Mono}"
                      Margin="0,10,0,0" />
         </StackPanel>

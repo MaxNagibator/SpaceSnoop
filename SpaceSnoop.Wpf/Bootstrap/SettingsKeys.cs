@@ -9,7 +9,6 @@ public static class SettingsKeys
     public const string WarnIfNotAdmin = "wpf.startup.admin_warning";
     public const string LastPage = "wpf.shell.last_page";
     public const string NavCollapsed = "wpf.shell.nav_collapsed";
-    public const string Backdrop = "wpf.shell.backdrop";
 
     public const string WindowLeft = "wpf.window.left";
     public const string WindowTop = "wpf.window.top";
@@ -24,6 +23,7 @@ public static class SettingsKeys
     public const string ScanSortMode = "wpf.scan.sort_mode";
     public const string ScanSortInvert = "wpf.scan.sort_invert";
     public const string ScanTreemap = "wpf.scan.treemap";
+    public const string ScanRevealFiles = "wpf.scan.reveal_files";
 
     public const string ScanInspectorCollapsed = "wpf.scan.inspector.collapsed";
     public const string ScanInspectorWidth = "wpf.scan.inspector.width";
@@ -52,8 +52,22 @@ public static class SettingsKeys
     public const string SyncDiffUnified = "wpf.sync.diff_unified";
     public const string SyncDiffCollapse = "wpf.sync.diff_collapse";
     public const string SyncPathSuggest = "wpf.sync.path_suggest";
+    public const string SyncGitFolders = "wpf.sync.git_folders";
+    public const string SyncGitHistoryCount = "wpf.sync.git_history_count";
+    public const string SyncGroupFolders = "wpf.sync.group_folders";
+
+    public const string OverviewSort = "wpf.overview.sort";
+    public const string OverviewSortDesc = "wpf.overview.sort_desc";
+    public const string OverviewGroupUnchanged = "wpf.overview.group_unchanged";
 
     public const string ScheduleProfiles = "wpf.schedule.profiles";
+
+    public const string BatchSource = "wpf.batch.source";
+    public const string BatchDest = "wpf.batch.dest";
+    public const string BatchMode = "wpf.batch.mode";
+    public const string BatchMirror = "wpf.batch.mirror";
+    public const string BatchExclusions = "wpf.batch.exclusions";
+    public const string BatchSort = "wpf.batch.sort";
 
     public const string UpdateDismissedVersion = "wpf.update.dismissed";
     public const string UpdateRepository = "wpf.update.repository";

@@ -73,6 +73,8 @@ public partial class App : Application
                 ShutdownMode = ShutdownMode.OnMainWindowClose;
             }
 
+            _ = Task.Run(() => ScheduleReconciler.Reconcile(settings, _logging.CreateLogger<ScheduleViewModel>()));
+
             splash.Dispose();
             splash = null;
         }
@@ -135,6 +137,8 @@ public partial class App : Application
         services.AddSingleton<ArchiveService>();
 
         services.AddKeepShell();
+        services.AddKeepShellToasts();
+        services.AddSingleton<ToastNotifier>();
         services.AddSingleton<ShellPreferences>();
         services.AddSingleton<OperationPreferences>();
         services.AddSingleton<ScanPreferences>();
@@ -157,6 +161,7 @@ public partial class App : Application
 
         services.AddSingleton<ScanViewModel>();
         services.AddSingleton<SyncViewModel>();
+        services.AddSingleton<OverviewViewModel>();
         services.AddSingleton<ScheduleViewModel>();
         services.AddSingleton<DockerViewModel>();
         services.AddSingleton<LogsViewModel>();

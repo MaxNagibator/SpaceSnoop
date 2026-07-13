@@ -1,6 +1,6 @@
 ﻿using SpaceSnoop.Core.Domain;
 using SpaceSnoop.Wpf.Bootstrap;
-using SpaceSnoop.Wpf.ViewModels;
+using SpaceSnoop.Wpf.ViewModels.Schedule;
 
 namespace SpaceSnoop.Wpf.Tests;
 
@@ -74,7 +74,18 @@ public class SyncSchedulerTests
             Assert.That(status.LastRun, Is.EqualTo("23.06.2026 3:00:05"));
             Assert.That(status.LastResult, Is.EqualTo(0));
             Assert.That(status.LastResultText, Is.EqualTo("Успех"));
+            Assert.That(status.Action, Is.EqualTo("task"));
         }
+    }
+
+    [TestCase(@"""C:\New\app.exe"" --sync ab12cd34", @"C:\New\app.exe", false)]
+    [TestCase(@"""C:\new\APP.exe"" --sync ab12cd34", @"C:\New\app.exe", false)]
+    [TestCase(@"""C:\Old\app.exe"" --sync ab12cd34", @"C:\New\app.exe", true)]
+    [TestCase("", @"C:\New\app.exe", false)]
+    [TestCase(@"""C:\Old\app.exe""", "", false)]
+    public void Устаревший_путь_задачи_определяется_по_подстроке(string action, string exe, bool stale)
+    {
+        Assert.That(SyncScheduler.IsStale(action, exe), Is.EqualTo(stale));
     }
 
     [Test]

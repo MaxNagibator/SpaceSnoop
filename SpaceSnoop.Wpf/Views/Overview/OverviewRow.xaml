@@ -1,0 +1,200 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Overview.OverviewRow"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:overview="clr-namespace:SpaceSnoop.Wpf.ViewModels.Overview"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance overview:OverviewRowViewModel}"
+             d:DesignWidth="860">
+
+    <UserControl.Resources>
+        <Style x:Key="FreshIcon"
+               TargetType="iconPacks:PackIconLucide">
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Muted}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding NewerIsLeft}"
+                             Value="True">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.Success}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding NewerIsRight}"
+                             Value="True">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.Info}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="FreshValue"
+               TargetType="TextBlock">
+            <Setter Property="FontWeight"
+                    Value="{DynamicResource Font.Weight.SemiBold}" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Muted}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding NewerIsLeft}"
+                             Value="True">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.Success}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding NewerIsRight}"
+                             Value="True">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.Info}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Border Style="{StaticResource Card.Inset}"
+            Margin="0,0,0,8"
+            Padding="14,10">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <iconPacks:PackIconLucide Grid.Column="0"
+                                      Kind="{Binding StatusIconKind}"
+                                      Width="22"
+                                      Height="22"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,14,0">
+                <iconPacks:PackIconLucide.Style>
+                    <Style TargetType="iconPacks:PackIconLucide">
+                        <Setter Property="Foreground"
+                                Value="{DynamicResource Fg.Secondary}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Status}"
+                                         Value="{x:Static overview:OverviewRunStatus.Compared}">
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource Accent.Primary}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Status}"
+                                         Value="{x:Static overview:OverviewRunStatus.Unavailable}">
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource State.Warning}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Status}"
+                                         Value="{x:Static overview:OverviewRunStatus.Overlap}">
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource State.Warning}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Status}"
+                                         Value="{x:Static overview:OverviewRunStatus.Error}">
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource State.Error}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Status}"
+                                         Value="{x:Static overview:OverviewRunStatus.Synced}">
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource State.Success}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding SyncHadErrors}"
+                                         Value="True">
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource State.Warning}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </iconPacks:PackIconLucide.Style>
+            </iconPacks:PackIconLucide>
+
+            <StackPanel Grid.Column="1"
+                        VerticalAlignment="Center">
+                <TextBlock Text="{Binding Name}"
+                           Foreground="{DynamicResource Fg.Primary}"
+                           FontWeight="{DynamicResource Font.Weight.SemiBold}"
+                           TextTrimming="CharacterEllipsis" />
+                <TextBlock Style="{StaticResource TextBlock.Subtle}"
+                           TextTrimming="CharacterEllipsis"
+                           Margin="0,2,0,0">
+                    <Run Text="{Binding Left, Mode=OneWay}" />
+                    <Run Text="{Binding DirectionArrow, Mode=OneWay}" />
+                    <Run Text="{Binding Right, Mode=OneWay}" />
+                </TextBlock>
+                <TextBlock Text="{Binding StatusText}"
+                           Foreground="{DynamicResource Fg.Primary}"
+                           TextTrimming="CharacterEllipsis"
+                           Margin="0,4,0,0" />
+                <TextBlock Text="{Binding BreakdownText}"
+                           Style="{StaticResource TextBlock.Subtle}"
+                           Margin="0,1,0,0"
+                           Visibility="{Binding HasCounts, Converter={StaticResource BoolToVisibility}}" />
+
+                <StackPanel Orientation="Horizontal"
+                            Margin="0,4,0,0"
+                            Visibility="{Binding ShowNewerBadge, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}"
+                            ToolTip="{Binding NewerBadgeTooltip}">
+                    <iconPacks:PackIconLucide Kind="{Binding NewerBadgeIconKind}"
+                                              Width="12"
+                                              Height="12"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,7,0"
+                                              Style="{StaticResource FreshIcon}" />
+                    <TextBlock Text="СВЕЖЕЕ"
+                               Style="{StaticResource TextBlock.Subtle}"
+                               VerticalAlignment="Center"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding NewerBadgeText}"
+                               VerticalAlignment="Center"
+                               Style="{StaticResource FreshValue}" />
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel Grid.Column="2"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        Margin="12,0,0,0">
+                <Button Style="{StaticResource Button.Ghost}"
+                        Command="{Binding CycleDirectionCommand}"
+                        MinHeight="{DynamicResource Control.Height.Default}"
+                        MinWidth="0"
+                        Padding="10,6"
+                        Margin="0,0,8,0"
+                        ToolTip="{Binding DirectionTooltip}"
+                        AutomationProperties.Name="Сменить направление">
+                    <iconPacks:PackIconLucide Kind="{Binding DirectionIconKind}"
+                                              Width="15"
+                                              Height="15"
+                                              VerticalAlignment="Center" />
+                </Button>
+                <Button Style="{StaticResource Button.Ghost}"
+                        Command="{Binding DataContext.SyncRowCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                        CommandParameter="{Binding}"
+                        MinHeight="{DynamicResource Control.Height.Default}"
+                        Padding="12,6"
+                        Margin="0,0,8,0"
+                        ToolTip="Синхронизировать этот профиль (удаления – в корзину)">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.RefreshCw}"
+                                                  Width="14"
+                                                  Height="14"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,6,0" />
+                        <TextBlock Text="Синхр." />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource Button.Ghost}"
+                        Command="{Binding OpenInSyncCommand}"
+                        MinHeight="{DynamicResource Control.Height.Default}"
+                        Padding="12,6"
+                        ToolTip="Открыть пару на странице «Синхронизация»">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderSync}"
+                                                  Width="14"
+                                                  Height="14"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,6,0" />
+                        <TextBlock Text="Открыть" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>
