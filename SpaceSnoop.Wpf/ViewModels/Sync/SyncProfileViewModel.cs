@@ -30,7 +30,13 @@ public sealed partial class SyncProfileViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(Summary))]
     [NotifyPropertyChangedFor(nameof(MirrorApplicable))]
     [NotifyPropertyChangedFor(nameof(MirrorWarning))]
+    [NotifyPropertyChangedFor(nameof(WinnerApplicable))]
     private int _selectedModeIndex;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MirrorApplicable))]
+    [NotifyPropertyChangedFor(nameof(MirrorWarning))]
+    private int _selectedWinnerIndex;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(MirrorWarning))]
@@ -89,6 +95,7 @@ public sealed partial class SyncProfileViewModel : ObservableObject
         _rightPath = model.Right;
         _exclusions = model.Exclusions;
         _selectedModeIndex = Math.Clamp(model.Mode, 0, 2);
+        _selectedWinnerIndex = SyncProfile.IndexOfWinner(model.Winner);
         _mirror = model.Mirror;
         _selectedIntervalIndex = model.Interval switch
         {
@@ -106,15 +113,19 @@ public sealed partial class SyncProfileViewModel : ObservableObject
 
     public IReadOnlyList<string> Modes => _parent.Modes;
 
+    public IReadOnlyList<string> Winners => _parent.Winners;
+
     public IReadOnlyList<string> Intervals => _parent.Intervals;
 
     public string DisplayName => string.IsNullOrWhiteSpace(Name) ? "Без названия" : Name;
 
     public bool TimeApplicable => SelectedIntervalIndex != 2;
 
-    public bool MirrorApplicable => SelectedModeIndex != 2;
+    public bool WinnerApplicable => SelectedModeIndex == 2;
 
-    public bool MirrorWarning => Mirror && SelectedModeIndex != 2;
+    public bool MirrorApplicable => SelectedModeIndex != 2 || SelectedWinnerIndex is 1 or 2;
+
+    public bool MirrorWarning => Mirror && MirrorApplicable;
 
     public PackIconLucideKind StatusIconKind =>
         Enabled && IsScheduled && OsEnabled ? PackIconLucideKind.CalendarCheck : PackIconLucideKind.CalendarOff;
@@ -155,6 +166,7 @@ public sealed partial class SyncProfileViewModel : ObservableObject
             Left = LeftPath.Trim(),
             Right = RightPath.Trim(),
             Mode = SelectedModeIndex,
+            Winner = SyncProfile.WinnerFromIndex(SelectedWinnerIndex),
             Mirror = Mirror,
             Exclusions = Exclusions.Trim(),
             Interval = SelectedIntervalIndex switch
@@ -245,6 +257,7 @@ public sealed partial class SyncProfileViewModel : ObservableObject
             RightPath = model.Right;
             Exclusions = model.Exclusions;
             SelectedModeIndex = Math.Clamp(model.Mode, 0, 2);
+            SelectedWinnerIndex = SyncProfile.IndexOfWinner(model.Winner);
             Mirror = model.Mirror;
             SelectedIntervalIndex = model.Interval switch
             {

@@ -21,6 +21,9 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
     private int _selectedModeIndex;
 
     [ObservableProperty]
+    private int _selectedWinnerIndex;
+
+    [ObservableProperty]
     private bool _mirror;
 
     [ObservableProperty]
@@ -38,6 +41,7 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
         _sourceParent = settings.GetStringValue(SettingsKeys.BatchSource) ?? string.Empty;
         _destParent = settings.GetStringValue(SettingsKeys.BatchDest) ?? string.Empty;
         _selectedModeIndex = Math.Clamp(settings.GetInt(SettingsKeys.BatchMode, settings.GetInt(SettingsKeys.SyncMode)), 0, Modes.Count - 1);
+        _selectedWinnerIndex = Math.Clamp(settings.GetInt(SettingsKeys.BatchWinner, settings.GetInt(SettingsKeys.SyncWinner)), 0, Winners.Count - 1);
         _mirror = settings.GetBool(SettingsKeys.BatchMirror, settings.GetBool(SettingsKeys.SyncMirror));
         _selectedSort = Math.Clamp(settings.GetInt(SettingsKeys.BatchSort), 0, SortOptions.Count - 1);
         _exclusions = settings.GetStringValue(SettingsKeys.BatchExclusions) ?? FallbackExclusions(settings);
@@ -52,6 +56,8 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
     public bool PathSuggest { get; }
 
     public IReadOnlyList<string> Modes { get; } = ["Слева направо", "Справа налево", "Двусторонний"];
+
+    public IReadOnlyList<string> Winners { get; } = ["Новее", "Слева", "Справа"];
 
     public IReadOnlyList<string> SortOptions { get; } = ["Имя (А–Я)", "Имя (Я–А)", "Сначала новые"];
 
@@ -104,7 +110,9 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
         }
     }
 
-    public bool MirrorApplicable => SelectedModeIndex != 2;
+    public bool WinnerApplicable => SelectedModeIndex == 2;
+
+    public bool MirrorApplicable => SelectedModeIndex != 2 || SelectedWinnerIndex is 1 or 2;
 
     private void OnRowChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -170,6 +178,7 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
                 Left = row.Left,
                 Right = row.Right,
                 Mode = SelectedModeIndex,
+                Winner = SyncProfile.WinnerFromIndex(SelectedWinnerIndex),
                 Mirror = Mirror,
                 Exclusions = Exclusions.Trim(),
             })
@@ -211,9 +220,16 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
     partial void OnSelectedModeIndexChanged(int value)
     {
         _settings.SetInt(SettingsKeys.BatchMode, value);
+        OnPropertyChanged(nameof(WinnerApplicable));
         OnPropertyChanged(nameof(MirrorApplicable));
         OnPropertyChanged(nameof(DirectionIconKind));
         OnPropertyChanged(nameof(DirectionHint));
+    }
+
+    partial void OnSelectedWinnerIndexChanged(int value)
+    {
+        _settings.SetInt(SettingsKeys.BatchWinner, value);
+        OnPropertyChanged(nameof(MirrorApplicable));
     }
 
     partial void OnMirrorChanged(bool value)

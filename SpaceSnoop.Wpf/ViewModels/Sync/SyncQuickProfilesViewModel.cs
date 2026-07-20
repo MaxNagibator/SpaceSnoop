@@ -75,6 +75,7 @@ public sealed partial class SyncQuickProfilesViewModel(
         model.Right = current.Right;
         model.Mode = current.Mode;
         model.Mirror = current.Mirror;
+        model.Winner = current.Winner;
         model.Exclusions = current.Exclusions;
         SelectedProfile = Items[0];
     }

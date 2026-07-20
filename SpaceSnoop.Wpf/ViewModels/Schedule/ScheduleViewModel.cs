@@ -27,6 +27,8 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
 
     public IReadOnlyList<string> Modes { get; } = ["Слева направо", "Справа налево", "Двусторонний"];
 
+    public IReadOnlyList<string> Winners { get; } = ["Новее", "Слева", "Справа"];
+
     public IReadOnlyList<string> Intervals { get; } = ["Ежедневно", "Каждый час", "При входе в систему"];
 
     public ObservableCollection<SyncProfileViewModel> Profiles { get; } = [];
@@ -126,6 +128,7 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
             Right = (Settings.GetStringValue(SettingsKeys.SyncRight) ?? string.Empty).Trim(),
             Mode = Settings.GetInt(SettingsKeys.SyncMode),
             Mirror = Settings.GetBool(SettingsKeys.SyncMirror),
+            Winner = SyncProfile.WinnerFromIndex(Settings.GetInt(SettingsKeys.SyncWinner)),
             Exclusions = (Settings.GetStringValue(SettingsKeys.SyncExclusions) ?? string.Empty).Trim(),
         };
 
@@ -197,6 +200,7 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
             Right = right,
             Mode = Settings.GetInt(SettingsKeys.SyncMode),
             Mirror = Settings.GetBool(SettingsKeys.SyncMirror),
+            Winner = SyncProfile.WinnerFromIndex(Settings.GetInt(SettingsKeys.SyncWinner)),
             Exclusions = exclusions,
             Enabled = legacyExists,
         };

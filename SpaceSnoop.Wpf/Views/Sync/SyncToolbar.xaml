@@ -355,7 +355,7 @@
                             BorderBrush="{DynamicResource Border.Subtle}"
                             VerticalAlignment="Center"
                             Margin="0,0,16,0"
-                            Visibility="{Binding IsBidirectional, Converter={StaticResource BoolToVisibility}}"
+                            Visibility="{Binding ShowConflictResolvers, Converter={StaticResource BoolToVisibility}}"
                             ToolTip="Разрешить все спорные элементы разом">
                         <StackPanel Orientation="Horizontal"
                                     VerticalAlignment="Center">
@@ -616,6 +616,16 @@
                                   Style="{StaticResource ComboBox.Toolbar}"
                                   HorizontalAlignment="Stretch"
                                   ToolTip="Направление синхронизации" />
+                        <StackPanel Visibility="{Binding IsBidirectional, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="Победитель"
+                                       Style="{StaticResource TextBlock.Subtle}"
+                                       Margin="0,12,0,4" />
+                            <ComboBox ItemsSource="{Binding Winners}"
+                                      SelectedIndex="{Binding SelectedWinnerIndex}"
+                                      Style="{StaticResource ComboBox.Toolbar}"
+                                      HorizontalAlignment="Stretch"
+                                      ToolTip="{Binding WinnerHint}" />
+                        </StackPanel>
                         <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
                                       IsChecked="{Binding Verify}"
                                       MinWidth="0"

@@ -198,6 +198,14 @@
                       VerticalAlignment="Center"
                       Margin="0,0,16,8"
                       ToolTip="Направление синхронизации" />
+            <ComboBox Style="{StaticResource ComboBox.Form}"
+                      ItemsSource="{Binding Winners}"
+                      SelectedIndex="{Binding SelectedWinnerIndex}"
+                      MinWidth="130"
+                      VerticalAlignment="Center"
+                      Margin="0,0,16,8"
+                      Visibility="{Binding WinnerApplicable, Converter={StaticResource BoolToVisibility}}"
+                      ToolTip="Победитель (двусторонний): решает изменённые файлы; при зеркале – что удалять на проигравшей стороне." />
             <CheckBox Content="Зеркало"
                       IsChecked="{Binding Mirror}"
                       IsEnabled="{Binding MirrorApplicable}"

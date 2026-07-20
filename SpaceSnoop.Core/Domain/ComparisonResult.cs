@@ -32,9 +32,9 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
         return stats;
     }
 
-    public void ApplyMode(SyncMode mode, bool mirror = false)
+    public void ApplyMode(SyncMode mode, bool mirror = false, SyncWinner winner = SyncWinner.Newest)
     {
-        ApplyModeRecursive(Root, mode, mirror);
+        ApplyModeRecursive(Root, mode, mirror, winner);
     }
 
     public bool HasUnresolvedConflicts()
@@ -160,36 +160,47 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
         }
     }
 
-    private static void ApplyModeRecursive(DirectoryComparison dir, SyncMode mode, bool mirror)
+    private static void ApplyModeRecursive(DirectoryComparison dir, SyncMode mode, bool mirror, SyncWinner winner)
     {
         foreach (var file in dir.Files)
         {
+            if (file.Status == ComparisonStatus.Conflict)
+            {
+                file.Status = ComparisonStatus.Modified;
+            }
+
             file.Action = mode switch
             {
                 SyncMode.LeftToRight => ApplyLeftToRight(file, mirror),
                 SyncMode.RightToLeft => ApplyRightToLeft(file, mirror),
-                SyncMode.Bidirectional => ApplyBidirectional(file),
+                SyncMode.Bidirectional => ApplyBidirectional(file, mirror, winner),
                 _ => SyncAction.Skip,
             };
         }
 
         foreach (var sub in dir.SubDirectories)
         {
-            sub.Action = ApplyDirMode(sub, mode, mirror);
-            ApplyModeRecursive(sub, mode, mirror);
+            sub.Action = ApplyDirMode(sub, mode, mirror, winner);
+            ApplyModeRecursive(sub, mode, mirror, winner);
         }
     }
 
-    private static SyncAction ApplyDirMode(DirectoryComparison dir, SyncMode mode, bool mirror)
+    private static SyncAction ApplyDirMode(DirectoryComparison dir, SyncMode mode, bool mirror, SyncWinner winner)
     {
         return dir.Status switch
         {
-            ComparisonStatus.LeftOnly => mode == SyncMode.RightToLeft
-                ? mirror ? SyncAction.DeleteLeft : SyncAction.Skip
-                : SyncAction.CopyToRight,
-            ComparisonStatus.RightOnly => mode == SyncMode.LeftToRight
-                ? mirror ? SyncAction.DeleteRight : SyncAction.Skip
-                : SyncAction.CopyToLeft,
+            ComparisonStatus.LeftOnly => mode switch
+            {
+                SyncMode.RightToLeft => mirror ? SyncAction.DeleteLeft : SyncAction.Skip,
+                SyncMode.Bidirectional => mirror && winner == SyncWinner.Right ? SyncAction.DeleteLeft : SyncAction.CopyToRight,
+                _ => SyncAction.CopyToRight,
+            },
+            ComparisonStatus.RightOnly => mode switch
+            {
+                SyncMode.LeftToRight => mirror ? SyncAction.DeleteRight : SyncAction.Skip,
+                SyncMode.Bidirectional => mirror && winner == SyncWinner.Left ? SyncAction.DeleteRight : SyncAction.CopyToLeft,
+                _ => SyncAction.CopyToLeft,
+            },
             _ => SyncAction.None,
         };
     }
@@ -216,33 +227,43 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
         };
     }
 
-    private static SyncAction ApplyBidirectional(FileComparison file)
+    private static SyncAction ApplyBidirectional(FileComparison file, bool mirror, SyncWinner winner)
     {
         switch (file.Status)
         {
             case ComparisonStatus.Modified:
-                if (file.LeftModified > file.RightModified)
+                return winner switch
                 {
-                    return SyncAction.CopyToRight;
-                }
-
-                if (file.RightModified > file.LeftModified)
-                {
-                    return SyncAction.CopyToLeft;
-                }
-
-                file.Status = ComparisonStatus.Conflict;
-                return SyncAction.None;
+                    SyncWinner.Left => SyncAction.CopyToRight,
+                    SyncWinner.Right => SyncAction.CopyToLeft,
+                    _ => ResolveModifiedByNewest(file),
+                };
 
             case ComparisonStatus.LeftOnly:
-                return SyncAction.CopyToRight;
+                return mirror && winner == SyncWinner.Right ? SyncAction.DeleteLeft : SyncAction.CopyToRight;
 
             case ComparisonStatus.RightOnly:
-                return SyncAction.CopyToLeft;
+                return mirror && winner == SyncWinner.Left ? SyncAction.DeleteRight : SyncAction.CopyToLeft;
 
             default:
                 return SyncAction.Skip;
         }
+    }
+
+    private static SyncAction ResolveModifiedByNewest(FileComparison file)
+    {
+        if (file.LeftModified > file.RightModified)
+        {
+            return SyncAction.CopyToRight;
+        }
+
+        if (file.RightModified > file.LeftModified)
+        {
+            return SyncAction.CopyToLeft;
+        }
+
+        file.Status = ComparisonStatus.Conflict;
+        return SyncAction.None;
     }
 
     private static bool HasUnresolvedConflictsRecursive(DirectoryComparison dir)

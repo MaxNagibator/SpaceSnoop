@@ -140,6 +140,82 @@ public class ComparisonResultTests
         }
     }
 
+    [TestCase(SyncWinner.Left, SyncAction.CopyToRight)]
+    [TestCase(SyncWinner.Right, SyncAction.CopyToLeft)]
+    public void ApplyBidirectional_WinnerSide_ResolvesModifiedRegardlessOfDate(SyncWinner winner, SyncAction expected)
+    {
+        var now = DateTime.Now;
+        var earlier = now.AddHours(-1);
+
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("a.txt", "a.txt") { Status = ComparisonStatus.Modified, LeftModified = earlier, RightModified = now });
+        root.Files.Add(new("b.txt", "b.txt") { Status = ComparisonStatus.Modified, LeftModified = now, RightModified = earlier });
+        root.Files.Add(new("l.txt", "l.txt") { Status = ComparisonStatus.LeftOnly });
+        root.Files.Add(new("r.txt", "r.txt") { Status = ComparisonStatus.RightOnly });
+
+        var result = new ComparisonResult("C:\\Left", "C:\\Right", root);
+        result.ApplyMode(SyncMode.Bidirectional, false, winner);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(root.Files[0].Action, Is.EqualTo(expected));
+            Assert.That(root.Files[1].Action, Is.EqualTo(expected));
+            Assert.That(root.Files[0].Status, Is.EqualTo(ComparisonStatus.Modified));
+            Assert.That(root.Files[2].Action, Is.EqualTo(SyncAction.CopyToRight));
+            Assert.That(root.Files[3].Action, Is.EqualTo(SyncAction.CopyToLeft));
+        }
+    }
+
+    [TestCase(SyncWinner.Left)]
+    [TestCase(SyncWinner.Right)]
+    public void ApplyBidirectional_MirrorWinner_DeletesLoserOnlyItems_KeepsWinnerOnly(SyncWinner winner)
+    {
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("left.txt", "left.txt") { Status = ComparisonStatus.LeftOnly });
+        root.Files.Add(new("right.txt", "right.txt") { Status = ComparisonStatus.RightOnly });
+
+        var leftDir = new DirectoryComparison("ld", "ld") { Status = ComparisonStatus.LeftOnly };
+        var rightDir = new DirectoryComparison("rd", "rd") { Status = ComparisonStatus.RightOnly };
+        root.SubDirectories.Add(leftDir);
+        root.SubDirectories.Add(rightDir);
+
+        var result = new ComparisonResult("C:\\Left", "C:\\Right", root);
+        result.ApplyMode(SyncMode.Bidirectional, true, winner);
+
+        var keepLeft = winner == SyncWinner.Left;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(root.Files[0].Action, Is.EqualTo(keepLeft ? SyncAction.CopyToRight : SyncAction.DeleteLeft));
+            Assert.That(root.Files[1].Action, Is.EqualTo(keepLeft ? SyncAction.DeleteRight : SyncAction.CopyToLeft));
+            Assert.That(leftDir.Action, Is.EqualTo(keepLeft ? SyncAction.CopyToRight : SyncAction.DeleteLeft));
+            Assert.That(rightDir.Action, Is.EqualTo(keepLeft ? SyncAction.DeleteRight : SyncAction.CopyToLeft));
+        }
+    }
+
+    [TestCase(SyncWinner.Left, SyncAction.CopyToRight)]
+    [TestCase(SyncWinner.Right, SyncAction.CopyToLeft)]
+    public void ApplyBidirectional_ReapplyWithWinnerSide_ResolvesFileThatNewestFlaggedConflict(SyncWinner winner, SyncAction expected)
+    {
+        var now = DateTime.Now;
+
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("a.txt", "a.txt") { Status = ComparisonStatus.Modified, LeftModified = now, RightModified = now });
+
+        var result = new ComparisonResult("C:\\Left", "C:\\Right", root);
+        result.ApplyMode(SyncMode.Bidirectional, false, SyncWinner.Newest);
+
+        Assume.That(root.Files[0].Status, Is.EqualTo(ComparisonStatus.Conflict));
+
+        result.ApplyMode(SyncMode.Bidirectional, false, winner);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(root.Files[0].Status, Is.EqualTo(ComparisonStatus.Modified));
+            Assert.That(root.Files[0].Action, Is.EqualTo(expected));
+        }
+    }
+
     [Test]
     public void CountPlannedActions_SplitsNewAndModifiedAndDeletes()
     {

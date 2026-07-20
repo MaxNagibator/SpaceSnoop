@@ -40,6 +40,7 @@ public static class SettingsKeys
     public const string SyncExclusions = "wpf.sync.exclusions";
     public const string SyncMode = "wpf.sync.mode";
     public const string SyncMirror = "wpf.sync.mirror";
+    public const string SyncWinner = "wpf.sync.winner";
     public const string SyncShowIdentical = "wpf.sync.show_identical";
     public const string SyncShowSizes = "wpf.sync.show_sizes";
     public const string SyncShowModified = "wpf.sync.show_modified";
@@ -66,6 +67,7 @@ public static class SettingsKeys
     public const string BatchDest = "wpf.batch.dest";
     public const string BatchMode = "wpf.batch.mode";
     public const string BatchMirror = "wpf.batch.mirror";
+    public const string BatchWinner = "wpf.batch.winner";
     public const string BatchExclusions = "wpf.batch.exclusions";
     public const string BatchSort = "wpf.batch.sort";
 

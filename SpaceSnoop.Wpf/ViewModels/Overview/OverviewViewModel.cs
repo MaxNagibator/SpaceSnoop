@@ -395,17 +395,14 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         var right = profile.Right.Trim();
         var mode = HeadlessSync.MapMode(profile.Mode);
         var mirror = profile.Mirror;
+        var winner = profile.Winner;
 
-        if (mirror && mode != SyncMode.Bidirectional)
+        if (mirror && SyncProfile.MirrorSource(mode, winner, left, right) is { } mirrorSource
+            && (!Directory.Exists(mirrorSource) || !Directory.EnumerateFileSystemEntries(mirrorSource).Any()))
         {
-            var source = mode == SyncMode.RightToLeft ? right : left;
-
-            if (!Directory.EnumerateFileSystemEntries(source).Any())
-            {
-                row.Error = "Зеркало отменено: источник пуст.";
-                row.Status = OverviewRunStatus.Error;
-                return;
-            }
+            row.Error = "Зеркало отменено: источник пуст.";
+            row.Status = OverviewRunStatus.Error;
+            return;
         }
 
         row.Comparison = null;
@@ -418,7 +415,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
                 {
                     var filter = new ExclusionFilter(profile.Exclusions);
                     var result = new DirectoryComparer(filter, _comparerLogger).Compare(left, right, token);
-                    result.ApplyMode(mode, mirror);
+                    result.ApplyMode(mode, mirror, winner);
                     result.ResolveAllConflicts(SyncAction.Skip);
                     return new SyncEngine(_engineLogger, false).Execute(result, token);
                 },

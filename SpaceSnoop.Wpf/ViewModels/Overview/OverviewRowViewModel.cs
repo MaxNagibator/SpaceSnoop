@@ -88,6 +88,22 @@ public sealed partial class OverviewRowViewModel : ObservableObject
         _ => "Направление: слева направо. Клик – сменить.",
     };
 
+    public bool WinnerApplicable => Profile.Mode == 2;
+
+    public PackIconLucideKind WinnerIconKind => Profile.Winner switch
+    {
+        SyncWinner.Left => PackIconLucideKind.ArrowLeftToLine,
+        SyncWinner.Right => PackIconLucideKind.ArrowRightToLine,
+        _ => PackIconLucideKind.Clock,
+    };
+
+    public string WinnerTooltip => Profile.Winner switch
+    {
+        SyncWinner.Left => "Победитель: слева. Клик – сменить.",
+        SyncWinner.Right => "Победитель: справа. Клик – сменить.",
+        _ => "Победитель: новее по дате. Клик – сменить.",
+    };
+
     public int DiffCount => LeftOnlyCount + RightOnlyCount + ModifiedCount + ConflictCount;
 
     public bool IsUnchanged =>
@@ -215,6 +231,20 @@ public sealed partial class OverviewRowViewModel : ObservableObject
         OnPropertyChanged(nameof(DirectionIconKind));
         OnPropertyChanged(nameof(DirectionArrow));
         OnPropertyChanged(nameof(DirectionTooltip));
+        OnPropertyChanged(nameof(WinnerApplicable));
+    }
+
+    internal void AdvanceWinner()
+    {
+        Profile.Winner = Profile.Winner switch
+        {
+            SyncWinner.Left => SyncWinner.Right,
+            SyncWinner.Right => SyncWinner.Newest,
+            _ => SyncWinner.Left,
+        };
+
+        OnPropertyChanged(nameof(WinnerIconKind));
+        OnPropertyChanged(nameof(WinnerTooltip));
     }
 
     private static string FormatStamp(DateTime? value)
@@ -254,6 +284,13 @@ public sealed partial class OverviewRowViewModel : ObservableObject
     private void CycleDirection()
     {
         AdvanceDirection();
+        _onDirectionChanged();
+    }
+
+    [RelayCommand]
+    private void CycleWinner()
+    {
+        AdvanceWinner();
         _onDirectionChanged();
     }
 }

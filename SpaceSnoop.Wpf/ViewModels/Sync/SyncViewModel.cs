@@ -13,6 +13,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 {
     private const long MaxDiffBytes = 5 * 1024 * 1024;
     private static readonly SyncMode[] ModeOrder = [SyncMode.LeftToRight, SyncMode.RightToLeft, SyncMode.Bidirectional];
+    private static readonly SyncWinner[] WinnerOrder = [SyncWinner.Newest, SyncWinner.Left, SyncWinner.Right];
     private readonly ISettingsStore _settings;
     private readonly IDialogService _dialogs;
     private readonly ILogger<SyncViewModel> _logger;
@@ -62,6 +63,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     [ObservableProperty]
     private bool _mirror;
+
+    [ObservableProperty]
+    private int _selectedWinnerIndex;
 
     [ObservableProperty]
     private bool _showIdentical;
@@ -144,6 +148,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public IReadOnlyList<string> Modes { get; } = ["Слева направо", "Справа налево", "Двусторонний"];
 
+    public IReadOnlyList<string> Winners { get; } = ["Новее", "Слева", "Справа"];
+
     public bool HasResult => _result is not null;
 
     public bool SyncIsPrimary => HasActionableChanges();
@@ -192,14 +198,25 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _ => "Направление: слева направо. Клик – сменить, ПКМ – поменять пути местами.",
     };
 
-    public bool MirrorApplicable => CurrentMode != SyncMode.Bidirectional;
+    public bool MirrorApplicable => CurrentMode != SyncMode.Bidirectional || CurrentWinner is SyncWinner.Left or SyncWinner.Right;
 
     public bool IsBidirectional => CurrentMode == SyncMode.Bidirectional;
+
+    public bool WinnerIsNewest => CurrentWinner == SyncWinner.Newest;
+
+    public bool ShowConflictResolvers => IsBidirectional && WinnerIsNewest;
+
+    public string WinnerHint => "Победитель решает изменённые и спорные файлы; при зеркале — что удалять на проигравшей стороне.";
 
     public string MirrorHint => CurrentMode switch
     {
         SyncMode.RightToLeft => "Зеркало: удалять слева то, чего нет справа (в корзину).",
-        SyncMode.Bidirectional => "Зеркало доступно только при одностороннем направлении.",
+        SyncMode.Bidirectional => CurrentWinner switch
+        {
+            SyncWinner.Left => "Зеркало победителя: удалять справа то, чего нет слева (в корзину).",
+            SyncWinner.Right => "Зеркало победителя: удалять слева то, чего нет справа (в корзину).",
+            _ => "Зеркало доступно при победителе «Слева» или «Справа».",
+        },
         _ => "Зеркало: удалять справа то, чего нет слева (в корзину).",
     };
 
@@ -405,6 +422,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     private SyncMode CurrentMode => ModeOrder[Math.Clamp(SelectedModeIndex, 0, ModeOrder.Length - 1)];
 
+    private SyncWinner CurrentWinner => WinnerOrder[Math.Clamp(SelectedWinnerIndex, 0, WinnerOrder.Length - 1)];
+
     private PlannedActions CurrentPlan => _result?.CountPlannedActions() ?? new(0, 0, 0, 0, 0);
 
     public void NotifyActionsChanged()
@@ -526,6 +545,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         Exclusions = profile.Exclusions;
         SelectedModeIndex = Math.Clamp(profile.Mode, 0, ModeOrder.Length - 1);
         Mirror = profile.Mirror;
+        SelectedWinnerIndex = SyncProfile.IndexOfWinner(profile.Winner);
 
         if (comparison is null)
         {
@@ -980,7 +1000,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _result = comparison;
         _dirSizeCache = BuildDirSizeCache(comparison.Root);
         _outcomes = [];
-        comparison.ApplyMode(CurrentMode, Mirror);
+        comparison.ApplyMode(CurrentMode, Mirror, CurrentWinner);
         CollapseAllDirectories(comparison.Root);
         RebuildRows();
         UpdateSummary();
@@ -1086,12 +1106,13 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         var mode = CurrentMode;
         var mirror = Mirror;
+        var winner = CurrentWinner;
 
         var prepared = await RunAsync("Сравнение каталогов:", (token, progress) =>
         {
             var comparer = new DirectoryComparer(filter, _comparerLogger);
             var compared = comparer.Compare(left, right, token, progress);
-            compared.ApplyMode(mode, mirror);
+            compared.ApplyMode(mode, mirror, winner);
             return new ComparePreparation(compared, BuildDirSizeCache(compared.Root));
         });
 
@@ -1523,6 +1544,20 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         OnPropertyChanged(nameof(IsBidirectional));
         OnPropertyChanged(nameof(MirrorHint));
         OnPropertyChanged(nameof(MirrorDeletes));
+        OnPropertyChanged(nameof(WinnerIsNewest));
+        OnPropertyChanged(nameof(ShowConflictResolvers));
+        ReapplyMode();
+    }
+
+    partial void OnSelectedWinnerIndexChanged(int value)
+    {
+        Persist(SettingsKeys.SyncWinner, value.ToString());
+        Profiles.MarkCurrent();
+        OnPropertyChanged(nameof(MirrorApplicable));
+        OnPropertyChanged(nameof(MirrorHint));
+        OnPropertyChanged(nameof(MirrorDeletes));
+        OnPropertyChanged(nameof(WinnerIsNewest));
+        OnPropertyChanged(nameof(ShowConflictResolvers));
         ReapplyMode();
     }
 
@@ -1547,7 +1582,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             return;
         }
 
-        _result.ApplyMode(CurrentMode, Mirror);
+        _result.ApplyMode(CurrentMode, Mirror, CurrentWinner);
         RebuildRows();
         UpdateSummary();
     }
@@ -2111,6 +2146,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             Right = RightPath.Trim(),
             Mode = SelectedModeIndex,
             Mirror = Mirror,
+            Winner = CurrentWinner,
             Exclusions = Exclusions.Trim(),
             Interval = existing?.Interval ?? ScheduleInterval.Daily,
             Time = existing?.Time ?? "03:00",
@@ -2128,6 +2164,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         SelectedModeIndex = Math.Clamp(_settings.GetInt(SettingsKeys.SyncMode), 0, ModeOrder.Length - 1);
         Mirror = _settings.GetBool(SettingsKeys.SyncMirror);
+        SelectedWinnerIndex = Math.Clamp(_settings.GetInt(SettingsKeys.SyncWinner), 0, WinnerOrder.Length - 1);
         ShowIdentical = _settings.GetBool(SettingsKeys.SyncShowIdentical);
         ShowSizes = _settings.GetBool(SettingsKeys.SyncShowSizes, AppDefaults.SyncShowSizesDefault);
         ShowModified = _settings.GetBool(SettingsKeys.SyncShowModified);

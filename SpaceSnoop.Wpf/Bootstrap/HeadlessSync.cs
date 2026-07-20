@@ -13,6 +13,7 @@ internal sealed class HeadlessSync
         string name, left, right, exclusions;
         SyncMode mode;
         bool mirror;
+        SyncWinner winner;
 
         if (!string.IsNullOrEmpty(profileId))
         {
@@ -29,6 +30,7 @@ internal sealed class HeadlessSync
             right = profile.Right.Trim();
             mode = MapMode(profile.Mode);
             mirror = profile.Mirror;
+            winner = profile.Winner;
             exclusions = profile.Exclusions;
         }
         else
@@ -38,6 +40,7 @@ internal sealed class HeadlessSync
             right = (settings.GetStringValue(SettingsKeys.SyncRight) ?? string.Empty).Trim();
             mode = MapMode(settings.GetInt(SettingsKeys.SyncMode));
             mirror = settings.GetBool(SettingsKeys.SyncMirror);
+            winner = SyncProfile.WinnerFromIndex(settings.GetInt(SettingsKeys.SyncWinner));
             exclusions = settings.GetStringValue(SettingsKeys.SyncExclusions) ?? string.Empty;
 
             if (string.IsNullOrEmpty(exclusions))
@@ -64,15 +67,11 @@ internal sealed class HeadlessSync
             return 5;
         }
 
-        if (mirror && mode != SyncMode.Bidirectional)
+        if (mirror && SyncProfile.MirrorSource(mode, winner, left, right) is { } mirrorSource
+            && (!Directory.Exists(mirrorSource) || !Directory.EnumerateFileSystemEntries(mirrorSource).Any()))
         {
-            var source = mode == SyncMode.RightToLeft ? right : left;
-
-            if (!Directory.EnumerateFileSystemEntries(source).Any())
-            {
-                logger.HeadlessSyncAborted("зеркало отменено: источник пуст");
-                return 4;
-            }
+            logger.HeadlessSyncAborted("зеркало отменено: источник пуст");
+            return 4;
         }
 
         logger.HeadlessSyncStarted(left, right, mode, mirror);
@@ -102,7 +101,7 @@ internal sealed class HeadlessSync
             var comparer = new DirectoryComparer(filter, NullLogger<DirectoryComparer>.Instance);
             var result = comparer.Compare(left, right, CancellationToken.None);
 
-            result.ApplyMode(mode, mirror);
+            result.ApplyMode(mode, mirror, winner);
             result.ResolveAllConflicts(SyncAction.Skip);
 
             var engine = new SyncEngine(NullLogger<SyncEngine>.Instance, false);
