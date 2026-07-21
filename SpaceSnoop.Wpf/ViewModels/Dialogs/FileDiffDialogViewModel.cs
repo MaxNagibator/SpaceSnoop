@@ -109,12 +109,29 @@ public sealed partial class FileDiffDialogViewModel : ObservableObject, IDialogV
         return "Размер и строки совпадают – различие в служебных метаданных файла.";
     }
 
+    public static string DescribeOneSided(FileComparison file)
+    {
+        return file.Status switch
+        {
+            ComparisonStatus.LeftOnly => $"Файл есть только слева, справа его нет – показано всё содержимое левой стороны ({SizeFormatter.Format(file.LeftSize ?? 0)}).",
+            ComparisonStatus.RightOnly => $"Файл есть только справа, слева его нет – показано всё содержимое правой стороны ({SizeFormatter.Format(file.RightSize ?? 0)}).",
+            _ => string.Empty,
+        };
+    }
+
     private static string BuildSummary(FileComparison file, string? unavailable, bool hasChanges)
     {
+        var oneSided = DescribeOneSided(file);
+
         if (unavailable is not null)
         {
-            var reason = DescribeHiddenDifference(file);
+            var reason = oneSided.Length > 0 ? oneSided : DescribeHiddenDifference(file);
             return reason.Length == 0 ? unavailable : $"{unavailable} {reason}";
+        }
+
+        if (oneSided.Length > 0)
+        {
+            return oneSided;
         }
 
         if (!hasChanges && file.Status != ComparisonStatus.Identical)

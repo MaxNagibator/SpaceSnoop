@@ -163,7 +163,7 @@
                         <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                                   Kind="{x:Static iconPacks:PackIconLucideKind.GitCompareArrows}"
                                                   Foreground="{DynamicResource State.Info}" />
-                        <TextBlock Text="Сравнить содержимое"
+                        <TextBlock Text="{Binding PlacementTarget.DataContext.CompareContentHeader, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                    VerticalAlignment="Center" />
                     </StackPanel>
                 </MenuItem.Header>

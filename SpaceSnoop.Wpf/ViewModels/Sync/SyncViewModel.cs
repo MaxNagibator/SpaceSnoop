@@ -852,14 +852,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         var leftInfo = new FileInfo(leftPath);
         var rightInfo = new FileInfo(rightPath);
 
-        if (!leftInfo.Exists)
+        if (!leftInfo.Exists && !rightInfo.Exists)
         {
-            throw new InvalidOperationException($"Файл не найден: {leftPath}");
-        }
-
-        if (!rightInfo.Exists)
-        {
-            throw new InvalidOperationException($"Файл не найден: {rightPath}");
+            throw new InvalidOperationException($"Файл не найден ни с одной стороны: {leftPath}");
         }
 
         if (DiffUnavailable(leftInfo, out var reason) || DiffUnavailable(rightInfo, out reason))
@@ -867,15 +862,26 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             return FileDiffResult.Unreadable(reason);
         }
 
-        var lines = TextDiff.Compute(File.ReadAllLines(leftPath), File.ReadAllLines(rightPath));
+        var lines = TextDiff.Compute(ReadLines(leftInfo), ReadLines(rightInfo));
         var added = lines.Count(static l => l.Kind == DiffLineKind.Added);
         var removed = lines.Count(static l => l.Kind == DiffLineKind.Removed);
         return new(lines, added, removed, null);
+
+        static string[] ReadLines(FileInfo info)
+        {
+            return info.Exists ? File.ReadAllLines(info.FullName) : [];
+        }
     }
 
     // TODO: бинарь определяем по NUL-байту; кодировку доверяем File.ReadAllLines (BOM → UTF-8)
     private static bool DiffUnavailable(FileInfo info, out string reason)
     {
+        if (!info.Exists)
+        {
+            reason = string.Empty;
+            return false;
+        }
+
         if (info.Length > MaxDiffBytes)
         {
             reason = "Файл велик для построчного сравнения (> 5 МБ) – показано только сводное различие.";

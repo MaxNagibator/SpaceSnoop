@@ -163,7 +163,11 @@ public sealed partial class SyncNodeViewModel : ObservableObject
 
     public GridLength ExpanderColumnWidth => _flat ? new(0) : new GridLength(14);
 
-    public bool CanCompareContent => _file is not null && Status is not (ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly);
+    public bool CanCompareContent => _file is not null;
+
+    public string CompareContentHeader => Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly
+        ? "Показать содержимое"
+        : "Сравнить содержимое";
 
     public bool CanCopyRight => IsFile && Status is ComparisonStatus.LeftOnly or ComparisonStatus.Modified or ComparisonStatus.Conflict;
 

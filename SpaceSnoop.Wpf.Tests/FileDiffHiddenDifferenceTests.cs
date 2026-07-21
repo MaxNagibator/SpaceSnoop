@@ -51,4 +51,30 @@ public class FileDiffHiddenDifferenceTests
 
         Assert.That(text, Does.Contain("метаданных"));
     }
+
+    [TestCase(ComparisonStatus.LeftOnly, "только слева")]
+    [TestCase(ComparisonStatus.RightOnly, "только справа")]
+    public void Односторонний_файл_объясняет_отсутствующую_сторону(ComparisonStatus status, string expected)
+    {
+        var file = new FileComparison("a.txt", "a.txt")
+        {
+            Status = status,
+            LeftSize = status == ComparisonStatus.LeftOnly ? 2048 : null,
+            RightSize = status == ComparisonStatus.RightOnly ? 2048 : null,
+        };
+
+        var text = FileDiffDialogViewModel.DescribeOneSided(file);
+
+        Assert.That(text, Does.Contain(expected).And.Contain("2"));
+    }
+
+    [TestCase(ComparisonStatus.Identical)]
+    [TestCase(ComparisonStatus.Modified)]
+    public void Двусторонний_файл_не_получает_пояснения_об_отсутствии(ComparisonStatus status)
+    {
+        var file = Modified(100, 100, 0);
+        file.Status = status;
+
+        Assert.That(FileDiffDialogViewModel.DescribeOneSided(file), Is.Empty);
+    }
 }
