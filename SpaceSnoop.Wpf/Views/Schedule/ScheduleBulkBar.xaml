@@ -1,0 +1,288 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Schedule.ScheduleBulkBar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Schedule"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:ScheduleViewModel}"
+             d:DesignWidth="900">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Views/Settings/SettingsResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <Style x:Key="Bulk.RowLabel"
+                   TargetType="TextBlock"
+                   BasedOn="{StaticResource Setting.Label}">
+                <Setter Property="VerticalAlignment"
+                        Value="Center" />
+                <Setter Property="Margin"
+                        Value="0,0,14,0" />
+            </Style>
+
+            <Style x:Key="Bulk.Action"
+                   TargetType="Button"
+                   BasedOn="{StaticResource Button.Ghost}">
+                <Setter Property="MinHeight"
+                        Value="{DynamicResource Control.Height.Default}" />
+                <Setter Property="Padding"
+                        Value="12,6" />
+                <Setter Property="Margin"
+                        Value="0,0,8,0" />
+            </Style>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Border Style="{StaticResource Card.Inset}"
+            BorderBrush="{DynamicResource Accent.Primary}"
+            Margin="0,0,0,10"
+            Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}}">
+        <StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0"
+                            Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.CheckCheck}"
+                                              Width="16"
+                                              Height="16"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,10,0"
+                                              Foreground="{DynamicResource Accent.Primary}" />
+                    <TextBlock Text="{Binding SelectionSummary}"
+                               VerticalAlignment="Center"
+                               FontWeight="{DynamicResource Font.Weight.SemiBold}"
+                               Foreground="{DynamicResource Fg.Primary}" />
+                </StackPanel>
+
+                <Button Grid.Column="1"
+                        Style="{StaticResource Button.Ghost}"
+                        Command="{Binding ClearSelectionCommand}"
+                        MinHeight="{DynamicResource Control.Height.Default}"
+                        Padding="12,6">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.X}"
+                                                  Width="13"
+                                                  Height="13"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,6,0" />
+                        <TextBlock Text="Снять выделение" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+
+            <Grid Margin="0,14,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0"
+                           Grid.Column="0"
+                           Text="Направление"
+                           Style="{StaticResource Bulk.RowLabel}" />
+                <ListBox Grid.Row="0"
+                         Grid.Column="1"
+                         Style="{StaticResource ListBox.Segmented}"
+                         ItemsSource="{Binding Modes}"
+                         SelectedIndex="{Binding BulkModeIndex}"
+                         HorizontalAlignment="Left"
+                         AutomationProperties.Name="Направление для выбранных профилей" />
+
+                <TextBlock Grid.Row="1"
+                           Grid.Column="0"
+                           Text="Победитель"
+                           Style="{StaticResource Bulk.RowLabel}"
+                           Margin="0,10,14,0" />
+                <ListBox Grid.Row="1"
+                         Grid.Column="1"
+                         Style="{StaticResource ListBox.Segmented}"
+                         ItemsSource="{Binding Winners}"
+                         SelectedIndex="{Binding BulkWinnerIndex}"
+                         HorizontalAlignment="Left"
+                         Margin="0,10,0,0"
+                         ToolTip="Действует только в двустороннем режиме"
+                         AutomationProperties.Name="Победитель для выбранных профилей" />
+
+                <TextBlock Grid.Row="2"
+                           Grid.Column="0"
+                           Text="Зеркало"
+                           Style="{StaticResource Bulk.RowLabel}"
+                           Margin="0,12,14,0" />
+                <StackPanel Grid.Row="2"
+                            Grid.Column="1"
+                            Orientation="Horizontal"
+                            Margin="0,12,0,0">
+                    <Button Style="{StaticResource Bulk.Action}"
+                            Command="{Binding BulkMirrorOnCommand}"
+                            ToolTip="Удалять на приёмнике лишнее (применяется там, где зеркало допустимо)">
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FlipHorizontal2}"
+                                                      Width="13"
+                                                      Height="13"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,6,0" />
+                            <TextBlock Text="Включить" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource Bulk.Action}"
+                            Command="{Binding BulkMirrorOffCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Ban}"
+                                                      Width="13"
+                                                      Height="13"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,6,0" />
+                            <TextBlock Text="Выключить" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <TextBlock Grid.Row="3"
+                           Grid.Column="0"
+                           Text="Исключения"
+                           Style="{StaticResource Bulk.RowLabel}"
+                           Margin="0,12,14,0" />
+                <Grid Grid.Row="3"
+                      Grid.Column="1"
+                      Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox Grid.Column="0"
+                             Text="{Binding BulkExclusions, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource TextBox.Toolbar}"
+                             VerticalAlignment="Center"
+                             ToolTip="Через запятую, например .git,bin,obj. Пустое поле очищает исключения."
+                             AutomationProperties.Name="Исключения для выбранных профилей" />
+                    <Button Grid.Column="1"
+                            Style="{StaticResource Bulk.Action}"
+                            Command="{Binding BulkApplyExclusionsCommand}"
+                            Margin="8,0,0,0"
+                            Content="Применить" />
+                </Grid>
+
+                <TextBlock Grid.Row="4"
+                           Grid.Column="0"
+                           Text="Расписание"
+                           Style="{StaticResource Bulk.RowLabel}"
+                           Margin="0,12,14,0" />
+                <StackPanel Grid.Row="4"
+                            Grid.Column="1"
+                            Orientation="Horizontal"
+                            Margin="0,12,0,0">
+                    <ComboBox Style="{StaticResource ComboBox.Form}"
+                              ItemsSource="{Binding Intervals}"
+                              SelectedIndex="{Binding BulkIntervalIndex}"
+                              Width="200"
+                              VerticalAlignment="Center"
+                              Margin="0,0,8,0"
+                              AutomationProperties.Name="Периодичность для выбранных профилей" />
+                    <TextBox Text="{Binding BulkTime, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource TextBox.Toolbar}"
+                             Width="90"
+                             VerticalAlignment="Center"
+                             Margin="0,0,8,0"
+                             ToolTip="Время запуска в формате ЧЧ:ММ"
+                             AutomationProperties.Name="Время запуска для выбранных профилей" />
+                    <Button Style="{StaticResource Bulk.Action}"
+                            Command="{Binding BulkApplyScheduleCommand}"
+                            Content="Применить" />
+                </StackPanel>
+
+                <TextBlock Grid.Row="5"
+                           Grid.Column="0"
+                           Text="Автозапуск"
+                           Style="{StaticResource Bulk.RowLabel}"
+                           Margin="0,12,14,0" />
+                <Grid Grid.Row="5"
+                      Grid.Column="1"
+                      Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Button Grid.Column="0"
+                            Style="{StaticResource Bulk.Action}"
+                            Command="{Binding BulkEnableCommand}"
+                            ToolTip="Создать задачи Планировщика для выбранных профилей">
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.CalendarCheck}"
+                                                      Width="13"
+                                                      Height="13"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,6,0" />
+                            <TextBlock Text="Включить" />
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="1"
+                            Style="{StaticResource Bulk.Action}"
+                            HorizontalAlignment="Left"
+                            Command="{Binding BulkDisableCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.CalendarOff}"
+                                                      Width="13"
+                                                      Height="13"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,6,0" />
+                            <TextBlock Text="Выключить" />
+                        </StackPanel>
+                    </Button>
+
+                    <Button Grid.Column="2"
+                            Style="{StaticResource Button.Ghost}"
+                            Command="{Binding BulkDeleteCommand}"
+                            Foreground="{DynamicResource State.Error}"
+                            MinHeight="{DynamicResource Control.Height.Default}"
+                            Padding="12,6"
+                            ToolTip="Удалить выбранные профили и их задачи в Планировщике">
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                                      Width="13"
+                                                      Height="13"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,6,0" />
+                            <TextBlock Text="Удалить выбранные" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Grid>
+
+            <TextBlock Text="{Binding BulkMessage}"
+                       TextWrapping="Wrap">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock"
+                           BasedOn="{StaticResource Setting.Hint}">
+                        <Setter Property="Margin"
+                                Value="0,12,0,0" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding BulkMessage}"
+                                         Value="">
+                                <Setter Property="Visibility"
+                                        Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </StackPanel>
+    </Border>
+</UserControl>

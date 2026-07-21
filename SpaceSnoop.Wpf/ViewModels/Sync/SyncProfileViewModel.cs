@@ -59,6 +59,9 @@ public sealed partial class SyncProfileViewModel : ObservableObject
     private bool _isEditing;
 
     [ObservableProperty]
+    private bool _isSelected;
+
+    [ObservableProperty]
     private bool _confirmingDelete;
 
     [ObservableProperty]
@@ -205,6 +208,11 @@ public sealed partial class SyncProfileViewModel : ObservableObject
         }
     }
 
+    partial void OnIsSelectedChanged(bool value)
+    {
+        _parent.NotifySelectionChanged();
+    }
+
     partial void OnEnabledChanged(bool value)
     {
         if (_suppress)
@@ -212,16 +220,27 @@ public sealed partial class SyncProfileViewModel : ObservableObject
             return;
         }
 
+        ApplyEnabled(value);
+        _parent.Persist();
+    }
+
+    internal bool ApplyEnabled(bool value)
+    {
         if (value && !ValidateForScheduling(out var reason))
         {
             Message = reason;
             _suppress = true;
             Enabled = false;
             _suppress = false;
-            return;
+            return false;
         }
 
-        Apply();
+        _suppress = true;
+        Enabled = value;
+        _suppress = false;
+
+        ApplySchedule();
+        return true;
     }
 
     [RelayCommand]
@@ -241,6 +260,7 @@ public sealed partial class SyncProfileViewModel : ObservableObject
     {
         Message = string.Empty;
         ConfirmingDelete = false;
+        IsSelected = false;
         IsEditing = true;
     }
 
@@ -340,7 +360,11 @@ public sealed partial class SyncProfileViewModel : ObservableObject
     private void Apply()
     {
         _parent.Persist();
+        ApplySchedule();
+    }
 
+    internal void ApplySchedule()
+    {
         if (Enabled)
         {
             TimeSpan.TryParse(Time, out var time);
@@ -391,7 +415,7 @@ public sealed partial class SyncProfileViewModel : ObservableObject
             return false;
         }
 
-        if (TimeApplicable && (!TimeSpan.TryParse(Time, out var time) || time < TimeSpan.Zero || time.TotalHours >= 24))
+        if (TimeApplicable && !SyncProfile.IsValidTime(Time))
         {
             reason = "Время укажите в формате ЧЧ:ММ, например 03:00.";
             return false;

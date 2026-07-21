@@ -201,7 +201,7 @@ public class SyncQuickProfileTests
     {
         var notifier = new ToastNotifier(new(), new(new MemorySettings()));
         return new(settings,
-            new Dialogs(),
+            new NoopDialogs(),
             new(settings),
             NullLogger<SyncViewModel>.Instance,
             NullLogger<SyncEngine>.Instance,
@@ -209,62 +209,4 @@ public class SyncQuickProfileTests
             notifier);
     }
 
-    private sealed class MemorySettings : ISettingsStore
-    {
-        private readonly Dictionary<string, string> _values = [];
-
-        public event EventHandler<string>? Changed;
-
-        public string FilePath => string.Empty;
-
-        public string? GetStringValue(string key)
-        {
-            return _values.GetValueOrDefault(key);
-        }
-
-        public void SetValue(string key, string value)
-        {
-            _values[key] = value;
-            Changed?.Invoke(this, key);
-        }
-
-        public void Flush()
-        {
-        }
-    }
-
-    private sealed class Dialogs : IDialogService
-    {
-        public Task<bool> ShowAsync(IDialogViewModel viewModel)
-        {
-            return Task.FromResult(false);
-        }
-
-        public Task<bool> ReplaceAsync(IDialogViewModel viewModel)
-        {
-            return Task.FromResult(false);
-        }
-
-        public bool Confirm(string title, string message, bool defaultYes = false)
-        {
-            return true;
-        }
-
-        public bool ConfirmWarning(string title, string message, bool defaultYes = false)
-        {
-            return true;
-        }
-
-        public void Info(string title, string message)
-        {
-        }
-
-        public void Warning(string title, string message)
-        {
-        }
-
-        public void Error(string title, string message)
-        {
-        }
-    }
 }

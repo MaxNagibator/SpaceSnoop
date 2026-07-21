@@ -83,6 +83,11 @@
 
                     <StackPanel Grid.Column="0"
                                 Orientation="Horizontal">
+                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                  VerticalAlignment="Center"
+                                  Margin="0,0,10,0"
+                                  ToolTip="Выбрать для пакетного редактирования"
+                                  AutomationProperties.Name="Выбрать профиль" />
                         <iconPacks:PackIconLucide Kind="{Binding StatusIconKind}"
                                                   Width="16"
                                                   Height="16"

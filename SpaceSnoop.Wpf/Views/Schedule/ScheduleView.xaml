@@ -71,6 +71,22 @@
                 <StackPanel Grid.Column="1"
                             Orientation="Horizontal">
                     <Button Style="{StaticResource Button.Ghost}"
+                            Command="{Binding SelectAllProfilesCommand}"
+                            MinHeight="{DynamicResource Control.Height.Default}"
+                            Padding="14,6"
+                            Margin="0,0,8,0"
+                            Visibility="{Binding HasProfiles, Converter={StaticResource BoolToVisibility}}"
+                            ToolTip="Выбрать все профили для пакетного редактирования">
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.CheckCheck}"
+                                                      Width="14"
+                                                      Height="14"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,6,0" />
+                            <TextBlock Text="Выбрать все" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource Button.Ghost}"
                             Command="{Binding CreateBatchCommand}"
                             MinHeight="{DynamicResource Control.Height.Default}"
                             Padding="14,6"
@@ -110,6 +126,8 @@
                                Style="{StaticResource Setting.Hint}" />
                 </StackPanel>
             </Border>
+
+            <schedule:ScheduleBulkBar />
 
             <ItemsControl ItemsSource="{Binding Profiles}">
                 <ItemsControl.ItemTemplate>

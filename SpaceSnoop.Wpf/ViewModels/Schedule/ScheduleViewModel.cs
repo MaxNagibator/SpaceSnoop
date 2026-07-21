@@ -12,6 +12,24 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
     private bool _migrated;
     private bool _persisting;
 
+    [ObservableProperty]
+    private int _bulkModeIndex = -1;
+
+    [ObservableProperty]
+    private int _bulkWinnerIndex = -1;
+
+    [ObservableProperty]
+    private int _bulkIntervalIndex = -1;
+
+    [ObservableProperty]
+    private string _bulkTime = "03:00";
+
+    [ObservableProperty]
+    private string _bulkExclusions = string.Empty;
+
+    [ObservableProperty]
+    private string _bulkMessage = string.Empty;
+
     public ScheduleViewModel(ISettingsStore settings, IDialogService dialogs, ILogger<ScheduleViewModel> logger)
     {
         Settings = settings;
@@ -19,7 +37,13 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
         _logger = logger;
 
         ReloadProfiles();
-        Profiles.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasProfiles));
+
+        Profiles.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(HasProfiles));
+            NotifySelectionChanged();
+        };
+
         Settings.Changed += OnSettingsChanged;
     }
 
@@ -36,6 +60,12 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
     public ObservableCollection<ScheduleRunEntry> History { get; } = [];
 
     public bool HasProfiles => Profiles.Count > 0;
+
+    public int SelectedCount => Profiles.Count(profile => profile.IsSelected);
+
+    public bool HasSelection => SelectedCount > 0;
+
+    public string SelectionSummary => $"Выбрано профилей: {SelectedCount} из {Profiles.Count}";
 
     public bool HasHistory => History.Count > 0;
 
@@ -104,9 +134,278 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
         _logger.ScheduleTaskFailed(name, error);
     }
 
+    public void NotifySelectionChanged()
+    {
+        OnPropertyChanged(nameof(SelectedCount));
+        OnPropertyChanged(nameof(HasSelection));
+        OnPropertyChanged(nameof(SelectionSummary));
+
+        BulkModeIndex = -1;
+        BulkWinnerIndex = -1;
+        BulkIntervalIndex = -1;
+        BulkMessage = string.Empty;
+    }
+
     internal static bool LineHasErrors(string line)
     {
         return !line.Contains(", 0 ошибок", StringComparison.Ordinal);
+    }
+
+    partial void OnBulkModeIndexChanged(int value)
+    {
+        if (value < 0)
+        {
+            return;
+        }
+
+        if (!ConfirmDirectionChange(value))
+        {
+            BulkModeIndex = -1;
+            return;
+        }
+
+        ApplyToSelected(profile => profile.SelectedModeIndex = value, $"направление «{SyncOptions.Modes[value].Text}»");
+    }
+
+    partial void OnBulkWinnerIndexChanged(int value)
+    {
+        if (value < 0)
+        {
+            return;
+        }
+
+        ApplyToSelected(profile => profile.SelectedWinnerIndex = value, $"победитель «{SyncOptions.Winners[value].Text}»");
+    }
+
+    [RelayCommand]
+    private void SelectAllProfiles()
+    {
+        SetSelection(true);
+    }
+
+    [RelayCommand]
+    private void ClearSelection()
+    {
+        SetSelection(false);
+    }
+
+    [RelayCommand]
+    private void BulkMirrorOn()
+    {
+        SetMirror(true);
+    }
+
+    [RelayCommand]
+    private void BulkMirrorOff()
+    {
+        SetMirror(false);
+    }
+
+    [RelayCommand]
+    private void BulkEnable()
+    {
+        SetEnabled(true);
+    }
+
+    [RelayCommand]
+    private void BulkDisable()
+    {
+        SetEnabled(false);
+    }
+
+    [RelayCommand]
+    private void BulkApplyExclusions()
+    {
+        var value = BulkExclusions.Trim();
+
+        ApplyToSelected(
+            profile => profile.Exclusions = value,
+            value.Length == 0 ? "исключения очищены" : $"исключения «{value}»");
+    }
+
+    [RelayCommand]
+    private void BulkApplySchedule()
+    {
+        if (BulkIntervalIndex < 0)
+        {
+            BulkMessage = "Выберите периодичность.";
+            return;
+        }
+
+        var interval = BulkIntervalIndex;
+        var time = BulkTime.Trim();
+        var timeApplicable = interval != 2;
+
+        if (timeApplicable && !SyncProfile.IsValidTime(time))
+        {
+            BulkMessage = "Время укажите в формате ЧЧ:ММ, например 03:00.";
+            return;
+        }
+
+        ApplyToSelected(
+            profile =>
+            {
+                profile.SelectedIntervalIndex = interval;
+
+                if (timeApplicable)
+                {
+                    profile.Time = time;
+                }
+            },
+            $"расписание «{Intervals[interval]}»",
+            reschedule: true);
+    }
+
+    [RelayCommand]
+    private void BulkDelete()
+    {
+        var targets = SelectedProfiles();
+
+        if (targets.Length == 0)
+        {
+            return;
+        }
+
+        var choice = StyledMessageBox.Show($"""
+                                            Удалить выбранные профили ({targets.Length}) и их задачи в Планировщике?
+
+                                            Синхронизированные файлы не затрагиваются.
+                                            """,
+            "Удаление профилей",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (choice != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        foreach (var profile in targets)
+        {
+            SyncScheduler.Remove(profile.TaskName, out _);
+            Profiles.Remove(profile);
+        }
+
+        Persist();
+        BulkMessage = string.Empty;
+        _logger.ScheduleBulkRemoved(targets.Length);
+    }
+
+    private SyncProfileViewModel[] SelectedProfiles()
+    {
+        return Profiles.Where(profile => profile.IsSelected).ToArray();
+    }
+
+    private void SetSelection(bool value)
+    {
+        foreach (var profile in Profiles)
+        {
+            profile.IsSelected = value;
+        }
+    }
+
+    private bool ConfirmDirectionChange(int mode)
+    {
+        var mirrored = SelectedProfiles().Count(profile => profile.Mirror && profile.SelectedModeIndex != mode);
+
+        if (mirrored == 0)
+        {
+            return true;
+        }
+
+        var side = mode switch
+        {
+            1 => "слева",
+            2 => "на проигравшей стороне",
+            _ => "справа",
+        };
+
+        var choice = StyledMessageBox.Show($"""
+                                            У выбранных профилей с включённым «Зеркалом» ({mirrored}) смена направления меняет сторону удаления: лишнее будет уходить в корзину {side}.
+
+                                            Сменить направление?
+                                            """,
+            "Смена направления",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        return choice == MessageBoxResult.Yes;
+    }
+
+    private void SetMirror(bool value)
+    {
+        var selected = SelectedProfiles();
+        var targets = Array.FindAll(selected, profile => profile.MirrorApplicable);
+        var skipped = selected.Length - targets.Length;
+
+        if (targets.Length == 0)
+        {
+            BulkMessage = $"Зеркало неприменимо ни к одному из выбранных ({skipped}): в двустороннем режиме нужен победитель «Слева» или «Справа».";
+            return;
+        }
+
+        ApplyTo(targets, profile => profile.Mirror = value, value ? "зеркало включено" : "зеркало выключено");
+
+        if (skipped > 0)
+        {
+            BulkMessage += $", пропущено {skipped} (зеркало неприменимо)";
+        }
+    }
+
+    private void SetEnabled(bool value)
+    {
+        var targets = SelectedProfiles();
+
+        if (targets.Length == 0)
+        {
+            return;
+        }
+
+        // TODO: задачи Планировщика переписываются синхронно на UI-потоке; при десятках профилей выносить в Task.Run с индикатором прогресса
+        var applied = targets.Count(profile => profile.ApplyEnabled(value));
+
+        Persist();
+
+        BulkMessage = value
+            ? $"Включено: {applied} из {targets.Length}" + (applied < targets.Length ? " (остальные не прошли проверку, причина в карточке)" : string.Empty)
+            : $"Выключено: {applied}";
+
+        _logger.ScheduleBulkApplied(value ? "включение" : "выключение", applied);
+    }
+
+    private void ApplyToSelected(Action<SyncProfileViewModel> apply, string what, bool reschedule = false)
+    {
+        ApplyTo(SelectedProfiles(), apply, what, reschedule);
+    }
+
+    private void ApplyTo(SyncProfileViewModel[] targets, Action<SyncProfileViewModel> apply, string what, bool reschedule = false)
+    {
+        if (targets.Length == 0)
+        {
+            BulkMessage = "Ни один профиль не подходит для этого действия.";
+            return;
+        }
+
+        foreach (var profile in targets)
+        {
+            apply(profile);
+        }
+
+        Persist();
+
+        if (reschedule)
+        {
+            foreach (var profile in targets)
+            {
+                if (profile.Enabled)
+                {
+                    profile.ApplySchedule();
+                }
+            }
+        }
+
+        BulkMessage = $"Применено к {targets.Length}: {what}";
+        _logger.ScheduleBulkApplied(what, targets.Length);
     }
 
     private void OnSettingsChanged(object? sender, string key)
