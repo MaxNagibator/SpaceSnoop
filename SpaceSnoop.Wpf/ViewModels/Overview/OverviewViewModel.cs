@@ -475,6 +475,39 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         return !IsBusy && Rows.Count > 0;
     }
 
+    public void ApplyProfileRun(SyncProfileRun run)
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        var row = Rows.FirstOrDefault(item => string.Equals(item.Profile.Id, run.ProfileId, StringComparison.Ordinal));
+
+        if (row is null)
+        {
+            return;
+        }
+
+        row.Error = null;
+        row.ElapsedMs = run.ElapsedMs;
+
+        if (run.Report is { } report)
+        {
+            row.Comparison = null;
+            row.ApplySyncReport(report);
+        }
+        else if (run.Comparison is { } comparison)
+        {
+            row.ApplyStatistics(comparison.GetStatistics(), comparison.GetDirectoryStatistics());
+            row.ApplyFreshness(SyncFreshness.Compute(comparison.Root));
+            row.Comparison = comparison;
+            row.Status = OverviewRunStatus.Compared;
+        }
+
+        RefreshView();
+    }
+
     private void ReloadRows()
     {
         Rows.Clear();

@@ -32,6 +32,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private Dictionary<object, SyncOutcome> _outcomes = [];
     private Dictionary<DirectoryComparison, (long Left, long Right)>? _dirSizeCache;
     private CancellationTokenSource? _cts;
+    private string? _activeProfileId;
     private bool _suppressPersist;
     private bool _gitPromptDeclined;
     private bool _gitGroupExpanded;
@@ -137,6 +138,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         Profiles.Load();
         _settings.Changed += OnSettingsChanged;
     }
+
+    public event Action<SyncProfileRun>? ProfileRunCompleted;
 
     public static int[] GitHistoryCounts { get; } = [4, 8, 16, 32];
 
@@ -546,6 +549,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         SelectedModeIndex = Math.Clamp(profile.Mode, 0, ModeOrder.Length - 1);
         Mirror = profile.Mirror;
         SelectedWinnerIndex = SyncProfile.IndexOfWinner(profile.Winner);
+        _activeProfileId = profile.Id;
 
         if (comparison is null)
         {
@@ -1139,6 +1143,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         StatusCaption = SummaryText;
 
         _logger.CompareFinished(_total, (long)stopwatch.Elapsed.TotalMilliseconds);
+        RaiseProfileRun(_result, null, (long)stopwatch.Elapsed.TotalMilliseconds);
 
         await ReadGitStateAsync();
         await OfferToSkipGitAsync();
@@ -1430,6 +1435,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _outcomes = SyncOutcomes.Build(result, report.Errors, report.Mismatches);
         RebuildRows();
         RefreshLedgerAfterSync();
+        RaiseProfileRun(null, report, (long)stopwatch.Elapsed.TotalMilliseconds);
         await ReadGitStateAsync();
 
         var verifyText = verify ? $", расхождений: {report.Mismatches.Count:N0}" : string.Empty;
@@ -1695,6 +1701,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     {
         Persist(SettingsKeys.SyncLeft, value);
         LeftPathInvalid = PathMissing(value);
+        _activeProfileId = null;
         Profiles.MarkCurrent();
         DiscardComparisonIfPathChanged();
     }
@@ -1703,8 +1710,17 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     {
         Persist(SettingsKeys.SyncRight, value);
         RightPathInvalid = PathMissing(value);
+        _activeProfileId = null;
         Profiles.MarkCurrent();
         DiscardComparisonIfPathChanged();
+    }
+
+    private void RaiseProfileRun(ComparisonResult? comparison, SyncReport? report, long elapsedMs)
+    {
+        if (_activeProfileId is { } id)
+        {
+            ProfileRunCompleted?.Invoke(new(id, comparison, report, elapsedMs));
+        }
     }
 
     private void DiscardComparisonIfPathChanged()

@@ -76,6 +76,8 @@ public sealed partial class ShellViewModel : ShellViewModelBase
             Selected = syncItem;
         };
 
+        sync.ProfileRunCompleted += overview.ApplyProfileRun;
+
         _settingsItem = new("Настройки", PackIconLucideKind.Settings, settingsPage);
 
         IsNavCollapsed = Preferences.NavCollapsed;
