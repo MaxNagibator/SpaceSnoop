@@ -5,7 +5,7 @@ namespace SpaceSnoop.Wpf.ViewModels.Overview;
 public sealed partial class OverviewRowViewModel : ObservableObject
 {
     private readonly Action<SyncProfile, ComparisonResult?> _openInSync;
-    private readonly Action _onDirectionChanged;
+    private readonly Action _persist;
 
     private FreshnessSummary _freshness;
 
@@ -50,11 +50,11 @@ public sealed partial class OverviewRowViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(StatusText))]
     private string? _error;
 
-    public OverviewRowViewModel(SyncProfile profile, Action<SyncProfile, ComparisonResult?> openInSync, Action onDirectionChanged)
+    public OverviewRowViewModel(SyncProfile profile, Action<SyncProfile, ComparisonResult?> openInSync, Action persist)
     {
         Profile = profile;
         _openInSync = openInSync;
-        _onDirectionChanged = onDirectionChanged;
+        _persist = persist;
     }
 
     public SyncProfile Profile { get; }
@@ -66,6 +66,27 @@ public sealed partial class OverviewRowViewModel : ObservableObject
     public string Left => Profile.Left;
 
     public string Right => Profile.Right;
+
+    public bool IncludeInBatch
+    {
+        get => !Profile.SkipInBatch;
+        set
+        {
+            if (value == IncludeInBatch)
+            {
+                return;
+            }
+
+            Profile.SkipInBatch = !value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(BatchTooltip));
+            _persist();
+        }
+    }
+
+    public string BatchTooltip => IncludeInBatch
+        ? "Профиль участвует в «Сравнить все» и «Синхронизировать всё». Клик – исключить из пакета."
+        : "Профиль исключён из пакетных операций. Клик – вернуть в пакет.";
 
     public IReadOnlyList<SegmentOption> Modes => SyncOptions.Modes;
 
@@ -84,7 +105,7 @@ public sealed partial class OverviewRowViewModel : ObservableObject
             Profile.Mode = value;
             OnPropertyChanged();
             AdvanceDirectionChanged();
-            _onDirectionChanged();
+            _persist();
         }
     }
 
@@ -103,7 +124,7 @@ public sealed partial class OverviewRowViewModel : ObservableObject
             Profile.Winner = winner;
             OnPropertyChanged();
             AdvanceWinnerChanged();
-            _onDirectionChanged();
+            _persist();
         }
     }
 
@@ -162,7 +183,15 @@ public sealed partial class OverviewRowViewModel : ObservableObject
         _ => null,
     };
 
-    public int FreshnessSkew => _freshness.LeftNewer - _freshness.RightNewer;
+    public int FreshnessOrder => _freshness.Verdict switch
+    {
+        NewerSide.Left => 0,
+        NewerSide.Right => 1,
+        NewerSide.Tie => 2,
+        _ => 3,
+    };
+
+    public double FreshnessLead => _freshness.LeadSeconds;
 
     public bool HasCounts => Status == OverviewRunStatus.Compared;
 
@@ -207,6 +236,7 @@ public sealed partial class OverviewRowViewModel : ObservableObject
         OverviewRunStatus.Synced => SyncSummary(),
         OverviewRunStatus.Unavailable => "Каталог недоступен",
         OverviewRunStatus.Overlap => "Пути пересекаются или вложены",
+        OverviewRunStatus.Skipped => Error ?? "Пропущено",
         OverviewRunStatus.Error => Error ?? "Ошибка",
         _ => "Не сравнивалось",
     };
@@ -219,6 +249,7 @@ public sealed partial class OverviewRowViewModel : ObservableObject
         OverviewRunStatus.Synced => SyncErrors > 0 ? PackIconLucideKind.TriangleAlert : PackIconLucideKind.FolderCheck,
         OverviewRunStatus.Unavailable => PackIconLucideKind.FolderX,
         OverviewRunStatus.Overlap => PackIconLucideKind.TriangleAlert,
+        OverviewRunStatus.Skipped => PackIconLucideKind.SkipForward,
         OverviewRunStatus.Error => PackIconLucideKind.CircleX,
         _ => PackIconLucideKind.Minus,
     };
@@ -262,7 +293,8 @@ public sealed partial class OverviewRowViewModel : ObservableObject
         OnPropertyChanged(nameof(NewerIsLeft));
         OnPropertyChanged(nameof(NewerIsRight));
         OnPropertyChanged(nameof(NewestModified));
-        OnPropertyChanged(nameof(FreshnessSkew));
+        OnPropertyChanged(nameof(FreshnessOrder));
+        OnPropertyChanged(nameof(FreshnessLead));
     }
 
     internal void AdvanceDirection()

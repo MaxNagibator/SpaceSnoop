@@ -15,6 +15,7 @@ public sealed class SyncProfile
     public ScheduleInterval Interval { get; set; } = ScheduleInterval.Daily;
     public string Time { get; set; } = "03:00";
     public bool Enabled { get; set; }
+    public bool SkipInBatch { get; set; }
 
     public static SyncWinner WinnerFromIndex(int index)
     {

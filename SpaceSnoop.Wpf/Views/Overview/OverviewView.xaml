@@ -133,6 +133,22 @@
                                 Orientation="Horizontal"
                                 VerticalAlignment="Center">
                         <Button Style="{StaticResource Button.Ghost}"
+                                Command="{Binding SkipCurrentCommand}"
+                                MinHeight="{DynamicResource Control.Height.Default}"
+                                Padding="14,6"
+                                Margin="0,0,8,0"
+                                ToolTip="Пропустить текущий профиль и перейти к следующему"
+                                Visibility="{Binding IsBatchRunning, Converter={StaticResource BoolToVisibility}}">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.SkipForward}"
+                                                          Width="14"
+                                                          Height="14"
+                                                          VerticalAlignment="Center"
+                                                          Margin="0,0,6,0" />
+                                <TextBlock Text="Пропустить" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource Button.Ghost}"
                                 Command="{Binding CancelCommand}"
                                 Content="Отмена"
                                 MinHeight="{DynamicResource Control.Height.Default}"
@@ -247,7 +263,7 @@
                               Margin="8,0,0,0"
                               HorizontalAlignment="Stretch"
                               VerticalAlignment="Center"
-                              ToolTip="Сортировка профилей. Дата – по самому свежему файлу; свежесть – по стороне, которая свежее (слева/справа), и насколько перевес.">
+                              ToolTip="Сортировка профилей. Дата – по самому свежему файлу; свежесть – группами по бейджу: сначала где свежее слева, затем справа, потом поровну и не сравнённые; внутри группы – по величине разрыва.">
                         <ComboBoxItem Content="Исходный порядок"
                                       Tag="{x:Static vm:OverviewSortField.None}" />
                         <ComboBoxItem Content="По имени"

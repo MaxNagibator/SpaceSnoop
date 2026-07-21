@@ -39,6 +39,13 @@ internal readonly record struct FreshnessSummary(
                 : NewerSide.Right;
         }
     }
+
+    public double LeadSeconds => (LeftChangedMax, RightChangedMax) switch
+    {
+        ({ } left, { } right) => Math.Abs((left - right).TotalSeconds),
+        (null, null) => 0,
+        _ => double.MaxValue,
+    };
 }
 
 internal static class SyncFreshness

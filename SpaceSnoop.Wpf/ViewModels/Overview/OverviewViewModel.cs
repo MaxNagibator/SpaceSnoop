@@ -18,12 +18,16 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
     private readonly ILogger<SyncEngine> _engineLogger;
 
     private CancellationTokenSource? _cts;
+    private CancellationTokenSource? _rowCts;
     private bool _suppressReload;
     private readonly bool _suppressPersist;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CompareAllCommand), nameof(SyncRowCommand), nameof(SyncAllCommand), nameof(CycleAllDirectionsCommand))]
     private bool _isBusy;
+
+    [ObservableProperty]
+    private bool _isBatchRunning;
 
     [ObservableProperty]
     private string _searchText = string.Empty;
@@ -120,26 +124,29 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         _cts = new();
         var token = _cts.Token;
 
+        var targets = BatchTargets();
+
         IsBusy = true;
+        IsBatchRunning = true;
         IsIndeterminate = false;
-        ProgressMax = Rows.Count;
+        ProgressMax = targets.Count;
         ProgressValue = 0;
 
-        var total = Rows.Count;
+        var total = targets.Count;
         var compared = 0;
         var failed = 0;
-        var skipped = 0;
+        var skipped = Rows.Count - total;
         var stopwatch = Stopwatch.StartNew();
 
         _logger.OverviewCompareStarted(total);
 
         try
         {
-            for (var i = 0; i < Rows.Count; i++)
+            for (var i = 0; i < targets.Count; i++)
             {
                 token.ThrowIfCancellationRequested();
 
-                var row = Rows[i];
+                var row = targets[i];
                 ProgressValue = i;
                 StatusCaption = $"Пара {i + 1} из {total} · {row.Name}";
 
@@ -156,12 +163,14 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
                 row.Comparison = null;
                 row.Status = OverviewRunStatus.Comparing;
                 var rowStopwatch = Stopwatch.StartNew();
+                var rowCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+                _rowCts = rowCts;
 
                 try
                 {
                     var filter = new ExclusionFilter(row.Profile.Exclusions);
-                    var result = await Task.Run(() => new DirectoryComparer(filter, _comparerLogger).Compare(row.Profile.Left.Trim(), row.Profile.Right.Trim(), token),
-                        token);
+                    var result = await Task.Run(() => new DirectoryComparer(filter, _comparerLogger).Compare(row.Profile.Left.Trim(), row.Profile.Right.Trim(), rowCts.Token),
+                        rowCts.Token);
 
                     rowStopwatch.Stop();
                     row.ApplyStatistics(result.GetStatistics(), result.GetDirectoryStatistics());
@@ -171,6 +180,11 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
                     row.Comparison = result;
                     row.Status = OverviewRunStatus.Compared;
                     compared++;
+                }
+                catch (OperationCanceledException) when (!token.IsCancellationRequested)
+                {
+                    MarkSkipped(row);
+                    skipped++;
                 }
                 catch (OperationCanceledException)
                 {
@@ -182,6 +196,11 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
                     row.Error = exception.Unwrap().Message;
                     row.Status = OverviewRunStatus.Error;
                     failed++;
+                }
+                finally
+                {
+                    _rowCts = null;
+                    rowCts.Dispose();
                 }
             }
 
@@ -199,6 +218,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         finally
         {
             IsBusy = false;
+            IsBatchRunning = false;
             IsIndeterminate = false;
             RefreshView();
             _cts.Dispose();
@@ -268,9 +288,12 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
     [RelayCommand(CanExecute = nameof(CanSyncAll))]
     private async Task SyncAll()
     {
+        var targets = BatchTargets();
+        var excluded = Rows.Count - targets.Count;
+
         var lines = new[]
         {
-            $"Синхронизировать все профили: {Rows.Count}.",
+            $"Синхронизировать профилей: {targets.Count}." + (excluded > 0 ? $" Исключено из пакета: {excluded}." : string.Empty),
             string.Empty,
             "Файлы будут скопированы по направлению каждого профиля, удаления – в корзину.",
             string.Empty,
@@ -286,25 +309,26 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         var token = _cts.Token;
 
         IsBusy = true;
+        IsBatchRunning = true;
         IsIndeterminate = false;
-        ProgressMax = Rows.Count;
+        ProgressMax = targets.Count;
         ProgressValue = 0;
 
-        var total = Rows.Count;
+        var total = targets.Count;
         var synced = 0;
         var failed = 0;
-        var skipped = 0;
+        var skipped = excluded;
         var stopwatch = Stopwatch.StartNew();
 
         _logger.OverviewSyncStarted(total);
 
         try
         {
-            for (var i = 0; i < Rows.Count; i++)
+            for (var i = 0; i < targets.Count; i++)
             {
                 token.ThrowIfCancellationRequested();
 
-                var row = Rows[i];
+                var row = targets[i];
                 ProgressValue = i;
                 StatusCaption = $"Пара {i + 1} из {total} · {row.Name}";
 
@@ -330,6 +354,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         finally
         {
             IsBusy = false;
+            IsBatchRunning = false;
             IsIndeterminate = false;
             RefreshView();
             _cts.Dispose();
@@ -341,6 +366,12 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
     private void CancelOperation()
     {
         _cts?.Cancel();
+    }
+
+    [RelayCommand]
+    private void SkipCurrent()
+    {
+        _rowCts?.Cancel();
     }
 
     [RelayCommand(CanExecute = nameof(CanCycleAllDirections))]
@@ -371,6 +402,9 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         {
             _suppressReload = false;
         }
+
+        CompareAllCommand.NotifyCanExecuteChanged();
+        SyncAllCommand.NotifyCanExecuteChanged();
     }
 
     [RelayCommand]
@@ -408,24 +442,30 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         row.Comparison = null;
         row.Status = OverviewRunStatus.Syncing;
         var stopwatch = Stopwatch.StartNew();
+        var rowCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+        _rowCts = rowCts;
 
         try
         {
             var report = await Task.Run(() =>
                 {
                     var filter = new ExclusionFilter(profile.Exclusions);
-                    var result = new DirectoryComparer(filter, _comparerLogger).Compare(left, right, token);
+                    var result = new DirectoryComparer(filter, _comparerLogger).Compare(left, right, rowCts.Token);
                     result.ApplyMode(mode, mirror, winner);
                     result.ResolveAllConflicts(SyncAction.Skip);
-                    return new SyncEngine(_engineLogger, false).Execute(result, token);
+                    return new SyncEngine(_engineLogger, false).Execute(result, rowCts.Token);
                 },
-                token);
+                rowCts.Token);
 
             stopwatch.Stop();
             row.ApplySyncReport(report);
             row.ElapsedMs = (long)stopwatch.Elapsed.TotalMilliseconds;
             row.Error = null;
             WriteSyncLog(profile.Name, report);
+        }
+        catch (OperationCanceledException) when (!token.IsCancellationRequested)
+        {
+            MarkSkipped(row, "Пропущено: часть файлов могла быть перенесена");
         }
         catch (OperationCanceledException)
         {
@@ -437,6 +477,24 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
             row.Error = exception.Unwrap().Message;
             row.Status = OverviewRunStatus.Error;
         }
+        finally
+        {
+            _rowCts = null;
+            rowCts.Dispose();
+        }
+    }
+
+    private void MarkSkipped(OverviewRowViewModel row, string? note = null)
+    {
+        row.Comparison = null;
+        row.Error = note;
+        row.Status = OverviewRunStatus.Skipped;
+        _logger.OverviewRowSkipped(row.Name);
+    }
+
+    private List<OverviewRowViewModel> BatchTargets()
+    {
+        return [.. Rows.Where(static row => row.IncludeInBatch)];
     }
 
     private void NotifyResult(string caption, int ok, int failed)
@@ -462,7 +520,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
 
     private bool CanCompareAll()
     {
-        return !IsBusy && Rows.Count > 0;
+        return !IsBusy && Rows.Any(static row => row.IncludeInBatch);
     }
 
     private bool CanSyncRow(OverviewRowViewModel? row)
@@ -472,7 +530,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
 
     private bool CanSyncAll()
     {
-        return !IsBusy && Rows.Count > 0;
+        return !IsBusy && Rows.Any(static row => row.IncludeInBatch);
     }
 
     public void ApplyProfileRun(SyncProfileRun run)
@@ -578,7 +636,9 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
                     break;
 
                 case OverviewSortField.Freshness:
-                    RowsView.SortDescriptions.Add(new(nameof(OverviewRowViewModel.FreshnessSkew), direction));
+                    RowsView.SortDescriptions.Add(new(nameof(OverviewRowViewModel.FreshnessOrder), ListSortDirection.Ascending));
+                    RowsView.SortDescriptions.Add(new(nameof(OverviewRowViewModel.FreshnessLead),
+                        SortDescending ? ListSortDirection.Ascending : ListSortDirection.Descending));
                     break;
             }
         }

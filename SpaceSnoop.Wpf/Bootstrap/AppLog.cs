@@ -249,4 +249,7 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 1905, Level = LogLevel.Information, Message = "Пакетная синхронизация отменена")]
     public static partial void OverviewSyncCancelled(this ILogger logger);
+
+    [LoggerMessage(EventId = 1906, Level = LogLevel.Information, Message = "Профиль пропущен пользователем: {Name}")]
+    public static partial void OverviewRowSkipped(this ILogger logger, string name);
 }
