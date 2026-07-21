@@ -654,6 +654,24 @@
                                   Style="{StaticResource ComboBox.Toolbar}"
                                   HorizontalAlignment="Stretch"
                                   ToolTip="Сколько последних коммитов показывать в раскрытой Git-полоске" />
+                        <Button Style="{StaticResource Button.Secondary}"
+                                Command="{Binding ExportComparisonCommand}"
+                                MinWidth="0"
+                                Padding="9,0"
+                                HorizontalAlignment="Stretch"
+                                Margin="0,8,0,0"
+                                ToolTip="Выгрузить результат сравнения в JSON – параметры, сводку, список различий, состояние Git"
+                                AutomationProperties.Name="Экспорт сравнения в JSON">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FileBraces}"
+                                                          Width="14"
+                                                          Height="14"
+                                                          VerticalAlignment="Center"
+                                                          Margin="0,0,6,0" />
+                                <TextBlock Text="Экспорт сравнения"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
                         <TextBlock Text="Исключения"
                                    Style="{StaticResource TextBlock.Subtle}"
                                    Margin="0,12,0,4" />

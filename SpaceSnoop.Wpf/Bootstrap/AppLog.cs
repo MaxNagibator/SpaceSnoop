@@ -109,6 +109,13 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1219, Level = LogLevel.Warning, Message = "Не удалось прочитать состояние Git")]
     public static partial void GitStateFailed(this ILogger logger, Exception exception);
 
+    [LoggerMessage(EventId = 1220, Level = LogLevel.Information,
+        Message = "Сравнение выгружено в «{Path}»: записей {Entries}, пропущено {Omitted}")]
+    public static partial void ComparisonExported(this ILogger logger, string path, int entries, int omitted);
+
+    [LoggerMessage(EventId = 1221, Level = LogLevel.Error, Message = "Не удалось выгрузить сравнение в «{Path}»")]
+    public static partial void ComparisonExportFailed(this ILogger logger, Exception exception, string path);
+
     [LoggerMessage(EventId = 1250, Level = LogLevel.Information, Message = "Профиль расписания сохранён: «{Name}» (активно: {Enabled})")]
     public static partial void ScheduleProfileSaved(this ILogger logger, string name, bool enabled);
 

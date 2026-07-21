@@ -1,6 +1,7 @@
 ﻿using KeepShell.Services;
 using MahApps.Metro.IconPacks;
 using Microsoft.Win32;
+using SpaceSnoop.Core.Export;
 using SpaceSnoop.Core.Git;
 using SpaceSnoop.Wpf.Diff;
 using System.Diagnostics;
@@ -25,6 +26,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private readonly HashSet<string> _collapsedSubGroups = new(StringComparer.OrdinalIgnoreCase);
 
     private ComparisonResult? _result;
+    private SyncReport? _lastReport;
     private GitRepoState? _leftGit;
     private GitRepoState? _rightGit;
     private bool _gitHistoryLoaded;
@@ -107,6 +109,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     [NotifyCanExecuteChangedFor(nameof(SyncCommand))]
     [NotifyCanExecuteChangedFor(nameof(BrowseLeftCommand))]
     [NotifyCanExecuteChangedFor(nameof(BrowseRightCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ExportComparisonCommand))]
     private bool _isBusy;
 
     [ObservableProperty]
@@ -1432,6 +1435,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
 
         WriteSyncLog(report);
+        _lastReport = report;
         _outcomes = SyncOutcomes.Build(result, report.Errors, report.Mismatches);
         RebuildRows();
         RefreshLedgerAfterSync();
@@ -1526,6 +1530,66 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         RebuildRows();
         UpdateSummary();
         StatusCaption = $"Разрешено элементов: {count}.";
+    }
+
+    private bool CanExport()
+    {
+        return !IsBusy && _result is not null;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanExport))]
+    private void ExportComparison()
+    {
+        if (_result is null)
+        {
+            return;
+        }
+
+        var dialog = new SaveFileDialog
+        {
+            Title = "Экспорт сравнения",
+            Filter = "JSON (*.json)|*.json",
+            DefaultExt = ".json",
+            AddExtension = true,
+            FileName = BuildExportFileName(),
+        };
+
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var model = ComparisonExport.Build(_result, new(CurrentMode, CurrentWinner, Mirror, Exclusions.Trim()), AppInfo.Version) with
+            {
+                Git = _leftGit is null && _rightGit is null ? null : new(_leftGit, _rightGit, GitVerdictText),
+                LastSync = _lastReport is null
+                    ? null
+                    : new(_lastReport.CopiedCount, _lastReport.DeletedCount, _lastReport.Errors, _lastReport.Mismatches),
+            };
+
+            File.WriteAllText(dialog.FileName, ComparisonExport.ToJson(model));
+            _logger.ComparisonExported(dialog.FileName, model.Entries.Count, model.OmittedEntries);
+
+            var omitted = model.OmittedEntries > 0 ? $", пропущено {model.OmittedEntries:N0}" : string.Empty;
+            StatusCaption = $"Сравнение выгружено: {Path.GetFileName(dialog.FileName)}";
+            _notifier.Notify($"Сравнение выгружено: записей {model.Entries.Count:N0}{omitted}", StatusSeverity.Success);
+        }
+        catch (Exception ex)
+        {
+            _logger.ComparisonExportFailed(ex, dialog.FileName);
+            _dialogs.Error("Экспорт сравнения", ex.Message);
+        }
+    }
+
+    private string BuildExportFileName()
+    {
+        var trimmed = LeftPath.Trim().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var raw = Path.GetFileName(trimmed);
+        var name = string.Join("_", raw.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
+
+        return $"sync-compare-{(name.Length == 0 ? "root" : name)}-{DateTime.Now:yyyyMMdd-HHmmss}.json";
     }
 
     [RelayCommand]
@@ -1843,6 +1907,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private void ClearComparison()
     {
         _result = null;
+        _lastReport = null;
         _dirSizeCache = null;
         _outcomes = [];
         _collapsed.Clear();
@@ -2022,6 +2087,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             HasPending = false;
             SyncCommand.NotifyCanExecuteChanged();
             HashCommand.NotifyCanExecuteChanged();
+            ExportComparisonCommand.NotifyCanExecuteChanged();
             OnPropertyChanged(nameof(SyncIsPrimary));
             return;
         }
@@ -2044,6 +2110,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         HasPending = _result.HasPendingResolution();
         SyncCommand.NotifyCanExecuteChanged();
         HashCommand.NotifyCanExecuteChanged();
+        ExportComparisonCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(SyncIsPrimary));
     }
 
