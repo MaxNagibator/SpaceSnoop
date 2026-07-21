@@ -111,9 +111,9 @@ public sealed partial class SyncProfileViewModel : ObservableObject
 
     public string Id { get; }
 
-    public IReadOnlyList<string> Modes => _parent.Modes;
+    public IReadOnlyList<SegmentOption> Modes => _parent.Modes;
 
-    public IReadOnlyList<string> Winners => _parent.Winners;
+    public IReadOnlyList<SegmentOption> Winners => _parent.Winners;
 
     public IReadOnlyList<string> Intervals => _parent.Intervals;
 

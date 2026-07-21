@@ -151,33 +151,17 @@
                         Orientation="Horizontal"
                         VerticalAlignment="Center"
                         Margin="12,0,0,0">
-                <Button Style="{StaticResource Button.Ghost}"
-                        Command="{Binding CycleDirectionCommand}"
-                        MinHeight="{DynamicResource Control.Height.Default}"
-                        MinWidth="0"
-                        Padding="10,6"
-                        Margin="0,0,8,0"
-                        ToolTip="{Binding DirectionTooltip}"
-                        AutomationProperties.Name="Сменить направление">
-                    <iconPacks:PackIconLucide Kind="{Binding DirectionIconKind}"
-                                              Width="15"
-                                              Height="15"
-                                              VerticalAlignment="Center" />
-                </Button>
-                <Button Style="{StaticResource Button.Ghost}"
-                        Command="{Binding CycleWinnerCommand}"
-                        MinHeight="{DynamicResource Control.Height.Default}"
-                        MinWidth="0"
-                        Padding="10,6"
-                        Margin="0,0,8,0"
-                        Visibility="{Binding WinnerApplicable, Converter={StaticResource BoolToVisibility}}"
-                        ToolTip="{Binding WinnerTooltip}"
-                        AutomationProperties.Name="Сменить победителя">
-                    <iconPacks:PackIconLucide Kind="{Binding WinnerIconKind}"
-                                              Width="15"
-                                              Height="15"
-                                              VerticalAlignment="Center" />
-                </Button>
+                <ListBox Style="{StaticResource ListBox.SegmentedCompact}"
+                         ItemsSource="{Binding Modes}"
+                         SelectedIndex="{Binding SelectedModeIndex}"
+                         Margin="0,0,8,0"
+                         AutomationProperties.Name="Направление синхронизации" />
+                <ListBox Style="{StaticResource ListBox.SegmentedCompact}"
+                         ItemsSource="{Binding Winners}"
+                         SelectedIndex="{Binding SelectedWinnerIndex}"
+                         Margin="0,0,8,0"
+                         Visibility="{Binding WinnerApplicable, Converter={StaticResource BoolToVisibility}}"
+                         AutomationProperties.Name="Победитель в двустороннем режиме" />
                 <Button Style="{StaticResource Button.Ghost}"
                         Command="{Binding DataContext.SyncRowCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                         CommandParameter="{Binding}"

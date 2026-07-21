@@ -67,6 +67,46 @@ public sealed partial class OverviewRowViewModel : ObservableObject
 
     public string Right => Profile.Right;
 
+    public IReadOnlyList<SegmentOption> Modes => SyncOptions.Modes;
+
+    public IReadOnlyList<SegmentOption> Winners => SyncOptions.Winners;
+
+    public int SelectedModeIndex
+    {
+        get => Math.Clamp(Profile.Mode, 0, SyncOptions.Modes.Count - 1);
+        set
+        {
+            if (value < 0 || value == Profile.Mode)
+            {
+                return;
+            }
+
+            Profile.Mode = value;
+            OnPropertyChanged();
+            AdvanceDirectionChanged();
+            _onDirectionChanged();
+        }
+    }
+
+    public int SelectedWinnerIndex
+    {
+        get => SyncProfile.IndexOfWinner(Profile.Winner);
+        set
+        {
+            var winner = SyncProfile.WinnerFromIndex(value);
+
+            if (value < 0 || winner == Profile.Winner)
+            {
+                return;
+            }
+
+            Profile.Winner = winner;
+            OnPropertyChanged();
+            AdvanceWinnerChanged();
+            _onDirectionChanged();
+        }
+    }
+
     public PackIconLucideKind DirectionIconKind => Profile.Mode switch
     {
         1 => PackIconLucideKind.ArrowLeft,
@@ -227,22 +267,21 @@ public sealed partial class OverviewRowViewModel : ObservableObject
 
     internal void AdvanceDirection()
     {
-        Profile.Mode = (Profile.Mode + 1) % 3;
+        Profile.Mode = (Profile.Mode + 1) % SyncOptions.Modes.Count;
+        OnPropertyChanged(nameof(SelectedModeIndex));
+        AdvanceDirectionChanged();
+    }
+
+    private void AdvanceDirectionChanged()
+    {
         OnPropertyChanged(nameof(DirectionIconKind));
         OnPropertyChanged(nameof(DirectionArrow));
         OnPropertyChanged(nameof(DirectionTooltip));
         OnPropertyChanged(nameof(WinnerApplicable));
     }
 
-    internal void AdvanceWinner()
+    private void AdvanceWinnerChanged()
     {
-        Profile.Winner = Profile.Winner switch
-        {
-            SyncWinner.Left => SyncWinner.Right,
-            SyncWinner.Right => SyncWinner.Newest,
-            _ => SyncWinner.Left,
-        };
-
         OnPropertyChanged(nameof(WinnerIconKind));
         OnPropertyChanged(nameof(WinnerTooltip));
     }
@@ -280,17 +319,4 @@ public sealed partial class OverviewRowViewModel : ObservableObject
         _openInSync(Profile, Status == OverviewRunStatus.Compared ? Comparison : null);
     }
 
-    [RelayCommand]
-    private void CycleDirection()
-    {
-        AdvanceDirection();
-        _onDirectionChanged();
-    }
-
-    [RelayCommand]
-    private void CycleWinner()
-    {
-        AdvanceWinner();
-        _onDirectionChanged();
-    }
 }

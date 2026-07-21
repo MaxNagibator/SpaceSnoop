@@ -611,20 +611,21 @@
                         <TextBlock Text="Направление"
                                    Style="{StaticResource TextBlock.Subtle}"
                                    Margin="0,0,0,4" />
-                        <ComboBox ItemsSource="{Binding Modes}"
-                                  SelectedIndex="{Binding SelectedModeIndex}"
-                                  Style="{StaticResource ComboBox.Toolbar}"
-                                  HorizontalAlignment="Stretch"
-                                  ToolTip="Направление синхронизации" />
+                        <ListBox ItemsSource="{Binding Modes}"
+                                 SelectedIndex="{Binding SelectedModeIndex}"
+                                 Style="{StaticResource ListBox.Segmented}"
+                                 HorizontalAlignment="Stretch"
+                                 AutomationProperties.Name="Направление синхронизации" />
                         <StackPanel Visibility="{Binding IsBidirectional, Converter={StaticResource BoolToVisibility}}">
                             <TextBlock Text="Победитель"
                                        Style="{StaticResource TextBlock.Subtle}"
                                        Margin="0,12,0,4" />
-                            <ComboBox ItemsSource="{Binding Winners}"
-                                      SelectedIndex="{Binding SelectedWinnerIndex}"
-                                      Style="{StaticResource ComboBox.Toolbar}"
-                                      HorizontalAlignment="Stretch"
-                                      ToolTip="{Binding WinnerHint}" />
+                            <ListBox ItemsSource="{Binding Winners}"
+                                     SelectedIndex="{Binding SelectedWinnerIndex}"
+                                     Style="{StaticResource ListBox.Segmented}"
+                                     HorizontalAlignment="Stretch"
+                                     ToolTip="{Binding WinnerHint}"
+                                     AutomationProperties.Name="Победитель в двустороннем режиме" />
                         </StackPanel>
                         <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
                                       IsChecked="{Binding Verify}"

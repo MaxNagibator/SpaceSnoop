@@ -8,6 +8,7 @@
                 <ResourceDictionary Source="pack://application:,,,/KeepShell;component/Resources/Themes/Tokens.xaml" />
                 <ResourceDictionary Source="pack://application:,,,/KeepShell;component/Resources/Converters.xaml" />
                 <ResourceDictionary Source="pack://application:,,,/KeepShell;component/Resources/Styles/Controls.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Segments.xaml" />
                 <ResourceDictionary Source="Resources/Styles/Trees.xaml" />
                 <ResourceDictionary Source="Resources/Styles/Shared.xaml" />
             </ResourceDictionary.MergedDictionaries>

@@ -329,21 +329,21 @@
 
                 <TextBlock Text="Направление"
                            Style="{StaticResource Schedule.FormLabel}" />
-                <ComboBox Style="{StaticResource ComboBox.Form}"
-                          ItemsSource="{Binding Modes}"
-                          SelectedIndex="{Binding SelectedModeIndex}"
-                          HorizontalAlignment="Left"
-                          Width="240" />
+                <ListBox Style="{StaticResource ListBox.Segmented}"
+                         ItemsSource="{Binding Modes}"
+                         SelectedIndex="{Binding SelectedModeIndex}"
+                         HorizontalAlignment="Left"
+                         AutomationProperties.Name="Направление синхронизации" />
 
                 <StackPanel Visibility="{Binding WinnerApplicable, Converter={StaticResource BoolToVisibility}}">
                     <TextBlock Text="Победитель (двусторонний)"
                                Style="{StaticResource Schedule.FormLabel}" />
-                    <ComboBox Style="{StaticResource ComboBox.Form}"
-                              ItemsSource="{Binding Winners}"
-                              SelectedIndex="{Binding SelectedWinnerIndex}"
-                              HorizontalAlignment="Left"
-                              Width="240"
-                              ToolTip="Победитель решает изменённые файлы; при зеркале – что удалять на проигравшей стороне." />
+                    <ListBox Style="{StaticResource ListBox.Segmented}"
+                             ItemsSource="{Binding Winners}"
+                             SelectedIndex="{Binding SelectedWinnerIndex}"
+                             HorizontalAlignment="Left"
+                             ToolTip="Победитель решает изменённые файлы; при зеркале – что удалять на проигравшей стороне."
+                             AutomationProperties.Name="Победитель в двустороннем режиме" />
                 </StackPanel>
 
                 <CheckBox Content="Зеркало (удалять на приёмнике лишнее)"

@@ -55,9 +55,9 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
 
     public bool PathSuggest { get; }
 
-    public IReadOnlyList<string> Modes { get; } = ["Слева направо", "Справа налево", "Двусторонний"];
+    public IReadOnlyList<SegmentOption> Modes => SyncOptions.Modes;
 
-    public IReadOnlyList<string> Winners { get; } = ["Новее", "Слева", "Справа"];
+    public IReadOnlyList<SegmentOption> Winners => SyncOptions.Winners;
 
     public IReadOnlyList<string> SortOptions { get; } = ["Имя (А–Я)", "Имя (Я–А)", "Сначала новые"];
 

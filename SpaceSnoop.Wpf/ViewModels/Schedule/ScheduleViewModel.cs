@@ -25,9 +25,9 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
 
     public ISettingsStore Settings { get; }
 
-    public IReadOnlyList<string> Modes { get; } = ["Слева направо", "Справа налево", "Двусторонний"];
+    public IReadOnlyList<SegmentOption> Modes => SyncOptions.Modes;
 
-    public IReadOnlyList<string> Winners { get; } = ["Новее", "Слева", "Справа"];
+    public IReadOnlyList<SegmentOption> Winners => SyncOptions.Winners;
 
     public IReadOnlyList<string> Intervals { get; } = ["Ежедневно", "Каждый час", "При входе в систему"];
 

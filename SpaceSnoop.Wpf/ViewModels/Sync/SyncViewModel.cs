@@ -149,9 +149,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public SyncQuickProfilesViewModel Profiles { get; }
 
-    public IReadOnlyList<string> Modes { get; } = ["Слева направо", "Справа налево", "Двусторонний"];
+    public IReadOnlyList<SegmentOption> Modes => SyncOptions.Modes;
 
-    public IReadOnlyList<string> Winners { get; } = ["Новее", "Слева", "Справа"];
+    public IReadOnlyList<SegmentOption> Winners => SyncOptions.Winners;
 
     public bool HasResult => _result is not null;
 
