@@ -259,4 +259,28 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 1906, Level = LogLevel.Information, Message = "Профиль пропущен пользователем: {Name}")]
     public static partial void OverviewRowSkipped(this ILogger logger, string name);
+
+    [LoggerMessage(EventId = 2000, Level = LogLevel.Information, Message = "MCP-сервер запущен: {Endpoint}")]
+    public static partial void McpServerStarted(this ILogger logger, string endpoint);
+
+    [LoggerMessage(EventId = 2001, Level = LogLevel.Information, Message = "MCP-сервер остановлен")]
+    public static partial void McpServerStopped(this ILogger logger);
+
+    [LoggerMessage(EventId = 2002, Level = LogLevel.Error, Message = "MCP-сервер не смог запуститься на порту {Port}")]
+    public static partial void McpServerFailed(this ILogger logger, Exception exception, int port);
+
+    [LoggerMessage(EventId = 2003, Level = LogLevel.Debug, Message = "MCP-инструмент вызван: {Tool} ({Details})")]
+    public static partial void McpToolInvoked(this ILogger logger, string tool, string details);
+
+    [LoggerMessage(EventId = 2004, Level = LogLevel.Warning, Message = "MCP-инструмент отклонён: {Tool} ({Reason})")]
+    public static partial void McpToolRejected(this ILogger logger, string tool, string reason);
+
+    [LoggerMessage(EventId = 2005, Level = LogLevel.Information, Message = "MCP-инструмент изменяет данные: {Tool} ({Details})")]
+    public static partial void McpMutationRequested(this ILogger logger, string tool, string details);
+
+    [LoggerMessage(EventId = 2006, Level = LogLevel.Warning, Message = "MCP-сервер поднят в процессе с правами администратора: {Endpoint}")]
+    public static partial void McpServerElevated(this ILogger logger, string endpoint);
+
+    [LoggerMessage(EventId = 2007, Level = LogLevel.Warning, Message = "MCP-сервер не запущен: токен доступа не задан")]
+    public static partial void McpServerTokenMissing(this ILogger logger);
 }

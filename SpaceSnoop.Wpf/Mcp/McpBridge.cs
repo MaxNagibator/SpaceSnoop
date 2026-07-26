@@ -1,0 +1,344 @@
+﻿using ModelContextProtocol;
+using SpaceSnoop.Core.Export;
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Windows.Threading;
+
+namespace SpaceSnoop.Wpf.Mcp;
+
+public sealed class McpBridge(
+    ISettingsStore settings,
+    SyncViewModel sync,
+    McpPreferences preferences,
+    ToastNotifier notifier,
+    ILogger<DirectoryComparer> comparerLogger,
+    ILogger<McpBridge> logger)
+{
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        Converters = { new JsonStringEnumConverter() },
+    };
+
+    private ShellViewModel? _shell;
+
+    public void Attach(ShellViewModel shell)
+    {
+        _shell = shell;
+    }
+
+    public string GetState()
+    {
+        logger.McpToolInvoked("get_app_state", "-");
+
+        return Dispatch(() => Serialize(new McpAppState(
+            AppInfo.Name,
+            AppInfo.Version,
+            AdminElevation.IsElevated,
+            _shell?.CurrentSectionKey,
+            preferences.AllowMutations,
+            SyncProfileStore.Load(settings).Count,
+            ReadSyncState())));
+    }
+
+    public string ListProfiles()
+    {
+        logger.McpToolInvoked("list_profiles", "-");
+
+        var profiles = SyncProfileStore.Load(settings)
+            .Select(static profile => new McpProfile(
+                profile.Id,
+                profile.Name,
+                profile.Left,
+                profile.Right,
+                HeadlessSync.MapMode(profile.Mode),
+                profile.Winner,
+                profile.Mirror,
+                profile.Exclusions,
+                profile.Enabled,
+                profile.SkipInBatch,
+                $"{profile.Interval} {profile.Time}",
+                DescribeUnavailable(profile)))
+            .ToList();
+
+        return Serialize(profiles);
+    }
+
+    public async Task<string> CompareAsync(
+        string left,
+        string right,
+        SyncMode mode,
+        SyncWinner winner,
+        bool mirror,
+        string? exclusions,
+        int entryLimit,
+        CancellationToken cancellationToken)
+    {
+        left = left.Trim();
+        right = right.Trim();
+        entryLimit = ClampEntryLimit(entryLimit);
+
+        logger.McpToolInvoked("compare_directories", $"«{left}» → «{right}», режим {mode}, записей до {entryLimit}");
+
+        Validate(left, right, mode);
+
+        var patterns = exclusions?.Trim() ?? string.Empty;
+
+        var model = await Task.Run(
+            () =>
+            {
+                var comparer = new DirectoryComparer(new ExclusionFilter(patterns), comparerLogger);
+                var result = comparer.Compare(left, right, cancellationToken);
+                result.ApplyMode(mode, mirror, winner);
+
+                return ComparisonExport.Build(result, new(mode, winner, mirror, patterns), AppInfo.Version, entryLimit);
+            },
+            cancellationToken)
+            .ConfigureAwait(false);
+
+        return ComparisonExport.ToJson(model);
+    }
+
+    public Task<string> GetCurrentComparisonAsync(int entryLimit, CancellationToken cancellationToken)
+    {
+        entryLimit = ClampEntryLimit(entryLimit);
+        logger.McpToolInvoked("get_current_comparison", $"записей до {entryLimit}");
+
+        return ExportCurrentAsync(entryLimit, cancellationToken);
+    }
+
+    public async Task<string> OpenSyncAsync(
+        string? left,
+        string? right,
+        SyncMode? mode,
+        SyncWinner? winner,
+        bool? mirror,
+        string? exclusions,
+        bool compare,
+        CancellationToken cancellationToken)
+    {
+        logger.McpToolInvoked("open_sync", $"«{left ?? "как есть"}» → «{right ?? "как есть"}», режим {mode?.ToString() ?? "как есть"}, сравнение {compare}");
+
+        var comparison = Dispatch(() =>
+        {
+            if (sync.IsBusy)
+            {
+                logger.McpToolRejected("open_sync", "страница занята операцией");
+                throw new McpException("Страница «Синхронизация» сейчас занята другой операцией.");
+            }
+
+            var targetLeft = string.IsNullOrWhiteSpace(left) ? sync.LeftPath.Trim() : left.Trim();
+            var targetRight = string.IsNullOrWhiteSpace(right) ? sync.RightPath.Trim() : right.Trim();
+            var targetMode = mode ?? sync.CurrentMode;
+
+            if (compare)
+            {
+                Validate(targetLeft, targetRight, targetMode);
+            }
+
+            if (!string.Equals(sync.LeftPath, targetLeft, StringComparison.Ordinal))
+            {
+                sync.LeftPath = targetLeft;
+            }
+
+            if (!string.Equals(sync.RightPath, targetRight, StringComparison.Ordinal))
+            {
+                sync.RightPath = targetRight;
+            }
+
+            sync.SelectedModeIndex = SyncProfile.IndexOfMode(targetMode);
+
+            if (winner is { } side)
+            {
+                sync.SelectedWinnerIndex = SyncProfile.IndexOfWinner(side);
+            }
+
+            if (mirror is { } enabled)
+            {
+                sync.Mirror = enabled;
+            }
+
+            if (exclusions is not null)
+            {
+                sync.Exclusions = exclusions.Trim();
+            }
+
+            _shell?.TryNavigate(SectionKey.Sync);
+
+            notifier.Notify(compare
+                ? $"Агент запустил сравнение: {targetLeft} → {targetRight}"
+                : "Агент открыл страницу «Синхронизация»");
+
+            return compare ? sync.CompareCommand.ExecuteAsync(null) : null;
+        });
+
+        if (comparison is not null)
+        {
+            await comparison.ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        return Dispatch(() => Serialize(new McpNavigationResult(_shell?.CurrentSectionKey ?? SectionKey.Sync, ReadSyncState())));
+    }
+
+    public async Task<string> SyncCurrentAsync(bool dryRun, int entryLimit, CancellationToken cancellationToken)
+    {
+        entryLimit = ClampEntryLimit(entryLimit);
+
+        if (dryRun)
+        {
+            logger.McpToolInvoked("sync_current", $"план, записей до {entryLimit}");
+            return await ExportCurrentAsync(entryLimit, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (!preferences.AllowMutations)
+        {
+            logger.McpToolRejected("sync_current", "изменяющие операции запрещены");
+            throw new McpException("Изменяющие операции запрещены. Включите «Разрешить изменяющие операции» в настройках приложения.");
+        }
+
+        var run = Dispatch(() =>
+        {
+            if (!sync.HasResult)
+            {
+                throw new McpException("Сначала выполните сравнение: open_sync с compare=true.");
+            }
+
+            if (sync.IsBusy)
+            {
+                throw new McpException("Страница «Синхронизация» сейчас занята другой операцией.");
+            }
+
+            if (sync.HasPending)
+            {
+                throw new McpException("Есть неразрешённые спорные элементы – разрешите их в приложении.");
+            }
+
+            logger.McpMutationRequested("sync_current", $"«{sync.LeftPath}» → «{sync.RightPath}», режим {sync.CurrentMode}, зеркало {sync.Mirror}");
+            notifier.Notify("Агент запустил синхронизацию", StatusSeverity.Warning);
+
+            return sync.SyncFromAutomationAsync();
+        });
+
+        var report = await run.ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (report is null)
+        {
+            throw new McpException("Синхронизация не выполнена: операция отменена или сравнение сброшено.");
+        }
+
+        return Dispatch(() => Serialize(new McpSyncResult(
+            report.CopiedCount,
+            report.DeletedCount,
+            report.SuccessCount,
+            report.Errors,
+            report.Mismatches,
+            ReadSyncState())));
+    }
+
+    internal static int ClampEntryLimit(int entryLimit)
+    {
+        return Math.Clamp(entryLimit, AppDefaults.McpEntryLimitMin, AppDefaults.McpEntryLimitMax);
+    }
+
+    internal static void Validate(string left, string right, SyncMode mode)
+    {
+        if (left.Length == 0 || right.Length == 0)
+        {
+            throw new McpException("Оба каталога должны быть заданы.");
+        }
+
+        if (SyncProfile.PathsOverlap(left, right))
+        {
+            throw new McpException("Каталоги совпадают или вложены друг в друга.");
+        }
+
+        if (SyncProfile.SourceMissing(left, right, mode))
+        {
+            throw new McpException("Каталог-источник недоступен.");
+        }
+    }
+
+    private static string? DescribeUnavailable(SyncProfile profile)
+    {
+        return OverviewPipeline.Classify(profile) switch
+        {
+            OverviewRunStatus.Unavailable => "каталог недоступен или не задан",
+            OverviewRunStatus.Overlap => "каталоги совпадают или вложены",
+            _ => null,
+        };
+    }
+
+    private static async Task<string> BuildJsonAsync(Func<ComparisonExportModel> build, CancellationToken cancellationToken)
+    {
+        var model = await Task.Run(build, cancellationToken).ConfigureAwait(false);
+
+        return ComparisonExport.ToJson(model);
+    }
+
+    private static string Serialize<T>(T value)
+    {
+        return JsonSerializer.Serialize(value, JsonOptions);
+    }
+
+    private static T Dispatch<T>(Func<T> action)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+
+        if (dispatcher is null || dispatcher.CheckAccess())
+        {
+            return action();
+        }
+
+        try
+        {
+            return dispatcher.Invoke(
+                action,
+                DispatcherPriority.Normal,
+                CancellationToken.None,
+                TimeSpan.FromSeconds(AppDefaults.McpDispatchTimeoutSeconds));
+        }
+        catch (TimeoutException)
+        {
+            throw new McpException("Окно приложения занято и не ответило вовремя – повторите позже.");
+        }
+    }
+
+    private Task<string> ExportCurrentAsync(int entryLimit, CancellationToken cancellationToken)
+    {
+        var build = Dispatch(() => sync.CaptureExportBuilder(entryLimit));
+
+        if (build is null)
+        {
+            throw new McpException("На странице «Синхронизация» сравнение ещё не выполнялось. Запустите open_sync с compare=true или compare_directories.");
+        }
+
+        return BuildJsonAsync(build, cancellationToken);
+    }
+
+    private McpSyncState ReadSyncState()
+    {
+        return new(
+            sync.LeftPath,
+            sync.RightPath,
+            sync.CurrentMode,
+            sync.CurrentWinner,
+            sync.Mirror,
+            sync.Exclusions,
+            sync.IsBusy,
+            sync.HasResult,
+            new Dictionary<string, int>
+            {
+                ["Identical"] = sync.IdenticalCount,
+                ["LeftOnly"] = sync.LeftOnlyCount,
+                ["RightOnly"] = sync.RightOnlyCount,
+                ["Modified"] = sync.ModifiedCount,
+                ["Conflict"] = sync.ConflictCount,
+            });
+    }
+}

@@ -46,6 +46,16 @@ public static class AppDefaults
     public const OverviewSortField OverviewSortDefault = OverviewSortField.None;
     public const bool OverviewGroupUnchangedDefault = true;
 
+    public const bool McpEnabledDefault = false;
+    public const bool McpAllowMutationsDefault = false;
+    public const int McpPortDefault = 7654;
+    public const int McpPortMin = 1024;
+    public const int McpPortMax = 65535;
+    public const string McpEndpointPath = "/mcp";
+    public const int McpEntryLimitMin = 1;
+    public const int McpEntryLimitMax = 10_000;
+    public const int McpDispatchTimeoutSeconds = 30;
+
     public const string UpdateRepositoryDefault = AppInfo.RepoSlug;
     public const bool UpdateCheckOnStartupDefault = true;
     public const bool UpdateAutoDownloadDefault = false;

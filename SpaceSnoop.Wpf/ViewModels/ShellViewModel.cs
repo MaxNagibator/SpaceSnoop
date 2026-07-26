@@ -100,6 +100,19 @@ public sealed partial class ShellViewModel : ShellViewModelBase
 
     public override IPageHeader? EffectivePageHeader => Preferences.ShowPageHeader ? CurrentPageHeader : null;
 
+    public string? CurrentSectionKey => _sectionByKey.FirstOrDefault(p => p.Value == Selected).Key;
+
+    public bool TryNavigate(string sectionKey)
+    {
+        if (!_sectionByKey.TryGetValue(sectionKey, out var item))
+        {
+            return false;
+        }
+
+        Selected = item;
+        return true;
+    }
+
     protected override void OnSelectionChanged(NavigationItem? value)
     {
         StatusText = value?.Title ?? "Готов";

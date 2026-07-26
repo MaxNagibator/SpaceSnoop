@@ -1,0 +1,157 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Settings.SettingsMcpCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Settings"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
+             d:DesignWidth="900">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Views/Settings/SettingsResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <Style x:Key="Mcp.Notice"
+                   TargetType="Border">
+                <Setter Property="Background" Value="{DynamicResource Bg.SurfaceAlt}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="{DynamicResource Radius.M}" />
+                <Setter Property="Padding" Value="12" />
+                <Setter Property="Margin" Value="0,14,0,0" />
+            </Style>
+
+            <Style x:Key="Mcp.NoticeIcon"
+                   TargetType="iconPacks:PackIconLucide">
+                <Setter Property="Width" Value="16" />
+                <Setter Property="Height" Value="16" />
+                <Setter Property="VerticalAlignment" Value="Top" />
+                <Setter Property="Margin" Value="0,1,8,0" />
+            </Style>
+
+            <Style x:Key="Mcp.NoticeText"
+                   TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource Fg.Primary}" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+                <Setter Property="MaxWidth" Value="560" />
+                <Setter Property="HorizontalAlignment" Value="Left" />
+            </Style>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Border Style="{StaticResource Card.Inset}"
+            Margin="0,0,0,10">
+        <StackPanel>
+            <TextBlock Text="MCP-сервер"
+                       Style="{StaticResource Setting.SectionTitle}" />
+            <TextBlock Style="{StaticResource Setting.Hint}"
+                       Text="Даёт агенту доступ к запущенному приложению: состояние, профили, сравнение каталогов и открытие страницы «Синхронизация» с нужными путями. Слушает только 127.0.0.1 и требует токен." />
+
+            <CheckBox Content="Включить сервер"
+                      IsChecked="{Binding Mcp.Enabled, Mode=TwoWay}"
+                      Margin="0,14,0,0"
+                      VerticalAlignment="Center" />
+
+            <CheckBox Content="Разрешить изменяющие операции"
+                      IsChecked="{Binding Mcp.AllowMutations, Mode=TwoWay}"
+                      Margin="0,12,0,0"
+                      VerticalAlignment="Center" />
+            <TextBlock Style="{StaticResource Setting.Hint}"
+                       Text="Без этой галки агент может только читать и открывать страницы. С ней он может запускать синхронизацию, то есть копировать и удалять файлы (удаление идёт в корзину)." />
+
+            <TextBlock Text="Порт"
+                       Style="{StaticResource Setting.Label}"
+                       Margin="0,16,0,0" />
+            <TextBox Style="{StaticResource TextBox.Form}"
+                     Text="{Binding Mcp.Port, UpdateSourceTrigger=LostFocus}"
+                     FontFamily="{DynamicResource Font.Mono}"
+                     Width="120"
+                     HorizontalAlignment="Left"
+                     Margin="0,8,0,0" />
+
+            <TextBlock Text="Токен доступа"
+                       Style="{StaticResource Setting.Label}"
+                       Margin="0,16,0,0" />
+            <Grid Margin="0,8,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox Style="{StaticResource TextBox.Form}"
+                         Text="{Binding Mcp.Token, UpdateSourceTrigger=LostFocus}"
+                         FontFamily="{DynamicResource Font.Mono}" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Button.Secondary}"
+                        Content="Обновить"
+                        Command="{Binding Mcp.RegenerateTokenCommand}"
+                        ToolTip="Выдать новый токен – прежние подключения перестанут работать"
+                        Margin="8,0,0,0" />
+            </Grid>
+
+            <Border Style="{StaticResource Mcp.Notice}"
+                    BorderBrush="{DynamicResource State.Error}"
+                    Visibility="{Binding Mcp.TokenMissing, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource Mcp.NoticeIcon}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.ShieldAlert}"
+                                              Foreground="{DynamicResource State.Error}" />
+                    <TextBlock Style="{StaticResource Mcp.NoticeText}"
+                               Text="Без токена сервер не запускается: подключение без секрета приняло бы кого угодно. Нажмите «Обновить», чтобы выдать новый." />
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="Подключение"
+                       Style="{StaticResource Setting.Label}"
+                       Margin="0,16,0,0" />
+            <TextBlock Style="{StaticResource Setting.Hint}"
+                       Text="MCP поддерживают разные клиенты – выберите формат, который просит ваш." />
+            <ListBox ItemsSource="{Binding McpConnectFormats}"
+                     SelectedIndex="{Binding SelectedMcpFormatIndex}"
+                     Style="{StaticResource ListBox.Segmented}"
+                     HorizontalAlignment="Left"
+                     MinWidth="320"
+                     Margin="0,8,0,0"
+                     AutomationProperties.Name="Формат строки подключения" />
+            <TextBox Style="{StaticResource TextBox.Form}"
+                     Text="{Binding McpConnectSnippet, Mode=OneWay}"
+                     FontFamily="{DynamicResource Font.Mono}"
+                     FontSize="{DynamicResource Font.Size.S}"
+                     IsReadOnly="True"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     MaxHeight="200"
+                     VerticalScrollBarVisibility="Auto"
+                     Margin="0,8,0,0" />
+            <Button Style="{StaticResource Button.Secondary}"
+                    Content="Копировать"
+                    Command="{Binding CopyMcpConnectionCommand}"
+                    HorizontalAlignment="Left"
+                    Margin="0,8,0,0" />
+
+            <TextBlock Style="{StaticResource Setting.Hint}"
+                       Margin="0,14,0,0"
+                       Text="{Binding McpServer.Endpoint, StringFormat=Сервер слушает {0}}"
+                       Visibility="{Binding McpServer.Endpoint, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
+            <TextBlock Style="{StaticResource Setting.Hint}"
+                       Margin="0,14,0,0"
+                       Foreground="{DynamicResource State.Error}"
+                       Text="{Binding McpServer.LastError}"
+                       Visibility="{Binding McpServer.LastError, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
+
+            <Border Style="{StaticResource Mcp.Notice}"
+                    BorderBrush="{DynamicResource State.Warning}"
+                    Visibility="{Binding McpElevatedWarning, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource Mcp.NoticeIcon}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
+                                              Foreground="{DynamicResource State.Warning}" />
+                    <TextBlock Style="{StaticResource Mcp.NoticeText}"
+                               Text="Приложение запущено с правами администратора, значит с этими правами работает и сервер. Токен лежит в settings.toml вашего профиля – любая программа, запущенная от вашего имени, может его прочитать и обратиться к серверу. Держите сервер выключенным, когда он не нужен." />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Border>
+</UserControl>

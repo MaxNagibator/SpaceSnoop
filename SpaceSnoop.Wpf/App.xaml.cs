@@ -73,6 +73,9 @@ public partial class App : Application
                 ShutdownMode = ShutdownMode.OnMainWindowClose;
             }
 
+            _services.GetRequiredService<McpBridge>().Attach(_services.GetRequiredService<ShellViewModel>());
+            _services.GetRequiredService<McpServerHost>().Apply();
+
             _ = Task.Run(() => ScheduleReconciler.Reconcile(settings, _logging.CreateLogger<ScheduleViewModel>()));
 
             splash.Dispose();
@@ -89,6 +92,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _services?.GetService<McpServerHost>()?.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _services?.GetService<ISettingsStore>()?.Flush();
 
         _services?.Dispose();
@@ -171,6 +175,10 @@ public partial class App : Application
         services.AddSingleton<AppUpdateViewModel>();
         services.AddSingleton<ShellViewModel>();
         services.AddSingleton<MainWindow>();
+
+        services.AddSingleton<McpPreferences>();
+        services.AddSingleton<McpBridge>();
+        services.AddSingleton<McpServerHost>();
 
         return services.BuildServiceProvider();
     }

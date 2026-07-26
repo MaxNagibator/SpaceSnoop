@@ -426,9 +426,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
     }
 
-    private SyncMode CurrentMode => ModeOrder[Math.Clamp(SelectedModeIndex, 0, ModeOrder.Length - 1)];
+    internal SyncMode CurrentMode => ModeOrder[Math.Clamp(SelectedModeIndex, 0, ModeOrder.Length - 1)];
 
-    private SyncWinner CurrentWinner => WinnerOrder[Math.Clamp(SelectedWinnerIndex, 0, WinnerOrder.Length - 1)];
+    internal SyncWinner CurrentWinner => WinnerOrder[Math.Clamp(SelectedWinnerIndex, 0, WinnerOrder.Length - 1)];
 
     private PlannedActions CurrentPlan => _result?.CountPlannedActions() ?? new(0, 0, 0, 0, 0);
 
@@ -1059,11 +1059,13 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
     }
 
-    private void WriteSyncLog(SyncReport report)
+    private void WriteSyncLog(SyncReport report, bool interactive = true)
     {
+        var origin = interactive ? string.Empty : " (запуск агентом через MCP)";
+
         try
         {
-            SyncLog.Append($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Синхронизация: {report.SuccessCount} успешно, {report.Errors.Count} ошибок", report);
+            SyncLog.Append($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Синхронизация{origin}: {report.SuccessCount} успешно, {report.Errors.Count} ошибок", report);
         }
         catch (Exception ex)
         {
@@ -1400,7 +1402,23 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             return;
         }
 
+        await ExecuteSyncAsync(true);
+    }
+
+    internal Task<SyncReport?> SyncFromAutomationAsync()
+    {
+        return ExecuteSyncAsync(false);
+    }
+
+    private async Task<SyncReport?> ExecuteSyncAsync(bool interactive)
+    {
+        if (_result is null)
+        {
+            return null;
+        }
+
         var result = _result;
+        var planned = CurrentPlan;
         var stopwatch = Stopwatch.StartNew();
 
         _logger.SyncStarted(CurrentMode);
@@ -1424,7 +1442,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         if (report is null)
         {
-            return;
+            return null;
         }
 
         _logger.SyncFinished(report.SuccessCount, report.Errors.Count, (long)stopwatch.Elapsed.TotalMilliseconds);
@@ -1434,7 +1452,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             _logger.SyncVerified(report.Applied.Count, report.Mismatches.Count);
         }
 
-        WriteSyncLog(report);
+        WriteSyncLog(report, interactive);
         _lastReport = report;
         _outcomes = SyncOutcomes.Build(result, report.Errors, report.Mismatches);
         RebuildRows();
@@ -1458,6 +1476,16 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         _notifier.Notify(syncToastMessage, syncToastSeverity);
 
+        if (interactive)
+        {
+            ShowSyncOutcome(report, stopwatch.Elapsed);
+        }
+
+        return report;
+    }
+
+    private void ShowSyncOutcome(SyncReport report, TimeSpan elapsed)
+    {
         if (report.Errors.Count > 0)
         {
             const int MaxShown = 20;
@@ -1497,7 +1525,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             }
 
             var detail = done.Count > 0 ? string.Join(", ", done) : "изменений не потребовалось";
-            _dialogs.Info("Синхронизация", $"Готово за {stopwatch.Elapsed.TotalSeconds:F1} с. {char.ToUpperInvariant(detail[0])}{detail[1..]}.");
+            _dialogs.Info("Синхронизация", $"Готово за {elapsed.TotalSeconds:F1} с. {char.ToUpperInvariant(detail[0])}{detail[1..]}.");
         }
     }
 
@@ -1561,13 +1589,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         try
         {
-            var model = ComparisonExport.Build(_result, new(CurrentMode, CurrentWinner, Mirror, Exclusions.Trim()), AppInfo.Version) with
-            {
-                Git = _leftGit is null && _rightGit is null ? null : new(_leftGit, _rightGit, GitVerdictText),
-                LastSync = _lastReport is null
-                    ? null
-                    : new(_lastReport.CopiedCount, _lastReport.DeletedCount, _lastReport.Errors, _lastReport.Mismatches),
-            };
+            var model = BuildExportModel(ComparisonExport.DefaultEntryLimit)!;
 
             File.WriteAllText(dialog.FileName, ComparisonExport.ToJson(model));
             _logger.ComparisonExported(dialog.FileName, model.Entries.Count, model.OmittedEntries);
@@ -1581,6 +1603,36 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             _logger.ComparisonExportFailed(ex, dialog.FileName);
             _dialogs.Error("Экспорт сравнения", ex.Message);
         }
+    }
+
+    internal ComparisonExportModel? BuildExportModel(int entryLimit)
+    {
+        return CaptureExportBuilder(entryLimit)?.Invoke();
+    }
+
+    internal Func<ComparisonExportModel>? CaptureExportBuilder(int entryLimit)
+    {
+        if (_result is null)
+        {
+            return null;
+        }
+
+        var result = _result;
+        var options = new ComparisonExportOptions(CurrentMode, CurrentWinner, Mirror, Exclusions.Trim());
+
+        var git = _leftGit is null && _rightGit is null
+            ? null
+            : new ComparisonExportGit(_leftGit, _rightGit, GitVerdictText);
+
+        var lastSync = _lastReport is null
+            ? null
+            : new ComparisonExportSync(_lastReport.CopiedCount, _lastReport.DeletedCount, _lastReport.Errors, _lastReport.Mismatches);
+
+        return () => ComparisonExport.Build(result, options, AppInfo.Version, entryLimit) with
+        {
+            Git = git,
+            LastSync = lastSync,
+        };
     }
 
     private string BuildExportFileName()

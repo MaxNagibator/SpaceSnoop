@@ -20,6 +20,7 @@
             <settings:SettingsArchiveCard />
             <settings:SettingsExclusionsCard />
             <settings:SettingsUpdateCard />
+            <settings:SettingsMcpCard />
             <settings:SettingsStartupCard />
             <settings:SettingsFileCard />
         </StackPanel>

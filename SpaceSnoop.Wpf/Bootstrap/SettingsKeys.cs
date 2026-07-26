@@ -71,6 +71,11 @@ public static class SettingsKeys
     public const string BatchExclusions = "wpf.batch.exclusions";
     public const string BatchSort = "wpf.batch.sort";
 
+    public const string McpEnabled = "wpf.mcp.enabled";
+    public const string McpPort = "wpf.mcp.port";
+    public const string McpToken = "wpf.mcp.token";
+    public const string McpAllowMutations = "wpf.mcp.allow_mutations";
+
     public const string UpdateDismissedVersion = "wpf.update.dismissed";
     public const string UpdateRepository = "wpf.update.repository";
     public const string UpdateCheckOnStartup = "wpf.update.check";

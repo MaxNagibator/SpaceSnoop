@@ -37,6 +37,16 @@ public sealed class SyncProfile
         };
     }
 
+    public static int IndexOfMode(SyncMode mode)
+    {
+        return mode switch
+        {
+            SyncMode.RightToLeft => 1,
+            SyncMode.Bidirectional => 2,
+            _ => 0,
+        };
+    }
+
     public static bool IsValidTime(string value)
     {
         return TimeSpan.TryParse(value.Trim(), out var time) && time >= TimeSpan.Zero && time.TotalHours < 24;
