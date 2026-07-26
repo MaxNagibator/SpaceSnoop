@@ -1,5 +1,11 @@
 ﻿namespace SpaceSnoop.Wpf.Agent;
 
+public enum AgentBackendKind
+{
+    Claude = 0,
+    Codex = 1,
+}
+
 public enum AgentEventKind
 {
     Started = 0,
@@ -19,6 +25,8 @@ public sealed record AgentEvent(AgentEventKind Kind)
 
     public double CostUsd { get; init; }
 
+    public long Tokens { get; init; }
+
     public static AgentEvent Begin(string sessionId)
     {
         return new(AgentEventKind.Started) { SessionId = sessionId };
@@ -34,9 +42,9 @@ public sealed record AgentEvent(AgentEventKind Kind)
         return new(AgentEventKind.ToolCall) { ToolName = toolName };
     }
 
-    public static AgentEvent Done(string? sessionId, double costUsd)
+    public static AgentEvent Done(string? sessionId, double costUsd, long tokens = 0)
     {
-        return new(AgentEventKind.Completed) { SessionId = sessionId, CostUsd = costUsd };
+        return new(AgentEventKind.Completed) { SessionId = sessionId, CostUsd = costUsd, Tokens = tokens };
     }
 
     public static AgentEvent Fail(string reason)
@@ -47,7 +55,6 @@ public sealed record AgentEvent(AgentEventKind Kind)
 
 public sealed record AgentCliInfo(string ExecutablePath, string Version);
 
-/// <param name="AllowedTools">Короткие имена, без префикса: полное имя <c>mcp__{ServerName}__{tool}</c> складывает бэкенд.</param>
 public sealed record AgentMcpConfig(
     string ServerName,
     string Endpoint,
@@ -68,11 +75,39 @@ public sealed record AgentRequest
     public AgentMcpConfig? Mcp { get; init; }
 }
 
+public sealed record AgentTempFile(string Path, string Content);
+
+public sealed record AgentLaunch
+{
+    public required IReadOnlyList<string> Arguments { get; init; }
+
+    public string Stdin { get; init; } = string.Empty;
+
+    public IReadOnlyDictionary<string, string> Environment { get; init; } = new Dictionary<string, string>();
+
+    public IReadOnlyList<AgentTempFile> TempFiles { get; init; } = [];
+}
+
+public interface IAgentStreamParser
+{
+    AgentEvent? Parse(string line);
+
+    string? FailureHint => null;
+}
+
 public interface IAgentBackend
 {
-    string Id { get; }
+    AgentBackendKind Kind { get; }
 
     string DisplayName { get; }
+
+    string CliName { get; }
+
+    bool HasBuiltInShell { get; }
+
+    bool SendsSystemPromptEachTurn { get; }
+
+    string MissingCliHint { get; }
 
     AgentCliInfo? Detect();
 

@@ -287,14 +287,14 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 2100, Level = LogLevel.Information, Message = "CLI агента найден: {Path} ({Version})")]
     public static partial void AgentCliDetected(this ILogger logger, string path, string version);
 
-    [LoggerMessage(EventId = 2101, Level = LogLevel.Information, Message = "CLI агента не найден на машине")]
-    public static partial void AgentCliMissing(this ILogger logger);
+    [LoggerMessage(EventId = 2101, Level = LogLevel.Information, Message = "CLI агента «{Backend}» не найден на машине")]
+    public static partial void AgentCliMissing(this ILogger logger, string backend);
 
-    [LoggerMessage(EventId = 2102, Level = LogLevel.Debug, Message = "Ход агента начат: инструментов {Tools}, продолжение сессии {Resume}")]
-    public static partial void AgentTurnStarted(this ILogger logger, int tools, bool resume);
+    [LoggerMessage(EventId = 2102, Level = LogLevel.Debug, Message = "Ход агента «{Backend}» начат: инструментов {Tools}, продолжение сессии {Resume}")]
+    public static partial void AgentTurnStarted(this ILogger logger, string backend, int tools, bool resume);
 
-    [LoggerMessage(EventId = 2103, Level = LogLevel.Information, Message = "Ход агента завершён за {ElapsedMs} мс, стоимость {CostUsd} $")]
-    public static partial void AgentTurnCompleted(this ILogger logger, long elapsedMs, double costUsd);
+    [LoggerMessage(EventId = 2103, Level = LogLevel.Information, Message = "Ход агента завершён за {ElapsedMs} мс, стоимость {CostUsd} $, токенов {Tokens}")]
+    public static partial void AgentTurnCompleted(this ILogger logger, long elapsedMs, double costUsd, long tokens);
 
     [LoggerMessage(EventId = 2104, Level = LogLevel.Error, Message = "Ход агента оборвался: {Reason}")]
     public static partial void AgentTurnFailed(this ILogger logger, Exception? exception, string reason);
@@ -310,4 +310,16 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 2108, Level = LogLevel.Information, Message = "Ход агента получил изменяющие инструменты: {Tools}")]
     public static partial void AgentMutationsGranted(this ILogger logger, string tools);
+
+    [LoggerMessage(EventId = 2109, Level = LogLevel.Warning, Message = "MCP-сервер «{Name}» агенту не подключился (статус «{Status}») – его инструменты будут недоступны")]
+    public static partial void AgentMcpServerUnavailable(this ILogger logger, string name, string status);
+
+    [LoggerMessage(EventId = 2110, Level = LogLevel.Warning, Message = "Агент сообщил об ошибке в потоке: {Message}")]
+    public static partial void AgentStreamError(this ILogger logger, string message);
+
+    [LoggerMessage(EventId = 2111, Level = LogLevel.Information, Message = "Бэкенд агента переключён на «{Backend}»")]
+    public static partial void AgentBackendChanged(this ILogger logger, string backend);
+
+    [LoggerMessage(EventId = 2112, Level = LogLevel.Warning, Message = "Поиск CLI агента «{Backend}» сорвался")]
+    public static partial void AgentCliDetectionFailed(this ILogger logger, Exception exception, string backend);
 }

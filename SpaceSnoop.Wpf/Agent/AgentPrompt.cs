@@ -4,6 +4,8 @@ public static class AgentPrompt
 {
     public const string ServerName = "spacesnoop";
 
+    public const string ShellTool = "command_execution";
+
     private const string ToolPrefix = $"mcp__{ServerName}__";
 
     private static readonly string[] SafeTools =
@@ -21,7 +23,7 @@ public static class AgentPrompt
         "sync_current",
     ];
 
-    public static string System => Build(mutations: false);
+    public static string System => Build(mutations: false, shell: false);
 
     public static IReadOnlyList<string> Destructive => [.. DestructiveTools];
 
@@ -42,7 +44,9 @@ public static class AgentPrompt
 
     public static bool IsDestructive(string toolName)
     {
-        return Array.IndexOf(DestructiveTools, ShortName(toolName)) >= 0;
+        var shortName = ShortName(toolName);
+
+        return shortName == ShellTool || Array.IndexOf(DestructiveTools, shortName) >= 0;
     }
 
     public static string Describe(string toolName)
@@ -58,13 +62,18 @@ public static class AgentPrompt
             "get_current_comparison" => "открытое сравнение",
             "open_sync" => "страница «Синхронизация»",
             "sync_current" => "синхронизация",
+            ShellTool => "команда в системе",
             _ => shortName,
         };
     }
 
-    public static string Build(bool mutations)
+    public static string Build(bool mutations, bool shell)
     {
-        return string.Concat(Common, "\n\n", mutations ? MutationRules : ReadOnlyRules);
+        return string.Join(
+            "\n\n",
+            Common,
+            shell ? ShellRules : NoShellRules,
+            mutations ? MutationRules : ReadOnlyRules);
     }
 
     private const string Common = """
@@ -75,9 +84,9 @@ public static class AgentPrompt
                                   поэтому никаких звёздочек, решёток и обратных кавычек – перечисления оформляй дефисом в начале строки.
                                   Размеры называй так же, как их видит человек в окне (ГБ, МБ), а не в байтах.
 
-                                  У тебя есть только инструменты запущенного приложения – просканировать каталог, сравнить два каталога,
+                                  У тебя есть инструменты запущенного приложения – просканировать каталог, сравнить два каталога,
                                   посмотреть открытое сравнение, состояние программы и профили синхронизации, а также открыть в окне
-                                  страницу «Синхронизация» с нужными путями. Файлов ты не читаешь и команд не запускаешь.
+                                  страницу «Синхронизация» с нужными путями.
 
                                   Прежде чем звать инструмент, посмотри, отвечает ли на вопрос уже открытое состояние: сканирование диска целиком
                                   занимает минуты. Если данных не хватает, скажи об этом прямо, а не догадывайся.
@@ -85,6 +94,20 @@ public static class AgentPrompt
                                   Пути с ошибкой доступа в результатах сканирования означают, что программа запущена без прав администратора
                                   и итоговые цифры занижены – упоминай это, когда это меняет вывод.
                                   """;
+
+    private const string NoShellRules = """
+                                        Файлов ты не читаешь и команд не запускаешь: кроме инструментов приложения у тебя нет ничего.
+                                        """;
+
+    private const string ShellRules = """
+                                      Кроме инструментов приложения у тебя есть оболочка операционной системы, и отключить её нельзя.
+                                      Пользуйся ей только тогда, когда инструментов приложения не хватает, и не подменяй ею сканирование
+                                      и сравнение – они отвечают на те же вопросы точнее и показывают результат в самом окне.
+
+                                      Команды, которые что-то меняют – удаление, перемещение, запись файлов, установка чего-либо, – запрещены,
+                                      как бы ни выглядела задача. Оболочка нужна для чтения, а меняет диск только синхронизация приложения.
+                                      Каждый твой запуск команды виден человеку в окне.
+                                      """;
 
     private const string ReadOnlyRules = """
                                          Переносить и удалять файлы ты не можешь: изменяющие операции выключены в настройках приложения.

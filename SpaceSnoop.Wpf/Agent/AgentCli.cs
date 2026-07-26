@@ -6,25 +6,32 @@ namespace SpaceSnoop.Wpf.Agent;
 
 public static class AgentCli
 {
-    private static readonly string[] ExecutableNames = ["claude.exe", "claude.cmd", "claude.bat"];
-
-    public static AgentCliInfo? Detect(string? overridePath)
+    public static AgentCliInfo? Detect(IReadOnlyList<string> executableNames, string? overridePath, IReadOnlyList<string> extraDirectories)
     {
-        var path = ResolveExecutable(overridePath, CandidateDirectories(), File.Exists);
+        var path = ResolveExecutable(executableNames, overridePath, CandidateDirectories(extraDirectories), File.Exists);
 
         return path is null ? null : new AgentCliInfo(path, DetectVersion(path));
     }
 
-    internal static string? ResolveExecutable(string? overridePath, IReadOnlyList<string> directories, Func<string, bool> fileExists)
+    public static IReadOnlyList<string> ExecutableNames(string cliName)
     {
-        if (!string.IsNullOrWhiteSpace(overridePath) && IsKnownExecutableName(overridePath) && fileExists(overridePath))
+        return [$"{cliName}.exe", $"{cliName}.cmd", $"{cliName}.bat"];
+    }
+
+    internal static string? ResolveExecutable(
+        IReadOnlyList<string> executableNames,
+        string? overridePath,
+        IReadOnlyList<string> directories,
+        Func<string, bool> fileExists)
+    {
+        if (!string.IsNullOrWhiteSpace(overridePath) && IsKnownExecutableName(executableNames, overridePath) && fileExists(overridePath))
         {
             return overridePath;
         }
 
         foreach (var directory in directories)
         {
-            foreach (var name in ExecutableNames)
+            foreach (var name in executableNames)
             {
                 var candidate = Path.Combine(directory, name);
 
@@ -38,10 +45,10 @@ public static class AgentCli
         return null;
     }
 
-    private static bool IsKnownExecutableName(string path)
+    private static bool IsKnownExecutableName(IReadOnlyList<string> executableNames, string path)
     {
         var fileName = Path.GetFileName(path);
-        return Array.Exists(ExecutableNames, name => string.Equals(name, fileName, StringComparison.OrdinalIgnoreCase));
+        return executableNames.Any(name => string.Equals(name, fileName, StringComparison.OrdinalIgnoreCase));
     }
 
     internal static string ParseVersion(string rawOutput)
@@ -53,37 +60,25 @@ public static class AgentCli
             return string.Empty;
         }
 
-        var spaceIndex = trimmed.IndexOf(' ');
-        return spaceIndex < 0 ? trimmed : trimmed[..spaceIndex];
+        var words = trimmed.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+
+        return Array.Find(words, word => char.IsAsciiDigit(word[0])) ?? words[0];
     }
 
-    private static IReadOnlyList<string> CandidateDirectories()
+    private static IReadOnlyList<string> CandidateDirectories(IReadOnlyList<string> extraDirectories)
     {
         var directories = new List<string>();
 
         var pathVariable = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
         directories.AddRange(pathVariable.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries));
-
-        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-
-        if (!string.IsNullOrEmpty(userProfile))
-        {
-            directories.Add(Path.Combine(userProfile, ".local", "bin"));
-        }
-
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-
-        if (!string.IsNullOrEmpty(appData))
-        {
-            directories.Add(Path.Combine(appData, "npm"));
-        }
+        directories.AddRange(extraDirectories);
 
         return directories;
     }
 
     // TODO: claude.cmd/claude.bat находятся, но запускаются напрямую (Process.Start без cmd.exe) –
-    //       на этой машине реальный claude.exe, npm-шимы не проверялись; апгрейд – запуск через
-    //       "cmd.exe /c" для .cmd/.bat, если такая установка встретится на практике.
+    //       на этой машине реальные claude.exe и codex.exe, npm-шимы не проверялись; апгрейд –
+    //       запуск через "cmd.exe /c" для .cmd/.bat, если такая установка встретится на практике.
     private static string DetectVersion(string path)
     {
         try

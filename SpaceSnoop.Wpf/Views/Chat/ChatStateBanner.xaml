@@ -49,7 +49,7 @@
                 <iconPacks:PackIconLucide Style="{StaticResource Chat.BannerIcon}"
                                           Kind="{x:Static iconPacks:PackIconLucideKind.LoaderCircle}"
                                           Foreground="{DynamicResource Fg.Muted}" />
-                <TextBlock Text="Проверяю, установлен ли Claude Code…"
+                <TextBlock Text="{Binding DetectingCliText}"
                            Style="{StaticResource TextBlock.Subtle}"
                            VerticalAlignment="Center" />
             </StackPanel>
@@ -63,12 +63,12 @@
                     <iconPacks:PackIconLucide Style="{StaticResource Chat.BannerIcon}"
                                               Kind="{x:Static iconPacks:PackIconLucideKind.BotOff}"
                                               Foreground="{DynamicResource State.Warning}" />
-                    <TextBlock Text="Claude Code не найден"
+                    <TextBlock Text="{Binding CliMissingTitle}"
                                FontWeight="{DynamicResource Font.Weight.SemiBold}"
                                VerticalAlignment="Center" />
                 </StackPanel>
                 <TextBlock Style="{StaticResource Chat.BannerText}"
-                           Text="Чат работает через уже установленный на этой машине CLI Claude Code – по вашей подписке, без ключей в настройках. Установите CLI и войдите в свою подписку, затем проверьте снова." />
+                           Text="{Binding CliMissingText}" />
                 <Button Style="{StaticResource Button.Secondary}"
                         Content="Проверить снова"
                         Command="{Binding RecheckCliCommand}"
@@ -90,9 +90,9 @@
                                VerticalAlignment="Center" />
                 </StackPanel>
                 <TextBlock Style="{StaticResource Chat.BannerText}"
-                           Text="Текст сообщения и то, что агент запрашивает у инструментов приложения (пути, размеры, результаты сравнения), уходит в CLI Claude Code и дальше в Anthropic – под вашей собственной подпиской, не по ключу приложения." />
+                           Text="{Binding ConsentText}" />
                 <TextBlock Style="{StaticResource Chat.BannerText}"
-                           Text="Продолжение разговора (--resume) заставляет CLI хранить весь диалог – сообщения и то, что вернули инструменты, то есть пути и размеры с ваших дисков – локально, в своей рабочей папке, привязанной к текущему каталогу запуска." />
+                           Text="Продолжение разговора заставляет CLI хранить весь диалог – сообщения и то, что вернули инструменты, то есть пути и размеры с ваших дисков – локально, в своей рабочей папке, привязанной к текущему каталогу запуска." />
                 <Button Style="{StaticResource Button.Primary}"
                         Content="Разрешить"
                         Command="{Binding GrantConsentCommand}"
@@ -124,6 +124,23 @@
                            Foreground="{DynamicResource State.Error}"
                            Text="{Binding McpServer.LastError}"
                            Visibility="{Binding McpServer.LastError, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
+            </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource Chat.Banner}"
+                BorderBrush="{DynamicResource State.Warning}"
+                Visibility="{Binding ShowShellBanner, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource Chat.BannerIcon}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.SquareTerminal}"
+                                              Foreground="{DynamicResource State.Warning}" />
+                    <TextBlock Text="У агента есть оболочка системы"
+                               FontWeight="{DynamicResource Font.Weight.SemiBold}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Style="{StaticResource Chat.BannerText}"
+                           Text="{Binding ShellNotice}" />
             </StackPanel>
         </Border>
     </StackPanel>

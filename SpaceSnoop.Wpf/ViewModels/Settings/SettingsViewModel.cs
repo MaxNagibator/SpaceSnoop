@@ -16,7 +16,10 @@ public sealed record EnumOption<T>(T Value, string Label) where T : struct, Enum
 
 public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
 {
+    private static readonly AgentBackendKind[] AgentBackendOrder = [AgentBackendKind.Claude, AgentBackendKind.Codex];
+
     private readonly ISettingsStore _settings;
+    private readonly AgentBackends _agentBackends;
     private readonly ILogger<SettingsViewModel> _logger;
 
     [ObservableProperty]
@@ -33,10 +36,12 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         McpPreferences mcp,
         McpServerHost mcpServer,
         AgentPreferences agent,
+        AgentBackends agentBackends,
         ISettingsStore settings,
         ILogger<SettingsViewModel> logger)
     {
         Agent = agent;
+        _agentBackends = agentBackends;
         Theme = theme;
         Shell = shell;
         Operations = operations;
@@ -69,6 +74,33 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     public McpServerHost McpServer { get; }
 
     public AgentPreferences Agent { get; }
+
+    public IReadOnlyList<SegmentOption> AgentBackendOptions { get; } =
+    [
+        new(PackIconLucideKind.Bot, "Claude Code", "CLI claude – встроенные инструменты отключаются целиком, у агента только инструменты приложения"),
+        new(PackIconLucideKind.SquareTerminal, "Codex", "CLI codex – помимо инструментов приложения агент получает оболочку системы, отключить её нечем"),
+    ];
+
+    public int SelectedAgentBackendIndex
+    {
+        get => Array.IndexOf(AgentBackendOrder, Agent.Backend);
+        set
+        {
+            if (value < 0 || value >= AgentBackendOrder.Length || AgentBackendOrder[value] == Agent.Backend)
+            {
+                return;
+            }
+
+            Agent.Backend = AgentBackendOrder[value];
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(AgentCliPathLabel));
+            OnPropertyChanged(nameof(AgentShellWarning));
+        }
+    }
+
+    public string AgentCliPathLabel => $"Путь к {_agentBackends.Current.CliName}.exe";
+
+    public bool AgentShellWarning => _agentBackends.Current.HasBuiltInShell;
 
     public bool McpElevatedWarning => Mcp.Enabled && AdminElevation.IsElevated;
 

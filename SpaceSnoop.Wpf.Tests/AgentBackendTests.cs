@@ -6,10 +6,13 @@ namespace SpaceSnoop.Wpf.Tests;
 [TestFixture]
 public class AgentBackendTests
 {
+    private static readonly IReadOnlyList<string> ClaudeNames = AgentCli.ExecutableNames("claude");
+
     [Test]
     public void Явный_путь_используется_если_файл_существует()
     {
         var path = AgentCli.ResolveExecutable(
+            ClaudeNames,
             @"D:\custom\claude.exe",
             [@"C:\A"],
             candidate => candidate == @"D:\custom\claude.exe" || candidate == @"C:\A\claude.exe");
@@ -21,6 +24,7 @@ public class AgentBackendTests
     public void Несуществующий_явный_путь_не_блокирует_поиск_по_каталогам()
     {
         var path = AgentCli.ResolveExecutable(
+            ClaudeNames,
             @"D:\custom\claude.exe",
             [@"C:\A"],
             candidate => candidate == @"C:\A\claude.exe");
@@ -32,6 +36,7 @@ public class AgentBackendTests
     public void Поиск_идёт_по_каталогам_по_порядку()
     {
         var path = AgentCli.ResolveExecutable(
+            ClaudeNames,
             null,
             [@"C:\First", @"C:\Second"],
             candidate => candidate == @"C:\Second\claude.cmd");
@@ -43,6 +48,7 @@ public class AgentBackendTests
     public void Исполняемый_exe_предпочтительнее_cmd_и_bat()
     {
         var path = AgentCli.ResolveExecutable(
+            ClaudeNames,
             null,
             [@"C:\A"],
             candidate => candidate is @"C:\A\claude.exe" or @"C:\A\claude.cmd" or @"C:\A\claude.bat");
@@ -53,7 +59,7 @@ public class AgentBackendTests
     [Test]
     public void Ничего_не_найдено_возвращает_null()
     {
-        var path = AgentCli.ResolveExecutable(null, [@"C:\A", @"C:\B"], _ => false);
+        var path = AgentCli.ResolveExecutable(ClaudeNames, null, [@"C:\A", @"C:\B"], _ => false);
 
         Assert.That(path, Is.Null);
     }
@@ -62,6 +68,7 @@ public class AgentBackendTests
     public void Явный_путь_с_чужим_именем_файла_игнорируется()
     {
         var path = AgentCli.ResolveExecutable(
+            ClaudeNames,
             @"D:\custom\evil.exe",
             [@"C:\A"],
             candidate => candidate == @"D:\custom\evil.exe" || candidate == @"C:\A\claude.exe");
@@ -73,6 +80,7 @@ public class AgentBackendTests
     public void Явный_путь_сравнивает_имя_файла_без_учёта_регистра()
     {
         var path = AgentCli.ResolveExecutable(
+            ClaudeNames,
             @"D:\custom\Claude.EXE",
             [@"C:\A"],
             candidate => candidate == @"D:\custom\Claude.EXE");
@@ -80,12 +88,26 @@ public class AgentBackendTests
         Assert.That(path, Is.EqualTo(@"D:\custom\Claude.EXE"));
     }
 
+    [Test]
+    public void Имя_бэкенда_не_пускает_чужой_CLI_по_явному_пути()
+    {
+        var path = AgentCli.ResolveExecutable(
+            AgentCli.ExecutableNames("codex"),
+            @"D:\custom\claude.exe",
+            [@"C:\A"],
+            candidate => candidate is @"D:\custom\claude.exe" or @"C:\A\codex.exe");
+
+        Assert.That(path, Is.EqualTo(@"C:\A\codex.exe"));
+    }
+
     [TestCase("2.1.220 (Claude Code)", ExpectedResult = "2.1.220")]
+    [TestCase("codex-cli 0.145.0", ExpectedResult = "0.145.0")]
     [TestCase("2.1.220", ExpectedResult = "2.1.220")]
     [TestCase("1.0.0\r\n", ExpectedResult = "1.0.0")]
+    [TestCase("без цифр вообще", ExpectedResult = "без")]
     [TestCase("", ExpectedResult = "")]
     [TestCase("   ", ExpectedResult = "")]
-    public string Версия_разбирается_из_первого_слова_вывода(string rawOutput)
+    public string Версия_разбирается_из_первого_слова_с_цифры(string rawOutput)
     {
         return AgentCli.ParseVersion(rawOutput);
     }

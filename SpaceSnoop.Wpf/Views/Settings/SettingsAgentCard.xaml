@@ -22,7 +22,7 @@
             <TextBlock Text="Агент-чат"
                        Style="{StaticResource Setting.SectionTitle}" />
             <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="Страница «Чат» говорит с уже установленным на этой машине CLI Claude Code – по вашей подписке, без ключей и токенов Anthropic в настройках приложения. Сообщение и то, что агент запрашивает у инструментов (пути, размеры, результаты сравнения), уходит в CLI и дальше в Anthropic под вашей подпиской." />
+                       Text="Страница «Чат» говорит с уже установленным на этой машине CLI – по вашей подписке, без ключей и токенов в настройках приложения. Сообщение и то, что агент запрашивает у инструментов (пути, размеры, результаты сравнения), уходит в CLI и дальше поставщику модели под вашей подпиской." />
 
             <CheckBox Content="Показывать страницу чата"
                       IsChecked="{Binding Agent.Enabled, Mode=TwoWay}"
@@ -36,6 +36,21 @@
             <TextBlock Style="{StaticResource Setting.Hint}"
                        Text="Снимите галку, чтобы отозвать согласие – страница чата снова покажет предупреждение и спросит его перед следующим сообщением." />
 
+            <TextBlock Text="CLI"
+                       Style="{StaticResource Setting.Label}"
+                       Margin="0,16,0,0" />
+            <ListBox Style="{StaticResource ListBox.Segmented}"
+                     ItemsSource="{Binding AgentBackendOptions}"
+                     SelectedIndex="{Binding SelectedAgentBackendIndex}"
+                     HorizontalAlignment="Left"
+                     Margin="0,8,0,0" />
+            <TextBlock Style="{StaticResource Setting.Hint}"
+                       Text="Модель и путь ниже относятся к выбранному CLI – у каждого свои." />
+            <TextBlock Style="{StaticResource Setting.Hint}"
+                       Foreground="{DynamicResource State.Warning}"
+                       Text="У codex есть собственная оболочка операционной системы, и отключить её нечем: помимо инструментов приложения агент может выполнять команды с правами SpaceSnoop, а оно обычно запущено от администратора. Инструменты приложения при этом работают только с полным доступом – при песочнице codex не может дозваться разрешения и гасит вызов сам. Из-за оболочки запрет отдельных инструментов для codex – подсказка, а не преграда: настоящий барьер один и тот же для обоих CLI – галка «Разрешить изменяющие операции» ниже, её проверяет сам MCP-сервер."
+                       Visibility="{Binding AgentShellWarning, Converter={StaticResource BoolToVisibility}}" />
+
             <TextBlock Text="Модель"
                        Style="{StaticResource Setting.Label}"
                        Margin="0,16,0,0" />
@@ -47,7 +62,7 @@
             <TextBlock Style="{StaticResource Setting.Hint}"
                        Text="Пусто – модель, выбранная по умолчанию в самом CLI." />
 
-            <TextBlock Text="Путь к claude.exe"
+            <TextBlock Text="{Binding AgentCliPathLabel}"
                        Style="{StaticResource Setting.Label}"
                        Margin="0,16,0,0" />
             <TextBox Style="{StaticResource TextBox.Form}"

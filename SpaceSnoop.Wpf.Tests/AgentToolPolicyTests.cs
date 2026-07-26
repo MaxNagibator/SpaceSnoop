@@ -93,7 +93,7 @@ public class AgentToolPolicyTests
     [Test]
     public void Промпт_без_мутаций_объявляет_запрет_на_перенос()
     {
-        var prompt = AgentPrompt.Build(mutations: false);
+        var prompt = AgentPrompt.Build(mutations: false, shell: false);
 
         using (Assert.EnterMultipleScope())
         {
@@ -105,7 +105,7 @@ public class AgentToolPolicyTests
     [Test]
     public void Промпт_с_мутациями_требует_сначала_план_и_согласие()
     {
-        var prompt = AgentPrompt.Build(mutations: true);
+        var prompt = AgentPrompt.Build(mutations: true, shell: false);
 
         using (Assert.EnterMultipleScope())
         {
@@ -116,14 +116,45 @@ public class AgentToolPolicyTests
     }
 
     [Test]
-    public void Дефолтный_промпт_равен_read_only_редакции()
+    public void Промпт_без_оболочки_объявляет_что_команд_нет()
     {
-        Assert.That(AgentPrompt.System, Is.EqualTo(AgentPrompt.Build(mutations: false)));
+        var prompt = AgentPrompt.Build(mutations: false, shell: false);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(prompt, Does.Contain("команд не запускаешь"));
+            Assert.That(prompt, Does.Not.Contain("оболочка операционной системы"));
+        }
+    }
+
+    [Test]
+    public void Промпт_с_оболочкой_запрещает_менять_ею_диск()
+    {
+        var prompt = AgentPrompt.Build(mutations: false, shell: true);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(prompt, Does.Contain("оболочка операционной системы"));
+            Assert.That(prompt, Does.Contain("запрещены"));
+            Assert.That(prompt, Does.Not.Contain("команд не запускаешь"));
+        }
+    }
+
+    [Test]
+    public void Дефолтный_промпт_равен_read_only_редакции_без_оболочки()
+    {
+        Assert.That(AgentPrompt.System, Is.EqualTo(AgentPrompt.Build(mutations: false, shell: false)));
     }
 
     [Test]
     public void Обе_редакции_промпта_несут_общую_часть()
     {
-        Assert.That(AgentPrompt.Build(mutations: true), Does.StartWith("Ты – помощник внутри программы SpaceSnoop"));
+        Assert.That(AgentPrompt.Build(mutations: true, shell: false), Does.StartWith("Ты – помощник внутри программы SpaceSnoop"));
+    }
+
+    [Test]
+    public void Запуск_команды_помечается_как_изменяющий_вызов()
+    {
+        Assert.That(ChatToolCall.From(AgentPrompt.ShellTool).IsMutating, Is.True);
     }
 }

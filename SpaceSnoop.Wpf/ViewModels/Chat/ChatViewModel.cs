@@ -5,21 +5,23 @@ namespace SpaceSnoop.Wpf.ViewModels.Chat;
 
 public sealed partial class ChatViewModel : ObservableObject, IPageHeader
 {
-    private readonly IAgentBackend _backend;
+    private readonly AgentBackends _backends;
     private readonly AgentPreferences _preferences;
     private readonly ILogger<ChatViewModel> _logger;
 
     private bool _detectStarted;
+    private int _detectGeneration;
     private string? _sessionId;
+    private bool _sessionDropped;
     private CancellationTokenSource? _cts;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowCliMissingBanner), nameof(ShowConsentBanner), nameof(ShowMcpBanner), nameof(CanChat))]
+    [NotifyPropertyChangedFor(nameof(ShowCliMissingBanner), nameof(ShowConsentBanner), nameof(ShowMcpBanner), nameof(CanChat), nameof(ShowShellBanner))]
     [NotifyCanExecuteChangedFor(nameof(SendCommand))]
     private AgentCliInfo? _cliInfo;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowCliMissingBanner))]
+    [NotifyPropertyChangedFor(nameof(ShowCliMissingBanner), nameof(ShowShellBanner))]
     [NotifyCanExecuteChangedFor(nameof(SendCommand))]
     private bool _isDetectingCli;
 
@@ -31,9 +33,9 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
     [NotifyCanExecuteChangedFor(nameof(SendCommand), nameof(CancelCommand), nameof(NewConversationCommand))]
     private bool _isBusy;
 
-    public ChatViewModel(IAgentBackend backend, AgentPreferences preferences, McpPreferences mcp, McpServerHost mcpServer, ILogger<ChatViewModel> logger)
+    public ChatViewModel(AgentBackends backends, AgentPreferences preferences, McpPreferences mcp, McpServerHost mcpServer, ILogger<ChatViewModel> logger)
     {
-        _backend = backend;
+        _backends = backends;
         _preferences = preferences;
         Mcp = mcp;
         McpServer = mcpServer;
@@ -73,9 +75,25 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
 
     public bool MutationsAllowed => Mcp.AllowMutations;
 
+    public string BackendName => Backend.DisplayName;
+
+    public string DetectingCliText => $"Проверяю, установлен ли {Backend.DisplayName}…";
+
+    public string CliMissingTitle => $"{Backend.DisplayName} не найден";
+
+    public string CliMissingText => $"Чат работает через уже установленный на этой машине CLI {Backend.DisplayName} – по вашей подписке, без ключей в настройках. Установите CLI и войдите в свою подписку, затем проверьте снова: {Backend.MissingCliHint}";
+
+    public string ConsentText => $"Текст сообщения и то, что агент запрашивает у инструментов приложения (пути, размеры, результаты сравнения), уходит в CLI {Backend.DisplayName} и дальше поставщику модели – под вашей собственной подпиской, не по ключу приложения.";
+
+    public bool ShowShellBanner => Backend.HasBuiltInShell && CanChat;
+
+    public string ShellNotice => $"У CLI {Backend.DisplayName} есть собственная оболочка операционной системы, и отключить её нечем: помимо инструментов приложения агент может выполнять команды с правами SpaceSnoop. Запуск команды виден в ленте отдельным бейджем.";
+
     public string EmptyStateHint => MutationsAllowed
         ? "Агент смотрит на приложение теми же инструментами, что и MCP-сервер: сканирует, сравнивает, читает открытое сравнение. Изменяющие операции разрешены – синхронизацию он может запустить сам, но только показав план и дождавшись вашего согласия."
         : "Агент смотрит на приложение теми же read-only инструментами, что и MCP-сервер: сканирует, сравнивает, читает открытое сравнение. Ничего не удаляет и не переносит сам.";
+
+    private IAgentBackend Backend => _backends.Current;
 
     private bool McpReady => Mcp.Enabled && McpServer.IsRunning && !string.IsNullOrWhiteSpace(Mcp.Token);
 
@@ -104,15 +122,36 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
 
     private async Task DetectCliAsync()
     {
+        var backend = Backend;
+        var generation = ++_detectGeneration;
+
         IsDetectingCli = true;
 
         try
         {
-            CliInfo = await Task.Run(_backend.Detect);
+            AgentCliInfo? info;
+
+            try
+            {
+                info = await Task.Run(backend.Detect);
+            }
+            catch (Exception exception)
+            {
+                _logger.AgentCliDetectionFailed(exception, backend.DisplayName);
+                info = null;
+            }
+
+            if (generation == _detectGeneration)
+            {
+                CliInfo = info;
+            }
         }
         finally
         {
-            IsDetectingCli = false;
+            if (generation == _detectGeneration)
+            {
+                IsDetectingCli = false;
+            }
         }
     }
 
@@ -166,6 +205,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         Messages.Add(assistant);
         OnPropertyChanged(nameof(HasMessages));
 
+        var backend = Backend;
         var mutations = Mcp.AllowMutations;
         var allowed = AgentPrompt.AllowedTools(mutations);
 
@@ -178,24 +218,29 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         {
             Prompt = prompt,
             ResumeSessionId = _sessionId,
-            SystemPrompt = AgentPrompt.Build(mutations),
-            Model = string.IsNullOrWhiteSpace(_preferences.Model) ? null : _preferences.Model,
+            SystemPrompt = AgentPrompt.Build(mutations, backend.HasBuiltInShell),
+            Model = _preferences.ModelFor(backend.Kind) is { Length: > 0 } model ? model : null,
             Mcp = new AgentMcpConfig(AgentPrompt.ServerName, McpServer.Endpoint ?? string.Empty, Mcp.Token, allowed, AgentPrompt.DeniedTools(mutations)),
         };
 
         _cts = new CancellationTokenSource();
         var token = _cts.Token;
 
+        _sessionDropped = false;
         IsBusy = true;
 
         try
         {
-            await foreach (var turnEvent in _backend.RunAsync(request, token).WithCancellation(token))
+            await foreach (var turnEvent in backend.RunAsync(request, token).WithCancellation(token))
             {
                 switch (turnEvent.Kind)
                 {
                     case AgentEventKind.Started:
-                        _sessionId = turnEvent.SessionId;
+                        if (!_sessionDropped)
+                        {
+                            _sessionId = turnEvent.SessionId;
+                        }
+
                         break;
 
                     case AgentEventKind.Text:
@@ -207,8 +252,13 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
                         break;
 
                     case AgentEventKind.Completed:
-                        _sessionId = turnEvent.SessionId ?? _sessionId;
+                        if (!_sessionDropped)
+                        {
+                            _sessionId = turnEvent.SessionId ?? _sessionId;
+                        }
+
                         assistant.CostUsd = turnEvent.CostUsd;
+                        assistant.Tokens = turnEvent.Tokens;
                         break;
 
                     case AgentEventKind.Failed:
@@ -242,9 +292,24 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
 
     private void OnGateSourceChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (ReferenceEquals(sender, _preferences) && e.PropertyName == nameof(AgentPreferences.Enabled) && !_preferences.Enabled)
+        if (ReferenceEquals(sender, _preferences))
         {
-            _cts?.Cancel();
+            if (e.PropertyName == nameof(AgentPreferences.Enabled) && !_preferences.Enabled)
+            {
+                _cts?.Cancel();
+            }
+
+            if (e.PropertyName == nameof(AgentPreferences.Backend))
+            {
+                SwitchBackend();
+                return;
+            }
+        }
+
+        if (ReferenceEquals(sender, Mcp) && e.PropertyName == nameof(McpPreferences.AllowMutations) && !Backend.SendsSystemPromptEachTurn)
+        {
+            _sessionId = null;
+            _sessionDropped = IsBusy;
         }
 
         var dispatcher = Application.Current?.Dispatcher;
@@ -258,11 +323,51 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         NotifyGatesChanged();
     }
 
+    private void SwitchBackend()
+    {
+        _cts?.Cancel();
+        _sessionId = null;
+        _logger.AgentBackendChanged(Backend.DisplayName);
+
+        var dispatcher = Application.Current?.Dispatcher;
+
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            dispatcher.BeginInvoke(ReloadBackend);
+            return;
+        }
+
+        ReloadBackend();
+    }
+
+    private void ReloadBackend()
+    {
+        NotifyGatesChanged();
+        NotifyBackendChanged();
+
+        if (_detectStarted)
+        {
+            _ = DetectCliAsync();
+        }
+    }
+
+    private void NotifyBackendChanged()
+    {
+        OnPropertyChanged(nameof(BackendName));
+        OnPropertyChanged(nameof(DetectingCliText));
+        OnPropertyChanged(nameof(CliMissingTitle));
+        OnPropertyChanged(nameof(CliMissingText));
+        OnPropertyChanged(nameof(ConsentText));
+        OnPropertyChanged(nameof(ShowShellBanner));
+        OnPropertyChanged(nameof(ShellNotice));
+    }
+
     private void NotifyGatesChanged()
     {
         OnPropertyChanged(nameof(ShowConsentBanner));
         OnPropertyChanged(nameof(ShowMcpBanner));
         OnPropertyChanged(nameof(CanChat));
+        OnPropertyChanged(nameof(ShowShellBanner));
         OnPropertyChanged(nameof(MutationsAllowed));
         OnPropertyChanged(nameof(EmptyStateHint));
         SendCommand.NotifyCanExecuteChanged();

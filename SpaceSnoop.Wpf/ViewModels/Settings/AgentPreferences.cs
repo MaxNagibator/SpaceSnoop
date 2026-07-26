@@ -3,13 +3,16 @@
 public sealed partial class AgentPreferences : ObservableObject
 {
     private readonly ISettingsStore _settings;
-    private readonly bool _suppressPersist;
+    private bool _suppressPersist;
 
     [ObservableProperty]
     private bool _enabled = AppDefaults.AgentEnabledDefault;
 
     [ObservableProperty]
     private bool _consent = AppDefaults.AgentConsentDefault;
+
+    [ObservableProperty]
+    private AgentBackendKind _backend = AppDefaults.AgentBackendDefault;
 
     [ObservableProperty]
     private string _model = AppDefaults.AgentModelDefault;
@@ -22,11 +25,46 @@ public sealed partial class AgentPreferences : ObservableObject
         _settings = settings;
 
         _suppressPersist = true;
+        MigrateSharedKeys();
         Enabled = _settings.GetBool(SettingsKeys.AgentEnabled, AppDefaults.AgentEnabledDefault);
         Consent = _settings.GetBool(SettingsKeys.AgentConsent, AppDefaults.AgentConsentDefault);
-        Model = _settings.GetStringValue(SettingsKeys.AgentModel)?.Trim() ?? AppDefaults.AgentModelDefault;
-        CliPath = _settings.GetStringValue(SettingsKeys.AgentCliPath)?.Trim() ?? string.Empty;
+        Backend = _settings.GetEnum(SettingsKeys.AgentBackend, AppDefaults.AgentBackendDefault);
+        Model = ModelFor(Backend);
+        CliPath = CliPathFor(Backend);
         _suppressPersist = false;
+    }
+
+    public string ModelFor(AgentBackendKind kind)
+    {
+        return _settings.GetStringValue(SettingsKeys.AgentModel(kind))?.Trim() ?? AppDefaults.AgentModelDefault;
+    }
+
+    public string CliPathFor(AgentBackendKind kind)
+    {
+        return _settings.GetStringValue(SettingsKeys.AgentCliPath(kind))?.Trim() ?? string.Empty;
+    }
+
+    private void MigrateSharedKeys()
+    {
+        Migrate(SettingsKeys.AgentModelShared, SettingsKeys.AgentModel(AgentBackendKind.Claude));
+        Migrate(SettingsKeys.AgentCliPathShared, SettingsKeys.AgentCliPath(AgentBackendKind.Claude));
+    }
+
+    private void Migrate(string sharedKey, string backendKey)
+    {
+        var shared = _settings.GetStringValue(sharedKey);
+
+        if (string.IsNullOrWhiteSpace(shared))
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_settings.GetStringValue(backendKey)))
+        {
+            _settings.SetValue(backendKey, shared);
+        }
+
+        _settings.SetValue(sharedKey, string.Empty);
     }
 
     partial void OnEnabledChanged(bool value)
@@ -45,11 +83,26 @@ public sealed partial class AgentPreferences : ObservableObject
         }
     }
 
+    partial void OnBackendChanged(AgentBackendKind value)
+    {
+        if (_suppressPersist)
+        {
+            return;
+        }
+
+        _settings.SetEnum(SettingsKeys.AgentBackend, value);
+
+        _suppressPersist = true;
+        Model = ModelFor(value);
+        CliPath = CliPathFor(value);
+        _suppressPersist = false;
+    }
+
     partial void OnModelChanged(string value)
     {
         if (!_suppressPersist)
         {
-            _settings.SetValue(SettingsKeys.AgentModel, value);
+            _settings.SetValue(SettingsKeys.AgentModel(Backend), value);
         }
     }
 
@@ -57,7 +110,7 @@ public sealed partial class AgentPreferences : ObservableObject
     {
         if (!_suppressPersist)
         {
-            _settings.SetValue(SettingsKeys.AgentCliPath, value);
+            _settings.SetValue(SettingsKeys.AgentCliPath(Backend), value);
         }
     }
 }

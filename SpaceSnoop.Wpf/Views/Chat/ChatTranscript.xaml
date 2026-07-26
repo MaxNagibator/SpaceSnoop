@@ -206,8 +206,8 @@
                                                FontSize="{DynamicResource Font.Size.Caption}"
                                                Foreground="{DynamicResource Fg.Muted}"
                                                Margin="0,8,0,0"
-                                               Text="{Binding CostUsd, StringFormat=Стоимость хода: \${0:0.0000}}"
-                                               Visibility="{Binding HasCost, Converter={StaticResource BoolToVisibility}}" />
+                                               Text="{Binding UsageText}"
+                                               Visibility="{Binding HasUsage, Converter={StaticResource BoolToVisibility}}" />
                                 </StackPanel>
                             </Border>
                         </Grid>

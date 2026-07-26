@@ -60,6 +60,7 @@ public static class AppDefaults
     public const bool AgentConsentDefault = false;
     public const string AgentModelDefault = "";
     public const int AgentDetectTimeoutSeconds = 10;
+    public const AgentBackendKind AgentBackendDefault = AgentBackendKind.Claude;
 
     public const string UpdateRepositoryDefault = AppInfo.RepoSlug;
     public const bool UpdateCheckOnStartupDefault = true;

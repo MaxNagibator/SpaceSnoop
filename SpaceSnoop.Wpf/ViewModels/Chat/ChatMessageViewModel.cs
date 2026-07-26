@@ -35,10 +35,18 @@ public sealed partial class ChatMessageViewModel : ObservableObject
     private bool _isCancelled;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasCost))]
+    [NotifyPropertyChangedFor(nameof(HasUsage), nameof(UsageText))]
     private double _costUsd;
 
-    public bool HasCost => CostUsd > 0;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasUsage), nameof(UsageText))]
+    private long _tokens;
+
+    public bool HasUsage => CostUsd > 0 || Tokens > 0;
+
+    public string UsageText => CostUsd > 0
+        ? $"Стоимость хода: ${CostUsd:0.0000}"
+        : $"Токенов за ход: {Tokens:N0}";
 
     public ObservableCollection<ChatToolCall> ToolCalls { get; } = [];
 

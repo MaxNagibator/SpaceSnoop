@@ -78,8 +78,11 @@ public static class SettingsKeys
 
     public const string AgentEnabled = "wpf.agent.enabled";
     public const string AgentConsent = "wpf.agent.consent";
-    public const string AgentModel = "wpf.agent.model";
-    public const string AgentCliPath = "wpf.agent.cli_path";
+    public const string AgentBackend = "wpf.agent.backend";
+    public const string AgentModelShared = $"{AgentPrefix}.model";
+    public const string AgentCliPathShared = $"{AgentPrefix}.cli_path";
+
+    private const string AgentPrefix = "wpf.agent";
 
     public const string UpdateDismissedVersion = "wpf.update.dismissed";
     public const string UpdateRepository = "wpf.update.repository";
@@ -87,4 +90,19 @@ public static class SettingsKeys
     public const string UpdateAutoDownload = "wpf.update.auto_download";
 
     public static string Theme => ThemeManager.SettingsKeyName;
+
+    public static string AgentModel(AgentBackendKind backend)
+    {
+        return $"{AgentPrefix}.{Suffix(backend)}.model";
+    }
+
+    public static string AgentCliPath(AgentBackendKind backend)
+    {
+        return $"{AgentPrefix}.{Suffix(backend)}.cli_path";
+    }
+
+    private static string Suffix(AgentBackendKind backend)
+    {
+        return backend.ToString().ToLowerInvariant();
+    }
 }
