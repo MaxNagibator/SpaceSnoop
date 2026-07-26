@@ -73,6 +73,34 @@
                 </Style.Triggers>
             </Style>
 
+            <Style x:Key="Chat.ToolBadge"
+                   TargetType="Border"
+                   BasedOn="{StaticResource Badge.Info}">
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsMutating}"
+                                 Value="True">
+                        <Setter Property="Background" Value="{DynamicResource State.WarningSoft}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource State.Warning}" />
+                        <Setter Property="TextElement.Foreground" Value="{DynamicResource State.Warning}" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <Style x:Key="Chat.ToolBadgeIcon"
+                   TargetType="iconPacks:PackIconLucide">
+                <Setter Property="Width" Value="11" />
+                <Setter Property="Height" Value="11" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Margin" Value="0,0,5,0" />
+                <Setter Property="Kind" Value="{x:Static iconPacks:PackIconLucideKind.Wrench}" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsMutating}"
+                                 Value="True">
+                        <Setter Property="Kind" Value="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
             <Style x:Key="Chat.BubbleText"
                    TargetType="TextBox"
                    BasedOn="{StaticResource TextBox.Form}">
@@ -102,7 +130,7 @@
                 <TextBlock Style="{StaticResource Chat.Headline}"
                            Text="Спросите про место на диске" />
                 <TextBlock Style="{StaticResource Chat.Hint}"
-                           Text="Агент смотрит на приложение теми же read-only инструментами, что и MCP-сервер: сканирует, сравнивает, читает открытое сравнение. Ничего не удаляет и не переносит сам." />
+                           Text="{Binding EmptyStateHint}" />
 
                 <ItemsControl ItemsSource="{x:Static chatvm:ChatViewModel.ExampleQuestions}"
                               HorizontalAlignment="Center"
@@ -154,11 +182,14 @@
                                             </ItemsPanelTemplate>
                                         </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Style="{StaticResource Badge.Info}"
+                                            <DataTemplate DataType="{x:Type chatvm:ChatToolCall}">
+                                                <Border Style="{StaticResource Chat.ToolBadge}"
                                                         Margin="0,0,6,6">
-                                                    <TextBlock Text="{Binding}"
-                                                               FontSize="{DynamicResource Font.Size.Caption}" />
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <iconPacks:PackIconLucide Style="{StaticResource Chat.ToolBadgeIcon}" />
+                                                        <TextBlock Text="{Binding Text}"
+                                                                   FontSize="{DynamicResource Font.Size.Caption}" />
+                                                    </StackPanel>
                                                 </Border>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>

@@ -307,4 +307,7 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 2107, Level = LogLevel.Information, Message = "Отправка данных агенту разрешена пользователем")]
     public static partial void AgentConsentGranted(this ILogger logger);
+
+    [LoggerMessage(EventId = 2108, Level = LogLevel.Information, Message = "Ход агента получил изменяющие инструменты: {Tools}")]
+    public static partial void AgentMutationsGranted(this ILogger logger, string tools);
 }

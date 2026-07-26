@@ -40,7 +40,7 @@ public sealed partial class ChatMessageViewModel : ObservableObject
 
     public bool HasCost => CostUsd > 0;
 
-    public ObservableCollection<string> ToolCalls { get; } = [];
+    public ObservableCollection<ChatToolCall> ToolCalls { get; } = [];
 
     public void Append(string text)
     {

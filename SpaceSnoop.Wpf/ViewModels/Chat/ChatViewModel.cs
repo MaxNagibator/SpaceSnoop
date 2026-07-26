@@ -71,6 +71,12 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
 
     public bool CanChat => !IsDetectingCli && CliInfo is not null && _preferences.Consent && McpReady;
 
+    public bool MutationsAllowed => Mcp.AllowMutations;
+
+    public string EmptyStateHint => MutationsAllowed
+        ? "Агент смотрит на приложение теми же инструментами, что и MCP-сервер: сканирует, сравнивает, читает открытое сравнение. Изменяющие операции разрешены – синхронизацию он может запустить сам, но только показав план и дождавшись вашего согласия."
+        : "Агент смотрит на приложение теми же read-only инструментами, что и MCP-сервер: сканирует, сравнивает, читает открытое сравнение. Ничего не удаляет и не переносит сам.";
+
     private bool McpReady => Mcp.Enabled && McpServer.IsRunning && !string.IsNullOrWhiteSpace(Mcp.Token);
 
     private bool CanSend => !IsBusy && CanChat && !string.IsNullOrWhiteSpace(InputText);
@@ -160,13 +166,21 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         Messages.Add(assistant);
         OnPropertyChanged(nameof(HasMessages));
 
+        var mutations = Mcp.AllowMutations;
+        var allowed = AgentPrompt.AllowedTools(mutations);
+
+        if (mutations)
+        {
+            _logger.AgentMutationsGranted(string.Join(", ", AgentPrompt.Destructive));
+        }
+
         var request = new AgentRequest
         {
             Prompt = prompt,
             ResumeSessionId = _sessionId,
-            SystemPrompt = AgentPrompt.System,
+            SystemPrompt = AgentPrompt.Build(mutations),
             Model = string.IsNullOrWhiteSpace(_preferences.Model) ? null : _preferences.Model,
-            Mcp = new AgentMcpConfig(AgentPrompt.ServerName, McpServer.Endpoint ?? string.Empty, Mcp.Token, AgentPrompt.ReadOnlyTools, AgentPrompt.MutatingTools),
+            Mcp = new AgentMcpConfig(AgentPrompt.ServerName, McpServer.Endpoint ?? string.Empty, Mcp.Token, allowed, AgentPrompt.DeniedTools(mutations)),
         };
 
         _cts = new CancellationTokenSource();
@@ -189,7 +203,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
                         break;
 
                     case AgentEventKind.ToolCall:
-                        assistant.ToolCalls.Add($"Инструмент: {turnEvent.ToolName ?? "?"}");
+                        assistant.ToolCalls.Add(ChatToolCall.From(turnEvent.ToolName));
                         break;
 
                     case AgentEventKind.Completed:
@@ -249,6 +263,8 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         OnPropertyChanged(nameof(ShowConsentBanner));
         OnPropertyChanged(nameof(ShowMcpBanner));
         OnPropertyChanged(nameof(CanChat));
+        OnPropertyChanged(nameof(MutationsAllowed));
+        OnPropertyChanged(nameof(EmptyStateHint));
         SendCommand.NotifyCanExecuteChanged();
     }
 }

@@ -14,6 +14,34 @@
             BorderThickness="0,1,0,0"
             Padding="16,12">
         <StackPanel>
+            <Border Background="{DynamicResource State.WarningSoft}"
+                    BorderBrush="{DynamicResource State.Warning}"
+                    BorderThickness="1"
+                    CornerRadius="{DynamicResource Radius.M}"
+                    Padding="10,8"
+                    Margin="0,0,0,10"
+                    Visibility="{Binding MutationsAllowed, Converter={StaticResource BoolToVisibility}}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <iconPacks:PackIconLucide Grid.Column="0"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
+                                              Width="15"
+                                              Height="15"
+                                              VerticalAlignment="Top"
+                                              Margin="0,1,8,0"
+                                              Foreground="{DynamicResource State.Warning}" />
+                    <TextBlock Grid.Column="1"
+                               Style="{StaticResource TextBlock.Subtle}"
+                               FontSize="{DynamicResource Font.Size.S}"
+                               TextWrapping="Wrap"
+                               Text="Изменяющие операции разрешены в настройках: агент может сам запустить синхронизацию – файлы скопируются, лишние уйдут в корзину. Сначала он обязан показать план и дождаться вашего согласия." />
+                </Grid>
+            </Border>
+
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
