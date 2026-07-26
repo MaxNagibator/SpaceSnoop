@@ -1,5 +1,6 @@
 ﻿using ModelContextProtocol;
 using SpaceSnoop.Core.Export;
+using System.IO;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -11,6 +12,8 @@ public sealed class McpBridge(
     ISettingsStore settings,
     SyncViewModel sync,
     McpPreferences preferences,
+    ScanPreferences scanPreferences,
+    DiskSpaceCalculator calculator,
     ToastNotifier notifier,
     ILogger<DirectoryComparer> comparerLogger,
     ILogger<McpBridge> logger)
@@ -101,6 +104,37 @@ public sealed class McpBridge(
             .ConfigureAwait(false);
 
         return ComparisonExport.ToJson(model);
+    }
+
+    public async Task<string> ScanAsync(string path, int depth, int entryLimit, CancellationToken cancellationToken)
+    {
+        path = path.Trim();
+        depth = ClampDepth(depth);
+        entryLimit = ClampEntryLimit(entryLimit);
+
+        logger.McpToolInvoked("scan_directory", $"«{path}», глубина {depth}, записей до {entryLimit}");
+
+        ValidateScanPath(path);
+
+        // Те же параметры обхода, что и у человека на странице «Сканирование».
+        var multithreaded = scanPreferences.UseMultithreading;
+        var parallelism = scanPreferences.MaxParallelism;
+
+        var model = await Task.Run(
+            () =>
+            {
+                var directory = new DirectoryInfo(path);
+
+                var root = multithreaded
+                    ? calculator.CalculateMultithreaded(directory, parallelism, cancellationToken)
+                    : calculator.Calculate(directory, cancellationToken);
+
+                return ScanExport.Build(root, directory.FullName, new(depth, multithreaded, parallelism), AppInfo.Version, entryLimit);
+            },
+            cancellationToken)
+            .ConfigureAwait(false);
+
+        return ScanExport.ToJson(model);
     }
 
     public Task<string> GetCurrentComparisonAsync(int entryLimit, CancellationToken cancellationToken)
@@ -244,6 +278,24 @@ public sealed class McpBridge(
     internal static int ClampEntryLimit(int entryLimit)
     {
         return Math.Clamp(entryLimit, AppDefaults.McpEntryLimitMin, AppDefaults.McpEntryLimitMax);
+    }
+
+    internal static int ClampDepth(int depth)
+    {
+        return Math.Clamp(depth, ScanExport.MinDepth, ScanExport.MaxDepth);
+    }
+
+    internal static void ValidateScanPath(string path)
+    {
+        if (path.Length == 0)
+        {
+            throw new McpException("Путь к каталогу должен быть задан.");
+        }
+
+        if (!Directory.Exists(path))
+        {
+            throw new McpException($"Каталог «{path}» не найден или недоступен.");
+        }
     }
 
     internal static void Validate(string left, string right, SyncMode mode)

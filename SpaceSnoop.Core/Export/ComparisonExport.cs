@@ -1,7 +1,5 @@
 ﻿using SpaceSnoop.Core.Git;
-using System.Text.Encodings.Web;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace SpaceSnoop.Core.Export;
 
@@ -68,15 +66,6 @@ public static class ComparisonExport
 
     private const string RootDirectoryName = ".";
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        Converters = { new JsonStringEnumConverter() },
-    };
-
     public static ComparisonExportModel Build(
         ComparisonResult result,
         ComparisonExportOptions options,
@@ -113,7 +102,7 @@ public static class ComparisonExport
 
     public static string ToJson(ComparisonExportModel model)
     {
-        return JsonSerializer.Serialize(model, JsonOptions);
+        return JsonSerializer.Serialize(model, ExportJson.Options);
     }
 
     private static long Weight(ComparisonExportEntry entry)

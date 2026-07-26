@@ -21,6 +21,18 @@ public sealed class SpaceSnoopTools
         return bridge.ListProfiles();
     }
 
+    [McpServerTool(Name = "scan_directory")]
+    [Description("Сканирует каталог или диск и возвращает распределение занятого места: крупнейшие подкаталоги до заданной глубины и крупнейшие файлы всего дерева. Только чтение – приложение не трогает, ничего не удаляет.")]
+    public static Task<string> ScanDirectoryAsync(
+        McpBridge bridge,
+        [Description("Путь к каталогу или диску, например «C:\\» или «C:\\Users\\Иван»")] string path,
+        [Description("До какой глубины вложенности перечислять подкаталоги")] int depth = ScanExport.DefaultDepth,
+        [Description("Сколько записей выгружать в каждом списке (крупнейшие по размеру)")] int entryLimit = ScanExport.DefaultEntryLimit,
+        CancellationToken cancellationToken = default)
+    {
+        return bridge.ScanAsync(path, depth, entryLimit, cancellationToken);
+    }
+
     [McpServerTool(Name = "compare_directories")]
     [Description("Сравнивает два каталога и возвращает машиночитаемый разбор различий (сводка, распределение по каталогам, список файлов с причиной различия). Приложение не трогает, ничего не копирует и не удаляет.")]
     public static Task<string> CompareDirectoriesAsync(

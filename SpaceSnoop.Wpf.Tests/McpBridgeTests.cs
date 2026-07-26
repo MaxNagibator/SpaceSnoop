@@ -47,6 +47,45 @@ public class McpBridgeTests
         Assert.That(McpBridge.ClampEntryLimit(ComparisonExport.DefaultEntryLimit), Is.EqualTo(ComparisonExport.DefaultEntryLimit));
     }
 
+    [TestCase(0, ScanExport.MinDepth)]
+    [TestCase(-3, ScanExport.MinDepth)]
+    [TestCase(3, 3)]
+    [TestCase(int.MaxValue, ScanExport.MaxDepth)]
+    public void Глубина_скана_от_агента_зажимается_в_диапазон(int requested, int expected)
+    {
+        Assert.That(McpBridge.ClampDepth(requested), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void Дефолтная_глубина_скана_проходит_кламп_без_изменений()
+    {
+        Assert.That(McpBridge.ClampDepth(ScanExport.DefaultDepth), Is.EqualTo(ScanExport.DefaultDepth));
+    }
+
+    [Test]
+    public void Путь_скана_пропускается_для_существующего_каталога()
+    {
+        Assert.DoesNotThrow(() => McpBridge.ValidateScanPath(_left));
+    }
+
+    [Test]
+    public void Пустой_путь_скана_отбивается()
+    {
+        Assert.That(
+            Assert.Throws<McpException>(() => McpBridge.ValidateScanPath(string.Empty))?.Message,
+            Does.Contain("должен быть задан"));
+    }
+
+    [Test]
+    public void Несуществующий_путь_скана_отбивается()
+    {
+        var missing = Path.Combine(_root, "нет-такого");
+
+        Assert.That(
+            Assert.Throws<McpException>(() => McpBridge.ValidateScanPath(missing))?.Message,
+            Does.Contain("не найден"));
+    }
+
     [Test]
     public void Валидация_пропускает_разные_существующие_каталоги()
     {
