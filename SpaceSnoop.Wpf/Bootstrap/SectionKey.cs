@@ -7,6 +7,7 @@ public static class SectionKey
     public const string Overview = "overview";
     public const string Schedule = "schedule";
     public const string Docker = "docker";
+    public const string Chat = "chat";
     public const string Logs = "logs";
     public const string About = "about";
 }

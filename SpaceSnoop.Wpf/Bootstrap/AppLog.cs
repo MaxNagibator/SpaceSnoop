@@ -283,4 +283,28 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 2007, Level = LogLevel.Warning, Message = "MCP-сервер не запущен: токен доступа не задан")]
     public static partial void McpServerTokenMissing(this ILogger logger);
+
+    [LoggerMessage(EventId = 2100, Level = LogLevel.Information, Message = "CLI агента найден: {Path} ({Version})")]
+    public static partial void AgentCliDetected(this ILogger logger, string path, string version);
+
+    [LoggerMessage(EventId = 2101, Level = LogLevel.Information, Message = "CLI агента не найден на машине")]
+    public static partial void AgentCliMissing(this ILogger logger);
+
+    [LoggerMessage(EventId = 2102, Level = LogLevel.Debug, Message = "Ход агента начат: инструментов {Tools}, продолжение сессии {Resume}")]
+    public static partial void AgentTurnStarted(this ILogger logger, int tools, bool resume);
+
+    [LoggerMessage(EventId = 2103, Level = LogLevel.Information, Message = "Ход агента завершён за {ElapsedMs} мс, стоимость {CostUsd} $")]
+    public static partial void AgentTurnCompleted(this ILogger logger, long elapsedMs, double costUsd);
+
+    [LoggerMessage(EventId = 2104, Level = LogLevel.Error, Message = "Ход агента оборвался: {Reason}")]
+    public static partial void AgentTurnFailed(this ILogger logger, Exception? exception, string reason);
+
+    [LoggerMessage(EventId = 2105, Level = LogLevel.Information, Message = "Ход агента отменён пользователем")]
+    public static partial void AgentTurnCancelled(this ILogger logger);
+
+    [LoggerMessage(EventId = 2106, Level = LogLevel.Debug, Message = "Агент вызвал инструмент: {Tool}")]
+    public static partial void AgentToolInvoked(this ILogger logger, string tool);
+
+    [LoggerMessage(EventId = 2107, Level = LogLevel.Information, Message = "Отправка данных агенту разрешена пользователем")]
+    public static partial void AgentConsentGranted(this ILogger logger);
 }

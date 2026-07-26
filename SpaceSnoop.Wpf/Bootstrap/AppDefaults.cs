@@ -56,6 +56,11 @@ public static class AppDefaults
     public const int McpEntryLimitMax = 10_000;
     public const int McpDispatchTimeoutSeconds = 30;
 
+    public const bool AgentEnabledDefault = true;
+    public const bool AgentConsentDefault = false;
+    public const string AgentModelDefault = "";
+    public const int AgentDetectTimeoutSeconds = 10;
+
     public const string UpdateRepositoryDefault = AppInfo.RepoSlug;
     public const bool UpdateCheckOnStartupDefault = true;
     public const bool UpdateAutoDownloadDefault = false;

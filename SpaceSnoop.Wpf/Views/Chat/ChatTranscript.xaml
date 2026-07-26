@@ -1,0 +1,188 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Chat.ChatTranscript"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:chatvm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Chat"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance chatvm:ChatViewModel}"
+             d:DesignHeight="600"
+             d:DesignWidth="900">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Views/Chat/ChatResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <Style x:Key="Chat.Bubble"
+                   TargetType="Border">
+                <Setter Property="Background" Value="{DynamicResource Bg.SurfaceAlt}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="{DynamicResource Radius.M}" />
+                <Setter Property="Padding" Value="12,10" />
+                <Setter Property="MaxWidth" Value="640" />
+                <Setter Property="HorizontalAlignment" Value="Left" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsUser}"
+                                 Value="True">
+                        <Setter Property="Background" Value="{DynamicResource Accent.Soft}" />
+                        <Setter Property="HorizontalAlignment" Value="Right" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsError}"
+                                 Value="True">
+                        <Setter Property="Background" Value="{DynamicResource State.ErrorSoft}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource State.Error}" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <Style x:Key="Chat.BubbleRole"
+                   TargetType="TextBlock"
+                   BasedOn="{StaticResource TextBlock.Subtle}">
+                <Setter Property="FontSize" Value="{DynamicResource Font.Size.S}" />
+                <Setter Property="Text" Value="Ассистент" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsUser}"
+                                 Value="True">
+                        <Setter Property="Text" Value="Вы" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsError}"
+                                 Value="True">
+                        <Setter Property="Text" Value="Ошибка" />
+                        <Setter Property="Foreground" Value="{DynamicResource State.Error}" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <Style x:Key="Chat.RoleIcon"
+                   TargetType="iconPacks:PackIconLucide">
+                <Setter Property="Width" Value="14" />
+                <Setter Property="Height" Value="14" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Margin" Value="0,0,6,0" />
+                <Setter Property="Foreground" Value="{DynamicResource Fg.Muted}" />
+                <Setter Property="Kind" Value="{x:Static iconPacks:PackIconLucideKind.Bot}" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsUser}"
+                                 Value="True">
+                        <Setter Property="Kind" Value="{x:Static iconPacks:PackIconLucideKind.User}" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <Style x:Key="Chat.BubbleText"
+                   TargetType="TextBox"
+                   BasedOn="{StaticResource TextBox.Form}">
+                <Setter Property="IsReadOnly" Value="True" />
+                <Setter Property="IsReadOnlyCaretVisible" Value="False" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="MinHeight" Value="0" />
+                <Setter Property="AcceptsReturn" Value="True" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+                <Setter Property="FontFamily" Value="{DynamicResource Font.Sans}" />
+            </Style>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <ScrollViewer x:Name="Scroller"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  Padding="0,0,0,8"
+                  ScrollChanged="OnScrollChanged">
+        <StackPanel>
+            <StackPanel Margin="16,40,16,0"
+                        Visibility="{Binding HasMessages, Converter={StaticResource InverseBoolToVisibility}}">
+                <iconPacks:PackIconLucide Style="{StaticResource Chat.HeroIcon}"
+                                          Kind="{x:Static iconPacks:PackIconLucideKind.Sparkles}" />
+                <TextBlock Style="{StaticResource Chat.Headline}"
+                           Text="Спросите про место на диске" />
+                <TextBlock Style="{StaticResource Chat.Hint}"
+                           Text="Агент смотрит на приложение теми же read-only инструментами, что и MCP-сервер: сканирует, сравнивает, читает открытое сравнение. Ничего не удаляет и не переносит сам." />
+
+                <ItemsControl ItemsSource="{x:Static chatvm:ChatViewModel.ExampleQuestions}"
+                              HorizontalAlignment="Center"
+                              Margin="0,16,0,0">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel HorizontalAlignment="Center" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Style="{StaticResource Button.Secondary}"
+                                    Content="{Binding}"
+                                    Command="{Binding DataContext.UseExampleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding}"
+                                    Margin="0,0,8,8" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+            <ItemsControl ItemsSource="{Binding Messages}"
+                          Visibility="{Binding HasMessages, Converter={StaticResource BoolToVisibility}}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type chatvm:ChatMessageViewModel}">
+                        <Grid Margin="16,8,16,8">
+                            <Border Style="{StaticResource Chat.Bubble}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal"
+                                                Margin="0,0,0,4">
+                                        <iconPacks:PackIconLucide Style="{StaticResource Chat.RoleIcon}" />
+                                        <TextBlock Style="{StaticResource Chat.BubbleRole}"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
+
+                                    <TextBox Style="{StaticResource Chat.BubbleText}"
+                                             Text="{Binding Text, Mode=OneWay}" />
+
+                                    <ProgressBar Height="2"
+                                                 IsIndeterminate="True"
+                                                 Margin="0,8,0,0"
+                                                 Visibility="{Binding IsStreaming, Converter={StaticResource BoolToVisibility}}" />
+
+                                    <ItemsControl ItemsSource="{Binding ToolCalls}"
+                                                  Margin="0,8,0,0">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Style="{StaticResource Badge.Info}"
+                                                        Margin="0,0,6,6">
+                                                    <TextBlock Text="{Binding}"
+                                                               FontSize="{DynamicResource Font.Size.Caption}" />
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <TextBlock Style="{StaticResource TextBlock.Subtle}"
+                                               FontSize="{DynamicResource Font.Size.S}"
+                                               Foreground="{DynamicResource State.Warning}"
+                                               Margin="0,8,0,0"
+                                               Text="Отменено"
+                                               Visibility="{Binding IsCancelled, Converter={StaticResource BoolToVisibility}}" />
+
+                                    <TextBlock Style="{StaticResource TextBlock.Subtle}"
+                                               FontSize="{DynamicResource Font.Size.Caption}"
+                                               Foreground="{DynamicResource Fg.Muted}"
+                                               Margin="0,8,0,0"
+                                               Text="{Binding CostUsd, StringFormat=Стоимость хода: \${0:0.0000}}"
+                                               Visibility="{Binding HasCost, Converter={StaticResource BoolToVisibility}}" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

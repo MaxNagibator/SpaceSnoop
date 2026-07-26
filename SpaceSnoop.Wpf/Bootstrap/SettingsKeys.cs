@@ -76,6 +76,11 @@ public static class SettingsKeys
     public const string McpToken = "wpf.mcp.token";
     public const string McpAllowMutations = "wpf.mcp.allow_mutations";
 
+    public const string AgentEnabled = "wpf.agent.enabled";
+    public const string AgentConsent = "wpf.agent.consent";
+    public const string AgentModel = "wpf.agent.model";
+    public const string AgentCliPath = "wpf.agent.cli_path";
+
     public const string UpdateDismissedVersion = "wpf.update.dismissed";
     public const string UpdateRepository = "wpf.update.repository";
     public const string UpdateCheckOnStartup = "wpf.update.check";

@@ -168,6 +168,7 @@ public partial class App : Application
         services.AddSingleton<OverviewViewModel>();
         services.AddSingleton<ScheduleViewModel>();
         services.AddSingleton<DockerViewModel>();
+        services.AddSingleton<ChatViewModel>();
         services.AddSingleton<LogsViewModel>();
         services.AddSingleton<AboutViewModel>();
         services.AddSingleton<SettingsViewModel>();
@@ -175,6 +176,9 @@ public partial class App : Application
         services.AddSingleton<AppUpdateViewModel>();
         services.AddSingleton<ShellViewModel>();
         services.AddSingleton<MainWindow>();
+
+        services.AddSingleton<AgentPreferences>();
+        services.AddSingleton<IAgentBackend, ClaudeAgentBackend>();
 
         services.AddSingleton<McpPreferences>();
         services.AddSingleton<McpBridge>();

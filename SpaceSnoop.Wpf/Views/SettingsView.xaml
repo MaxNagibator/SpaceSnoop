@@ -21,6 +21,7 @@
             <settings:SettingsExclusionsCard />
             <settings:SettingsUpdateCard />
             <settings:SettingsMcpCard />
+            <settings:SettingsAgentCard />
             <settings:SettingsStartupCard />
             <settings:SettingsFileCard />
         </StackPanel>

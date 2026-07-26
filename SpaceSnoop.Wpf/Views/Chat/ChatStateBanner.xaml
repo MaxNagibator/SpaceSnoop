@@ -1,0 +1,130 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Chat.ChatStateBanner"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:chatvm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Chat"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance chatvm:ChatViewModel}"
+             d:DesignWidth="900">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Views/Chat/ChatResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <Style x:Key="Chat.Banner"
+                   TargetType="Border">
+                <Setter Property="Background" Value="{DynamicResource Bg.SurfaceAlt}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="{DynamicResource Radius.M}" />
+                <Setter Property="Padding" Value="16" />
+                <Setter Property="Margin" Value="16,16,16,0" />
+            </Style>
+
+            <Style x:Key="Chat.BannerText"
+                   TargetType="TextBlock"
+                   BasedOn="{StaticResource TextBlock.Subtle}">
+                <Setter Property="TextWrapping" Value="Wrap" />
+                <Setter Property="Margin" Value="0,6,0,0" />
+            </Style>
+
+            <Style x:Key="Chat.BannerIcon"
+                   TargetType="iconPacks:PackIconLucide">
+                <Setter Property="Width" Value="18" />
+                <Setter Property="Height" Value="18" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Margin" Value="0,0,10,0" />
+            </Style>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <Border Style="{StaticResource Chat.Banner}"
+                BorderBrush="{DynamicResource Border.Subtle}"
+                Visibility="{Binding IsDetectingCli, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel Orientation="Horizontal">
+                <iconPacks:PackIconLucide Style="{StaticResource Chat.BannerIcon}"
+                                          Kind="{x:Static iconPacks:PackIconLucideKind.LoaderCircle}"
+                                          Foreground="{DynamicResource Fg.Muted}" />
+                <TextBlock Text="Проверяю, установлен ли Claude Code…"
+                           Style="{StaticResource TextBlock.Subtle}"
+                           VerticalAlignment="Center" />
+            </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource Chat.Banner}"
+                BorderBrush="{DynamicResource State.Warning}"
+                Visibility="{Binding ShowCliMissingBanner, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource Chat.BannerIcon}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.BotOff}"
+                                              Foreground="{DynamicResource State.Warning}" />
+                    <TextBlock Text="Claude Code не найден"
+                               FontWeight="{DynamicResource Font.Weight.SemiBold}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Style="{StaticResource Chat.BannerText}"
+                           Text="Чат работает через уже установленный на этой машине CLI Claude Code – по вашей подписке, без ключей в настройках. Установите CLI и войдите в свою подписку, затем проверьте снова." />
+                <Button Style="{StaticResource Button.Secondary}"
+                        Content="Проверить снова"
+                        Command="{Binding RecheckCliCommand}"
+                        HorizontalAlignment="Left"
+                        Margin="0,10,0,0" />
+            </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource Chat.Banner}"
+                BorderBrush="{DynamicResource State.Info}"
+                Visibility="{Binding ShowConsentBanner, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource Chat.BannerIcon}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.ShieldAlert}"
+                                              Foreground="{DynamicResource State.Info}" />
+                    <TextBlock Text="Нужно согласие на отправку данных"
+                               FontWeight="{DynamicResource Font.Weight.SemiBold}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Style="{StaticResource Chat.BannerText}"
+                           Text="Текст сообщения и то, что агент запрашивает у инструментов приложения (пути, размеры, результаты сравнения), уходит в CLI Claude Code и дальше в Anthropic – под вашей собственной подпиской, не по ключу приложения." />
+                <TextBlock Style="{StaticResource Chat.BannerText}"
+                           Text="Продолжение разговора (--resume) заставляет CLI хранить весь диалог – сообщения и то, что вернули инструменты, то есть пути и размеры с ваших дисков – локально, в своей рабочей папке, привязанной к текущему каталогу запуска." />
+                <Button Style="{StaticResource Button.Primary}"
+                        Content="Разрешить"
+                        Command="{Binding GrantConsentCommand}"
+                        HorizontalAlignment="Left"
+                        Margin="0,10,0,0" />
+            </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource Chat.Banner}"
+                BorderBrush="{DynamicResource State.Warning}"
+                Visibility="{Binding ShowMcpBanner, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource Chat.BannerIcon}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.Unplug}"
+                                              Foreground="{DynamicResource State.Warning}" />
+                    <TextBlock Text="MCP-сервер выключен"
+                               FontWeight="{DynamicResource Font.Weight.SemiBold}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Style="{StaticResource Chat.BannerText}"
+                           Text="Без него у агента нет ни одного инструмента приложения – он не сможет ни просканировать диск, ни посмотреть сравнение." />
+                <Button Style="{StaticResource Button.Primary}"
+                        Content="Включить MCP-сервер"
+                        Command="{Binding EnableMcpCommand}"
+                        HorizontalAlignment="Left"
+                        Margin="0,10,0,0" />
+                <TextBlock Style="{StaticResource Chat.BannerText}"
+                           Foreground="{DynamicResource State.Error}"
+                           Text="{Binding McpServer.LastError}"
+                           Visibility="{Binding McpServer.LastError, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

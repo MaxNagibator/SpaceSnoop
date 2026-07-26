@@ -32,9 +32,11 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         AppUpdateViewModel updater,
         McpPreferences mcp,
         McpServerHost mcpServer,
+        AgentPreferences agent,
         ISettingsStore settings,
         ILogger<SettingsViewModel> logger)
     {
+        Agent = agent;
         Theme = theme;
         Shell = shell;
         Operations = operations;
@@ -65,6 +67,8 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     public McpPreferences Mcp { get; }
 
     public McpServerHost McpServer { get; }
+
+    public AgentPreferences Agent { get; }
 
     public bool McpElevatedWarning => Mcp.Enabled && AdminElevation.IsElevated;
 

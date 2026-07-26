@@ -17,6 +17,12 @@ public sealed partial class ShellViewModel : ShellViewModelBase
 
     private readonly Dictionary<string, NavigationItem> _sectionByKey;
 
+    private readonly AgentPreferences _agent;
+
+    private readonly NavigationItem _chatItem;
+
+    private readonly NavigationItem _logsItem;
+
     [ObservableProperty]
     private bool _isTarkovBootPlaying;
 
@@ -27,10 +33,12 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         OverviewViewModel overview,
         ScheduleViewModel schedule,
         DockerViewModel docker,
+        ChatViewModel chat,
         LogsViewModel logs,
         AboutViewModel about,
         SettingsViewModel settingsPage,
         ModalHostViewModel modal,
+        AgentPreferences agent,
         ShellPreferences preferences,
         AppUpdateViewModel appUpdate,
         ToastHostViewModel toasts)
@@ -51,6 +59,9 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         var logsItem = new NavigationItem("Логи", PackIconLucideKind.ScrollText, logs);
         var aboutItem = new NavigationItem("О программе", PackIconLucideKind.Info, about);
 
+        _chatItem = new("Чат", PackIconLucideKind.MessageCircle, chat);
+        _logsItem = logsItem;
+
         Sections.Add(scanItem);
         Sections.Add(syncItem);
         Sections.Add(overviewItem);
@@ -66,9 +77,14 @@ public sealed partial class ShellViewModel : ShellViewModelBase
             [SectionKey.Overview] = overviewItem,
             [SectionKey.Schedule] = scheduleItem,
             [SectionKey.Docker] = dockerItem,
+            [SectionKey.Chat] = _chatItem,
             [SectionKey.Logs] = logsItem,
             [SectionKey.About] = aboutItem,
         };
+
+        _agent = agent;
+        _agent.PropertyChanged += OnAgentPreferencesChanged;
+        ApplyChatSection();
 
         overview.OpenInSyncRequested += (profile, comparison) =>
         {
@@ -137,6 +153,41 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         Selected = _settingsItem;
     }
 
+    /// <summary>
+    /// Страница чата видна только при включённой настройке: обнаружение CLI стоит запуска процесса,
+    /// поэтому при старте оно не делается вовсе – страница сама проверяет наличие CLI при первом открытии.
+    /// </summary>
+    private void ApplyChatSection()
+    {
+        var visible = Sections.Contains(_chatItem);
+
+        if (_agent.Enabled == visible)
+        {
+            return;
+        }
+
+        if (_agent.Enabled)
+        {
+            Sections.Insert(Sections.IndexOf(_logsItem), _chatItem);
+            return;
+        }
+
+        if (Selected == _chatItem)
+        {
+            Selected = Sections[0];
+        }
+
+        Sections.Remove(_chatItem);
+    }
+
+    private void OnAgentPreferencesChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(AgentPreferences.Enabled))
+        {
+            ApplyChatSection();
+        }
+    }
+
     private void OnPreferencesPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is not nameof(ShellPreferences.ShowPageHeader))
@@ -178,7 +229,8 @@ public sealed partial class ShellViewModel : ShellViewModelBase
             _ => null,
         };
 
-        return target ?? Sections[0];
+        // Последней страницей мог остаться выключенный с тех пор «Чат» – его в списке уже нет.
+        return target is not null && Sections.Contains(target) ? target : Sections[0];
     }
 
     private NavigationItem? FindSectionByKey(string key)
