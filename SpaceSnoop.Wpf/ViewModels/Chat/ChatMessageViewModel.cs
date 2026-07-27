@@ -28,20 +28,24 @@ public sealed partial class ChatMessageViewModel : ObservableObject
     public string AuthorName => IsUser ? "Вы" : AgentPersona.Name;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasText))]
+    [NotifyPropertyChangedFor(nameof(HasText), nameof(LooksTruncated))]
     private string _text = string.Empty;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(StatusText), nameof(ShowStatus))]
+    [NotifyPropertyChangedFor(nameof(StatusText), nameof(ShowStatus), nameof(CanRetry), nameof(LooksTruncated))]
     private bool _isStreaming;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanRetry))]
+    [NotifyPropertyChangedFor(nameof(CanRetry), nameof(LooksTruncated))]
     private bool _isError;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanRetry))]
+    [NotifyPropertyChangedFor(nameof(CanRetry), nameof(LooksTruncated))]
     private bool _isCancelled;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanRetry))]
+    private bool _isLast;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasTranscript))]
@@ -51,7 +55,11 @@ public sealed partial class ChatMessageViewModel : ObservableObject
 
     public bool ShowStatus => IsStreaming;
 
-    public bool CanRetry => !IsUser && (IsError || IsCancelled);
+    public bool CanRetry => !IsUser && IsLast && !IsStreaming;
+
+    public bool CanRewind => IsUser;
+
+    public bool LooksTruncated => !IsUser && !IsStreaming && !IsError && !IsCancelled && ChatAnswer.LooksTruncated(Text);
 
     public bool HasTranscript => TranscriptPath is { Length: > 0 };
 

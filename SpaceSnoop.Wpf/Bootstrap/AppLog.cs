@@ -358,4 +358,7 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 2124, Level = LogLevel.Warning, Message = "Не удалось открыть транскрипт хода агента «{Path}»")]
     public static partial void AgentTranscriptOpenFailed(this ILogger logger, Exception exception, string path);
+
+    [LoggerMessage(EventId = 2125, Level = LogLevel.Information, Message = "Разговор откачен к вопросу: убрано сообщений {Count}, сессия CLI сброшена")]
+    public static partial void ChatRewound(this ILogger logger, int count);
 }

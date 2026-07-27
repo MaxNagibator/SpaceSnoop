@@ -47,6 +47,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         nameof(CancelCommand),
         nameof(NewConversationCommand),
         nameof(RetryCommand),
+        nameof(RewindToCommand),
         nameof(SelectConversationCommand),
         nameof(DeleteConversationCommand),
         nameof(ClearHistoryCommand))]
@@ -291,6 +292,8 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
             Messages.Add(ChatMessageViewModel.Restore(message));
         }
 
+        RefreshLastFlags();
+
         _conversationId = record.Id;
         _startedUtc = record.StartedUtc;
         _sessionId = record.Backend == Backend.Kind ? record.SessionId : null;
@@ -403,14 +406,102 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
             return;
         }
 
-        var prompt = Messages.Take(index).LastOrDefault(candidate => candidate.IsUser)?.Text;
+        var question = PreviousQuestion(index);
 
-        if (prompt is not { Length: > 0 })
+        if (question < 0)
         {
             return;
         }
 
+        var prompt = Messages[question].Text;
+
+        TruncateFrom(question);
+
         await RunTurnAsync(prompt);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanManageConversation))]
+    private void RewindTo(ChatMessageViewModel? message)
+    {
+        if (message is not { IsUser: true })
+        {
+            return;
+        }
+
+        var index = Messages.IndexOf(message);
+
+        if (index < 0)
+        {
+            return;
+        }
+
+        var removed = Messages.Count - index;
+        var question = $"Всё, что после этого вопроса, пропадёт из разговора: сообщений – {removed}. Текст вопроса вернётся в поле ввода, а разговор с CLI начнётся заново – прежних ответов {AgentPersona.NameGenitive} он уже не вспомнит.";
+
+        if (!_dialogs.Confirm("Вернуться к вопросу", question))
+        {
+            return;
+        }
+
+        InputText = message.Text;
+        TruncateFrom(index);
+
+        _sessionId = null;
+        _resumedFromDisk = false;
+
+        PersistRewind();
+        _logger.ChatRewound(removed);
+        FocusRequested?.Invoke();
+    }
+
+    private int PreviousQuestion(int index)
+    {
+        for (var candidate = index - 1; candidate >= 0; candidate--)
+        {
+            if (Messages[candidate].IsUser)
+            {
+                return candidate;
+            }
+        }
+
+        return -1;
+    }
+
+    private void TruncateFrom(int index)
+    {
+        while (Messages.Count > index)
+        {
+            Messages.RemoveAt(Messages.Count - 1);
+        }
+
+        RefreshLastFlags();
+        OnPropertyChanged(nameof(HasMessages));
+    }
+
+    private void RefreshLastFlags()
+    {
+        for (var index = 0; index < Messages.Count; index++)
+        {
+            Messages[index].IsLast = index == Messages.Count - 1;
+        }
+    }
+
+    private void PersistRewind()
+    {
+        if (Messages.Count > 0)
+        {
+            CaptureTurn();
+
+            return;
+        }
+
+        if (CurrentConversation is { } conversation && Conversations.Remove(conversation))
+        {
+            OnPropertyChanged(nameof(HasConversations));
+        }
+
+        NewConversation();
+        Persist();
     }
 
     [RelayCommand(CanExecute = nameof(CanSend))]
@@ -433,6 +524,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
 
         var assistant = new ChatMessageViewModel(ChatRole.Assistant) { IsStreaming = true };
         Messages.Add(assistant);
+        RefreshLastFlags();
         OnPropertyChanged(nameof(HasMessages));
 
         var backend = Backend;

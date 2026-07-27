@@ -209,6 +209,16 @@
                                             </Button>
 
                                             <Button Style="{StaticResource Chat.MessageAction}"
+                                                    Command="{Binding DataContext.RewindToCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    ToolTip="Вернуться к этому вопросу: всё, что после него, пропадёт, а текст вернётся в поле ввода"
+                                                    AutomationProperties.Name="Вернуться к этому вопросу"
+                                                    Visibility="{Binding CanRewind, Converter={StaticResource BoolToVisibility}}">
+                                                <iconPacks:PackIconLucide Style="{StaticResource Chat.ActionIcon}"
+                                                                          Kind="{x:Static iconPacks:PackIconLucideKind.Undo2}" />
+                                            </Button>
+
+                                            <Button Style="{StaticResource Chat.MessageAction}"
                                                     Command="{Binding DataContext.OpenTranscriptCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     ToolTip="Показать транскрипт хода – всё, что CLI прислал за этот ответ"
@@ -292,6 +302,14 @@
                                                Margin="0,8,0,0"
                                                Text="Шнырь остановлен"
                                                Visibility="{Binding IsCancelled, Converter={StaticResource BoolToVisibility}}" />
+
+                                    <TextBlock Style="{StaticResource TextBlock.Subtle}"
+                                               FontSize="{DynamicResource Font.Size.S}"
+                                               Foreground="{DynamicResource State.Warning}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,8,0,0"
+                                               Text="Ответ оборвался на полуслове – так его прислал сам CLI. Спросите ещё раз."
+                                               Visibility="{Binding LooksTruncated, Converter={StaticResource BoolToVisibility}}" />
 
                                     <TextBlock Style="{StaticResource TextBlock.Subtle}"
                                                FontSize="{DynamicResource Font.Size.Caption}"
