@@ -1,5 +1,6 @@
 ﻿using KeepShell.Services;
 using Microsoft.Win32;
+using SpaceSnoop.Core.Export;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -224,6 +225,39 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     public double ProgressMax => 1;
 
     public ICommand CancelCommand => StopCommand;
+
+    internal DirectorySpace? CurrentRoot => Roots.Count > 0 ? Roots[0].Space as DirectorySpace : null;
+
+    internal Func<ScanExportModel>? CaptureExportBuilder(int depth, int entryLimit)
+    {
+        if (CurrentRoot is not { } root)
+        {
+            return null;
+        }
+
+        var options = new ScanExportOptions(depth, Preferences.UseMultithreading, Preferences.MaxParallelism);
+        var path = root.AbsolutePath;
+
+        return () => ScanExport.Build(root, path, options, AppInfo.Version, entryLimit);
+    }
+
+    internal void SelectPathForAutomation(string path)
+    {
+        if (!HasDrive(path))
+        {
+            AddDrive(path);
+            LoadDriveLabels();
+        }
+
+        SelectedDrive = path;
+    }
+
+    internal Task ScanFromAutomationAsync(string path)
+    {
+        SelectPathForAutomation(path);
+
+        return ScanAsync(path);
+    }
 
     private void RecountMarked()
     {

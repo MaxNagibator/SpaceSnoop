@@ -1,6 +1,7 @@
 ﻿using ModelContextProtocol;
 using SpaceSnoop.Core.Export;
 using System.IO;
+using System.Security;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -11,9 +12,11 @@ namespace SpaceSnoop.Wpf.Mcp;
 public sealed class McpBridge(
     ISettingsStore settings,
     SyncViewModel sync,
+    ScanViewModel scan,
     McpPreferences preferences,
     ScanPreferences scanPreferences,
     DiskSpaceCalculator calculator,
+    DockerService docker,
     ToastNotifier notifier,
     ILogger<DirectoryComparer> comparerLogger,
     ILogger<McpBridge> logger)
@@ -45,6 +48,7 @@ public sealed class McpBridge(
             _shell?.CurrentSectionKey,
             preferences.AllowMutations,
             SyncProfileStore.Load(settings).Count,
+            ReadScanState(),
             ReadSyncState())));
     }
 
@@ -135,6 +139,109 @@ public sealed class McpBridge(
             .ConfigureAwait(false);
 
         return ScanExport.ToJson(model);
+    }
+
+    public string ListDrives()
+    {
+        logger.McpToolInvoked("list_drives", "-");
+
+        var drives = DriveInfo.GetDrives().Select(Describe).ToList();
+
+        return Serialize(drives);
+    }
+
+    public Task<string> GetCurrentScanAsync(int depth, int entryLimit, CancellationToken cancellationToken)
+    {
+        depth = ClampDepth(depth);
+        entryLimit = ClampEntryLimit(entryLimit);
+
+        logger.McpToolInvoked("get_current_scan", $"глубина {depth}, записей до {entryLimit}");
+
+        var build = Dispatch(() => scan.CaptureExportBuilder(depth, entryLimit));
+
+        if (build is null)
+        {
+            throw new McpException("На странице «Сканирование» результата ещё нет. Запустите open_scan с scan=true или scan_directory.");
+        }
+
+        return BuildScanJsonAsync(build, cancellationToken);
+    }
+
+    public async Task<string> OpenScanAsync(string? path, bool start, CancellationToken cancellationToken)
+    {
+        logger.McpToolInvoked("open_scan", $"«{path ?? "как есть"}», сканирование {start}");
+
+        var run = Dispatch(() =>
+        {
+            if (scan.IsScanning)
+            {
+                logger.McpToolRejected("open_scan", "страница занята операцией");
+                throw new McpException("Страница «Сканирование» сейчас занята другой операцией.");
+            }
+
+            var target = string.IsNullOrWhiteSpace(path) ? scan.SelectedDrive.Trim() : path.Trim();
+
+            if (start)
+            {
+                ValidateScanPath(target);
+            }
+
+            if (target.Length > 0)
+            {
+                scan.SelectPathForAutomation(target);
+            }
+
+            _shell?.TryNavigate(SectionKey.Scan);
+
+            notifier.Notify(start
+                ? $"Агент запустил сканирование: {target}"
+                : "Агент открыл страницу «Сканирование»");
+
+            return start ? scan.ScanFromAutomationAsync(target) : null;
+        });
+
+        if (run is not null)
+        {
+            await run.ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        return Dispatch(() => Serialize(new McpScanNavigation(_shell?.CurrentSectionKey ?? SectionKey.Scan, ReadScanState())));
+    }
+
+    public async Task<string> GetDockerUsageAsync(bool includeObjects, int entryLimit, CancellationToken cancellationToken)
+    {
+        entryLimit = ClampEntryLimit(entryLimit);
+
+        logger.McpToolInvoked("docker_usage", $"объекты {includeObjects}, записей до {entryLimit}");
+
+        var snapshot = await docker.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+
+        var buckets = snapshot.Buckets
+            .Select(static bucket => new McpDockerBucket(
+                bucket.Type,
+                bucket.TotalCount,
+                bucket.Active,
+                bucket.Size,
+                DockerSize.ToBytes(bucket.Size),
+                bucket.Reclaimable,
+                DockerSize.ToBytes(bucket.Reclaimable)))
+            .ToList();
+
+        if (!snapshot.Available || !includeObjects)
+        {
+            return Serialize(new McpDockerReport(snapshot.Available, snapshot.Error, buckets, null, 0));
+        }
+
+        var inventory = await docker.GetInventoryAsync(cancellationToken).ConfigureAwait(false);
+
+        var objects = inventory
+            .OrderByDescending(static item => item.SizeBytes)
+            .Take(entryLimit)
+            .Select(static item => new McpDockerObject(item.Kind, item.Id, item.Name, item.Size, item.SizeBytes, item.InUse, item.Detail))
+            .ToList();
+
+        return Serialize(new McpDockerReport(true, snapshot.Error, buckets, objects, Math.Max(0, inventory.Count - objects.Count)));
     }
 
     public Task<string> GetCurrentComparisonAsync(int entryLimit, CancellationToken cancellationToken)
@@ -326,11 +433,51 @@ public sealed class McpBridge(
         };
     }
 
+    private static McpDrive Describe(DriveInfo drive)
+    {
+        try
+        {
+            if (!drive.IsReady)
+            {
+                return new(drive.Name, string.Empty, drive.DriveType.ToString(), null, false, 0, 0, 0, "–", "–", "–", "диск не готов");
+            }
+
+            var total = drive.TotalSize;
+            var free = drive.TotalFreeSpace;
+            var used = Math.Max(0, total - free);
+
+            return new(
+                drive.Name,
+                drive.VolumeLabel,
+                drive.DriveType.ToString(),
+                drive.DriveFormat,
+                true,
+                total,
+                free,
+                used,
+                SizeFormatter.Format(total),
+                SizeFormatter.Format(free),
+                SizeFormatter.Format(used),
+                null);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException)
+        {
+            return new(drive.Name, string.Empty, drive.DriveType.ToString(), null, false, 0, 0, 0, "–", "–", "–", exception.Message);
+        }
+    }
+
     private static async Task<string> BuildJsonAsync(Func<ComparisonExportModel> build, CancellationToken cancellationToken)
     {
         var model = await Task.Run(build, cancellationToken).ConfigureAwait(false);
 
         return ComparisonExport.ToJson(model);
+    }
+
+    private static async Task<string> BuildScanJsonAsync(Func<ScanExportModel> build, CancellationToken cancellationToken)
+    {
+        var model = await Task.Run(build, cancellationToken).ConfigureAwait(false);
+
+        return ScanExport.ToJson(model);
     }
 
     private static string Serialize<T>(T value)
@@ -371,6 +518,19 @@ public sealed class McpBridge(
         }
 
         return BuildJsonAsync(build, cancellationToken);
+    }
+
+    private McpScanState ReadScanState()
+    {
+        return new(
+            scan.SelectedDrive,
+            scan.ResultPath,
+            scan.IsScanning,
+            scan.HasResult,
+            scan.ResultSizeText,
+            scan.ResultFileCountText,
+            scan.ResultDirCountText,
+            scan.MarkedCount);
     }
 
     private McpSyncState ReadSyncState()

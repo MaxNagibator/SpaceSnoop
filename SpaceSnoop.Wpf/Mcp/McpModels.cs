@@ -7,7 +7,59 @@ internal sealed record McpAppState(
     string? Page,
     bool MutationsAllowed,
     int ProfileCount,
+    McpScanState Scan,
     McpSyncState Sync);
+
+internal sealed record McpScanState(
+    string SelectedPath,
+    string ResultPath,
+    bool Busy,
+    bool HasResult,
+    string Size,
+    string Files,
+    string Directories,
+    int MarkedForDeletion);
+
+internal sealed record McpScanNavigation(string Page, McpScanState Scan);
+
+internal sealed record McpDrive(
+    string Path,
+    string Label,
+    string Type,
+    string? FileSystem,
+    bool Ready,
+    long TotalBytes,
+    long FreeBytes,
+    long UsedBytes,
+    string Total,
+    string Free,
+    string Used,
+    string? Error);
+
+internal sealed record McpDockerBucket(
+    string Type,
+    int TotalCount,
+    int Active,
+    string Size,
+    long SizeBytes,
+    string Reclaimable,
+    long ReclaimableBytes);
+
+internal sealed record McpDockerObject(
+    DockerObjectKind Kind,
+    string Id,
+    string Name,
+    string Size,
+    long SizeBytes,
+    bool InUse,
+    string Detail);
+
+internal sealed record McpDockerReport(
+    bool Available,
+    string? Error,
+    IReadOnlyList<McpDockerBucket> Buckets,
+    IReadOnlyList<McpDockerObject>? Objects,
+    int OmittedObjects);
 
 internal sealed record McpSyncState(
     string LeftPath,

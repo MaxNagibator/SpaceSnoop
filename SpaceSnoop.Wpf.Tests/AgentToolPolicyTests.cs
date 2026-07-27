@@ -1,5 +1,8 @@
-﻿using SpaceSnoop.Wpf.Agent;
+﻿using ModelContextProtocol.Server;
+using SpaceSnoop.Wpf.Agent;
+using SpaceSnoop.Wpf.Mcp;
 using SpaceSnoop.Wpf.ViewModels.Chat;
+using System.Reflection;
 
 namespace SpaceSnoop.Wpf.Tests;
 
@@ -43,7 +46,40 @@ public class AgentToolPolicyTests
     {
         Assert.That(
             AgentPrompt.AllowedTools(mutations),
-            Is.SupersetOf(new[] { "get_app_state", "list_profiles", "scan_directory", "compare_directories", "get_current_comparison" }));
+            Is.SupersetOf(new[]
+            {
+                "get_app_state",
+                "list_profiles",
+                "list_drives",
+                "scan_directory",
+                "get_current_scan",
+                "compare_directories",
+                "get_current_comparison",
+                "docker_usage",
+                "open_scan",
+            }));
+    }
+
+    [Test]
+    public void Каждый_инструмент_сервера_объявлен_в_политике_и_назван_по_русски()
+    {
+        var tools = typeof(SpaceSnoopTools)
+            .GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .Select(static method => method.GetCustomAttribute<McpServerToolAttribute>()?.Name)
+            .OfType<string>()
+            .ToList();
+
+        Assert.That(tools, Is.Not.Empty);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(AgentPrompt.AllowedTools(mutations: true), Is.EquivalentTo(tools));
+
+            foreach (var tool in tools)
+            {
+                Assert.That(AgentPrompt.Describe(tool), Is.Not.EqualTo(tool), $"инструмент {tool} остался без русского имени");
+            }
+        }
     }
 
     [TestCase("mcp__spacesnoop__scan_directory", ExpectedResult = "scan_directory")]

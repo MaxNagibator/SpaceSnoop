@@ -21,6 +21,46 @@ public sealed class SpaceSnoopTools
         return bridge.ListProfiles();
     }
 
+    [McpServerTool(Name = "list_drives")]
+    [Description("Диски машины: буква, метка, файловая система, сколько всего, занято и свободно. Отвечает мгновенно – с этого дешевле начинать разговор о нехватке места, чем со сканирования.")]
+    public static string ListDrives(McpBridge bridge)
+    {
+        return bridge.ListDrives();
+    }
+
+    [McpServerTool(Name = "get_current_scan")]
+    [Description("Выгружает результат сканирования, который сейчас открыт на странице «Сканирование»: крупнейшие подкаталоги и файлы. Ничего не пересчитывает – это снимок того, что видит человек в окне.")]
+    public static Task<string> GetCurrentScanAsync(
+        McpBridge bridge,
+        [Description("До какой глубины вложенности перечислять подкаталоги")] int depth = ScanExport.DefaultDepth,
+        [Description("Сколько записей выгружать в каждом списке (крупнейшие по размеру)")] int entryLimit = ScanExport.DefaultEntryLimit,
+        CancellationToken cancellationToken = default)
+    {
+        return bridge.GetCurrentScanAsync(depth, entryLimit, cancellationToken);
+    }
+
+    [McpServerTool(Name = "open_scan")]
+    [Description("Управляет окном приложения: открывает страницу «Сканирование», подставляет путь и по запросу запускает сканирование. Ничего не удаляет.")]
+    public static Task<string> OpenScanAsync(
+        McpBridge bridge,
+        [Description("Путь к каталогу или диску; не задан – остаётся текущий")] string? path = null,
+        [Description("Запустить сканирование сразу после открытия страницы")] bool scan = true,
+        CancellationToken cancellationToken = default)
+    {
+        return bridge.OpenScanAsync(path, scan, cancellationToken);
+    }
+
+    [McpServerTool(Name = "docker_usage")]
+    [Description("Сколько места занял Docker: образы, контейнеры, тома и кэш сборки, с долей, которую можно вернуть. Только чтение – очистка Docker агенту недоступна, она удаляет мимо корзины.")]
+    public static Task<string> GetDockerUsageAsync(
+        McpBridge bridge,
+        [Description("Перечислить сами объекты (образы, контейнеры, тома), а не только итоги по типам")] bool includeObjects = false,
+        [Description("Сколько объектов выгружать (крупнейшие по размеру)")] int entryLimit = ComparisonExport.DefaultEntryLimit,
+        CancellationToken cancellationToken = default)
+    {
+        return bridge.GetDockerUsageAsync(includeObjects, entryLimit, cancellationToken);
+    }
+
     [McpServerTool(Name = "scan_directory")]
     [Description("Сканирует каталог или диск и возвращает распределение занятого места: крупнейшие подкаталоги до заданной глубины и крупнейшие файлы всего дерева. Только чтение – приложение не трогает, ничего не удаляет.")]
     public static Task<string> ScanDirectoryAsync(
