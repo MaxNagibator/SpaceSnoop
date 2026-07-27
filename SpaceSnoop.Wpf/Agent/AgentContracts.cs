@@ -4,6 +4,7 @@ public enum AgentBackendKind
 {
     Claude = 0,
     Codex = 1,
+    OpenCode = 2,
 }
 
 public enum AgentEventKind
@@ -95,6 +96,8 @@ public interface IAgentStreamParser
     AgentEvent? Parse(string line);
 
     string? FailureHint => null;
+
+    AgentEvent? Complete() => null;
 }
 
 public interface IAgentBackend
@@ -111,7 +114,11 @@ public interface IAgentBackend
 
     string MissingCliHint { get; }
 
+    string ModelHint { get; }
+
     AgentCliInfo? Detect();
+
+    IReadOnlyList<AgentModelOption> LoadModels();
 
     IAsyncEnumerable<AgentEvent> RunAsync(AgentRequest request, CancellationToken cancellationToken);
 }

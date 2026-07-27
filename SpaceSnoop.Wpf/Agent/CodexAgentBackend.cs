@@ -5,8 +5,6 @@ namespace SpaceSnoop.Wpf.Agent;
 
 public sealed class CodexAgentBackend : AgentBackendBase
 {
-    internal const string TokenVariable = "SPACESNOOP_MCP_TOKEN";
-
     private const string SandboxMode = "danger-full-access";
 
     private readonly ILogger<CodexAgentBackend> _logger;

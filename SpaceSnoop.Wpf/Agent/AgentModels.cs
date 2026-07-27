@@ -1,11 +1,12 @@
 ﻿using System.IO;
+using System.Text;
 using System.Text.Json;
 
 namespace SpaceSnoop.Wpf.Agent;
 
 public sealed record AgentModelOption(string Id, string Title, string Hint)
 {
-    public IReadOnlyList<string> Efforts { get; init; } = [];
+    public IReadOnlyList<string>? Efforts { get; init; }
 
     public override string ToString()
     {
@@ -31,6 +32,8 @@ public static class AgentModels
 
     private static readonly string[] CodexEfforts = ["low", "medium", "high", "xhigh", "max", "ultra"];
 
+    private static readonly string[] OpenCodeVariants = ["minimal", "low", "medium", "high", "max"];
+
     private static readonly AgentModelOption[] ClaudeModels =
     [
         new("fable", "Fable 5", "Самая сильная и самая дорогая") { Efforts = ClaudeEfforts },
@@ -48,6 +51,8 @@ public static class AgentModels
 
     private static readonly Dictionary<string, string> EffortTitles = new(StringComparer.OrdinalIgnoreCase)
     {
+        ["none"] = "Без рассуждений",
+        ["minimal"] = "Минимальный",
         ["low"] = "Низкий",
         ["medium"] = "Средний",
         ["high"] = "Высокий",
@@ -60,7 +65,12 @@ public static class AgentModels
 
     public static IReadOnlyList<AgentModelOption> For(AgentBackendKind backend)
     {
-        return backend == AgentBackendKind.Codex ? LazyCodexModels.Value : ClaudeModels;
+        return backend switch
+        {
+            AgentBackendKind.Claude => ClaudeModels,
+            AgentBackendKind.Codex => LazyCodexModels.Value,
+            _ => [],
+        };
     }
 
     public static AgentModelOption? Find(AgentBackendKind backend, string? id)
@@ -72,11 +82,24 @@ public static class AgentModels
 
     public static IReadOnlyList<AgentEffortOption> Efforts(AgentBackendKind backend, string? modelId)
     {
-        var levels = Find(backend, modelId)?.Efforts is { Count: > 0 } known
-            ? known
-            : backend == AgentBackendKind.Codex ? CodexEfforts : ClaudeEfforts;
+        return EffortsFor(Find(backend, modelId), backend);
+    }
+
+    public static IReadOnlyList<AgentEffortOption> EffortsFor(AgentModelOption? model, AgentBackendKind backend)
+    {
+        var levels = model?.Efforts ?? DefaultEfforts(backend);
 
         return [EffortDefault, .. levels.Select(level => new AgentEffortOption(level, EffortTitle(level)))];
+    }
+
+    public static IReadOnlyList<string> DefaultEfforts(AgentBackendKind backend)
+    {
+        return backend switch
+        {
+            AgentBackendKind.Codex => CodexEfforts,
+            AgentBackendKind.OpenCode => OpenCodeVariants,
+            _ => ClaudeEfforts,
+        };
     }
 
     public static string EffortTitle(string effort)
@@ -125,6 +148,108 @@ public static class AgentModels
         }
     }
 
+    internal static IReadOnlyList<AgentModelOption> ParseOpenCodeModels(string output)
+    {
+        var models = new List<AgentModelOption>();
+        var block = new StringBuilder();
+
+        foreach (var raw in output.Split('\n'))
+        {
+            var line = raw.TrimEnd('\r');
+
+            if (block.Length == 0 && line != "{")
+            {
+                continue;
+            }
+
+            block.AppendLine(line);
+
+            if (line != "}")
+            {
+                continue;
+            }
+
+            if (ReadOpenCodeModel(block.ToString()) is { } option)
+            {
+                models.Add(option);
+            }
+
+            block.Clear();
+        }
+
+        return models;
+    }
+
+    private static AgentModelOption? ReadOpenCodeModel(string json)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            var model = document.RootElement;
+
+            if (model.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            var id = Text(model, "id");
+            var provider = Text(model, "providerID");
+
+            if (id.Length == 0 || provider.Length == 0)
+            {
+                return null;
+            }
+
+            var title = Text(model, "name") is { Length: > 0 } name ? name : id;
+
+            return new($"{provider}/{id}", title, DescribeOpenCodeModel(model)) { Efforts = Variants(model) };
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static string DescribeOpenCodeModel(JsonElement model)
+    {
+        var parts = new List<string>();
+
+        if (model.TryGetProperty("cost", out var cost) && cost.ValueKind == JsonValueKind.Object)
+        {
+            var input = Amount(cost, "input");
+            var output = Amount(cost, "output");
+
+            parts.Add(input == 0 && output == 0
+                ? "Бесплатная"
+                : $"${input:0.##} за миллион входных, ${output:0.##} за миллион выходных");
+        }
+
+        if (model.TryGetProperty("limit", out var limit)
+            && limit.ValueKind == JsonValueKind.Object
+            && limit.TryGetProperty("context", out var context)
+            && context.ValueKind == JsonValueKind.Number)
+        {
+            parts.Add($"контекст {context.GetInt64():N0}");
+        }
+
+        return string.Join(", ", parts);
+    }
+
+    private static IReadOnlyList<string>? Variants(JsonElement model)
+    {
+        if (!model.TryGetProperty("variants", out var variants) || variants.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        return [.. variants.EnumerateObject().Select(variant => variant.Name)];
+    }
+
+    private static double Amount(JsonElement element, string property)
+    {
+        return element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Number ? value.GetDouble() : 0;
+    }
+
     private static IReadOnlyList<AgentModelOption> LoadCodexModels()
     {
         try
@@ -148,11 +273,11 @@ public static class AgentModels
             : home.Trim();
     }
 
-    private static IReadOnlyList<string> ReasoningLevels(JsonElement model)
+    private static IReadOnlyList<string>? ReasoningLevels(JsonElement model)
     {
         if (!model.TryGetProperty("supported_reasoning_levels", out var levels) || levels.ValueKind != JsonValueKind.Array)
         {
-            return [];
+            return null;
         }
 
         return

@@ -87,4 +87,116 @@ public class AgentModelsTests
     {
         Assert.That(AgentModels.Efforts(AgentBackendKind.Claude, string.Empty)[0], Is.EqualTo(AgentModels.EffortDefault));
     }
+
+    [Test]
+    public void Без_запроса_к_CLI_каталога_у_OpenCode_нет()
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(AgentModels.For(AgentBackendKind.OpenCode), Is.Empty);
+            Assert.That(AgentModels.Efforts(AgentBackendKind.OpenCode, "opencode/big-pickle").Select(option => option.Id), Does.Contain("minimal"));
+        }
+    }
+
+    [Test]
+    public void Список_моделей_OpenCode_читается_из_вывода_CLI()
+    {
+        var models = AgentModels.ParseOpenCodeModels(OpenCodeListing);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(models.Select(model => model.Id), Is.EqualTo(new[] { "opencode/big-pickle", "opencode/laguna-s-2.1-free", "opencode/gpt-5.6-sol" }));
+            Assert.That(models[0].Title, Is.EqualTo("Big Pickle"));
+            Assert.That(models[0].Hint, Does.StartWith("Бесплатная"));
+            Assert.That(models[0].Hint, Does.Contain("контекст"));
+            Assert.That(models[2].Hint, Does.StartWith("$5"));
+        }
+    }
+
+    [Test]
+    public void Варианты_модели_становятся_её_уровнями_рассуждений()
+    {
+        var models = AgentModels.ParseOpenCodeModels(OpenCodeListing);
+        var laguna = models.First(model => model.Id == "opencode/laguna-s-2.1-free");
+
+        Assert.That(AgentModels.EffortsFor(laguna, AgentBackendKind.OpenCode).Select(option => option.Id), Is.EqualTo(new[] { "", "low", "medium", "high" }));
+    }
+
+    [Test]
+    public void Модель_без_вариантов_уровней_не_предлагает()
+    {
+        var models = AgentModels.ParseOpenCodeModels(OpenCodeListing);
+        var pickle = models.First(model => model.Id == "opencode/big-pickle");
+
+        Assert.That(AgentModels.EffortsFor(pickle, AgentBackendKind.OpenCode), Is.EqualTo(new[] { AgentModels.EffortDefault }));
+    }
+
+    [Test]
+    public void Неизвестной_модели_достаются_уровни_бэкенда()
+    {
+        Assert.That(AgentModels.EffortsFor(null, AgentBackendKind.OpenCode).Select(option => option.Id), Does.Contain("high"));
+    }
+
+    [TestCase("")]
+    [TestCase("opencode/big-pickle")]
+    [TestCase("не json вообще\n{ поломанный }\n")]
+    public void Непригодный_вывод_списка_даёт_пустой_каталог(string output)
+    {
+        Assert.That(AgentModels.ParseOpenCodeModels(output), Is.Empty);
+    }
+
+    private const string OpenCodeListing = """
+                                           opencode/big-pickle
+                                           {
+                                             "id": "big-pickle",
+                                             "providerID": "opencode",
+                                             "name": "Big Pickle",
+                                             "cost": {
+                                               "input": 0,
+                                               "output": 0
+                                             },
+                                             "limit": {
+                                               "context": 200000,
+                                               "output": 32000
+                                             },
+                                             "variants": {}
+                                           }
+                                           opencode/laguna-s-2.1-free
+                                           {
+                                             "id": "laguna-s-2.1-free",
+                                             "providerID": "opencode",
+                                             "name": "Laguna S 2.1 Free",
+                                             "cost": {
+                                               "input": 0,
+                                               "output": 0
+                                             },
+                                             "limit": {
+                                               "context": 256000
+                                             },
+                                             "variants": {
+                                               "low": {
+                                                 "reasoningEffort": "low"
+                                               },
+                                               "medium": {
+                                                 "reasoningEffort": "medium"
+                                               },
+                                               "high": {
+                                                 "reasoningEffort": "high"
+                                               }
+                                             }
+                                           }
+                                           opencode/gpt-5.6-sol
+                                           {
+                                             "id": "gpt-5.6-sol",
+                                             "providerID": "opencode",
+                                             "name": "GPT-5.6 Sol",
+                                             "cost": {
+                                               "input": 5,
+                                               "output": 30
+                                             },
+                                             "limit": {
+                                               "context": 400000
+                                             }
+                                           }
+                                           """;
 }

@@ -1,6 +1,7 @@
 ﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Settings.SettingsAgentCard"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Settings"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -54,19 +55,32 @@
             <TextBlock Text="Модель"
                        Style="{StaticResource Setting.Label}"
                        Margin="0,16,0,0" />
-            <ComboBox Style="{StaticResource ComboBox.Form}"
-                      ItemsSource="{Binding AgentModel.ModelOptions}"
-                      SelectedItem="{Binding AgentModel.SelectedModel, Mode=TwoWay}"
-                      Width="320"
-                      HorizontalAlignment="Left"
-                      Margin="0,8,0,0">
-                <ComboBox.ItemTemplate>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding Title}"
-                                   ToolTip="{Binding Hint}" />
-                    </DataTemplate>
-                </ComboBox.ItemTemplate>
-            </ComboBox>
+            <StackPanel Orientation="Horizontal"
+                        Margin="0,8,0,0">
+                <ComboBox Style="{StaticResource ComboBox.Form}"
+                          ItemsSource="{Binding AgentModel.ModelOptions}"
+                          SelectedItem="{Binding AgentModel.SelectedModel, Mode=TwoWay}"
+                          Width="320">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Title}"
+                                       ToolTip="{Binding Hint}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <Button Style="{StaticResource Button.Icon}"
+                        Command="{Binding AgentModel.ReloadModelsCommand}"
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center"
+                        AutomationProperties.Name="Обновить список моделей"
+                        ToolTip="Спросить у CLI, какие модели доступны сейчас">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.RefreshCw}"
+                                              Width="16"
+                                              Height="16"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                </Button>
+            </StackPanel>
             <TextBlock Style="{StaticResource Setting.Hint}"
                        Text="{Binding AgentModel.SelectedModel.Hint}" />
 
@@ -79,7 +93,7 @@
                      HorizontalAlignment="Left"
                      Margin="0,8,0,0" />
             <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="Модель, которой нет в списке: слаг уходит в CLI как есть и появляется отдельным пунктом выше. Пусто – модель, выбранная по умолчанию в самом CLI." />
+                       Text="{Binding AgentModelHint}" />
 
             <TextBlock Text="Глубина рассуждений"
                        Style="{StaticResource Setting.Label}"

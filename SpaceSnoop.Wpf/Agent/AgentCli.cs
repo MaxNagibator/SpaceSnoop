@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 
 namespace SpaceSnoop.Wpf.Agent;
 
@@ -29,9 +30,9 @@ public static class AgentCli
             return overridePath;
         }
 
-        foreach (var directory in directories)
+        foreach (var name in executableNames)
         {
-            foreach (var name in executableNames)
+            foreach (var directory in directories)
             {
                 var candidate = Path.Combine(directory, name);
 
@@ -76,10 +77,10 @@ public static class AgentCli
         return directories;
     }
 
-    // TODO: claude.cmd/claude.bat находятся, но запускаются напрямую (Process.Start без cmd.exe) –
-    //       на этой машине реальные claude.exe и codex.exe, npm-шимы не проверялись; апгрейд –
-    //       запуск через "cmd.exe /c" для .cmd/.bat, если такая установка встретится на практике.
-    private static string DetectVersion(string path)
+    // TODO: .cmd/.bat находятся, но запускаются напрямую (Process.Start без cmd.exe) и падают
+    //       Win32Exception; сейчас спасает порядок поиска (.exe по всем каталогам раньше шимов),
+    //       апгрейд – запуск через "cmd.exe /c", если встретится установка вообще без .exe.
+    public static string Run(string path, params string[] arguments)
     {
         try
         {
@@ -89,9 +90,14 @@ public static class AgentCli
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8,
             };
 
-            info.ArgumentList.Add("--version");
+            foreach (var argument in arguments)
+            {
+                info.ArgumentList.Add(argument);
+            }
 
             using var process = Process.Start(info);
 
@@ -112,11 +118,16 @@ public static class AgentCli
             var output = outputTask.GetAwaiter().GetResult();
             errorTask.GetAwaiter().GetResult();
 
-            return ParseVersion(output);
+            return output;
         }
         catch (Exception exception) when (exception is Win32Exception or InvalidOperationException)
         {
             return string.Empty;
         }
+    }
+
+    private static string DetectVersion(string path)
+    {
+        return ParseVersion(Run(path, "--version"));
     }
 }

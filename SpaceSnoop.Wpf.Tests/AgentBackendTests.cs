@@ -57,6 +57,18 @@ public class AgentBackendTests
     }
 
     [Test]
+    public void Настоящий_exe_из_дальнего_каталога_выигрывает_у_ближнего_шима()
+    {
+        var path = AgentCli.ResolveExecutable(
+            AgentCli.ExecutableNames("opencode"),
+            null,
+            [@"C:\npm", @"C:\npm\node_modules\opencode-ai\bin"],
+            candidate => candidate is @"C:\npm\opencode.cmd" or @"C:\npm\node_modules\opencode-ai\bin\opencode.exe");
+
+        Assert.That(path, Is.EqualTo(@"C:\npm\node_modules\opencode-ai\bin\opencode.exe"));
+    }
+
+    [Test]
     public void Ничего_не_найдено_возвращает_null()
     {
         var path = AgentCli.ResolveExecutable(ClaudeNames, null, [@"C:\A", @"C:\B"], _ => false);

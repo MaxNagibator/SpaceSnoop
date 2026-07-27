@@ -8,6 +8,8 @@ public static class AgentPrompt
 
     private const string ToolPrefix = $"mcp__{ServerName}__";
 
+    private const string ServerPrefix = $"{ServerName}_";
+
     private static readonly string[] SafeTools =
     [
         "get_app_state",
@@ -39,7 +41,12 @@ public static class AgentPrompt
 
     public static string ShortName(string toolName)
     {
-        return toolName.StartsWith(ToolPrefix, StringComparison.Ordinal) ? toolName[ToolPrefix.Length..] : toolName;
+        if (toolName.StartsWith(ToolPrefix, StringComparison.Ordinal))
+        {
+            return toolName[ToolPrefix.Length..];
+        }
+
+        return toolName.StartsWith(ServerPrefix, StringComparison.Ordinal) ? toolName[ServerPrefix.Length..] : toolName;
     }
 
     public static bool IsDestructive(string toolName)

@@ -16,7 +16,7 @@ public sealed record EnumOption<T>(T Value, string Label) where T : struct, Enum
 
 public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
 {
-    private static readonly AgentBackendKind[] AgentBackendOrder = [AgentBackendKind.Claude, AgentBackendKind.Codex];
+    private static readonly AgentBackendKind[] AgentBackendOrder = [AgentBackendKind.Claude, AgentBackendKind.Codex, AgentBackendKind.OpenCode];
 
     private readonly ISettingsStore _settings;
     private readonly AgentBackends _agentBackends;
@@ -83,6 +83,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     [
         new(PackIconLucideKind.Bot, "Claude Code", "CLI claude – встроенные инструменты отключаются целиком, у агента только инструменты приложения"),
         new(PackIconLucideKind.SquareTerminal, "Codex", "CLI codex – помимо инструментов приложения агент получает оболочку системы, отключить её нечем"),
+        new(PackIconLucideKind.SquareCode, "OpenCode", "CLI opencode – работает по локально настроенной авторизации, встроенные инструменты отключены, у агента только инструменты приложения"),
     ];
 
     public int SelectedAgentBackendIndex
@@ -99,10 +100,13 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
             OnPropertyChanged();
             OnPropertyChanged(nameof(AgentCliPathLabel));
             OnPropertyChanged(nameof(AgentShellWarning));
+            OnPropertyChanged(nameof(AgentModelHint));
         }
     }
 
     public string AgentCliPathLabel => $"Путь к {_agentBackends.Current.CliName}.exe";
+
+    public string AgentModelHint => _agentBackends.Current.ModelHint;
 
     public bool AgentShellWarning => _agentBackends.Current.HasBuiltInShell;
 

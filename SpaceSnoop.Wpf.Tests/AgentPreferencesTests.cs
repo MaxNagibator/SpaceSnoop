@@ -88,17 +88,22 @@ public class AgentPreferencesTests
 
         preferences.Model = "gpt-5.6";
         preferences.CliPath = @"D:\tools\codex.exe";
+        preferences.Backend = AgentBackendKind.OpenCode;
+        preferences.Model = "opencode/big-pickle";
+        preferences.CliPath = @"D:\tools\opencode.exe";
         store.Flush();
 
         var reopened = new AgentPreferences(Open());
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(reopened.Backend, Is.EqualTo(AgentBackendKind.Codex));
+            Assert.That(reopened.Backend, Is.EqualTo(AgentBackendKind.OpenCode));
             Assert.That(reopened.ModelFor(AgentBackendKind.Claude), Is.EqualTo("sonnet"));
             Assert.That(reopened.ModelFor(AgentBackendKind.Codex), Is.EqualTo("gpt-5.6"));
+            Assert.That(reopened.ModelFor(AgentBackendKind.OpenCode), Is.EqualTo("opencode/big-pickle"));
             Assert.That(reopened.CliPathFor(AgentBackendKind.Claude), Is.EqualTo(@"D:\tools\claude.exe"));
             Assert.That(reopened.CliPathFor(AgentBackendKind.Codex), Is.EqualTo(@"D:\tools\codex.exe"));
+            Assert.That(reopened.CliPathFor(AgentBackendKind.OpenCode), Is.EqualTo(@"D:\tools\opencode.exe"));
         }
     }
 

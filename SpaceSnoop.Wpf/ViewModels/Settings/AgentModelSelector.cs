@@ -5,6 +5,11 @@ namespace SpaceSnoop.Wpf.ViewModels.Settings;
 public sealed partial class AgentModelSelector : ObservableObject
 {
     private readonly AgentPreferences _preferences;
+    private readonly AgentBackends _backends;
+    private readonly ILogger<AgentModelSelector> _logger;
+
+    private readonly Dictionary<AgentBackendKind, IReadOnlyList<AgentModelOption>> _catalogs = [];
+
     private bool _suppressSync;
 
     [ObservableProperty]
@@ -19,11 +24,54 @@ public sealed partial class AgentModelSelector : ObservableObject
     [ObservableProperty]
     private AgentEffortOption _selectedEffort = AgentModels.EffortDefault;
 
-    public AgentModelSelector(AgentPreferences preferences)
+    [ObservableProperty]
+    private bool _isLoadingModels;
+
+    public AgentModelSelector(AgentPreferences preferences, AgentBackends backends, ILogger<AgentModelSelector> logger)
     {
         _preferences = preferences;
+        _backends = backends;
+        _logger = logger;
         _preferences.PropertyChanged += OnPreferencesChanged;
         Sync();
+    }
+
+    public Task EnsureModelsAsync()
+    {
+        return _catalogs.ContainsKey(_preferences.Backend) ? Task.CompletedTask : LoadModelsAsync();
+    }
+
+    [RelayCommand]
+    private async Task ReloadModelsAsync()
+    {
+        await LoadModelsAsync();
+    }
+
+    private async Task LoadModelsAsync()
+    {
+        var backend = _backends.Current;
+        IsLoadingModels = true;
+
+        try
+        {
+            var models = await Task.Run(backend.LoadModels);
+
+            _catalogs[backend.Kind] = models;
+            _logger.AgentModelsLoaded(backend.DisplayName, models.Count);
+        }
+        catch (Exception exception)
+        {
+            _logger.AgentModelsFailed(exception, backend.DisplayName);
+        }
+        finally
+        {
+            IsLoadingModels = false;
+        }
+
+        if (_preferences.Backend == backend.Kind)
+        {
+            Sync();
+        }
     }
 
     partial void OnSelectedModelChanged(AgentModelOption value)
@@ -62,9 +110,9 @@ public sealed partial class AgentModelSelector : ObservableObject
         var backend = _preferences.Backend;
         var model = _preferences.Model.Trim();
 
-        List<AgentModelOption> models = [AgentModels.CliDefault, .. AgentModels.For(backend)];
+        List<AgentModelOption> models = [AgentModels.CliDefault, .. Catalog(backend)];
 
-        if (model.Length > 0 && AgentModels.Find(backend, model) is null)
+        if (model.Length > 0 && !models.Exists(option => string.Equals(option.Id, model, StringComparison.OrdinalIgnoreCase)))
         {
             models.Add(new AgentModelOption(model, model, "Задана вручную"));
         }
@@ -72,7 +120,7 @@ public sealed partial class AgentModelSelector : ObservableObject
         ModelOptions = models;
         SelectedModel = models.Find(option => string.Equals(option.Id, model, StringComparison.OrdinalIgnoreCase)) ?? AgentModels.CliDefault;
 
-        var efforts = AgentModels.Efforts(backend, model);
+        var efforts = AgentModels.EffortsFor(SelectedModel, backend);
         var effort = _preferences.Effort.Trim();
 
         EffortOptions = efforts;
@@ -84,5 +132,10 @@ public sealed partial class AgentModelSelector : ObservableObject
         }
 
         _suppressSync = false;
+    }
+
+    private IReadOnlyList<AgentModelOption> Catalog(AgentBackendKind backend)
+    {
+        return _catalogs.TryGetValue(backend, out var loaded) ? loaded : AgentModels.For(backend);
     }
 }

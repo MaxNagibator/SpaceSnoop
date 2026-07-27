@@ -8,6 +8,8 @@ namespace SpaceSnoop.Wpf.Agent;
 
 public abstract class AgentBackendBase : IAgentBackend, IDisposable
 {
+    internal const string TokenVariable = "SPACESNOOP_MCP_TOKEN";
+
     private readonly AgentPreferences _preferences;
     private readonly ILogger _logger;
 
@@ -35,6 +37,8 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
 
     public abstract string MissingCliHint { get; }
 
+    public virtual string ModelHint => "Модель, которой нет в списке: слаг уходит в CLI как есть и появляется отдельным пунктом выше. Пусто – модель, выбранная по умолчанию в самом CLI.";
+
     protected abstract IReadOnlyList<string> ExtraDirectories { get; }
 
     protected abstract AgentLaunch CreateLaunch(AgentRequest request);
@@ -61,6 +65,11 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
         }
 
         GC.SuppressFinalize(this);
+    }
+
+    public virtual IReadOnlyList<AgentModelOption> LoadModels()
+    {
+        return AgentModels.For(Kind);
     }
 
     public AgentCliInfo? Detect()
@@ -208,6 +217,13 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
 
             await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
             await stderrTask.ConfigureAwait(false);
+
+            if (!resultYielded && process.ExitCode == 0 && parser.Complete() is { } completion)
+            {
+                resultYielded = true;
+                _logger.AgentTurnCompleted(stopwatch.ElapsedMilliseconds, completion.CostUsd, completion.Tokens);
+                yield return completion;
+            }
 
             if (!resultYielded)
             {

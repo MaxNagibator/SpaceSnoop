@@ -47,6 +47,7 @@ public class AgentToolPolicyTests
     }
 
     [TestCase("mcp__spacesnoop__scan_directory", ExpectedResult = "scan_directory")]
+    [TestCase("spacesnoop_scan_directory", ExpectedResult = "scan_directory")]
     [TestCase("scan_directory", ExpectedResult = "scan_directory")]
     [TestCase("mcp__другой__scan_directory", ExpectedResult = "mcp__другой__scan_directory")]
     [TestCase("", ExpectedResult = "")]
@@ -56,6 +57,7 @@ public class AgentToolPolicyTests
     }
 
     [TestCase("mcp__spacesnoop__sync_current", ExpectedResult = true)]
+    [TestCase("spacesnoop_sync_current", ExpectedResult = true)]
     [TestCase("sync_current", ExpectedResult = true)]
     [TestCase("mcp__spacesnoop__open_sync", ExpectedResult = false)]
     [TestCase("mcp__spacesnoop__scan_directory", ExpectedResult = false)]

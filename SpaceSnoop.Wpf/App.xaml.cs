@@ -181,6 +181,7 @@ public partial class App : Application
         services.AddSingleton<AgentModelSelector>();
         services.AddSingleton<ClaudeAgentBackend>();
         services.AddSingleton<CodexAgentBackend>();
+        services.AddSingleton<OpenCodeAgentBackend>();
         services.AddSingleton<AgentBackends>();
 
         services.AddSingleton<McpPreferences>();

@@ -325,4 +325,10 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 2113, Level = LogLevel.Warning, Message = "Не удалось скопировать сообщение чата в буфер обмена")]
     public static partial void AgentMessageCopyFailed(this ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 2114, Level = LogLevel.Information, Message = "Каталог моделей «{Backend}» обновлён: {Count}")]
+    public static partial void AgentModelsLoaded(this ILogger logger, string backend, int count);
+
+    [LoggerMessage(EventId = 2115, Level = LogLevel.Warning, Message = "Не удалось получить список моделей «{Backend}»")]
+    public static partial void AgentModelsFailed(this ILogger logger, Exception exception, string backend);
 }

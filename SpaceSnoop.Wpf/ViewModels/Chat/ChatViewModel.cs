@@ -166,6 +166,11 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
             {
                 CliInfo = info;
             }
+
+            if (info is not null && generation == _detectGeneration)
+            {
+                await AgentModel.EnsureModelsAsync();
+            }
         }
         finally
         {

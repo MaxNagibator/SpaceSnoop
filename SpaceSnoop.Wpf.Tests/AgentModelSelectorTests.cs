@@ -1,4 +1,5 @@
-﻿using SpaceSnoop.Wpf.Agent;
+﻿using Microsoft.Extensions.Logging.Abstractions;
+using SpaceSnoop.Wpf.Agent;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.ViewModels.Settings;
 
@@ -12,7 +13,7 @@ public class AgentModelSelectorTests
     {
         var settings = new MemorySettings();
         var preferences = new AgentPreferences(settings);
-        var selector = new AgentModelSelector(preferences);
+        var selector = Selector(preferences);
 
         selector.SelectedModel = selector.ModelOptions.First(option => option.Id == "sonnet");
 
@@ -23,7 +24,7 @@ public class AgentModelSelectorTests
     public void Слаг_вне_каталога_становится_отдельным_пунктом_списка()
     {
         var preferences = new AgentPreferences(new MemorySettings()) { Model = "claude-opus-5-мой" };
-        var selector = new AgentModelSelector(preferences);
+        var selector = Selector(preferences);
 
         using (Assert.EnterMultipleScope())
         {
@@ -39,7 +40,7 @@ public class AgentModelSelectorTests
         settings.SetValue(SettingsKeys.AgentEffort(AgentBackendKind.Claude), "ultra");
 
         var preferences = new AgentPreferences(settings);
-        var selector = new AgentModelSelector(preferences);
+        var selector = Selector(preferences);
 
         using (Assert.EnterMultipleScope())
         {
@@ -54,7 +55,7 @@ public class AgentModelSelectorTests
     {
         var settings = new MemorySettings();
         var preferences = new AgentPreferences(settings) { Backend = AgentBackendKind.Codex };
-        var selector = new AgentModelSelector(preferences);
+        var selector = Selector(preferences);
 
         selector.SelectedEffort = selector.EffortOptions.First(option => option.Id == "ultra");
 
@@ -69,7 +70,7 @@ public class AgentModelSelectorTests
     public void Смена_бэкенда_переставляет_список_моделей()
     {
         var preferences = new AgentPreferences(new MemorySettings());
-        var selector = new AgentModelSelector(preferences);
+        var selector = Selector(preferences);
 
         var claude = selector.ModelOptions.Select(option => option.Id).ToArray();
         preferences.Backend = AgentBackendKind.Codex;
@@ -80,5 +81,16 @@ public class AgentModelSelectorTests
             Assert.That(selector.ModelOptions.Select(option => option.Id), Does.Not.Contain("sonnet"));
             Assert.That(selector.SelectedModel, Is.EqualTo(AgentModels.CliDefault));
         }
+    }
+
+    private static AgentModelSelector Selector(AgentPreferences preferences)
+    {
+        var backends = new AgentBackends(
+            preferences,
+            new ClaudeAgentBackend(preferences, NullLogger<ClaudeAgentBackend>.Instance),
+            new CodexAgentBackend(preferences, NullLogger<CodexAgentBackend>.Instance),
+            new OpenCodeAgentBackend(preferences, NullLogger<OpenCodeAgentBackend>.Instance));
+
+        return new(preferences, backends, NullLogger<AgentModelSelector>.Instance);
     }
 }
