@@ -1,4 +1,5 @@
 ﻿using SpaceSnoop.Wpf.Agent;
+using SpaceSnoop.Wpf.ViewModels.Chat;
 
 namespace SpaceSnoop.Wpf.Tests;
 
@@ -155,6 +156,24 @@ public class CodexAgentBackendTests
                             """;
 
         Assert.That(Parse(line), Is.Null);
+    }
+
+    [Test]
+    public void Аргументы_вызова_доезжают_до_подсказки_бейджа()
+    {
+        const string line = """
+                            {"type":"item.started","item":{"id":"item_1","type":"mcp_tool_call","server":"spacesnoop","tool":"scan_directory","arguments":{"path":"C:\\Users\\admin\\AppData\\Local\\Temp\\claude\\ss-smoke","depth":2,"entryLimit":5},"result":null,"error":null,"status":"in_progress"}}
+                            """;
+
+        var result = Parse(line);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result?.ToolName, Is.EqualTo("scan_directory"));
+            Assert.That(
+                ChatToolArguments.Describe(result?.ToolArguments ?? string.Empty),
+                Is.EqualTo(@"path: C:\Users\admin\AppData\Local\Temp\claude\ss-smoke, depth: 2, entryLimit: 5"));
+        });
     }
 
     [Test]
