@@ -9,37 +9,29 @@
              d:DataContext="{d:DesignInstance chatvm:ChatViewModel}"
              d:DesignWidth="900">
 
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Views/Chat/ChatResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
     <Border Background="{DynamicResource Bg.Surface}"
             BorderBrush="{DynamicResource Border.Subtle}"
             BorderThickness="0,1,0,0"
             Padding="16,12">
         <StackPanel>
-            <Border Background="{DynamicResource State.WarningSoft}"
-                    BorderBrush="{DynamicResource State.Warning}"
-                    BorderThickness="1"
-                    CornerRadius="{DynamicResource Radius.M}"
-                    Padding="10,8"
+            <Border Style="{StaticResource Chat.Notice}"
                     Margin="0,0,0,10"
+                    ToolTip="{Binding MutationsNotice}"
                     Visibility="{Binding MutationsAllowed, Converter={StaticResource BoolToVisibility}}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-
-                    <iconPacks:PackIconLucide Grid.Column="0"
-                                              Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
-                                              Width="15"
-                                              Height="15"
-                                              VerticalAlignment="Top"
-                                              Margin="0,1,8,0"
-                                              Foreground="{DynamicResource State.Warning}" />
-                    <TextBlock Grid.Column="1"
-                               Style="{StaticResource TextBlock.Subtle}"
-                               FontSize="{DynamicResource Font.Size.S}"
-                               TextWrapping="Wrap"
-                               Text="Изменяющие операции разрешены в настройках: агент может сам запустить синхронизацию – файлы скопируются, лишние уйдут в корзину. Сначала он обязан показать план и дождаться вашего согласия." />
-                </Grid>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource Chat.NoticeIcon}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}" />
+                    <TextBlock Style="{StaticResource Chat.NoticeText}"
+                               Text="{Binding MutationsNoticeShort}" />
+                </StackPanel>
             </Border>
 
             <Grid>
@@ -48,15 +40,20 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <TextBox x:Name="Input"
-                         Grid.Column="0"
-                         Style="{StaticResource TextBox.Form}"
-                         Text="{Binding InputText, UpdateSourceTrigger=PropertyChanged}"
-                         AcceptsReturn="True"
-                         TextWrapping="Wrap"
-                         MaxHeight="140"
-                         VerticalScrollBarVisibility="Auto"
-                         PreviewKeyDown="OnInputPreviewKeyDown" />
+                <Grid Grid.Column="0">
+                    <TextBox x:Name="Input"
+                             Style="{StaticResource TextBox.Form}"
+                             Text="{Binding InputText, UpdateSourceTrigger=PropertyChanged}"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             MaxHeight="140"
+                             VerticalScrollBarVisibility="Auto"
+                             PreviewKeyDown="OnInputPreviewKeyDown" />
+
+                    <TextBlock Style="{StaticResource Chat.Placeholder}"
+                               Text="{Binding InputPlaceholder}"
+                               Visibility="{Binding Text, ElementName=Input, Converter={StaticResource NullToVisibility}, ConverterParameter=Inverse}" />
+                </Grid>
 
                 <StackPanel Grid.Column="1"
                             Orientation="Horizontal"

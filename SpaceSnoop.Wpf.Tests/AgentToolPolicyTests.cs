@@ -149,7 +149,7 @@ public class AgentToolPolicyTests
     [Test]
     public void Обе_редакции_промпта_несут_общую_часть()
     {
-        Assert.That(AgentPrompt.Build(mutations: true, shell: false), Does.StartWith("Ты – помощник внутри программы SpaceSnoop"));
+        Assert.That(AgentPrompt.Build(mutations: true, shell: false), Does.StartWith($"Тебя зовут {AgentPersona.Name}"));
     }
 
     [Test]

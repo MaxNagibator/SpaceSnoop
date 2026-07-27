@@ -22,8 +22,8 @@
                 <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="CornerRadius" Value="{DynamicResource Radius.M}" />
-                <Setter Property="Padding" Value="12,10" />
-                <Setter Property="MaxWidth" Value="640" />
+                <Setter Property="Padding" Value="14,10" />
+                <Setter Property="MaxWidth" Value="720" />
                 <Setter Property="HorizontalAlignment" Value="Left" />
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding IsUser}"
@@ -43,39 +43,46 @@
                    TargetType="TextBlock"
                    BasedOn="{StaticResource TextBlock.Subtle}">
                 <Setter Property="FontSize" Value="{DynamicResource Font.Size.S}" />
-                <Setter Property="Text" Value="Ассистент" />
+                <Setter Property="FontWeight" Value="{DynamicResource Font.Weight.SemiBold}" />
+                <Setter Property="VerticalAlignment" Value="Center" />
                 <Style.Triggers>
-                    <DataTrigger Binding="{Binding IsUser}"
-                                 Value="True">
-                        <Setter Property="Text" Value="Вы" />
-                    </DataTrigger>
                     <DataTrigger Binding="{Binding IsError}"
                                  Value="True">
-                        <Setter Property="Text" Value="Ошибка" />
                         <Setter Property="Foreground" Value="{DynamicResource State.Error}" />
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
 
-            <Style x:Key="Chat.RoleIcon"
-                   TargetType="iconPacks:PackIconLucide">
-                <Setter Property="Width" Value="14" />
-                <Setter Property="Height" Value="14" />
-                <Setter Property="VerticalAlignment" Value="Center" />
-                <Setter Property="Margin" Value="0,0,6,0" />
-                <Setter Property="Foreground" Value="{DynamicResource Fg.Muted}" />
-                <Setter Property="Kind" Value="{x:Static iconPacks:PackIconLucideKind.Bot}" />
+            <Style x:Key="Chat.MessageAction"
+                   TargetType="Button"
+                   BasedOn="{StaticResource Button.Icon}">
+                <Setter Property="Width" Value="26" />
+                <Setter Property="Height" Value="26" />
+                <Setter Property="MinHeight" Value="0" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Margin" Value="6,0,0,0" />
+                <Setter Property="Opacity" Value="0" />
                 <Style.Triggers>
-                    <DataTrigger Binding="{Binding IsUser}"
+                    <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Border}}"
                                  Value="True">
-                        <Setter Property="Kind" Value="{x:Static iconPacks:PackIconLucideKind.User}" />
+                        <Setter Property="Opacity" Value="1" />
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
 
+            <Style x:Key="Chat.ActionIcon"
+                   TargetType="iconPacks:PackIconLucide">
+                <Setter Property="Width" Value="13" />
+                <Setter Property="Height" Value="13" />
+            </Style>
+
             <Style x:Key="Chat.ToolBadge"
                    TargetType="Border"
-                   BasedOn="{StaticResource Badge.Info}">
+                   BasedOn="{StaticResource Badge}">
+                <Setter Property="Background" Value="{DynamicResource Bg.SurfaceMute}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}" />
+                <Setter Property="TextElement.Foreground" Value="{DynamicResource Fg.Secondary}" />
+                <Setter Property="TextElement.FontSize" Value="{DynamicResource Font.Size.Caption}" />
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding IsMutating}"
                                  Value="True">
@@ -117,62 +124,96 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <ScrollViewer x:Name="Scroller"
-                  VerticalScrollBarVisibility="Auto"
-                  HorizontalScrollBarVisibility="Disabled"
-                  Padding="0,0,0,8"
-                  ScrollChanged="OnScrollChanged">
-        <StackPanel>
-            <StackPanel Margin="16,40,16,0"
-                        Visibility="{Binding HasMessages, Converter={StaticResource InverseBoolToVisibility}}">
-                <iconPacks:PackIconLucide Style="{StaticResource Chat.HeroIcon}"
-                                          Kind="{x:Static iconPacks:PackIconLucideKind.Sparkles}" />
-                <TextBlock Style="{StaticResource Chat.Headline}"
-                           Text="Спросите про место на диске" />
-                <TextBlock Style="{StaticResource Chat.Hint}"
-                           Text="{Binding EmptyStateHint}" />
-
-                <ItemsControl ItemsSource="{x:Static chatvm:ChatViewModel.ExampleQuestions}"
-                              HorizontalAlignment="Center"
-                              Margin="0,16,0,0">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel HorizontalAlignment="Center" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Button Style="{StaticResource Button.Secondary}"
-                                    Content="{Binding}"
-                                    Command="{Binding DataContext.UseExampleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                    CommandParameter="{Binding}"
-                                    Margin="0,0,8,8" />
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </StackPanel>
-
-            <ItemsControl ItemsSource="{Binding Messages}"
-                          Visibility="{Binding HasMessages, Converter={StaticResource BoolToVisibility}}">
+    <Grid>
+        <ScrollViewer x:Name="Scroller"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Padding="0,0,0,8"
+                      Visibility="{Binding HasMessages, Converter={StaticResource BoolToVisibility}}"
+                      ScrollChanged="OnScrollChanged">
+            <ItemsControl ItemsSource="{Binding Messages}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="{x:Type chatvm:ChatMessageViewModel}">
-                        <Grid Margin="16,8,16,8">
-                            <Border Style="{StaticResource Chat.Bubble}">
+                        <Grid Margin="16,10,16,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0"
+                                    Style="{StaticResource Chat.Avatar}">
+                                <iconPacks:PackIconLucide Style="{StaticResource Chat.AvatarIcon}" />
+                            </Border>
+
+                            <Border Grid.Column="1"
+                                    Style="{StaticResource Chat.Bubble}">
                                 <StackPanel>
-                                    <StackPanel Orientation="Horizontal"
-                                                Margin="0,0,0,4">
-                                        <iconPacks:PackIconLucide Style="{StaticResource Chat.RoleIcon}" />
-                                        <TextBlock Style="{StaticResource Chat.BubbleRole}"
-                                                   VerticalAlignment="Center" />
-                                    </StackPanel>
+                                    <Grid Margin="0,0,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Grid.Column="0"
+                                                   Style="{StaticResource Chat.BubbleRole}"
+                                                   Text="{Binding AuthorName}" />
+
+                                        <StackPanel Grid.Column="1"
+                                                    Orientation="Horizontal">
+                                            <Button Style="{StaticResource Chat.MessageAction}"
+                                                    Command="{Binding DataContext.CopyMessageCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    ToolTip="Скопировать текст"
+                                                    AutomationProperties.Name="Скопировать текст"
+                                                    Visibility="{Binding HasText, Converter={StaticResource BoolToVisibility}}">
+                                                <iconPacks:PackIconLucide Style="{StaticResource Chat.ActionIcon}"
+                                                                          Kind="{x:Static iconPacks:PackIconLucideKind.Copy}" />
+                                            </Button>
+
+                                            <Button Style="{StaticResource Chat.MessageAction}"
+                                                    Command="{Binding DataContext.RetryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    ToolTip="Спросить ещё раз"
+                                                    AutomationProperties.Name="Спросить ещё раз"
+                                                    Visibility="{Binding CanRetry, Converter={StaticResource BoolToVisibility}}">
+                                                <iconPacks:PackIconLucide Style="{StaticResource Chat.ActionIcon}"
+                                                                          Kind="{x:Static iconPacks:PackIconLucideKind.RotateCcw}" />
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
 
                                     <TextBox Style="{StaticResource Chat.BubbleText}"
-                                             Text="{Binding Text, Mode=OneWay}" />
+                                             Text="{Binding Text, Mode=OneWay}"
+                                             Visibility="{Binding HasText, Converter={StaticResource BoolToVisibility}}" />
 
-                                    <ProgressBar Height="2"
-                                                 IsIndeterminate="True"
-                                                 Margin="0,8,0,0"
-                                                 Visibility="{Binding IsStreaming, Converter={StaticResource BoolToVisibility}}" />
+                                    <StackPanel Orientation="Horizontal"
+                                                Margin="0,6,0,0"
+                                                Visibility="{Binding ShowStatus, Converter={StaticResource BoolToVisibility}}">
+                                        <Ellipse Width="7"
+                                                 Height="7"
+                                                 VerticalAlignment="Center"
+                                                 Margin="0,0,8,0"
+                                                 Fill="{DynamicResource Accent.Primary}">
+                                            <Ellipse.Triggers>
+                                                <EventTrigger RoutedEvent="Ellipse.Loaded">
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                             From="1"
+                                                                             To="0.2"
+                                                                             Duration="0:0:0.7"
+                                                                             AutoReverse="True"
+                                                                             RepeatBehavior="Forever" />
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </EventTrigger>
+                                            </Ellipse.Triggers>
+                                        </Ellipse>
+                                        <TextBlock Style="{StaticResource TextBlock.Subtle}"
+                                                   FontSize="{DynamicResource Font.Size.S}"
+                                                   VerticalAlignment="Center"
+                                                   Text="{Binding StatusText}" />
+                                    </StackPanel>
 
                                     <ItemsControl ItemsSource="{Binding ToolCalls}"
                                                   Margin="0,8,0,0">
@@ -199,7 +240,7 @@
                                                FontSize="{DynamicResource Font.Size.S}"
                                                Foreground="{DynamicResource State.Warning}"
                                                Margin="0,8,0,0"
-                                               Text="Отменено"
+                                               Text="Шнырь остановлен"
                                                Visibility="{Binding IsCancelled, Converter={StaticResource BoolToVisibility}}" />
 
                                     <TextBlock Style="{StaticResource TextBlock.Subtle}"
@@ -214,6 +255,65 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+        </ScrollViewer>
+
+        <StackPanel VerticalAlignment="Center"
+                    HorizontalAlignment="Center"
+                    MaxWidth="640"
+                    Margin="24,0,24,24"
+                    Visibility="{Binding HasMessages, Converter={StaticResource InverseBoolToVisibility}}">
+            <Border Style="{StaticResource Chat.HeroAvatar}">
+                <iconPacks:PackIconLucide Width="28"
+                                          Height="28"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          Foreground="{DynamicResource Accent.Primary}"
+                                          Kind="{x:Static iconPacks:PackIconLucideKind.Rat}" />
+            </Border>
+
+            <TextBlock Style="{StaticResource Chat.Headline}"
+                       Text="{Binding AgentName}" />
+            <TextBlock Style="{StaticResource Chat.Subhead}"
+                       Text="{Binding Greeting}" />
+            <TextBlock Style="{StaticResource Chat.Hint}"
+                       Text="{Binding EmptyStateHint}" />
+
+            <ItemsControl ItemsSource="{x:Static chatvm:ChatViewModel.Examples}"
+                          Margin="0,20,0,0">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Columns="2" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type chatvm:ChatExample}">
+                        <Button Style="{StaticResource Chat.ExampleCard}"
+                                Command="{Binding DataContext.UseExampleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                CommandParameter="{Binding Text}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <iconPacks:PackIconLucide Grid.Column="0"
+                                                          Width="15"
+                                                          Height="15"
+                                                          VerticalAlignment="Top"
+                                                          Margin="0,2,10,0"
+                                                          Foreground="{DynamicResource Accent.Primary}"
+                                                          Kind="{Binding Icon}" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding Text}"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource Fg.Primary}"
+                                           FontWeight="{DynamicResource Font.Weight.Regular}"
+                                           FontSize="{DynamicResource Font.Size.S}" />
+                            </Grid>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
         </StackPanel>
-    </ScrollViewer>
+    </Grid>
 </UserControl>

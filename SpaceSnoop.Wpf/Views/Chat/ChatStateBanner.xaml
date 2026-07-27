@@ -114,7 +114,7 @@
                                VerticalAlignment="Center" />
                 </StackPanel>
                 <TextBlock Style="{StaticResource Chat.BannerText}"
-                           Text="Без него у агента нет ни одного инструмента приложения – он не сможет ни просканировать диск, ни посмотреть сравнение." />
+                           Text="Без него у Шныря нет ни одного инструмента приложения – он не сможет ни просканировать диск, ни посмотреть сравнение." />
                 <Button Style="{StaticResource Button.Primary}"
                         Content="Включить MCP-сервер"
                         Command="{Binding EnableMcpCommand}"
@@ -127,20 +127,15 @@
             </StackPanel>
         </Border>
 
-        <Border Style="{StaticResource Chat.Banner}"
-                BorderBrush="{DynamicResource State.Warning}"
+        <Border Style="{StaticResource Chat.Notice}"
+                Margin="16,12,16,0"
+                ToolTip="{Binding ShellNotice}"
                 Visibility="{Binding ShowShellBanner, Converter={StaticResource BoolToVisibility}}">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <iconPacks:PackIconLucide Style="{StaticResource Chat.BannerIcon}"
-                                              Kind="{x:Static iconPacks:PackIconLucideKind.SquareTerminal}"
-                                              Foreground="{DynamicResource State.Warning}" />
-                    <TextBlock Text="У агента есть оболочка системы"
-                               FontWeight="{DynamicResource Font.Weight.SemiBold}"
-                               VerticalAlignment="Center" />
-                </StackPanel>
-                <TextBlock Style="{StaticResource Chat.BannerText}"
-                           Text="{Binding ShellNotice}" />
+            <StackPanel Orientation="Horizontal">
+                <iconPacks:PackIconLucide Style="{StaticResource Chat.NoticeIcon}"
+                                          Kind="{x:Static iconPacks:PackIconLucideKind.SquareTerminal}" />
+                <TextBlock Style="{StaticResource Chat.NoticeText}"
+                           Text="{Binding ShellNoticeShort}" />
             </StackPanel>
         </Border>
     </StackPanel>

@@ -322,4 +322,7 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 2112, Level = LogLevel.Warning, Message = "Поиск CLI агента «{Backend}» сорвался")]
     public static partial void AgentCliDetectionFailed(this ILogger logger, Exception exception, string backend);
+
+    [LoggerMessage(EventId = 2113, Level = LogLevel.Warning, Message = "Не удалось скопировать сообщение чата в буфер обмена")]
+    public static partial void AgentMessageCopyFailed(this ILogger logger, Exception exception);
 }

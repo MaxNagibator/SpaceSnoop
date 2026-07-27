@@ -1,4 +1,5 @@
 ﻿using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Text;
 
 namespace SpaceSnoop.Wpf.ViewModels.Chat;
@@ -16,23 +17,39 @@ public sealed partial class ChatMessageViewModel : ObservableObject
             _builder.Append(text);
             _text = text;
         }
+
+        ToolCalls.CollectionChanged += OnToolCallsChanged;
     }
 
     public ChatRole Role { get; }
 
     public bool IsUser => Role == ChatRole.User;
 
+    public string AuthorName => IsUser ? "Вы" : AgentPersona.Name;
+
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasText))]
     private string _text = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatusText), nameof(ShowStatus))]
     private bool _isStreaming;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanRetry))]
     private bool _isError;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanRetry))]
     private bool _isCancelled;
+
+    public bool HasText => Text.Length > 0;
+
+    public bool ShowStatus => IsStreaming;
+
+    public bool CanRetry => !IsUser && (IsError || IsCancelled);
+
+    public string StatusText => ToolCalls.Count > 0 ? AgentPersona.WorkingOn(ToolCalls[^1].Text) : AgentPersona.Thinking;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasUsage), nameof(UsageText))]
@@ -59,5 +76,10 @@ public sealed partial class ChatMessageViewModel : ObservableObject
 
         _builder.Append(text);
         Text = _builder.ToString();
+    }
+
+    private void OnToolCallsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        OnPropertyChanged(nameof(StatusText));
     }
 }

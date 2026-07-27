@@ -1,4 +1,5 @@
-﻿using System.Collections.ObjectModel;
+﻿using MahApps.Metro.IconPacks;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 
 namespace SpaceSnoop.Wpf.ViewModels.Chat;
@@ -30,7 +31,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
     private string _inputText = string.Empty;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(SendCommand), nameof(CancelCommand), nameof(NewConversationCommand))]
+    [NotifyCanExecuteChangedFor(nameof(SendCommand), nameof(CancelCommand), nameof(NewConversationCommand), nameof(RetryCommand))]
     private bool _isBusy;
 
     public ChatViewModel(AgentBackends backends, AgentPreferences preferences, McpPreferences mcp, McpServerHost mcpServer, ILogger<ChatViewModel> logger)
@@ -46,11 +47,12 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         McpServer.PropertyChanged += OnGateSourceChanged;
     }
 
-    public static IReadOnlyList<string> ExampleQuestions { get; } =
+    public static IReadOnlyList<ChatExample> Examples { get; } =
     [
-        "Куда делось место на диске C?",
-        "Почему эти папки опять расходятся после синхронизации?",
-        "Какие профили синхронизации у меня настроены?",
+        new("Куда делось место на диске C?", PackIconLucideKind.HardDrive),
+        new("Что тут можно снести без последствий?", PackIconLucideKind.Trash2),
+        new("Почему эти папки опять расходятся после синхронизации?", PackIconLucideKind.FolderSync),
+        new("Какие профили синхронизации у меня настроены?", PackIconLucideKind.ListChecks),
     ];
 
     public ObservableCollection<ChatMessageViewModel> Messages { get; } = [];
@@ -61,7 +63,13 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
 
     public string PageTitle => "Чат";
 
-    public string? PageDescription => "Спроси агента про место на диске или про то, почему синхронизация не сходится – он смотрит на приложение теми же инструментами, что и MCP-сервер.";
+    public string? PageDescription => $"{AgentPersona.Name} – агент внутри программы: смотрит на неё теми же инструментами, что и MCP-сервер.";
+
+    public string AgentName => AgentPersona.Name;
+
+    public string Greeting => AgentPersona.Greeting;
+
+    public string InputPlaceholder => AgentPersona.InputPlaceholder;
 
     public bool HasMessages => Messages.Count > 0;
 
@@ -87,11 +95,15 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
 
     public bool ShowShellBanner => Backend.HasBuiltInShell && CanChat;
 
-    public string ShellNotice => $"У CLI {Backend.DisplayName} есть собственная оболочка операционной системы, и отключить её нечем: помимо инструментов приложения агент может выполнять команды с правами SpaceSnoop. Запуск команды виден в ленте отдельным бейджем.";
+    public string ShellNotice => $"У CLI {Backend.DisplayName} есть собственная оболочка операционной системы, и отключить её нечем: помимо инструментов приложения {AgentPersona.Name} может выполнять команды с правами SpaceSnoop. Запуск команды виден в ленте отдельным бейджем.";
 
-    public string EmptyStateHint => MutationsAllowed
-        ? "Агент смотрит на приложение теми же инструментами, что и MCP-сервер: сканирует, сравнивает, читает открытое сравнение. Изменяющие операции разрешены – синхронизацию он может запустить сам, но только показав план и дождавшись вашего согласия."
-        : "Агент смотрит на приложение теми же read-only инструментами, что и MCP-сервер: сканирует, сравнивает, читает открытое сравнение. Ничего не удаляет и не переносит сам.";
+    public string ShellNoticeShort => $"{Backend.DisplayName}: у {AgentPersona.NameGenitive} есть оболочка системы – он может выполнять команды с правами SpaceSnoop";
+
+    public string MutationsNoticeShort => $"Изменяющие операции разрешены: {AgentPersona.Name} может сам запустить синхронизацию, показав план и дождавшись согласия";
+
+    public string MutationsNotice => $"Изменяющие операции разрешены в настройках: {AgentPersona.Name} может сам запустить синхронизацию – файлы скопируются, лишние уйдут в корзину. Сначала он обязан показать план и дождаться вашего согласия.";
+
+    public string EmptyStateHint => MutationsAllowed ? AgentPersona.MutationsNote : AgentPersona.ReadOnlyNote;
 
     private IAgentBackend Backend => _backends.Current;
 
@@ -188,6 +200,49 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         _cts?.Cancel();
     }
 
+    [RelayCommand]
+    private void CopyMessage(ChatMessageViewModel? message)
+    {
+        if (message is null || message.Text.Length == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(message.Text);
+        }
+        catch (Exception exception)
+        {
+            _logger.AgentMessageCopyFailed(exception);
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanManageConversation))]
+    private async Task RetryAsync(ChatMessageViewModel? message)
+    {
+        if (message is null || !CanChat)
+        {
+            return;
+        }
+
+        var index = Messages.IndexOf(message);
+
+        if (index < 0)
+        {
+            return;
+        }
+
+        var prompt = Messages.Take(index).LastOrDefault(candidate => candidate.IsUser)?.Text;
+
+        if (prompt is not { Length: > 0 })
+        {
+            return;
+        }
+
+        await RunTurnAsync(prompt);
+    }
+
     [RelayCommand(CanExecute = nameof(CanSend))]
     private async Task SendAsync()
     {
@@ -199,6 +254,11 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         }
 
         InputText = string.Empty;
+        await RunTurnAsync(prompt);
+    }
+
+    private async Task RunTurnAsync(string prompt)
+    {
         Messages.Add(new ChatMessageViewModel(ChatRole.User, prompt));
 
         var assistant = new ChatMessageViewModel(ChatRole.Assistant) { IsStreaming = true };
@@ -360,6 +420,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         OnPropertyChanged(nameof(ConsentText));
         OnPropertyChanged(nameof(ShowShellBanner));
         OnPropertyChanged(nameof(ShellNotice));
+        OnPropertyChanged(nameof(ShellNoticeShort));
     }
 
     private void NotifyGatesChanged()
