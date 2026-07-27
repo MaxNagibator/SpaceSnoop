@@ -54,13 +54,45 @@
             <TextBlock Text="Модель"
                        Style="{StaticResource Setting.Label}"
                        Margin="0,16,0,0" />
+            <ComboBox Style="{StaticResource ComboBox.Form}"
+                      ItemsSource="{Binding AgentModel.ModelOptions}"
+                      SelectedItem="{Binding AgentModel.SelectedModel, Mode=TwoWay}"
+                      Width="320"
+                      HorizontalAlignment="Left"
+                      Margin="0,8,0,0">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Title}"
+                                   ToolTip="{Binding Hint}" />
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+            <TextBlock Style="{StaticResource Setting.Hint}"
+                       Text="{Binding AgentModel.SelectedModel.Hint}" />
+
+            <TextBlock Text="Свой слаг модели"
+                       Style="{StaticResource Setting.Label}"
+                       Margin="0,16,0,0" />
             <TextBox Style="{StaticResource TextBox.Form}"
                      Text="{Binding Agent.Model, UpdateSourceTrigger=LostFocus}"
-                     Width="260"
+                     Width="320"
                      HorizontalAlignment="Left"
                      Margin="0,8,0,0" />
             <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="Пусто – модель, выбранная по умолчанию в самом CLI." />
+                       Text="Модель, которой нет в списке: слаг уходит в CLI как есть и появляется отдельным пунктом выше. Пусто – модель, выбранная по умолчанию в самом CLI." />
+
+            <TextBlock Text="Глубина рассуждений"
+                       Style="{StaticResource Setting.Label}"
+                       Margin="0,16,0,0" />
+            <ComboBox Style="{StaticResource ComboBox.Form}"
+                      ItemsSource="{Binding AgentModel.EffortOptions}"
+                      SelectedItem="{Binding AgentModel.SelectedEffort, Mode=TwoWay}"
+                      DisplayMemberPath="Title"
+                      Width="320"
+                      HorizontalAlignment="Left"
+                      Margin="0,8,0,0" />
+            <TextBlock Style="{StaticResource Setting.Hint}"
+                       Text="Чем выше уровень, тем дольше и дороже ответ. «По умолчанию» – уровень, выбранный самим CLI для этой модели." />
 
             <TextBlock Text="{Binding AgentCliPathLabel}"
                        Style="{StaticResource Setting.Label}"

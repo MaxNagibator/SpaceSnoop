@@ -36,11 +36,13 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         McpPreferences mcp,
         McpServerHost mcpServer,
         AgentPreferences agent,
+        AgentModelSelector agentModels,
         AgentBackends agentBackends,
         ISettingsStore settings,
         ILogger<SettingsViewModel> logger)
     {
         Agent = agent;
+        AgentModel = agentModels;
         _agentBackends = agentBackends;
         Theme = theme;
         Shell = shell;
@@ -74,6 +76,8 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     public McpServerHost McpServer { get; }
 
     public AgentPreferences Agent { get; }
+
+    public AgentModelSelector AgentModel { get; }
 
     public IReadOnlyList<SegmentOption> AgentBackendOptions { get; } =
     [

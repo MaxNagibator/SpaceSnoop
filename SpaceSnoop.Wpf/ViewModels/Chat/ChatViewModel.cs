@@ -34,10 +34,17 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
     [NotifyCanExecuteChangedFor(nameof(SendCommand), nameof(CancelCommand), nameof(NewConversationCommand), nameof(RetryCommand))]
     private bool _isBusy;
 
-    public ChatViewModel(AgentBackends backends, AgentPreferences preferences, McpPreferences mcp, McpServerHost mcpServer, ILogger<ChatViewModel> logger)
+    public ChatViewModel(
+        AgentBackends backends,
+        AgentPreferences preferences,
+        AgentModelSelector agentModel,
+        McpPreferences mcp,
+        McpServerHost mcpServer,
+        ILogger<ChatViewModel> logger)
     {
         _backends = backends;
         _preferences = preferences;
+        AgentModel = agentModel;
         Mcp = mcp;
         McpServer = mcpServer;
         _logger = logger;
@@ -56,6 +63,8 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
     ];
 
     public ObservableCollection<ChatMessageViewModel> Messages { get; } = [];
+
+    public AgentModelSelector AgentModel { get; }
 
     public McpPreferences Mcp { get; }
 
@@ -280,6 +289,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
             ResumeSessionId = _sessionId,
             SystemPrompt = AgentPrompt.Build(mutations, backend.HasBuiltInShell),
             Model = _preferences.ModelFor(backend.Kind) is { Length: > 0 } model ? model : null,
+            Effort = _preferences.EffortFor(backend.Kind) is { Length: > 0 } effort ? effort : null,
             Mcp = new AgentMcpConfig(AgentPrompt.ServerName, McpServer.Endpoint ?? string.Empty, Mcp.Token, allowed, AgentPrompt.DeniedTools(mutations)),
         };
 

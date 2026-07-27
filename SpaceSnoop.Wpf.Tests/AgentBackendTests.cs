@@ -188,6 +188,16 @@ public class AgentBackendTests
         return args.Contains("--model") && args.Contains(model);
     }
 
+    [TestCase("", ExpectedResult = false)]
+    [TestCase("xhigh", ExpectedResult = true)]
+    public bool Глубина_рассуждений_добавляется_только_когда_задана(string effort)
+    {
+        var request = new AgentRequest { Prompt = "тест", Effort = effort };
+        var args = ClaudeAgentBackend.BuildArguments(request, mcpConfigPath: null);
+
+        return args.Contains("--effort") && args.Contains(effort);
+    }
+
     [Test]
     public void Продолжение_сессии_добавляется_через_resume()
     {

@@ -101,6 +101,11 @@ public static class SettingsKeys
         return $"{AgentPrefix}.{Suffix(backend)}.cli_path";
     }
 
+    public static string AgentEffort(AgentBackendKind backend)
+    {
+        return $"{AgentPrefix}.{Suffix(backend)}.effort";
+    }
+
     private static string Suffix(AgentBackendKind backend)
     {
         return backend.ToString().ToLowerInvariant();

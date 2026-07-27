@@ -149,6 +149,17 @@
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
+    <Style x:Key="Chat.Selector"
+           TargetType="ComboBox"
+           BasedOn="{StaticResource ComboBox.Toolbar}">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource Fg.Secondary}" />
+        <Setter Property="FontSize" Value="{DynamicResource Font.Size.S}" />
+        <Setter Property="Height" Value="26" />
+        <Setter Property="MinHeight" Value="26" />
+    </Style>
+
     <Style x:Key="Chat.NoticeIcon"
            TargetType="iconPacks:PackIconLucide">
         <Setter Property="Width" Value="14" />

@@ -97,10 +97,43 @@
                 </StackPanel>
             </Grid>
 
-            <TextBlock Style="{StaticResource TextBlock.Subtle}"
-                       FontSize="{DynamicResource Font.Size.S}"
-                       Margin="0,6,0,0"
-                       Text="Enter – отправить, Shift+Enter – перенос строки" />
+            <Grid Margin="0,8,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <ComboBox Grid.Column="0"
+                          Style="{StaticResource Chat.Selector}"
+                          ItemsSource="{Binding AgentModel.ModelOptions}"
+                          SelectedItem="{Binding AgentModel.SelectedModel, Mode=TwoWay}"
+                          ToolTip="Модель агента – применяется со следующего сообщения"
+                          AutomationProperties.Name="Модель агента">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Title}"
+                                       ToolTip="{Binding Hint}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+
+                <ComboBox Grid.Column="1"
+                          Style="{StaticResource Chat.Selector}"
+                          ItemsSource="{Binding AgentModel.EffortOptions}"
+                          SelectedItem="{Binding AgentModel.SelectedEffort, Mode=TwoWay}"
+                          Margin="4,0,0,0"
+                          ToolTip="Глубина рассуждений – чем выше, тем дольше и дороже ответ"
+                          AutomationProperties.Name="Глубина рассуждений" />
+
+                <TextBlock Grid.Column="2"
+                           Style="{StaticResource TextBlock.Subtle}"
+                           FontSize="{DynamicResource Font.Size.S}"
+                           HorizontalAlignment="Right"
+                           VerticalAlignment="Center"
+                           Margin="12,0,0,0"
+                           Text="Enter – отправить, Shift+Enter – перенос строки" />
+            </Grid>
         </StackPanel>
     </Border>
 </UserControl>

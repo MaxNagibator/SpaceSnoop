@@ -141,6 +141,11 @@ public sealed class CodexAgentBackend : AgentBackendBase
             }
         }
 
+        if (!string.IsNullOrEmpty(request.Effort))
+        {
+            AddConfig(args, "model_reasoning_effort", Quote(request.Effort));
+        }
+
         if (!string.IsNullOrEmpty(request.Model))
         {
             args.Add("--model");

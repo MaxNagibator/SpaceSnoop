@@ -119,6 +119,26 @@ public class AgentPreferencesTests
     }
 
     [Test]
+    public void Глубина_рассуждений_живёт_в_ключе_своего_бэкенда()
+    {
+        var store = Open();
+
+        var preferences = new AgentPreferences(store) { Effort = "xhigh", Backend = AgentBackendKind.Codex };
+
+        preferences.Effort = "ultra";
+        store.Flush();
+
+        var reopened = new AgentPreferences(Open());
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(reopened.EffortFor(AgentBackendKind.Claude), Is.EqualTo("xhigh"));
+            Assert.That(reopened.EffortFor(AgentBackendKind.Codex), Is.EqualTo("ultra"));
+            Assert.That(reopened.Effort, Is.EqualTo("ultra"));
+        }
+    }
+
+    [Test]
     public void Очищенная_модель_не_воскресает_из_прежнего_общего_ключа()
     {
         Seed(store => store.SetValue(SettingsKeys.AgentModelShared, "sonnet"));

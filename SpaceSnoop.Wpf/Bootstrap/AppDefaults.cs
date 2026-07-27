@@ -59,6 +59,7 @@ public static class AppDefaults
     public const bool AgentEnabledDefault = true;
     public const bool AgentConsentDefault = false;
     public const string AgentModelDefault = "";
+    public const string AgentEffortDefault = "";
     public const int AgentDetectTimeoutSeconds = 10;
     public const AgentBackendKind AgentBackendDefault = AgentBackendKind.Claude;
 

@@ -76,6 +76,15 @@ public class CodexAgentBackendTests
         return args.Contains("--model") && args.Contains(model);
     }
 
+    [TestCase("", ExpectedResult = false)]
+    [TestCase("high", ExpectedResult = true)]
+    public bool Глубина_рассуждений_уходит_ключом_конфигурации(string effort)
+    {
+        var args = CodexAgentBackend.BuildArguments(new() { Prompt = "тест", Effort = effort });
+
+        return args.Contains($"model_reasoning_effort=\"{effort}\"");
+    }
+
     [Test]
     public void Системный_промпт_уезжает_преамбулой_к_первому_сообщению()
     {

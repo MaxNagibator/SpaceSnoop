@@ -72,6 +72,8 @@ public sealed record AgentRequest
 
     public string? Model { get; init; }
 
+    public string? Effort { get; init; }
+
     public AgentMcpConfig? Mcp { get; init; }
 }
 

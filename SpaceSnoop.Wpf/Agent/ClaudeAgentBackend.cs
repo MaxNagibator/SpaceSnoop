@@ -122,6 +122,12 @@ public sealed class ClaudeAgentBackend : AgentBackendBase
             args.Add(request.Model);
         }
 
+        if (!string.IsNullOrEmpty(request.Effort))
+        {
+            args.Add("--effort");
+            args.Add(request.Effort);
+        }
+
         if (!string.IsNullOrEmpty(request.ResumeSessionId))
         {
             args.Add("--resume");

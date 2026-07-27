@@ -18,6 +18,9 @@ public sealed partial class AgentPreferences : ObservableObject
     private string _model = AppDefaults.AgentModelDefault;
 
     [ObservableProperty]
+    private string _effort = AppDefaults.AgentEffortDefault;
+
+    [ObservableProperty]
     private string _cliPath = string.Empty;
 
     public AgentPreferences(ISettingsStore settings)
@@ -30,6 +33,7 @@ public sealed partial class AgentPreferences : ObservableObject
         Consent = _settings.GetBool(SettingsKeys.AgentConsent, AppDefaults.AgentConsentDefault);
         Backend = _settings.GetEnum(SettingsKeys.AgentBackend, AppDefaults.AgentBackendDefault);
         Model = ModelFor(Backend);
+        Effort = EffortFor(Backend);
         CliPath = CliPathFor(Backend);
         _suppressPersist = false;
     }
@@ -37,6 +41,11 @@ public sealed partial class AgentPreferences : ObservableObject
     public string ModelFor(AgentBackendKind kind)
     {
         return _settings.GetStringValue(SettingsKeys.AgentModel(kind))?.Trim() ?? AppDefaults.AgentModelDefault;
+    }
+
+    public string EffortFor(AgentBackendKind kind)
+    {
+        return _settings.GetStringValue(SettingsKeys.AgentEffort(kind))?.Trim() ?? AppDefaults.AgentEffortDefault;
     }
 
     public string CliPathFor(AgentBackendKind kind)
@@ -94,6 +103,7 @@ public sealed partial class AgentPreferences : ObservableObject
 
         _suppressPersist = true;
         Model = ModelFor(value);
+        Effort = EffortFor(value);
         CliPath = CliPathFor(value);
         _suppressPersist = false;
     }
@@ -103,6 +113,14 @@ public sealed partial class AgentPreferences : ObservableObject
         if (!_suppressPersist)
         {
             _settings.SetValue(SettingsKeys.AgentModel(Backend), value);
+        }
+    }
+
+    partial void OnEffortChanged(string value)
+    {
+        if (!_suppressPersist)
+        {
+            _settings.SetValue(SettingsKeys.AgentEffort(Backend), value);
         }
     }
 
