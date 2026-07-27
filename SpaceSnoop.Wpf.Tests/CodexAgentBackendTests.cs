@@ -144,7 +144,7 @@ public class CodexAgentBackendTests
                             {"type":"item.started","item":{"id":"item_1","type":"mcp_tool_call","server":"spacesnoop","tool":"get_app_state","arguments":{},"result":null,"error":null,"status":"in_progress"}}
                             """;
 
-        Assert.That(Parse(line), Is.EqualTo(AgentEvent.Tool("get_app_state")));
+        Assert.That(Parse(line), Is.EqualTo(AgentEvent.Tool("get_app_state", "{}")));
     }
 
     [Test]
@@ -164,7 +164,7 @@ public class CodexAgentBackendTests
                             {"type":"item.started","item":{"id":"item_1","type":"command_execution","command":"bash -lc ls","status":"in_progress"}}
                             """;
 
-        Assert.That(Parse(line), Is.EqualTo(AgentEvent.Tool(AgentPrompt.ShellTool)));
+        Assert.That(Parse(line), Is.EqualTo(AgentEvent.Tool(AgentPrompt.ShellTool, "bash -lc ls")));
     }
 
     [Test]

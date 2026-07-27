@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.Json;
 
 namespace SpaceSnoop.Wpf.Agent;
 
@@ -279,6 +280,21 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
         builder.Append($"аргументы: {string.Join(' ', launch.Arguments)}");
 
         return builder.ToString();
+    }
+
+    internal static string ReadArguments(JsonElement owner, string name)
+    {
+        if (!owner.TryGetProperty(name, out var value))
+        {
+            return string.Empty;
+        }
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.Object => value.GetRawText(),
+            JsonValueKind.String => value.GetString() ?? string.Empty,
+            _ => string.Empty,
+        };
     }
 
     internal static string RedactToken(string text, string? token)

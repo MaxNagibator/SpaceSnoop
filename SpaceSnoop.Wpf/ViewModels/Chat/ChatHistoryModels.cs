@@ -41,4 +41,6 @@ public sealed record ChatMessageRecord
     public string? TranscriptPath { get; init; }
 
     public List<string> Tools { get; init; } = [];
+
+    public List<string> ToolArguments { get; init; } = [];
 }

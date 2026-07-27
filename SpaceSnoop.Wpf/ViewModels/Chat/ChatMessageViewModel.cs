@@ -81,6 +81,8 @@ public sealed partial class ChatMessageViewModel : ObservableObject
 
     public ObservableCollection<ChatToolCall> ToolCalls { get; } = [];
 
+    public ObservableCollection<ChatToolBadge> ToolBadges { get; } = [];
+
     public static ChatMessageViewModel Restore(ChatMessageRecord record)
     {
         var message = new ChatMessageViewModel(record.Role, record.Text)
@@ -92,9 +94,9 @@ public sealed partial class ChatMessageViewModel : ObservableObject
             TranscriptPath = record.TranscriptPath,
         };
 
-        foreach (var tool in record.Tools)
+        for (var index = 0; index < record.Tools.Count; index++)
         {
-            message.ToolCalls.Add(ChatToolCall.From(tool));
+            message.ToolCalls.Add(ChatToolCall.From(record.Tools[index], record.ToolArguments.ElementAtOrDefault(index)));
         }
 
         return message;
@@ -112,6 +114,7 @@ public sealed partial class ChatMessageViewModel : ObservableObject
             Tokens = Tokens,
             TranscriptPath = TranscriptPath,
             Tools = [.. ToolCalls.Select(call => call.Name)],
+            ToolArguments = [.. ToolCalls.Select(call => call.Arguments)],
         };
     }
 
@@ -139,6 +142,23 @@ public sealed partial class ChatMessageViewModel : ObservableObject
 
     private void OnToolCallsChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        foreach (var call in e.NewItems?.OfType<ChatToolCall>() ?? [])
+        {
+            Fold(call);
+        }
+
         OnPropertyChanged(nameof(StatusText));
+    }
+
+    private void Fold(ChatToolCall call)
+    {
+        if (ToolBadges.Count > 0 && ToolBadges[^1].Name == call.Name)
+        {
+            ToolBadges[^1].Add(call);
+
+            return;
+        }
+
+        ToolBadges.Add(new(call));
     }
 }

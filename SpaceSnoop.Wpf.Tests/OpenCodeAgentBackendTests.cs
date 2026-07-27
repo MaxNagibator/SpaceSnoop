@@ -200,6 +200,14 @@ public class OpenCodeAgentBackendTests
     }
 
     [Test]
+    public void Аргументы_вызова_берутся_из_состояния_части()
+    {
+        var line = Event("tool_use", "part", """{"id":"prt_3","type":"tool","tool":"spacesnoop_scan_directory","state":{"status":"completed","input":{"path":"C:\\Data"}}}""");
+
+        Assert.That(new OpenCodeAgentBackend.StreamParser().Parse(line), Is.EqualTo(AgentEvent.Tool("spacesnoop_scan_directory", """{"path":"C:\\Data"}""")));
+    }
+
+    [Test]
     public void Итог_хода_собирается_после_конца_потока_из_всех_шагов()
     {
         var parser = new OpenCodeAgentBackend.StreamParser();

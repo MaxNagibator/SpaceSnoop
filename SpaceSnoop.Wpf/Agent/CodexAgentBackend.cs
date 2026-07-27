@@ -273,9 +273,9 @@ public sealed class CodexAgentBackend : AgentBackendBase
             return itemType switch
             {
                 "mcp_tool_call" => item.TryGetProperty("tool", out var tool) && tool.ValueKind == JsonValueKind.String
-                    ? AgentEvent.Tool(tool.GetString() ?? string.Empty)
+                    ? AgentEvent.Tool(tool.GetString() ?? string.Empty, ReadArguments(item, "arguments"))
                     : null,
-                "command_execution" => AgentEvent.Tool(AgentPrompt.ShellTool),
+                "command_execution" => AgentEvent.Tool(AgentPrompt.ShellTool, ReadArguments(item, "command")),
                 _ => null,
             };
         }

@@ -275,7 +275,7 @@
                                                    Text="{Binding StatusText}" />
                                     </StackPanel>
 
-                                    <ItemsControl ItemsSource="{Binding ToolCalls}"
+                                    <ItemsControl ItemsSource="{Binding ToolBadges}"
                                                   Margin="0,8,0,0">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
@@ -283,12 +283,13 @@
                                             </ItemsPanelTemplate>
                                         </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
-                                            <DataTemplate DataType="{x:Type chatvm:ChatToolCall}">
+                                            <DataTemplate DataType="{x:Type chatvm:ChatToolBadge}">
                                                 <Border Style="{StaticResource Chat.ToolBadge}"
+                                                        ToolTip="{Binding Hint}"
                                                         Margin="0,0,6,6">
                                                     <StackPanel Orientation="Horizontal">
                                                         <iconPacks:PackIconLucide Style="{StaticResource Chat.ToolBadgeIcon}" />
-                                                        <TextBlock Text="{Binding Text}"
+                                                        <TextBlock Text="{Binding Label}"
                                                                    FontSize="{DynamicResource Font.Size.Caption}" />
                                                     </StackPanel>
                                                 </Border>

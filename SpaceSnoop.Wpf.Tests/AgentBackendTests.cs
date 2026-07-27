@@ -292,7 +292,7 @@ public class AgentBackendTests
 
         var result = ClaudeAgentBackend.ParseLine(line);
 
-        Assert.That(result, Is.EqualTo(AgentEvent.Tool("mcp__spacesnoop__scan_directory")));
+        Assert.That(result, Is.EqualTo(AgentEvent.Tool("mcp__spacesnoop__scan_directory", "{}")));
     }
 
     [Test]

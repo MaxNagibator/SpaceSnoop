@@ -24,6 +24,8 @@ public sealed record AgentEvent(AgentEventKind Kind)
 
     public string? ToolName { get; init; }
 
+    public string ToolArguments { get; init; } = string.Empty;
+
     public double CostUsd { get; init; }
 
     public long Tokens { get; init; }
@@ -38,9 +40,9 @@ public sealed record AgentEvent(AgentEventKind Kind)
         return new(AgentEventKind.Text) { Text = text };
     }
 
-    public static AgentEvent Tool(string toolName)
+    public static AgentEvent Tool(string toolName, string arguments = "")
     {
-        return new(AgentEventKind.ToolCall) { ToolName = toolName };
+        return new(AgentEventKind.ToolCall) { ToolName = toolName, ToolArguments = arguments };
     }
 
     public static AgentEvent Done(string? sessionId, double costUsd, long tokens = 0)

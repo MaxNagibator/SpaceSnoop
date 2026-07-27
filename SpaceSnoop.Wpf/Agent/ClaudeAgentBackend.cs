@@ -288,7 +288,7 @@ public sealed class ClaudeAgentBackend : AgentBackendBase
                 && block.TryGetProperty("name", out var name)
                 && name.ValueKind == JsonValueKind.String)
             {
-                return AgentEvent.Tool(name.GetString() ?? string.Empty);
+                return AgentEvent.Tool(name.GetString() ?? string.Empty, ReadArguments(block, "input"));
             }
         }
 

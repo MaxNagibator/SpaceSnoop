@@ -312,7 +312,16 @@ public sealed class OpenCodeAgentBackend : AgentBackendBase
 
             var tool = Text(part, "tool");
 
-            return tool.Length == 0 ? null : AgentEvent.Tool(tool);
+            if (tool.Length == 0)
+            {
+                return null;
+            }
+
+            var arguments = part.TryGetProperty("state", out var state) && state.ValueKind == JsonValueKind.Object
+                ? ReadArguments(state, "input")
+                : string.Empty;
+
+            return AgentEvent.Tool(tool, arguments);
         }
 
         private AgentEvent? ParseStepFinish(JsonElement root)
