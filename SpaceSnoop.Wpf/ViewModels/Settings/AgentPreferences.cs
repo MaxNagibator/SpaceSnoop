@@ -15,6 +15,9 @@ public sealed partial class AgentPreferences : ObservableObject
     private bool _historyVisible = AppDefaults.AgentHistoryVisibleDefault;
 
     [ObservableProperty]
+    private bool _transcript = AppDefaults.AgentTranscriptDefault;
+
+    [ObservableProperty]
     private AgentBackendKind _backend = AppDefaults.AgentBackendDefault;
 
     [ObservableProperty]
@@ -35,6 +38,7 @@ public sealed partial class AgentPreferences : ObservableObject
         Enabled = _settings.GetBool(SettingsKeys.AgentEnabled, AppDefaults.AgentEnabledDefault);
         Consent = _settings.GetBool(SettingsKeys.AgentConsent, AppDefaults.AgentConsentDefault);
         HistoryVisible = _settings.GetBool(SettingsKeys.AgentHistoryVisible, AppDefaults.AgentHistoryVisibleDefault);
+        Transcript = _settings.GetBool(SettingsKeys.AgentTranscript, AppDefaults.AgentTranscriptDefault);
         Backend = _settings.GetEnum(SettingsKeys.AgentBackend, AppDefaults.AgentBackendDefault);
         Model = ModelFor(Backend);
         Effort = EffortFor(Backend);
@@ -101,6 +105,14 @@ public sealed partial class AgentPreferences : ObservableObject
         if (!_suppressPersist)
         {
             _settings.SetBool(SettingsKeys.AgentHistoryVisible, value);
+        }
+    }
+
+    partial void OnTranscriptChanged(bool value)
+    {
+        if (!_suppressPersist)
+        {
+            _settings.SetBool(SettingsKeys.AgentTranscript, value);
         }
     }
 

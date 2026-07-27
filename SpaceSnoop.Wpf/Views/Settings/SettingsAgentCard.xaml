@@ -37,6 +37,13 @@
             <TextBlock Style="{StaticResource Setting.Hint}"
                        Text="Снимите галку, чтобы отозвать согласие – страница чата снова покажет предупреждение и спросит его перед следующим сообщением." />
 
+            <CheckBox Content="Записывать транскрипт хода"
+                      IsChecked="{Binding Agent.Transcript, Mode=TwoWay}"
+                      Margin="0,12,0,0"
+                      VerticalAlignment="Center" />
+            <TextBlock Style="{StaticResource Setting.Hint}"
+                       Text="Для разбора странных ответов: всё, что уходит в CLI и приходит от него, ложится в logs/chat отдельным файлом на ход, кнопка на сообщении его открывает. Токен доступа затирается, остальное сохраняется как есть – вопрос, состояние окна и ответы инструментов. Хранятся последние 20 ходов." />
+
             <TextBlock Text="CLI"
                        Style="{StaticResource Setting.Label}"
                        Margin="0,16,0,0" />

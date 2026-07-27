@@ -349,4 +349,13 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 2121, Level = LogLevel.Information, Message = "История чата очищена: удалено разговоров {Count}")]
     public static partial void ChatHistoryCleared(this ILogger logger, int count);
+
+    [LoggerMessage(EventId = 2122, Level = LogLevel.Debug, Message = "Транскрипт хода агента пишется в «{Path}»")]
+    public static partial void AgentTranscriptStarted(this ILogger logger, string path);
+
+    [LoggerMessage(EventId = 2123, Level = LogLevel.Warning, Message = "Транскрипт хода агента «{Path}» не пишется")]
+    public static partial void AgentTranscriptFailed(this ILogger logger, Exception exception, string path);
+
+    [LoggerMessage(EventId = 2124, Level = LogLevel.Warning, Message = "Не удалось открыть транскрипт хода агента «{Path}»")]
+    public static partial void AgentTranscriptOpenFailed(this ILogger logger, Exception exception, string path);
 }

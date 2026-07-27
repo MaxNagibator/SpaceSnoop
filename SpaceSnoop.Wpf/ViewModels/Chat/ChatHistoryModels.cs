@@ -38,5 +38,7 @@ public sealed record ChatMessageRecord
 
     public long Tokens { get; init; }
 
+    public string? TranscriptPath { get; init; }
+
     public List<string> Tools { get; init; } = [];
 }

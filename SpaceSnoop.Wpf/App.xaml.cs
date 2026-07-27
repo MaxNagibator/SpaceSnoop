@@ -180,6 +180,9 @@ public partial class App : Application
         services.AddSingleton<AgentPreferences>();
         services.AddSingleton<AgentModelSelector>();
         services.AddSingleton(provider => new ChatHistoryStore(provider.GetRequiredService<ILogger<ChatHistoryStore>>()));
+        services.AddSingleton(provider => new AgentTranscriptStore(
+            provider.GetRequiredService<AgentPreferences>(),
+            provider.GetRequiredService<ILogger<AgentTranscriptStore>>()));
         services.AddSingleton<ClaudeAgentBackend>();
         services.AddSingleton<CodexAgentBackend>();
         services.AddSingleton<OpenCodeAgentBackend>();

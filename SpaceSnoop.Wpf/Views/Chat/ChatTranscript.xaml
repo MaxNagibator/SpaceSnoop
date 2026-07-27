@@ -209,6 +209,16 @@
                                             </Button>
 
                                             <Button Style="{StaticResource Chat.MessageAction}"
+                                                    Command="{Binding DataContext.OpenTranscriptCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    ToolTip="Показать транскрипт хода – всё, что CLI прислал за этот ответ"
+                                                    AutomationProperties.Name="Показать транскрипт хода"
+                                                    Visibility="{Binding HasTranscript, Converter={StaticResource BoolToVisibility}}">
+                                                <iconPacks:PackIconLucide Style="{StaticResource Chat.ActionIcon}"
+                                                                          Kind="{x:Static iconPacks:PackIconLucideKind.FileText}" />
+                                            </Button>
+
+                                            <Button Style="{StaticResource Chat.MessageAction}"
                                                     Command="{Binding DataContext.RetryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     ToolTip="Спросить ещё раз"

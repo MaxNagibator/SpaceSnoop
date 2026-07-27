@@ -64,6 +64,8 @@ public static class AppDefaults
     public const string AgentEffortDefault = "";
     public const int AgentDetectTimeoutSeconds = 10;
     public const AgentBackendKind AgentBackendDefault = AgentBackendKind.Claude;
+    public const bool AgentTranscriptDefault = false;
+    public const int AgentTranscriptLimit = 20;
 
     public const string UpdateRepositoryDefault = AppInfo.RepoSlug;
     public const bool UpdateCheckOnStartupDefault = true;

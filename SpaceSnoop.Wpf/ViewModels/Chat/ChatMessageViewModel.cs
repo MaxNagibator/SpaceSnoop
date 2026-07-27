@@ -43,11 +43,17 @@ public sealed partial class ChatMessageViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(CanRetry))]
     private bool _isCancelled;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasTranscript))]
+    private string? _transcriptPath;
+
     public bool HasText => Text.Length > 0;
 
     public bool ShowStatus => IsStreaming;
 
     public bool CanRetry => !IsUser && (IsError || IsCancelled);
+
+    public bool HasTranscript => TranscriptPath is { Length: > 0 };
 
     public string StatusText => ToolCalls.Count > 0 ? AgentPersona.WorkingOn(ToolCalls[^1].Text) : AgentPersona.Thinking;
 
@@ -75,6 +81,7 @@ public sealed partial class ChatMessageViewModel : ObservableObject
             IsCancelled = record.IsCancelled,
             CostUsd = record.CostUsd,
             Tokens = record.Tokens,
+            TranscriptPath = record.TranscriptPath,
         };
 
         foreach (var tool in record.Tools)
@@ -95,6 +102,7 @@ public sealed partial class ChatMessageViewModel : ObservableObject
             IsCancelled = IsCancelled,
             CostUsd = CostUsd,
             Tokens = Tokens,
+            TranscriptPath = TranscriptPath,
             Tools = [.. ToolCalls.Select(call => call.Name)],
         };
     }

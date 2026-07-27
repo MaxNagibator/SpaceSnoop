@@ -80,6 +80,8 @@ public sealed record AgentRequest
     public string? Effort { get; init; }
 
     public AgentMcpConfig? Mcp { get; init; }
+
+    public IAgentTranscript? Transcript { get; init; }
 }
 
 public sealed record AgentTempFile(string Path, string Content);

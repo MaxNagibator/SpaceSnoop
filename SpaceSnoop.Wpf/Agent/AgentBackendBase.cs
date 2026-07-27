@@ -110,6 +110,7 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
         }
 
         var launch = CreateLaunch(request);
+        var transcript = request.Transcript;
         Process? process = null;
         var stderrTail = new List<string>();
         var resultYielded = false;
@@ -120,9 +121,12 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
 
         try
         {
+            transcript?.Write(AgentTranscriptKind.Launch, DescribeLaunch(DisplayName, cli, request, launch));
+
             foreach (var file in launch.TempFiles)
             {
                 await File.WriteAllTextAsync(file.Path, file.Content, cancellationToken).ConfigureAwait(false);
+                transcript?.Write(AgentTranscriptKind.Config, $"{file.Path}\n{file.Content}");
             }
 
             var info = BuildProcessStartInfo(cli.ExecutablePath, launch);
@@ -152,12 +156,13 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
             using var kill = cancellationToken.Register(() => TryKill(process));
 
             var mcpToken = request.Mcp?.Token;
-            var stderrTask = DrainStderrAsync(process, stderrTail, mcpToken);
+            var stderrTask = DrainStderrAsync(process, stderrTail, mcpToken, transcript);
 
             Exception? stdinFailure = null;
 
             try
             {
+                transcript?.Write(AgentTranscriptKind.Stdin, launch.Stdin);
                 await process.StandardInput.WriteAsync(launch.Stdin).ConfigureAwait(false);
                 await process.StandardInput.FlushAsync().ConfigureAwait(false);
                 process.StandardInput.Close();
@@ -186,6 +191,7 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
                     break;
                 }
 
+                transcript?.Write(AgentTranscriptKind.Stdout, line);
                 InspectLine(line);
 
                 var agentEvent = parser.Parse(line);
@@ -241,6 +247,8 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
 
             if (process is not null)
             {
+                transcript?.Write(AgentTranscriptKind.Exit, $"код {(process.HasExited ? process.ExitCode : -1)}, {stopwatch.ElapsedMilliseconds} мс, отмена {cancellationToken.IsCancellationRequested}");
+
                 lock (_live)
                 {
                     _live.Remove(process);
@@ -255,6 +263,22 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
                 TryDelete(file.Path);
             }
         }
+    }
+
+    internal static string DescribeLaunch(string backend, AgentCliInfo cli, AgentRequest request, AgentLaunch launch)
+    {
+        var builder = new StringBuilder();
+
+        builder.AppendLine($"бэкенд: {backend}");
+        builder.AppendLine($"CLI: {cli.ExecutablePath} ({cli.Version})");
+        builder.AppendLine($"модель: {Named(request.Model)}");
+        builder.AppendLine($"рассуждения: {Named(request.Effort)}");
+        builder.AppendLine($"продолжение сессии: {Named(request.ResumeSessionId)}");
+        builder.AppendLine($"инструменты: {string.Join(", ", request.Mcp?.AllowedTools ?? [])}");
+        builder.AppendLine($"переменные окружения: {string.Join(", ", launch.Environment.Keys)}");
+        builder.Append($"аргументы: {string.Join(' ', launch.Arguments)}");
+
+        return builder.ToString();
     }
 
     internal static string RedactToken(string text, string? token)
@@ -279,6 +303,11 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
         return stderrTail.Count > 0
             ? $"CLI {DisplayName} завершился с кодом {exitCode}: {string.Join(" ", stderrTail)}"
             : $"CLI {DisplayName} завершился с кодом {exitCode} без ответа.";
+    }
+
+    private static string Named(string? value)
+    {
+        return value is { Length: > 0 } ? value : "–";
     }
 
     private static void TryKill(Process process)
@@ -306,7 +335,7 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
         }
     }
 
-    private static async Task DrainStderrAsync(Process process, List<string> tail, string? mcpToken)
+    private static async Task DrainStderrAsync(Process process, List<string> tail, string? mcpToken, IAgentTranscript? transcript)
     {
         const int maxLines = 20;
 
@@ -314,6 +343,8 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
         {
             while (await process.StandardError.ReadLineAsync().ConfigureAwait(false) is { } line)
             {
+                transcript?.Write(AgentTranscriptKind.Stderr, line);
+
                 if (tail.Count >= maxLines)
                 {
                     tail.RemoveAt(0);

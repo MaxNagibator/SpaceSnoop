@@ -2,6 +2,8 @@
 using MahApps.Metro.IconPacks;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
 
 namespace SpaceSnoop.Wpf.ViewModels.Chat;
 
@@ -11,6 +13,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
     private readonly AgentPreferences _preferences;
     private readonly McpBridge _bridge;
     private readonly ChatHistoryStore _history;
+    private readonly AgentTranscriptStore _transcripts;
     private readonly IDialogService _dialogs;
     private readonly ILogger<ChatViewModel> _logger;
 
@@ -64,6 +67,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         McpServerHost mcpServer,
         McpBridge bridge,
         ChatHistoryStore history,
+        AgentTranscriptStore transcripts,
         IDialogService dialogs,
         ILogger<ChatViewModel> logger)
     {
@@ -71,6 +75,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         _preferences = preferences;
         _bridge = bridge;
         _history = history;
+        _transcripts = transcripts;
         _dialogs = dialogs;
         AgentModel = agentModel;
         Mcp = mcp;
@@ -359,6 +364,30 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         }
     }
 
+    [RelayCommand]
+    private void OpenTranscript(ChatMessageViewModel? message)
+    {
+        if (message?.TranscriptPath is not { Length: > 0 } path)
+        {
+            return;
+        }
+
+        try
+        {
+            var arguments = File.Exists(path) ? $"/select,\"{path}\"" : $"\"{_transcripts.DirectoryPath}\"";
+
+            Process.Start(new ProcessStartInfo(SystemExecutable.Explorer)
+            {
+                Arguments = arguments,
+                UseShellExecute = false,
+            });
+        }
+        catch (Exception exception)
+        {
+            _logger.AgentTranscriptOpenFailed(exception, path);
+        }
+    }
+
     [RelayCommand(CanExecute = nameof(CanManageConversation))]
     private async Task RetryAsync(ChatMessageViewModel? message)
     {
@@ -409,6 +438,8 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         var backend = Backend;
         var mutations = Mcp.AllowMutations;
         var allowed = AgentPrompt.AllowedTools(mutations);
+        var transcript = _transcripts.Begin(backend.Kind, Mcp.Token);
+        assistant.TranscriptPath = transcript?.Path;
 
         if (mutations)
         {
@@ -424,6 +455,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
             Model = _preferences.ModelFor(backend.Kind) is { Length: > 0 } model ? model : null,
             Effort = _preferences.EffortFor(backend.Kind) is { Length: > 0 } effort ? effort : null,
             Mcp = new AgentMcpConfig(AgentPrompt.ServerName, McpServer.Endpoint ?? string.Empty, Mcp.Token, allowed, AgentPrompt.DeniedTools(mutations)),
+            Transcript = transcript,
         };
 
         _cts = new CancellationTokenSource();
@@ -488,6 +520,9 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
             IsBusy = false;
             _cts?.Dispose();
             _cts = null;
+
+            transcript?.Write(AgentTranscriptKind.Message, assistant.Text);
+            transcript?.Dispose();
         }
 
         if (resumedFromDisk)
