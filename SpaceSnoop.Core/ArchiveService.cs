@@ -76,9 +76,15 @@ public sealed class ArchiveService
             : new(false, $"объём {SizeFormatter.Format(bytes)} ≠ {SizeFormatter.Format(expected.Bytes)}");
     }
 
-    public void DeleteDirectoryToRecycleBin(string path)
+    public void DeleteDirectoryToRecycleBin(string path, bool showUi)
     {
-        FileSystem.DeleteDirectory(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+        if (showUi)
+        {
+            FileSystem.DeleteDirectory(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+            return;
+        }
+
+        RecycleBin.DeleteSilent(path);
     }
 
     public void SafeDelete(string path)

@@ -16,7 +16,7 @@ public static class AgentPersona
 
     public const string ReadOnlyNote = "Ничего не удаляет и не переносит сам – только смотрит.";
 
-    public const string MutationsNote = "Синхронизацию может запустить сам, но сначала покажет план и дождётся вашего «да».";
+    public const string MutationsNote = "Синхронизацию и упаковку в архив может запустить сам, но сначала покажет план и дождётся вашего «да».";
 
     public static string WorkingOn(string tool)
     {

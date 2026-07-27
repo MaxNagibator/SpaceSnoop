@@ -110,6 +110,28 @@ public sealed class SpaceSnoopTools
         return bridge.SyncCurrentAsync(dryRun, entryLimit, cancellationToken);
     }
 
+    [McpServerTool(Name = "archive_directory")]
+    [Description("Упаковывает каталог из открытого сканирования в архив .zip рядом с ним и по запросу отправляет оригинал в корзину (только после проверки архива). При dryRun=true ничего не делается – возвращается план: сколько файлов и какого объёма попадёт в архив. Реальное выполнение требует включённой настройки «Разрешить изменяющие операции».")]
+    public static Task<string> ArchiveDirectoryAsync(
+        McpBridge bridge,
+        [Description("Путь к каталогу; он должен быть внутри дерева, открытого на странице «Сканирование»")] string path,
+        [Description("Отправить оригинал в корзину после успешной проверки архива")] bool deleteOriginal = false,
+        [Description("true – только показать план, ничего не упаковывать")] bool dryRun = true,
+        CancellationToken cancellationToken = default)
+    {
+        return bridge.ArchiveDirectoryAsync(path, deleteOriginal, dryRun, cancellationToken);
+    }
+
+    [McpServerTool(Name = "mark_for_deletion")]
+    [Description("Помечает каталоги и файлы открытого сканирования на удаление – ровно как «Ctrl + правый клик» в окне. Ничего не удаляет: пометки видны человеку в дереве, а удаление в корзину запускает он сам кнопкой «Удалить помеченное». Требует включённой настройки «Разрешить изменяющие операции».")]
+    public static string MarkForDeletion(
+        McpBridge bridge,
+        [Description("Пути к каталогам и файлам внутри дерева, открытого на странице «Сканирование»")] string[] paths,
+        [Description("true – пометить, false – снять пометку вместе со вложенными")] bool mark = true)
+    {
+        return bridge.MarkForDeletion(paths, mark);
+    }
+
     [McpServerTool(Name = "open_sync")]
     [Description("Управляет окном приложения: открывает страницу «Синхронизация», подставляет каталоги и параметры и по запросу запускает сравнение. Ничего не копирует и не удаляет.")]
     public static Task<string> OpenSyncAsync(

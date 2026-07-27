@@ -145,9 +145,9 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
 
     public string ShellNoticeShort => $"{Backend.DisplayName}: у {AgentPersona.NameGenitive} есть оболочка системы – он может выполнять команды с правами SpaceSnoop";
 
-    public string MutationsNoticeShort => $"Изменяющие операции разрешены: {AgentPersona.Name} может сам запустить синхронизацию, показав план и дождавшись согласия";
+    public string MutationsNoticeShort => $"Изменяющие операции разрешены: {AgentPersona.Name} может сам запустить синхронизацию, упаковать каталог в архив и пометить лишнее на удаление";
 
-    public string MutationsNotice => $"Изменяющие операции разрешены в настройках: {AgentPersona.Name} может сам запустить синхронизацию – файлы скопируются, лишние уйдут в корзину. Сначала он обязан показать план и дождаться вашего согласия.";
+    public string MutationsNotice => $"Изменяющие операции разрешены в настройках: {AgentPersona.Name} может сам запустить синхронизацию (файлы скопируются, лишние уйдут в корзину) и упаковать каталог в архив. Сначала он обязан показать план и дождаться вашего согласия. Пометки на удаление он тоже ставит сам, но удаляет помеченное только человек.";
 
     public string EmptyStateHint => MutationsAllowed ? AgentPersona.MutationsNote : AgentPersona.ReadOnlyNote;
 

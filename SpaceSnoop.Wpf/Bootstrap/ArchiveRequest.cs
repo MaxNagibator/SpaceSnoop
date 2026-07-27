@@ -8,4 +8,5 @@ public sealed record ArchiveRequest(
     IReadOnlyList<string> Files,
     long TotalBytes,
     bool DeleteOriginal,
-    CompressionLevel Level);
+    CompressionLevel Level,
+    bool Interactive);

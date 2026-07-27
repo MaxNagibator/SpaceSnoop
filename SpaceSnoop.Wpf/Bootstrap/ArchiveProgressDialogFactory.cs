@@ -9,18 +9,27 @@ public sealed class ArchiveProgressDialogFactory(
 {
     public ArchiveProgressDialogViewModel Create(DirectorySpace dir)
     {
+        return Create(CreateRequest(dir, operations.DeleteOriginalAfterArchive, interactive: true));
+    }
+
+    public ArchiveProgressDialogViewModel Create(ArchiveRequest request)
+    {
+        return new(request, service, logger);
+    }
+
+    public ArchiveRequest CreateRequest(DirectorySpace dir, bool deleteOriginal, bool interactive)
+    {
         var source = dir.AbsolutePath;
         var files = new List<string>();
         Collect(dir, files);
 
-        var request = new ArchiveRequest(source,
+        return new(source,
             UniqueZipPath(source),
             files,
             dir.TotalSize,
-            operations.DeleteOriginalAfterArchive,
-            operations.ArchiveCompression);
-
-        return new(request, service, logger);
+            deleteOriginal,
+            operations.ArchiveCompression,
+            interactive);
     }
 
     private static string UniqueZipPath(string source)

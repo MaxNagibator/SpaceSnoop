@@ -151,6 +151,11 @@ public sealed partial class ScanNodeViewModel : ObservableObject
         Children.ReplaceAll(ordered);
     }
 
+    public void RefreshMarks()
+    {
+        RefreshMarkRecursive();
+    }
+
     public void NotifyPropertiesChanged()
     {
         OnPropertyChanged(string.Empty);
@@ -177,7 +182,7 @@ public sealed partial class ScanNodeViewModel : ObservableObject
         return dir.SubDirectories.Cast<SpaceBase>().Concat(dir.Files);
     }
 
-    private static void RestoreRecursive(SpaceBase space)
+    internal static void RestoreRecursive(SpaceBase space)
     {
         if (space.IsDeleted)
         {

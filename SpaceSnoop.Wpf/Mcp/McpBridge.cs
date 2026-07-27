@@ -238,6 +238,142 @@ public sealed class McpBridge(
         return Dispatch(() => Serialize(new McpScanNavigation(_shell?.CurrentSectionKey ?? SectionKey.Scan, ReadScanState())));
     }
 
+    public async Task<string> ArchiveDirectoryAsync(string path, bool deleteOriginal, bool dryRun, CancellationToken cancellationToken)
+    {
+        path = path.Trim();
+
+        if (dryRun)
+        {
+            logger.McpToolInvoked("archive_directory", $"«{path}», план");
+
+            return Dispatch(() =>
+            {
+                var (_, request) = PrepareArchive(path, deleteOriginal);
+
+                return Serialize(new McpArchivePlan(
+                    request.SourcePath,
+                    request.TargetPath,
+                    request.Files.Count,
+                    request.TotalBytes,
+                    SizeFormatter.Format(request.TotalBytes),
+                    request.DeleteOriginal));
+            });
+        }
+
+        if (!preferences.AllowMutations)
+        {
+            logger.McpToolRejected("archive_directory", "изменяющие операции запрещены");
+            throw new McpException("Изменяющие операции запрещены. Включите «Разрешить изменяющие операции» в настройках приложения.");
+        }
+
+        var (prepared, run) = Dispatch(() =>
+        {
+            if (scan.IsScanning)
+            {
+                logger.McpToolRejected("archive_directory", "страница занята операцией");
+                throw new McpException("Страница «Сканирование» сейчас занята другой операцией.");
+            }
+
+            var (dir, request) = PrepareArchive(path, deleteOriginal);
+
+            logger.McpMutationRequested("archive_directory", $"«{request.SourcePath}» → «{request.TargetPath}», файлов {request.Files.Count}, оригинал в корзину {request.DeleteOriginal}");
+            notifier.Notify($"Агент упаковывает в архив: {request.SourcePath}", StatusSeverity.Warning);
+
+            return (request, scan.ArchiveFromAutomationAsync(dir, request, cancellationToken));
+        });
+
+        var dialog = await run.ConfigureAwait(false);
+
+        return Dispatch(() =>
+        {
+            if (dialog.CreatedArchivePath is null)
+            {
+                throw new McpException($"Архив не создан: {dialog.StatusText}");
+            }
+
+            return Serialize(new McpArchiveResult(
+                prepared.SourcePath,
+                dialog.CreatedArchivePath,
+                prepared.Files.Count,
+                dialog.OriginalDeleted,
+                dialog.StatusText,
+                ReadScanState()));
+        });
+    }
+
+    public string MarkForDeletion(IReadOnlyList<string> paths, bool mark)
+    {
+        logger.McpToolInvoked("mark_for_deletion", $"путей {paths.Count}, пометить {mark}");
+
+        if (!preferences.AllowMutations)
+        {
+            logger.McpToolRejected("mark_for_deletion", "изменяющие операции запрещены");
+            throw new McpException("Изменяющие операции запрещены. Включите «Разрешить изменяющие операции» в настройках приложения.");
+        }
+
+        if (paths.Count == 0)
+        {
+            throw new McpException("Список путей пуст.");
+        }
+
+        if (paths.Count > AppDefaults.McpEntryLimitMax)
+        {
+            throw new McpException($"За один вызов можно пометить не больше {AppDefaults.McpEntryLimitMax} путей.");
+        }
+
+        return Dispatch(() =>
+        {
+            if (!scan.HasResult)
+            {
+                throw new McpException("На странице «Сканирование» результата ещё нет. Запустите open_scan с scan=true.");
+            }
+
+            if (scan.IsScanning)
+            {
+                logger.McpToolRejected("mark_for_deletion", "страница занята операцией");
+                throw new McpException("Страница «Сканирование» сейчас занята другой операцией.");
+            }
+
+            List<SpaceBase> targets = [];
+            List<string> missing = [];
+
+            foreach (var path in paths.Select(static path => path.Trim()).Where(static path => path.Length > 0))
+            {
+                if (scan.FindForAutomation(path) is not { } space)
+                {
+                    missing.Add(path);
+                    continue;
+                }
+
+                if (mark && scan.IsScanRoot(space))
+                {
+                    throw new McpException($"«{path}» – корень открытого сканирования, пометить его целиком нельзя. Выберите подкаталоги.");
+                }
+
+                targets.Add(space);
+            }
+
+            var changed = scan.MarkForAutomation(targets, mark);
+
+            if (changed > 0)
+            {
+                logger.McpMutationRequested("mark_for_deletion", $"{(mark ? "помечено" : "снято")} {changed}, всего помечено {scan.MarkedCount}");
+
+                notifier.Notify(mark
+                        ? $"Агент пометил на удаление: {changed} · всего {SizeFormatter.Format(scan.MarkedBytes())}"
+                        : $"Агент снял пометку удаления: {changed}",
+                    StatusSeverity.Warning);
+            }
+
+            return Serialize(new McpMarkResult(
+                changed,
+                missing,
+                scan.MarkedCount,
+                SizeFormatter.Format(scan.MarkedBytes()),
+                ReadScanState()));
+        });
+    }
+
     public async Task<string> GetDockerUsageAsync(bool includeObjects, int entryLimit, CancellationToken cancellationToken)
     {
         entryLimit = ClampEntryLimit(entryLimit);
@@ -551,6 +687,31 @@ public sealed class McpBridge(
         {
             throw new McpException("Окно приложения занято и не ответило вовремя – повторите позже.");
         }
+    }
+
+    private (DirectorySpace Dir, ArchiveRequest Request) PrepareArchive(string path, bool deleteOriginal)
+    {
+        if (path.Length == 0)
+        {
+            throw new McpException("Путь к каталогу должен быть задан.");
+        }
+
+        if (scan.FindForAutomation(path) is not { } space)
+        {
+            throw new McpException($"Каталог «{path}» не найден в открытом сканировании. Упаковывается только то, что уже отсканировано: откройте дерево через open_scan с scan=true.");
+        }
+
+        if (space is not DirectorySpace dir)
+        {
+            throw new McpException($"«{path}» – файл, а упаковать можно только каталог.");
+        }
+
+        if (scan.IsScanRoot(space) || dir.Parent is not DirectorySpace)
+        {
+            throw new McpException($"«{path}» – корень сканирования, архив некуда положить. Выберите подкаталог.");
+        }
+
+        return (dir, scan.CreateArchiveRequest(dir, deleteOriginal));
     }
 
     private Task<string> ExportCurrentAsync(int entryLimit, CancellationToken cancellationToken)

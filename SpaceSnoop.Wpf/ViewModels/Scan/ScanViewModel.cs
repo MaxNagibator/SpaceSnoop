@@ -262,6 +262,99 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         return ScanAsync(path);
     }
 
+    internal SpaceBase? FindForAutomation(string path)
+    {
+        return ScanLookup.Find(Roots.Select(static root => root.Space).OfType<SpaceBase>(), path);
+    }
+
+    internal bool IsScanRoot(SpaceBase space)
+    {
+        return Roots.Any(root => ReferenceEquals(root.Space, space));
+    }
+
+    internal ArchiveRequest CreateArchiveRequest(DirectorySpace dir, bool deleteOriginal)
+    {
+        return _archiveDialogFactory.CreateRequest(dir, deleteOriginal, interactive: false);
+    }
+
+    internal async Task<ArchiveProgressDialogViewModel> ArchiveFromAutomationAsync(
+        DirectorySpace dir,
+        ArchiveRequest request,
+        CancellationToken cancellationToken)
+    {
+        var dialog = _archiveDialogFactory.Create(request);
+
+        using (cancellationToken.Register(dialog.RequestStop))
+        {
+            await dialog.StartCommand.ExecuteAsync(null);
+        }
+
+        ApplyArchiveResult(dir, dialog);
+
+        return dialog;
+    }
+
+    internal int MarkForAutomation(IReadOnlyList<SpaceBase> targets, bool mark)
+    {
+        var changed = 0;
+
+        foreach (var space in targets)
+        {
+            if (mark)
+            {
+                if (space.IsDeleted)
+                {
+                    continue;
+                }
+
+                space.Delete();
+            }
+            else
+            {
+                if (!HasMarkedSelfOrChild(space))
+                {
+                    continue;
+                }
+
+                ScanNodeViewModel.RestoreRecursive(space);
+            }
+
+            changed++;
+        }
+
+        if (changed > 0)
+        {
+            foreach (var root in Roots)
+            {
+                root.RefreshMarks();
+            }
+
+            RecountMarked();
+        }
+
+        return changed;
+    }
+
+    internal long MarkedBytes()
+    {
+        return CollectMarked().Sum(static item => item.TotalSize);
+    }
+
+    private static bool HasMarkedSelfOrChild(SpaceBase space)
+    {
+        if (space.IsDeleted)
+        {
+            return true;
+        }
+
+        if (space is not DirectorySpace dir)
+        {
+            return false;
+        }
+
+        return dir.SubDirectories.Cast<SpaceBase>().Concat(dir.Files).Any(HasMarkedSelfOrChild);
+    }
+
     private void RecountMarked()
     {
         MarkedCount = CollectMarked().Count;
@@ -311,6 +404,11 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
             dialog.RequestStop();
         }
 
+        ApplyArchiveResult(dir, dialog);
+    }
+
+    private void ApplyArchiveResult(DirectorySpace dir, ArchiveProgressDialogViewModel dialog)
+    {
         if (dialog.CreatedArchivePath is { } archivePath)
         {
             AddArchiveToTree(dir, archivePath);

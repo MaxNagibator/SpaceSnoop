@@ -177,7 +177,7 @@ public sealed partial class ArchiveProgressDialogViewModel : ObservableObject, I
 
         if (_request.DeleteOriginal)
         {
-            _service.DeleteDirectoryToRecycleBin(_request.SourcePath);
+            _service.DeleteDirectoryToRecycleBin(_request.SourcePath, _request.Interactive);
             OriginalDeleted = true;
         }
     }

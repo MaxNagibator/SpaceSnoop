@@ -9,22 +9,24 @@ namespace SpaceSnoop.Wpf.Tests;
 [TestFixture]
 public class AgentToolPolicyTests
 {
+    private static readonly string[] MutatingTools = ["sync_current", "archive_directory", "mark_for_deletion"];
+
     [Test]
-    public void Без_разрешения_мутаций_sync_current_запрещён()
+    public void Без_разрешения_мутаций_изменяющие_инструменты_запрещены()
     {
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(AgentPrompt.AllowedTools(mutations: false), Does.Not.Contain("sync_current"));
-            Assert.That(AgentPrompt.DeniedTools(mutations: false), Is.EqualTo(new[] { "sync_current" }));
+            Assert.That(AgentPrompt.AllowedTools(mutations: false).Intersect(MutatingTools), Is.Empty);
+            Assert.That(AgentPrompt.DeniedTools(mutations: false), Is.EquivalentTo(MutatingTools));
         }
     }
 
     [Test]
-    public void С_разрешением_мутаций_sync_current_разрешён_и_запретов_нет()
+    public void С_разрешением_мутаций_изменяющие_инструменты_разрешены_и_запретов_нет()
     {
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(AgentPrompt.AllowedTools(mutations: true), Does.Contain("sync_current"));
+            Assert.That(AgentPrompt.AllowedTools(mutations: true), Is.SupersetOf(MutatingTools));
             Assert.That(AgentPrompt.DeniedTools(mutations: true), Is.Empty);
         }
     }
@@ -95,10 +97,13 @@ public class AgentToolPolicyTests
     [TestCase("mcp__spacesnoop__sync_current", ExpectedResult = true)]
     [TestCase("spacesnoop_sync_current", ExpectedResult = true)]
     [TestCase("sync_current", ExpectedResult = true)]
+    [TestCase("mcp__spacesnoop__archive_directory", ExpectedResult = true)]
+    [TestCase("mcp__spacesnoop__mark_for_deletion", ExpectedResult = true)]
     [TestCase("mcp__spacesnoop__open_sync", ExpectedResult = false)]
     [TestCase("mcp__spacesnoop__scan_directory", ExpectedResult = false)]
+    [TestCase("mcp__spacesnoop__get_current_scan", ExpectedResult = false)]
     [TestCase("неизвестный", ExpectedResult = false)]
-    public bool Разрушающим_считается_только_sync_current(string toolName)
+    public bool Разрушающими_считаются_только_объявленные_инструменты(string toolName)
     {
         return AgentPrompt.IsDestructive(toolName);
     }
@@ -109,15 +114,17 @@ public class AgentToolPolicyTests
         Assert.That(AgentPrompt.Describe("mcp__spacesnoop__future_tool"), Is.EqualTo("future_tool"));
     }
 
-    [Test]
-    public void Вызов_sync_current_помечается_как_изменяющий()
+    [TestCase("mcp__spacesnoop__sync_current", "синхронизация")]
+    [TestCase("mcp__spacesnoop__archive_directory", "упаковка в архив")]
+    [TestCase("mcp__spacesnoop__mark_for_deletion", "пометка на удаление")]
+    public void Изменяющий_вызов_помечается_и_подписывается_по_русски(string toolName, string caption)
     {
-        var call = ChatToolCall.From("mcp__spacesnoop__sync_current");
+        var call = ChatToolCall.From(toolName);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(call.IsMutating, Is.True);
-            Assert.That(call.Text, Is.EqualTo("синхронизация"));
+            Assert.That(call.Text, Is.EqualTo(caption));
         }
     }
 
@@ -136,7 +143,11 @@ public class AgentToolPolicyTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(prompt, Does.Contain("Переносить и удалять файлы ты не можешь"));
-            Assert.That(prompt, Does.Not.Contain("sync_current"));
+
+            foreach (var tool in MutatingTools)
+            {
+                Assert.That(prompt, Does.Not.Contain(tool));
+            }
         }
     }
 
@@ -150,6 +161,11 @@ public class AgentToolPolicyTests
             Assert.That(prompt, Does.Contain("dryRun=true"));
             Assert.That(prompt, Does.Contain("dryRun=false"));
             Assert.That(prompt, Does.Contain("явно на него"));
+
+            foreach (var tool in MutatingTools)
+            {
+                Assert.That(prompt, Does.Contain(tool));
+            }
         }
     }
 

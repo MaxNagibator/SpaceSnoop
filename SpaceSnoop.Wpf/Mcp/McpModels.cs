@@ -22,6 +22,29 @@ internal sealed record McpScanState(
 
 internal sealed record McpScanNavigation(string Page, McpScanState Scan);
 
+internal sealed record McpArchivePlan(
+    string Path,
+    string Target,
+    int Files,
+    long Bytes,
+    string Size,
+    bool DeleteOriginal);
+
+internal sealed record McpArchiveResult(
+    string Path,
+    string Target,
+    int Files,
+    bool OriginalDeleted,
+    string Status,
+    McpScanState Scan);
+
+internal sealed record McpMarkResult(
+    int Changed,
+    IReadOnlyList<string> NotFound,
+    int MarkedTotal,
+    string MarkedSize,
+    McpScanState Scan);
+
 internal sealed record McpDrive(
     string Path,
     string Label,
