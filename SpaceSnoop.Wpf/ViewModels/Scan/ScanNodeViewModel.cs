@@ -98,6 +98,8 @@ public sealed partial class ScanNodeViewModel : ObservableObject
 
     public bool HasPreviewTiles => IsDirectory && PreviewTiles.Count > 0;
 
+    public bool CanAskAgent => Space is not null && _factory?.ChatEnabled == true;
+
     public bool CanMarkContentsDeleted => IsDirectory && !HasMarkedContents;
 
     public bool CanUnmarkContents => IsDirectory && HasMarkedContents;
@@ -250,6 +252,15 @@ public sealed partial class ScanNodeViewModel : ObservableObject
         if (Space is DirectorySpace)
         {
             _factory?.RequestArchive(this);
+        }
+    }
+
+    [RelayCommand]
+    private void AskAgent()
+    {
+        if (Space is not null)
+        {
+            _factory?.RequestAskAgent(this);
         }
     }
 

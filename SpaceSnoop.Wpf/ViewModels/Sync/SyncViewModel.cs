@@ -21,6 +21,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private readonly ILogger<SyncEngine> _engineLogger;
     private readonly ILogger<DirectoryComparer> _comparerLogger;
     private readonly ToastNotifier _notifier;
+    private readonly AgentPreferences _agent;
     private readonly GitService _git = new();
     private readonly HashSet<DirectoryComparison> _collapsed = [];
     private readonly HashSet<string> _collapsedSubGroups = new(StringComparer.OrdinalIgnoreCase);
@@ -127,11 +128,12 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     [NotifyCanExecuteChangedFor(nameof(ResolveAllSkipCommand))]
     private bool _hasPending;
 
-    public SyncViewModel(ISettingsStore settings, IDialogService dialogs, OperationPreferences operations, ILogger<SyncViewModel> logger, ILogger<SyncEngine> engineLogger, ILogger<DirectoryComparer> comparerLogger, ToastNotifier notifier)
+    public SyncViewModel(ISettingsStore settings, IDialogService dialogs, OperationPreferences operations, AgentPreferences agent, ILogger<SyncViewModel> logger, ILogger<SyncEngine> engineLogger, ILogger<DirectoryComparer> comparerLogger, ToastNotifier notifier)
     {
         _settings = settings;
         _dialogs = dialogs;
         Operations = operations;
+        _agent = agent;
         _logger = logger;
         _engineLogger = engineLogger;
         _comparerLogger = comparerLogger;
@@ -144,7 +146,11 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public event Action<SyncProfileRun>? ProfileRunCompleted;
 
+    public event Action<string>? AskAgentRequested;
+
     public static int[] GitHistoryCounts { get; } = [4, 8, 16, 32];
+
+    public bool ChatEnabled => _agent.Enabled;
 
     public OperationPreferences Operations { get; }
 
@@ -440,6 +446,17 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
 
         UpdateSummary();
+    }
+
+    public void AskAgentAbout(SyncNodeViewModel node)
+    {
+        AskAgentRequested?.Invoke(ChatQuestion.ForSyncNode(
+            node.RelativePath,
+            node.Status,
+            node.IsDirectory,
+            node.LeftSizeText,
+            node.RightSizeText,
+            node.DiffReason));
     }
 
     public void ToggleExpand(DirectoryComparison dir)

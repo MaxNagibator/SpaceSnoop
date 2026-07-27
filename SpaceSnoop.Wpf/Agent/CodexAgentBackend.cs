@@ -92,8 +92,8 @@ public sealed class CodexAgentBackend : AgentBackendBase
         var system = request.SystemPrompt;
 
         return string.IsNullOrEmpty(request.ResumeSessionId) && !string.IsNullOrWhiteSpace(system)
-            ? string.Concat(system, "\n\n", request.Prompt)
-            : request.Prompt;
+            ? string.Concat(system, "\n\n", request.TurnText)
+            : request.TurnText;
     }
 
     internal static IReadOnlyList<string> BuildArguments(AgentRequest request)

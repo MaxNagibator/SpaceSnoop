@@ -331,4 +331,7 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 2115, Level = LogLevel.Warning, Message = "Не удалось получить список моделей «{Backend}»")]
     public static partial void AgentModelsFailed(this ILogger logger, Exception exception, string backend);
+
+    [LoggerMessage(EventId = 2116, Level = LogLevel.Debug, Message = "Вопрос агенту подставлен со страницы: {Question}")]
+    public static partial void AgentQuestionPrefilled(this ILogger logger, string question);
 }

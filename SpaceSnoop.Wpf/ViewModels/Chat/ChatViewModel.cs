@@ -8,6 +8,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
 {
     private readonly AgentBackends _backends;
     private readonly AgentPreferences _preferences;
+    private readonly McpBridge _bridge;
     private readonly ILogger<ChatViewModel> _logger;
 
     private bool _detectStarted;
@@ -40,10 +41,12 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         AgentModelSelector agentModel,
         McpPreferences mcp,
         McpServerHost mcpServer,
+        McpBridge bridge,
         ILogger<ChatViewModel> logger)
     {
         _backends = backends;
         _preferences = preferences;
+        _bridge = bridge;
         AgentModel = agentModel;
         Mcp = mcp;
         McpServer = mcpServer;
@@ -54,12 +57,14 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         McpServer.PropertyChanged += OnGateSourceChanged;
     }
 
+    public event Action? FocusRequested;
+
     public static IReadOnlyList<ChatExample> Examples { get; } =
     [
         new("Куда делось место на диске C?", PackIconLucideKind.HardDrive),
         new("Что тут можно снести без последствий?", PackIconLucideKind.Trash2),
+        new("Сколько места занял Docker и сколько из него вернётся?", PackIconLucideKind.Container),
         new("Почему эти папки опять расходятся после синхронизации?", PackIconLucideKind.FolderSync),
-        new("Какие профили синхронизации у меня настроены?", PackIconLucideKind.ListChecks),
     ];
 
     public ObservableCollection<ChatMessageViewModel> Messages { get; } = [];
@@ -123,6 +128,18 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
     private bool CanCancel => IsBusy;
 
     private bool CanManageConversation => !IsBusy;
+
+    public void PrepareQuestion(string question)
+    {
+        if (question.Length == 0)
+        {
+            return;
+        }
+
+        InputText = question;
+        _logger.AgentQuestionPrefilled(question);
+        FocusRequested?.Invoke();
+    }
 
     public async Task EnsureLoadedAsync()
     {
@@ -291,6 +308,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         var request = new AgentRequest
         {
             Prompt = prompt,
+            Context = _bridge.DescribeContext(),
             ResumeSessionId = _sessionId,
             SystemPrompt = AgentPrompt.Build(mutations, backend.HasBuiltInShell),
             Model = _preferences.ModelFor(backend.Kind) is { Length: > 0 } model ? model : null,

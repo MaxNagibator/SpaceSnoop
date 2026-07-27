@@ -165,6 +165,10 @@ public sealed partial class SyncNodeViewModel : ObservableObject
 
     public bool CanCompareContent => _file is not null;
 
+    public bool CanAskAgent => !IsGroupHeader && _owner.ChatEnabled;
+
+    public string RelativePath => _file?.RelativePath ?? _dir?.RelativePath ?? Name;
+
     public string CompareContentHeader => Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly
         ? "Показать содержимое"
         : "Сравнить содержимое";
@@ -401,6 +405,12 @@ public sealed partial class SyncNodeViewModel : ObservableObject
         }
 
         return Task.CompletedTask;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanAskAgent))]
+    private void AskAgent()
+    {
+        _owner.AskAgentAbout(this);
     }
 
     [RelayCommand]

@@ -94,6 +94,9 @@ public sealed partial class ShellViewModel : ShellViewModelBase
 
         sync.ProfileRunCompleted += overview.ApplyProfileRun;
 
+        scan.AskAgentRequested += question => OpenChatWith(chat, question);
+        sync.AskAgentRequested += question => OpenChatWith(chat, question);
+
         _settingsItem = new("Настройки", PackIconLucideKind.Settings, settingsPage);
 
         IsNavCollapsed = Preferences.NavCollapsed;
@@ -178,6 +181,17 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         }
 
         Sections.Remove(_chatItem);
+    }
+
+    private void OpenChatWith(ChatViewModel chat, string question)
+    {
+        if (!Sections.Contains(_chatItem))
+        {
+            return;
+        }
+
+        Selected = _chatItem;
+        chat.PrepareQuestion(question);
     }
 
     private void OnAgentPreferencesChanged(object? sender, PropertyChangedEventArgs e)

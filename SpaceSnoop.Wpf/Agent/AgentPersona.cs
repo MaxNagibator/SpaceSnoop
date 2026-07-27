@@ -6,6 +6,8 @@ public static class AgentPersona
 
     public const string NameGenitive = "Шныря";
 
+    public const string AskHeader = $"Спросить {NameGenitive}";
+
     public const string Greeting = "Хожу по вашим дискам и говорю, куда делось место и почему папки опять разошлись.";
 
     public const string InputPlaceholder = "Спросите Шныря – про диск, папку или несходящуюся синхронизацию";

@@ -141,6 +141,35 @@ public sealed class McpBridge(
         return ScanExport.ToJson(model);
     }
 
+    public string DescribeContext()
+    {
+        return Dispatch(() =>
+        {
+            List<string> parts = [$"страница «{DescribePage(_shell?.CurrentSectionKey)}»"];
+
+            if (scan.IsScanning)
+            {
+                parts.Add($"идёт сканирование {scan.SelectedDrive}");
+            }
+            else if (scan.HasResult)
+            {
+                parts.Add($"открыт скан {scan.ResultPath} – {scan.ResultSizeText}, файлов {scan.ResultFileCountText}");
+            }
+
+            if (scan.MarkedCount > 0)
+            {
+                parts.Add($"помечено на удаление {scan.MarkedCount}");
+            }
+
+            if (sync.HasResult)
+            {
+                parts.Add($"открыто сравнение {sync.LeftPath} → {sync.RightPath}, различий {sync.LeftOnlyCount + sync.RightOnlyCount + sync.ModifiedCount + sync.ConflictCount}");
+            }
+
+            return $"[Состояние окна SpaceSnoop: {string.Join("; ", parts)}. Это служебная справка, отвечать на неё не надо.]";
+        });
+    }
+
     public string ListDrives()
     {
         logger.McpToolInvoked("list_drives", "-");
@@ -430,6 +459,22 @@ public sealed class McpBridge(
             OverviewRunStatus.Unavailable => "каталог недоступен или не задан",
             OverviewRunStatus.Overlap => "каталоги совпадают или вложены",
             _ => null,
+        };
+    }
+
+    internal static string DescribePage(string? sectionKey)
+    {
+        return sectionKey switch
+        {
+            SectionKey.Scan => "Сканирование",
+            SectionKey.Sync => "Синхронизация",
+            SectionKey.Overview => "Обзор",
+            SectionKey.Schedule => "Расписание",
+            SectionKey.Docker => "Docker",
+            SectionKey.Chat => "Чат",
+            SectionKey.Logs => "Логи",
+            SectionKey.About => "О программе",
+            _ => "неизвестно",
         };
     }
 

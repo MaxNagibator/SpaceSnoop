@@ -5,6 +5,7 @@
              xmlns:conv="clr-namespace:SpaceSnoop.Wpf.Converters"
              xmlns:controls="clr-namespace:SpaceSnoop.Wpf.Views.Scan"
              xmlns:bootstrap="clr-namespace:SpaceSnoop.Wpf.Bootstrap"
+             xmlns:agent="clr-namespace:SpaceSnoop.Wpf.Agent"
              xmlns:behaviors="clr-namespace:SpaceSnoop.Wpf.Views.Behaviors"
              xmlns:keepshell="https://schemas.keepshell.dev/wpf"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
@@ -254,6 +255,21 @@
                                                   Kind="{x:Static iconPacks:PackIconLucideKind.ExternalLink}"
                                                   Foreground="{DynamicResource State.Info}" />
                         <TextBlock Text="Открыть в проводнике"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </MenuItem.Header>
+            </MenuItem>
+
+            <MenuItem
+                Command="{Binding PlacementTarget.DataContext.AskAgentCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                ToolTip="Открыть чат с готовым вопросом об этом узле"
+                Visibility="{Binding PlacementTarget.DataContext.CanAskAgent, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+                <MenuItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                                  Kind="{x:Static iconPacks:PackIconLucideKind.MessageCircle}"
+                                                  Foreground="{DynamicResource State.Info}" />
+                        <TextBlock Text="{x:Static agent:AgentPersona.AskHeader}"
                                    VerticalAlignment="Center" />
                     </StackPanel>
                 </MenuItem.Header>

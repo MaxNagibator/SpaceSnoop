@@ -203,6 +203,7 @@ public class SyncQuickProfileTests
         return new(settings,
             new NoopDialogs(),
             new(settings),
+            new(settings),
             NullLogger<SyncViewModel>.Instance,
             NullLogger<SyncEngine>.Instance,
             NullLogger<DirectoryComparer>.Instance,

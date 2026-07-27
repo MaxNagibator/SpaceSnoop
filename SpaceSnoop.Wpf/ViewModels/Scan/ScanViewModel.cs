@@ -166,6 +166,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
         _nodeFactory.MarksChanged += RecountMarked;
         _nodeFactory.ArchiveRequested += OnArchiveRequested;
+        _nodeFactory.AskAgentRequested += OnAskAgentRequested;
 
         _progressTimer = new() { Interval = ProgressPollInterval };
         _progressTimer.Tick += OnProgressTick;
@@ -178,6 +179,8 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         LoadSettings();
         LoadDriveLabels();
     }
+
+    public event Action<string>? AskAgentRequested;
 
     public ObservableCollection<DriveItem> Drives { get; } = [];
 
@@ -278,6 +281,16 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
         Inspector.Intensity = Preferences.Intensity;
         OnPropertyChanged(nameof(Intensity));
+    }
+
+    private void OnAskAgentRequested(ScanNodeViewModel node)
+    {
+        if (node.Space is not { } space)
+        {
+            return;
+        }
+
+        AskAgentRequested?.Invoke(ChatQuestion.ForScanNode(space.AbsolutePath, node.SizeText, node.IsDirectory));
     }
 
     private async void OnArchiveRequested(ScanNodeViewModel node)

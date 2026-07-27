@@ -97,7 +97,7 @@ public sealed class OpenCodeAgentBackend : AgentBackendBase
         return new()
         {
             Arguments = BuildArguments(request),
-            Stdin = request.Prompt,
+            Stdin = request.TurnText,
             Environment = environment,
             TempFiles = [new(configPath, BuildConfigJson(request))],
         };

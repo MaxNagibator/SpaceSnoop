@@ -67,6 +67,10 @@ public sealed record AgentRequest
 {
     public required string Prompt { get; init; }
 
+    public string? Context { get; init; }
+
+    public string TurnText => Context is { Length: > 0 } context ? $"{context}\n\n{Prompt}" : Prompt;
+
     public string? ResumeSessionId { get; init; }
 
     public string? SystemPrompt { get; init; }

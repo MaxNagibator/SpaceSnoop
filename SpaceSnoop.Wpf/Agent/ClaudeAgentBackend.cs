@@ -56,7 +56,7 @@ public sealed class ClaudeAgentBackend : AgentBackendBase
         return new()
         {
             Arguments = BuildArguments(request, configPath),
-            Stdin = request.Prompt,
+            Stdin = request.TurnText,
             TempFiles = configPath is null || request.Mcp is null ? [] : [new(configPath, BuildMcpConfigJson(request.Mcp))],
         };
     }
