@@ -67,6 +67,17 @@ public sealed partial class ChatMessageViewModel : ObservableObject
 
     public ObservableCollection<ChatToolCall> ToolCalls { get; } = [];
 
+    public void DropPreamble()
+    {
+        if (_builder.Length == 0)
+        {
+            return;
+        }
+
+        _builder.Clear();
+        Text = string.Empty;
+    }
+
     public void Append(string text)
     {
         if (text.Length == 0)

@@ -1,6 +1,7 @@
 ﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Chat.ChatTranscript"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:behaviors="clr-namespace:SpaceSnoop.Wpf.Behaviors"
              xmlns:chatvm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Chat"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -120,6 +121,43 @@
                 <Setter Property="AcceptsReturn" Value="True" />
                 <Setter Property="TextWrapping" Value="Wrap" />
                 <Setter Property="FontFamily" Value="{DynamicResource Font.Sans}" />
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                    <MultiDataTrigger>
+                        <MultiDataTrigger.Conditions>
+                            <Condition Binding="{Binding IsUser}" Value="True" />
+                            <Condition Binding="{Binding HasText}" Value="True" />
+                        </MultiDataTrigger.Conditions>
+                        <Setter Property="Visibility" Value="Visible" />
+                    </MultiDataTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <Style x:Key="Chat.BubbleMarkdown"
+                   TargetType="RichTextBox">
+                <Setter Property="IsReadOnly" Value="True" />
+                <Setter Property="IsReadOnlyCaretVisible" Value="False" />
+                <Setter Property="IsDocumentEnabled" Value="False" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="MinWidth" Value="0" />
+                <Setter Property="MinHeight" Value="0" />
+                <Setter Property="Foreground" Value="{DynamicResource Fg.Primary}" />
+                <Setter Property="FontFamily" Value="{DynamicResource Font.Sans}" />
+                <Setter Property="FontSize" Value="{DynamicResource Font.Size.M}" />
+                <Setter Property="VerticalScrollBarVisibility" Value="Disabled" />
+                <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                    <MultiDataTrigger>
+                        <MultiDataTrigger.Conditions>
+                            <Condition Binding="{Binding IsUser}" Value="False" />
+                            <Condition Binding="{Binding HasText}" Value="True" />
+                        </MultiDataTrigger.Conditions>
+                        <Setter Property="Visibility" Value="Visible" />
+                    </MultiDataTrigger>
+                </Style.Triggers>
             </Style>
         </ResourceDictionary>
     </UserControl.Resources>
@@ -183,8 +221,10 @@
                                     </Grid>
 
                                     <TextBox Style="{StaticResource Chat.BubbleText}"
-                                             Text="{Binding Text, Mode=OneWay}"
-                                             Visibility="{Binding HasText, Converter={StaticResource BoolToVisibility}}" />
+                                             Text="{Binding Text, Mode=OneWay}" />
+
+                                    <RichTextBox Style="{StaticResource Chat.BubbleMarkdown}"
+                                                 behaviors:MarkdownText.Source="{Binding Text}" />
 
                                     <StackPanel Orientation="Horizontal"
                                                 Margin="0,6,0,0"

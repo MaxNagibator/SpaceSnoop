@@ -308,6 +308,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
                         break;
 
                     case AgentEventKind.ToolCall:
+                        assistant.DropPreamble();
                         assistant.ToolCalls.Add(ChatToolCall.From(turnEvent.ToolName));
                         break;
 
