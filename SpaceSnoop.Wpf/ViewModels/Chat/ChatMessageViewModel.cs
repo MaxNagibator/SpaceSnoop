@@ -67,6 +67,38 @@ public sealed partial class ChatMessageViewModel : ObservableObject
 
     public ObservableCollection<ChatToolCall> ToolCalls { get; } = [];
 
+    public static ChatMessageViewModel Restore(ChatMessageRecord record)
+    {
+        var message = new ChatMessageViewModel(record.Role, record.Text)
+        {
+            IsError = record.IsError,
+            IsCancelled = record.IsCancelled,
+            CostUsd = record.CostUsd,
+            Tokens = record.Tokens,
+        };
+
+        foreach (var tool in record.Tools)
+        {
+            message.ToolCalls.Add(ChatToolCall.From(tool));
+        }
+
+        return message;
+    }
+
+    public ChatMessageRecord ToRecord()
+    {
+        return new()
+        {
+            Role = Role,
+            Text = Text,
+            IsError = IsError,
+            IsCancelled = IsCancelled,
+            CostUsd = CostUsd,
+            Tokens = Tokens,
+            Tools = [.. ToolCalls.Select(call => call.Name)],
+        };
+    }
+
     public void DropPreamble()
     {
         if (_builder.Length == 0)

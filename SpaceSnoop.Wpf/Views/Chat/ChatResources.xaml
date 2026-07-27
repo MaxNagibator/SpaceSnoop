@@ -122,6 +122,76 @@
         </Setter>
     </Style>
 
+    <Style x:Key="Chat.HistoryItem"
+           TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="10,8" />
+        <Setter Property="Margin" Value="0,0,0,4" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Card"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{DynamicResource Radius.M}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Stretch"
+                                          VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver"
+                                 Value="True">
+                            <Setter TargetName="Card" Property="Background" Value="{DynamicResource Bg.SurfaceAlt}" />
+                        </Trigger>
+                        <DataTrigger Binding="{Binding IsCurrent}"
+                                     Value="True">
+                            <Setter TargetName="Card" Property="Background" Value="{DynamicResource Accent.Soft}" />
+                            <Setter TargetName="Card" Property="BorderBrush" Value="{DynamicResource Accent.Primary}" />
+                        </DataTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="Chat.HistoryTitle"
+           TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource Fg.Primary}" />
+        <Setter Property="FontSize" Value="{DynamicResource Font.Size.S}" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <Style x:Key="Chat.HistorySubtitle"
+           TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource Fg.Muted}" />
+        <Setter Property="FontSize" Value="{DynamicResource Font.Size.Caption}" />
+        <Setter Property="Margin" Value="0,2,0,0" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <Style x:Key="Chat.HistoryDelete"
+           TargetType="Button"
+           BasedOn="{StaticResource Button.Icon}">
+        <Setter Property="Width" Value="22" />
+        <Setter Property="Height" Value="22" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="6,0,0,0" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Opacity" Value="0.35" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver"
+                     Value="True">
+                <Setter Property="Opacity" Value="1" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <Style x:Key="Chat.Placeholder"
            TargetType="TextBlock">
         <Setter Property="Foreground" Value="{DynamicResource Fg.Muted}" />

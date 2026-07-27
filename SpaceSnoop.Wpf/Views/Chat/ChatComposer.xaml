@@ -60,9 +60,19 @@
                             VerticalAlignment="Bottom"
                             Margin="8,0,0,0">
                     <Button Style="{StaticResource Button.Icon}"
+                            Command="{Binding ToggleHistoryCommand}"
+                            ToolTip="{Binding HistoryToggleHint}"
+                            AutomationProperties.Name="{Binding HistoryToggleHint}">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.PanelLeft}"
+                                                  Width="16"
+                                                  Height="16" />
+                    </Button>
+
+                    <Button Style="{StaticResource Button.Icon}"
                             Command="{Binding NewConversationCommand}"
                             ToolTip="Новый разговор"
-                            AutomationProperties.Name="Новый разговор">
+                            AutomationProperties.Name="Новый разговор"
+                            Margin="8,0,0,0">
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.SquarePen}"
                                                   Width="16"
                                                   Height="16" />

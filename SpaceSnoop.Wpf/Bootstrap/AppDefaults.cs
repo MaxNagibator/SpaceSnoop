@@ -58,6 +58,8 @@ public static class AppDefaults
 
     public const bool AgentEnabledDefault = true;
     public const bool AgentConsentDefault = false;
+    public const bool AgentHistoryVisibleDefault = false;
+    public const int AgentHistoryLimit = 50;
     public const string AgentModelDefault = "";
     public const string AgentEffortDefault = "";
     public const int AgentDetectTimeoutSeconds = 10;

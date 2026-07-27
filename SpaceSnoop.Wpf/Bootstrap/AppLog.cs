@@ -334,4 +334,19 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 2116, Level = LogLevel.Debug, Message = "Вопрос агенту подставлен со страницы: {Question}")]
     public static partial void AgentQuestionPrefilled(this ILogger logger, string question);
+
+    [LoggerMessage(EventId = 2117, Level = LogLevel.Debug, Message = "История чата прочитана: разговоров {Count}")]
+    public static partial void ChatHistoryLoaded(this ILogger logger, int count);
+
+    [LoggerMessage(EventId = 2118, Level = LogLevel.Warning, Message = "Не удалось прочитать историю чата «{Path}» – разговоры начнутся с чистого листа")]
+    public static partial void ChatHistoryReadFailed(this ILogger logger, Exception exception, string path);
+
+    [LoggerMessage(EventId = 2119, Level = LogLevel.Warning, Message = "Не удалось сохранить историю чата «{Path}»")]
+    public static partial void ChatHistoryWriteFailed(this ILogger logger, Exception exception, string path);
+
+    [LoggerMessage(EventId = 2120, Level = LogLevel.Information, Message = "Сессия CLI из сохранённого разговора не подхватилась – следующий ход начнётся заново")]
+    public static partial void ChatRestoredSessionDropped(this ILogger logger);
+
+    [LoggerMessage(EventId = 2121, Level = LogLevel.Information, Message = "История чата очищена: удалено разговоров {Count}")]
+    public static partial void ChatHistoryCleared(this ILogger logger, int count);
 }

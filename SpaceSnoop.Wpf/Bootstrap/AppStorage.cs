@@ -73,6 +73,7 @@ public static class AppStorage
         [
             TomlSettingsFile.PrimaryFileName,
             AppInfo.DeletionLogFileName,
+            ChatHistoryStore.FileName,
         ];
 
         var copied = new List<string>();

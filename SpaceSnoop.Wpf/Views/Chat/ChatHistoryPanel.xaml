@@ -1,0 +1,126 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Chat.ChatHistoryPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:chatvm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Chat"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance chatvm:ChatViewModel}"
+             d:DesignHeight="600"
+             d:DesignWidth="252">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Views/Chat/ChatResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Border Width="252"
+            Background="{DynamicResource Bg.Surface}"
+            BorderBrush="{DynamicResource Border.Subtle}"
+            BorderThickness="0,0,1,0">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0"
+                  Margin="14,14,10,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           Style="{StaticResource TextBlock.Subtle}"
+                           FontSize="{DynamicResource Font.Size.S}"
+                           FontWeight="{DynamicResource Font.Weight.SemiBold}"
+                           VerticalAlignment="Center"
+                           Text="Разговоры" />
+
+                <Button Grid.Column="1"
+                        Style="{StaticResource Button.Icon}"
+                        Command="{Binding NewConversationCommand}"
+                        ToolTip="Новый разговор"
+                        AutomationProperties.Name="Новый разговор">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Plus}"
+                                              Width="15"
+                                              Height="15" />
+                </Button>
+            </Grid>
+
+            <ScrollViewer Grid.Row="1"
+                          Padding="10,0,10,0"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Visibility="{Binding HasConversations, Converter={StaticResource BoolToVisibility}}">
+                <ItemsControl ItemsSource="{Binding Conversations}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type chatvm:ChatConversationViewModel}">
+                            <Button Style="{StaticResource Chat.HistoryItem}"
+                                    Command="{Binding DataContext.SelectConversationCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding}"
+                                    ToolTip="{Binding Title}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Style="{StaticResource Chat.HistoryTitle}"
+                                                   Text="{Binding Title}" />
+                                        <TextBlock Style="{StaticResource Chat.HistorySubtitle}"
+                                                   Text="{Binding Subtitle}" />
+                                    </StackPanel>
+
+                                    <Button Grid.Column="1"
+                                            Style="{StaticResource Chat.HistoryDelete}"
+                                            Command="{Binding DataContext.DeleteConversationCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            ToolTip="Удалить разговор"
+                                            AutomationProperties.Name="Удалить разговор">
+                                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.X}"
+                                                                  Width="12"
+                                                                  Height="12" />
+                                    </Button>
+                                </Grid>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <TextBlock Grid.Row="1"
+                       Style="{StaticResource Chat.Hint}"
+                       VerticalAlignment="Center"
+                       Margin="16,0,16,24"
+                       Text="Прошлых разговоров нет. Спросите о чём-нибудь – разговор сохранится сам и переживёт перезапуск."
+                       Visibility="{Binding HasConversations, Converter={StaticResource InverseBoolToVisibility}}" />
+
+            <Button Grid.Row="2"
+                    Style="{StaticResource Button.Ghost}"
+                    Command="{Binding ClearHistoryCommand}"
+                    Margin="10,8,10,12"
+                    HorizontalAlignment="Stretch"
+                    ToolTip="Убрать из истории все разговоры"
+                    Visibility="{Binding HasConversations, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                              Width="13"
+                                              Height="13"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,8,0" />
+                    <TextBlock Text="Очистить историю"
+                               FontSize="{DynamicResource Font.Size.S}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+        </Grid>
+    </Border>
+</UserControl>

@@ -79,6 +79,7 @@ public static class SettingsKeys
     public const string AgentEnabled = "wpf.agent.enabled";
     public const string AgentConsent = "wpf.agent.consent";
     public const string AgentBackend = "wpf.agent.backend";
+    public const string AgentHistoryVisible = $"{AgentPrefix}.history_visible";
     public const string AgentModelShared = $"{AgentPrefix}.model";
     public const string AgentCliPathShared = $"{AgentPrefix}.cli_path";
 
