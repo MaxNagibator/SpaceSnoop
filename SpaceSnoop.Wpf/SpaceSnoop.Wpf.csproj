@@ -20,8 +20,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SpaceSnoop.Core\SpaceSnoop.Core.csproj" />
-    <PackageReference Include="KeepShell" Version="0.1.31" />
-    <PackageReference Include="KeepShell.Themes.Tarkov" Version="0.1.31" />
+    <PackageReference Include="KeepShell" Version="0.1.35" />
+    <PackageReference Include="KeepShell.Themes.Tarkov" Version="0.1.35" />
   </ItemGroup>
 
   <ItemGroup>
