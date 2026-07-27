@@ -20,7 +20,7 @@ internal sealed record McpScanState(
     string Directories,
     int MarkedForDeletion);
 
-internal sealed record McpScanNavigation(string Page, McpScanState Scan);
+internal sealed record McpScanNavigation(string Page, McpScanState Scan, string? Navigation);
 
 internal sealed record McpArchivePlan(
     string Path,
@@ -41,6 +41,8 @@ internal sealed record McpArchiveResult(
 internal sealed record McpMarkResult(
     int Changed,
     IReadOnlyList<string> NotFound,
+    IReadOnlyList<string> Rejected,
+    string? RejectedReason,
     int MarkedTotal,
     string MarkedSize,
     McpScanState Scan);
@@ -109,7 +111,7 @@ internal sealed record McpProfile(
     string Schedule,
     string? Unavailable);
 
-internal sealed record McpNavigationResult(string Page, McpSyncState Sync);
+internal sealed record McpNavigationResult(string Page, McpSyncState Sync, string? Navigation, string? IgnoredParameters);
 
 internal sealed record McpSyncResult(
     int Copied,

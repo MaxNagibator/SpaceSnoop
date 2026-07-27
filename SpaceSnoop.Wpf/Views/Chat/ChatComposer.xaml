@@ -24,6 +24,47 @@
         <StackPanel>
             <Border Style="{StaticResource Chat.Notice}"
                     Margin="0,0,0,10"
+                    BorderBrush="{DynamicResource Accent.Primary}"
+                    Visibility="{Binding PendingNavigation, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <iconPacks:PackIconLucide Grid.Column="0"
+                                              Style="{StaticResource Chat.NoticeIcon}"
+                                              Foreground="{DynamicResource Accent.Primary}"
+                                              Kind="{Binding PendingNavigation.Icon}" />
+
+                    <TextBlock Grid.Column="1"
+                               Style="{StaticResource Chat.NoticeText}"
+                               Text="{Binding PendingNavigation.Text}" />
+
+                    <Button Grid.Column="2"
+                            Style="{StaticResource Button.Primary}"
+                            Command="{Binding OpenPendingPageCommand}"
+                            Content="{Binding PendingNavigation.ActionText}"
+                            Padding="10,2"
+                            Margin="8,0,0,0" />
+
+                    <Button Grid.Column="3"
+                            Style="{StaticResource Button.Icon}"
+                            Command="{Binding DismissPendingPageCommand}"
+                            ToolTip="Скрыть"
+                            AutomationProperties.Name="Скрыть"
+                            Margin="4,0,0,0">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.X}"
+                                                  Width="14"
+                                                  Height="14" />
+                    </Button>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource Chat.Notice}"
+                    Margin="0,0,0,10"
                     ToolTip="{Binding MutationsNotice}"
                     Visibility="{Binding MutationsAllowed, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel Orientation="Horizontal">

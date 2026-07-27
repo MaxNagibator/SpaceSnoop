@@ -97,6 +97,8 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         scan.AskAgentRequested += question => OpenChatWith(chat, question);
         sync.AskAgentRequested += question => OpenChatWith(chat, question);
 
+        chat.NavigationRequested += sectionKey => TryNavigate(sectionKey);
+
         _settingsItem = new("Настройки", PackIconLucideKind.Settings, settingsPage);
 
         IsNavCollapsed = Preferences.NavCollapsed;

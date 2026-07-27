@@ -33,7 +33,7 @@ public sealed class SpaceSnoopTools
     public static Task<string> GetCurrentScanAsync(
         McpBridge bridge,
         [Description("До какой глубины вложенности перечислять подкаталоги")] int depth = ScanExport.DefaultDepth,
-        [Description("Сколько записей выгружать в каждом списке (крупнейшие по размеру)")] int entryLimit = ScanExport.DefaultEntryLimit,
+        [Description("Сколько записей выгружать в каждом списке (крупнейшие по размеру)")] int entryLimit = AppDefaults.McpEntryLimitDefault,
         CancellationToken cancellationToken = default)
     {
         return bridge.GetCurrentScanAsync(depth, entryLimit, cancellationToken);
@@ -55,22 +55,23 @@ public sealed class SpaceSnoopTools
     public static Task<string> GetDockerUsageAsync(
         McpBridge bridge,
         [Description("Перечислить сами объекты (образы, контейнеры, тома), а не только итоги по типам")] bool includeObjects = false,
-        [Description("Сколько объектов выгружать (крупнейшие по размеру)")] int entryLimit = ComparisonExport.DefaultEntryLimit,
+        [Description("Сколько объектов выгружать (крупнейшие по размеру)")] int entryLimit = AppDefaults.McpEntryLimitDefault,
         CancellationToken cancellationToken = default)
     {
         return bridge.GetDockerUsageAsync(includeObjects, entryLimit, cancellationToken);
     }
 
     [McpServerTool(Name = "scan_directory")]
-    [Description("Сканирует каталог или диск и возвращает распределение занятого места: крупнейшие подкаталоги до заданной глубины и крупнейшие файлы всего дерева. Только чтение – приложение не трогает, ничего не удаляет.")]
+    [Description("Сканирует каталог или диск и возвращает распределение занятого места: крупнейшие подкаталоги до заданной глубины и крупнейшие файлы всего дерева. Только чтение – ничего не удаляет. При show=true результат попадает в дерево страницы «Сканирование», и после этого по нему работают mark_for_deletion и archive_directory; без show это отдельный расчёт, окно о нём не знает.")]
     public static Task<string> ScanDirectoryAsync(
         McpBridge bridge,
         [Description("Путь к каталогу или диску, например «C:\\» или «C:\\Users\\Иван»")] string path,
         [Description("До какой глубины вложенности перечислять подкаталоги")] int depth = ScanExport.DefaultDepth,
-        [Description("Сколько записей выгружать в каждом списке (крупнейшие по размеру)")] int entryLimit = ScanExport.DefaultEntryLimit,
+        [Description("Сколько записей выгружать в каждом списке (крупнейшие по размеру)")] int entryLimit = AppDefaults.McpEntryLimitDefault,
+        [Description("Показать результат в окне: дерево заменит открытое на странице «Сканирование»")] bool show = false,
         CancellationToken cancellationToken = default)
     {
-        return bridge.ScanAsync(path, depth, entryLimit, cancellationToken);
+        return bridge.ScanAsync(path, depth, entryLimit, show, cancellationToken);
     }
 
     [McpServerTool(Name = "compare_directories")]
@@ -83,7 +84,7 @@ public sealed class SpaceSnoopTools
         [Description("Победитель в двустороннем режиме: Newest, Left или Right")] SyncWinner winner = SyncWinner.Newest,
         [Description("Зеркало: удалять на приёмнике то, чего нет у источника")] bool mirror = false,
         [Description("Исключения через запятую, например «bin,obj,*.tmp»")] string? exclusions = null,
-        [Description("Сколько различий выгружать (крупнейшие по размеру)")] int entryLimit = ComparisonExport.DefaultEntryLimit,
+        [Description("Сколько различий выгружать (крупнейшие по размеру)")] int entryLimit = AppDefaults.McpEntryLimitDefault,
         CancellationToken cancellationToken = default)
     {
         return bridge.CompareAsync(left, right, mode, winner, mirror, exclusions, entryLimit, cancellationToken);
@@ -93,18 +94,18 @@ public sealed class SpaceSnoopTools
     [Description("Выгружает сравнение, которое сейчас открыто на странице «Синхронизация», включая состояние Git обеих сторон и итог последней синхронизации.")]
     public static Task<string> GetCurrentComparisonAsync(
         McpBridge bridge,
-        [Description("Сколько различий выгружать (крупнейшие по размеру)")] int entryLimit = ComparisonExport.DefaultEntryLimit,
+        [Description("Сколько различий выгружать (крупнейшие по размеру)")] int entryLimit = AppDefaults.McpEntryLimitDefault,
         CancellationToken cancellationToken = default)
     {
         return bridge.GetCurrentComparisonAsync(entryLimit, cancellationToken);
     }
 
     [McpServerTool(Name = "sync_current")]
-    [Description("Применяет сравнение, открытое на странице «Синхронизация»: копирует файлы и удаляет лишние в корзину. При dryRun=true ничего не выполняется – возвращается только план. Реальное выполнение требует включённой настройки «Разрешить изменяющие операции».")]
+    [Description("Применяет сравнение, открытое на странице «Синхронизация»: копирует файлы и удаляет лишние в корзину. При dryRun=true ничего не выполняется – возвращается компактный план: счётчики действий, объём копируемого и удаляемого, крупнейшие пути. Полное сравнение отдаёт get_current_comparison. Реальное выполнение требует включённой настройки «Разрешить изменяющие операции».")]
     public static Task<string> SyncCurrentAsync(
         McpBridge bridge,
         [Description("true – только показать план, ничего не менять")] bool dryRun = true,
-        [Description("Сколько записей включать в план")] int entryLimit = ComparisonExport.DefaultEntryLimit,
+        [Description("Сколько крупнейших путей включать в план")] int entryLimit = SyncPlanExport.DefaultEntryLimit,
         CancellationToken cancellationToken = default)
     {
         return bridge.SyncCurrentAsync(dryRun, entryLimit, cancellationToken);
@@ -133,7 +134,7 @@ public sealed class SpaceSnoopTools
     }
 
     [McpServerTool(Name = "open_sync")]
-    [Description("Управляет окном приложения: открывает страницу «Синхронизация», подставляет каталоги и параметры и по запросу запускает сравнение. Ничего не копирует и не удаляет.")]
+    [Description("Управляет окном приложения: открывает страницу «Синхронизация», подставляет каталоги и параметры и по запросу запускает сравнение. Ничего не копирует и не удаляет. Победитель и зеркало заряжают удаления на приёмнике, поэтому применяются только при включённой настройке «Разрешить изменяющие операции» – без неё они игнорируются, и ответ это сообщает.")]
     public static Task<string> OpenSyncAsync(
         McpBridge bridge,
         [Description("Путь к левому каталогу; не задан – остаётся текущий")] string? left = null,

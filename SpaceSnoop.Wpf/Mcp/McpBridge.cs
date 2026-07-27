@@ -1,5 +1,6 @@
 ﻿using ModelContextProtocol;
 using SpaceSnoop.Core.Export;
+using System.Diagnostics;
 using System.IO;
 using System.Security;
 using System.Text.Encodings.Web;
@@ -31,6 +32,10 @@ public sealed class McpBridge(
     };
 
     private ShellViewModel? _shell;
+
+    public event Action<string>? NavigationDeferred;
+
+    public bool DeferNavigation { get; set; }
 
     public void Attach(ShellViewModel shell)
     {
@@ -110,21 +115,34 @@ public sealed class McpBridge(
         return ComparisonExport.ToJson(model);
     }
 
-    public async Task<string> ScanAsync(string path, int depth, int entryLimit, CancellationToken cancellationToken)
+    public async Task<string> ScanAsync(string path, int depth, int entryLimit, bool show, CancellationToken cancellationToken)
     {
         path = path.Trim();
         depth = ClampDepth(depth);
         entryLimit = ClampEntryLimit(entryLimit);
 
-        logger.McpToolInvoked("scan_directory", $"«{path}», глубина {depth}, записей до {entryLimit}");
+        logger.McpToolInvoked("scan_directory", $"«{path}», глубина {depth}, записей до {entryLimit}, показать в окне {show}");
 
         ValidateScanPath(path);
+
+        if (show)
+        {
+            Dispatch(() =>
+            {
+                if (scan.IsScanning)
+                {
+                    logger.McpToolRejected("scan_directory", "страница занята операцией");
+                    throw new McpException("Страница «Сканирование» сейчас занята другой операцией.");
+                }
+            });
+        }
 
         // Те же параметры обхода, что и у человека на странице «Сканирование».
         var multithreaded = scanPreferences.UseMultithreading;
         var parallelism = scanPreferences.MaxParallelism;
+        var stopwatch = Stopwatch.StartNew();
 
-        var model = await Task.Run(
+        var (tree, model) = await Task.Run(
             () =>
             {
                 var directory = new DirectoryInfo(path);
@@ -133,10 +151,25 @@ public sealed class McpBridge(
                     ? calculator.CalculateMultithreaded(directory, parallelism, cancellationToken)
                     : calculator.Calculate(directory, cancellationToken);
 
-                return ScanExport.Build(root, directory.FullName, new(depth, multithreaded, parallelism), AppInfo.Version, entryLimit);
+                return (root, ScanExport.Build(root, directory.FullName, new(depth, multithreaded, parallelism), AppInfo.Version, entryLimit));
             },
             cancellationToken)
             .ConfigureAwait(false);
+
+        stopwatch.Stop();
+
+        if (show)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            Dispatch(() =>
+            {
+                scan.ApplyScanResult(path, tree, stopwatch.Elapsed);
+                scan.SelectPathForAutomation(tree.AbsolutePath);
+                DeferOrNavigate(SectionKey.Scan);
+                notifier.Notify($"Агент показал сканирование: {tree.AbsolutePath} · {tree.TotalSizeText}");
+            });
+        }
 
         return ScanExport.ToJson(model);
     }
@@ -208,9 +241,10 @@ public sealed class McpBridge(
                 throw new McpException("Страница «Сканирование» сейчас занята другой операцией.");
             }
 
-            var target = string.IsNullOrWhiteSpace(path) ? scan.SelectedDrive.Trim() : path.Trim();
+            var explicitPath = !string.IsNullOrWhiteSpace(path);
+            var target = explicitPath ? path!.Trim() : scan.SelectedDrive.Trim();
 
-            if (start)
+            if (start || explicitPath)
             {
                 ValidateScanPath(target);
             }
@@ -220,22 +254,27 @@ public sealed class McpBridge(
                 scan.SelectPathForAutomation(target);
             }
 
-            _shell?.TryNavigate(SectionKey.Scan);
+            var deferred = DeferOrNavigate(SectionKey.Scan);
 
             notifier.Notify(start
                 ? $"Агент запустил сканирование: {target}"
-                : "Агент открыл страницу «Сканирование»");
+                : deferred
+                    ? "Агент подготовил страницу «Сканирование»"
+                    : "Агент открыл страницу «Сканирование»");
 
-            return start ? scan.ScanFromAutomationAsync(target) : null;
+            return (Run: start ? scan.ScanFromAutomationAsync(target, cancellationToken) : null, Deferred: deferred);
         });
 
-        if (run is not null)
+        if (run.Run is not null)
         {
-            await run.ConfigureAwait(false);
+            await run.Run.ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
         }
 
-        return Dispatch(() => Serialize(new McpScanNavigation(_shell?.CurrentSectionKey ?? SectionKey.Scan, ReadScanState())));
+        return Dispatch(() => Serialize(new McpScanNavigation(
+            _shell?.CurrentSectionKey ?? SectionKey.Scan,
+            ReadScanState(),
+            DescribeDeferredNavigation(run.Deferred))));
     }
 
     public async Task<string> ArchiveDirectoryAsync(string path, bool deleteOriginal, bool dryRun, CancellationToken cancellationToken)
@@ -303,13 +342,13 @@ public sealed class McpBridge(
 
     public string MarkForDeletion(IReadOnlyList<string> paths, bool mark)
     {
-        logger.McpToolInvoked("mark_for_deletion", $"путей {paths.Count}, пометить {mark}");
-
         if (!preferences.AllowMutations)
         {
             logger.McpToolRejected("mark_for_deletion", "изменяющие операции запрещены");
             throw new McpException("Изменяющие операции запрещены. Включите «Разрешить изменяющие операции» в настройках приложения.");
         }
+
+        logger.McpToolInvoked("mark_for_deletion", $"путей {paths.Count}, пометить {mark}");
 
         if (paths.Count == 0)
         {
@@ -336,6 +375,7 @@ public sealed class McpBridge(
 
             List<SpaceBase> targets = [];
             List<string> missing = [];
+            List<string> rejected = [];
 
             foreach (var path in paths.Select(static path => path.Trim()).Where(static path => path.Length > 0))
             {
@@ -347,7 +387,8 @@ public sealed class McpBridge(
 
                 if (mark && scan.IsScanRoot(space))
                 {
-                    throw new McpException($"«{path}» – корень открытого сканирования, пометить его целиком нельзя. Выберите подкаталоги.");
+                    rejected.Add(path);
+                    continue;
                 }
 
                 targets.Add(space);
@@ -368,6 +409,8 @@ public sealed class McpBridge(
             return Serialize(new McpMarkResult(
                 changed,
                 missing,
+                rejected,
+                rejected.Count == 0 ? null : "Корень открытого сканирования пометить целиком нельзя – выберите подкаталоги.",
                 scan.MarkedCount,
                 SizeFormatter.Format(scan.MarkedBytes()),
                 ReadScanState()));
@@ -458,14 +501,35 @@ public sealed class McpBridge(
 
             sync.SelectedModeIndex = SyncProfile.IndexOfMode(targetMode);
 
+            List<string> ignored = [];
+
             if (winner is { } side)
             {
-                sync.SelectedWinnerIndex = SyncProfile.IndexOfWinner(side);
+                if (preferences.AllowMutations)
+                {
+                    sync.SelectedWinnerIndex = SyncProfile.IndexOfWinner(side);
+                }
+                else
+                {
+                    ignored.Add("winner");
+                }
             }
 
             if (mirror is { } enabled)
             {
-                sync.Mirror = enabled;
+                if (preferences.AllowMutations)
+                {
+                    sync.Mirror = enabled;
+                }
+                else
+                {
+                    ignored.Add("mirror");
+                }
+            }
+
+            if (ignored.Count > 0)
+            {
+                logger.McpToolRejected("open_sync", $"параметры {string.Join(", ", ignored)} требуют разрешённых изменяющих операций");
             }
 
             if (exclusions is not null)
@@ -473,22 +537,31 @@ public sealed class McpBridge(
                 sync.Exclusions = exclusions.Trim();
             }
 
-            _shell?.TryNavigate(SectionKey.Sync);
+            var deferred = DeferOrNavigate(SectionKey.Sync);
 
             notifier.Notify(compare
                 ? $"Агент запустил сравнение: {targetLeft} → {targetRight}"
-                : "Агент открыл страницу «Синхронизация»");
+                : deferred
+                    ? "Агент подготовил страницу «Синхронизация»"
+                    : "Агент открыл страницу «Синхронизация»");
 
-            return compare ? sync.CompareCommand.ExecuteAsync(null) : null;
+            return (
+                Run: compare ? sync.CompareFromAutomationAsync(cancellationToken) : null,
+                Deferred: deferred,
+                Ignored: ignored);
         });
 
-        if (comparison is not null)
+        if (comparison.Run is not null)
         {
-            await comparison.ConfigureAwait(false);
+            await comparison.Run.ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
         }
 
-        return Dispatch(() => Serialize(new McpNavigationResult(_shell?.CurrentSectionKey ?? SectionKey.Sync, ReadSyncState())));
+        return Dispatch(() => Serialize(new McpNavigationResult(
+            _shell?.CurrentSectionKey ?? SectionKey.Sync,
+            ReadSyncState(),
+            DescribeDeferredNavigation(comparison.Deferred),
+            comparison.Ignored.Count == 0 ? null : $"Параметры {string.Join(", ", comparison.Ignored)} не применены: изменяющие операции выключены в настройках приложения.")));
     }
 
     public async Task<string> SyncCurrentAsync(bool dryRun, int entryLimit, CancellationToken cancellationToken)
@@ -498,7 +571,17 @@ public sealed class McpBridge(
         if (dryRun)
         {
             logger.McpToolInvoked("sync_current", $"план, записей до {entryLimit}");
-            return await ExportCurrentAsync(entryLimit, cancellationToken).ConfigureAwait(false);
+
+            var plan = Dispatch(() => sync.CapturePlanBuilder(entryLimit));
+
+            if (plan is null)
+            {
+                throw new McpException("На странице «Синхронизация» сравнение ещё не выполнялось. Запустите open_sync с compare=true или compare_directories.");
+            }
+
+            var model = await Task.Run(plan, cancellationToken).ConfigureAwait(false);
+
+            return SyncPlanExport.ToJson(model);
         }
 
         if (!preferences.AllowMutations)
@@ -527,7 +610,7 @@ public sealed class McpBridge(
             logger.McpMutationRequested("sync_current", $"«{sync.LeftPath}» → «{sync.RightPath}», режим {sync.CurrentMode}, зеркало {sync.Mirror}");
             notifier.Notify("Агент запустил синхронизацию", StatusSeverity.Warning);
 
-            return sync.SyncFromAutomationAsync();
+            return sync.SyncFromAutomationAsync(cancellationToken);
         });
 
         var report = await run.ConfigureAwait(false);
@@ -535,7 +618,7 @@ public sealed class McpBridge(
 
         if (report is null)
         {
-            throw new McpException("Синхронизация не выполнена: операция отменена или сравнение сброшено.");
+            throw new McpException("Синхронизация не доведена до конца: операция отменена или сравнение сброшено. Часть файлов могла быть уже перенесена – сравните каталоги заново.");
         }
 
         return Dispatch(() => Serialize(new McpSyncResult(
@@ -666,6 +749,22 @@ public sealed class McpBridge(
         return JsonSerializer.Serialize(value, JsonOptions);
     }
 
+    private static string? DescribeDeferredNavigation(bool deferred)
+    {
+        return deferred
+            ? "Страница подготовлена, но не открыта: идёт разговор в чате. Переход человек сделает кнопкой в ленте – пересказывать путь словами всё равно нужно."
+            : null;
+    }
+
+    private static void Dispatch(Action action)
+    {
+        Dispatch(() =>
+        {
+            action();
+            return true;
+        });
+    }
+
     private static T Dispatch<T>(Func<T> action)
     {
         var dispatcher = Application.Current?.Dispatcher;
@@ -687,6 +786,18 @@ public sealed class McpBridge(
         {
             throw new McpException("Окно приложения занято и не ответило вовремя – повторите позже.");
         }
+    }
+
+    private bool DeferOrNavigate(string sectionKey)
+    {
+        if (DeferNavigation)
+        {
+            NavigationDeferred?.Invoke(sectionKey);
+            return true;
+        }
+
+        _shell?.TryNavigate(sectionKey);
+        return false;
     }
 
     private (DirectorySpace Dir, ArchiveRequest Request) PrepareArchive(string path, bool deleteOriginal)

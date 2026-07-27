@@ -361,4 +361,7 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 2125, Level = LogLevel.Information, Message = "Разговор откачен к вопросу: убрано сообщений {Count}, сессия CLI сброшена")]
     public static partial void ChatRewound(this ILogger logger, int count);
+
+    [LoggerMessage(EventId = 2126, Level = LogLevel.Debug, Message = "Переход на страницу «{Page}» отложен до конца хода агента")]
+    public static partial void AgentNavigationDeferred(this ILogger logger, string page);
 }

@@ -1108,7 +1108,12 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     }
 
     [RelayCommand(CanExecute = nameof(CanRun))]
-    private async Task CompareAsync()
+    private Task CompareAsync()
+    {
+        return ExecuteCompareAsync(CancellationToken.None);
+    }
+
+    private async Task ExecuteCompareAsync(CancellationToken external)
     {
         var left = LeftPath.Trim();
         var right = RightPath.Trim();
@@ -1146,7 +1151,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             var compared = comparer.Compare(left, right, token, progress);
             compared.ApplyMode(mode, mirror, winner);
             return new ComparePreparation(compared, BuildDirSizeCache(compared.Root));
-        });
+        }, external: external);
 
         stopwatch.Stop();
 
@@ -1422,12 +1427,17 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         await ExecuteSyncAsync(true);
     }
 
-    internal Task<SyncReport?> SyncFromAutomationAsync()
+    internal Task CompareFromAutomationAsync(CancellationToken cancellationToken)
     {
-        return ExecuteSyncAsync(false);
+        return ExecuteCompareAsync(cancellationToken);
     }
 
-    private async Task<SyncReport?> ExecuteSyncAsync(bool interactive)
+    internal Task<SyncReport?> SyncFromAutomationAsync(CancellationToken cancellationToken)
+    {
+        return ExecuteSyncAsync(false, cancellationToken);
+    }
+
+    private async Task<SyncReport?> ExecuteSyncAsync(bool interactive, CancellationToken external = default)
     {
         if (_result is null)
         {
@@ -1453,7 +1463,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             }
 
             return executed;
-        }, planned.Total);
+        }, planned.Total, external);
 
         stopwatch.Stop();
 
@@ -1625,6 +1635,19 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     internal ComparisonExportModel? BuildExportModel(int entryLimit)
     {
         return CaptureExportBuilder(entryLimit)?.Invoke();
+    }
+
+    internal Func<SyncPlanExportModel>? CapturePlanBuilder(int entryLimit)
+    {
+        if (_result is null)
+        {
+            return null;
+        }
+
+        var result = _result;
+        var options = new ComparisonExportOptions(CurrentMode, CurrentWinner, Mirror, Exclusions.Trim());
+
+        return () => SyncPlanExport.Build(result, options, AppInfo.Version, entryLimit);
     }
 
     internal Func<ComparisonExportModel>? CaptureExportBuilder(int entryLimit)
@@ -1890,10 +1913,14 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
     }
 
-    private async Task<T?> RunAsync<T>(string caption, Func<CancellationToken, IProgress<OperationProgress>, T> work, int total = 0)
+    private async Task<T?> RunAsync<T>(
+        string caption,
+        Func<CancellationToken, IProgress<OperationProgress>, T> work,
+        int total = 0,
+        CancellationToken external = default)
         where T : class
     {
-        _cts = new();
+        _cts = CancellationTokenSource.CreateLinkedTokenSource(external);
         var token = _cts.Token;
         IsBusy = true;
 

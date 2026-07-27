@@ -4,6 +4,11 @@ public sealed record ChatToolCall(string Name, string Text, bool IsMutating, str
 {
     public string Details => ChatToolArguments.Describe(Arguments);
 
+    public static ChatToolCall From(AgentEvent turnEvent)
+    {
+        return From(turnEvent.ToolName, turnEvent.ToolArguments);
+    }
+
     public static ChatToolCall From(string? toolName, string? arguments = null)
     {
         var name = toolName ?? string.Empty;

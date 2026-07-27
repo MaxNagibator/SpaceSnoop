@@ -60,6 +60,9 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
     [ObservableProperty]
     private ChatConversationViewModel? _currentConversation;
 
+    [ObservableProperty]
+    private ChatPendingNavigation? _pendingNavigation;
+
     public ChatViewModel(
         AgentBackends backends,
         AgentPreferences preferences,
@@ -87,9 +90,12 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         _preferences.PropertyChanged += OnGateSourceChanged;
         Mcp.PropertyChanged += OnGateSourceChanged;
         McpServer.PropertyChanged += OnGateSourceChanged;
+        _bridge.NavigationDeferred += OnNavigationDeferred;
     }
 
     public event Action? FocusRequested;
+
+    public event Action<string>? NavigationRequested;
 
     public static IReadOnlyList<ChatExample> Examples { get; } =
     [
@@ -196,6 +202,35 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
     private async Task RecheckCliAsync()
     {
         await DetectCliAsync();
+    }
+
+    [RelayCommand]
+    private void OpenPendingPage()
+    {
+        if (PendingNavigation is not { } pending)
+        {
+            return;
+        }
+
+        PendingNavigation = null;
+        NavigationRequested?.Invoke(pending.Key);
+    }
+
+    [RelayCommand]
+    private void DismissPendingPage()
+    {
+        PendingNavigation = null;
+    }
+
+    private void OnNavigationDeferred(string sectionKey)
+    {
+        if (ChatPendingNavigation.For(sectionKey) is not { } pending)
+        {
+            return;
+        }
+
+        PendingNavigation = pending;
+        _logger.AgentNavigationDeferred(pending.Page);
     }
 
     private async Task DetectCliAsync()
@@ -556,6 +591,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
 
         _sessionDropped = false;
         IsBusy = true;
+        _bridge.DeferNavigation = true;
 
         try
         {
@@ -577,7 +613,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
 
                     case AgentEventKind.ToolCall:
                         assistant.DropPreamble();
-                        assistant.ToolCalls.Add(ChatToolCall.From(turnEvent.ToolName));
+                        assistant.ToolCalls.Add(ChatToolCall.From(turnEvent));
                         break;
 
                     case AgentEventKind.Completed:
@@ -610,6 +646,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         {
             assistant.IsStreaming = false;
             IsBusy = false;
+            _bridge.DeferNavigation = false;
             _cts?.Dispose();
             _cts = null;
 

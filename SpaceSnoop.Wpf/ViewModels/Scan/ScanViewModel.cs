@@ -255,11 +255,38 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         SelectedDrive = path;
     }
 
-    internal Task ScanFromAutomationAsync(string path)
+    internal Task ScanFromAutomationAsync(string path, CancellationToken cancellationToken)
     {
         SelectPathForAutomation(path);
 
-        return ScanAsync(path);
+        return ScanAsync(path, cancellationToken);
+    }
+
+    internal void ApplyScanResult(string path, DirectorySpace result, TimeSpan elapsed)
+    {
+        RemoveRoot(path);
+
+        _rootTotalSize = result.TotalSize;
+
+        var node = _nodeFactory.Create(result, result.TotalSize, result.TotalSize, _sortState);
+        node.IsExpanded = true;
+
+        Roots.Insert(0, node);
+        SetTreemapRoot(node);
+
+        ResultPath = result.AbsolutePath;
+        ResultSizeText = result.TotalSizeText;
+        ResultFileCountText = result.TotalFileCount.ToString("N0");
+        ResultDirCountText = result.TotalDirectoryCount.ToString("N0");
+        ResultElapsedText = FormatElapsed(elapsed);
+        HasResult = true;
+        RecountMarked();
+
+        _logger.ScanCompleted(result.AbsolutePath,
+            result.TotalSizeText,
+            result.TotalFileCount,
+            result.TotalDirectoryCount,
+            (long)elapsed.TotalMilliseconds);
     }
 
     internal SpaceBase? FindForAutomation(string path)
@@ -856,7 +883,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         _cts?.Cancel();
     }
 
-    private async Task ScanAsync(string path)
+    private async Task ScanAsync(string path, CancellationToken external = default)
     {
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -871,7 +898,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
             return;
         }
 
-        _cts = new();
+        _cts = CancellationTokenSource.CreateLinkedTokenSource(external);
         var token = _cts.Token;
         IsScanning = true;
         ScanWasCancelled = false;
@@ -898,29 +925,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
             _scanStopwatch.Stop();
 
-            RemoveRoot(path);
-
-            _rootTotalSize = result.TotalSize;
-
-            var node = _nodeFactory.Create(result, result.TotalSize, result.TotalSize, _sortState);
-            node.IsExpanded = true;
-
-            Roots.Insert(0, node);
-            SetTreemapRoot(node);
-
-            ResultPath = result.AbsolutePath;
-            ResultSizeText = result.TotalSizeText;
-            ResultFileCountText = result.TotalFileCount.ToString("N0");
-            ResultDirCountText = result.TotalDirectoryCount.ToString("N0");
-            ResultElapsedText = FormatElapsed(_scanStopwatch.Elapsed);
-            HasResult = true;
-            RecountMarked();
-
-            _logger.ScanCompleted(result.AbsolutePath,
-                result.TotalSizeText,
-                result.TotalFileCount,
-                result.TotalDirectoryCount,
-                (long)_scanStopwatch.Elapsed.TotalMilliseconds);
+            ApplyScanResult(path, result, _scanStopwatch.Elapsed);
 
             _notifier.Notify($"Сканирование завершено: {result.AbsolutePath} · {result.TotalSizeText}", StatusSeverity.Success);
         }

@@ -118,6 +118,19 @@ public class ChatMessageTests
     }
 
     [Test]
+    public void Вызов_из_события_хода_несёт_аргументы()
+    {
+        var call = ChatToolCall.From(AgentEvent.Tool("mcp__spacesnoop__scan_directory", """{"path":"C:\\Data"}"""));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(call.Name, Is.EqualTo("mcp__spacesnoop__scan_directory"));
+            Assert.That(call.Arguments, Is.EqualTo("""{"path":"C:\\Data"}"""));
+            Assert.That(call.Details, Is.EqualTo("path: C:\\Data"));
+        });
+    }
+
+    [Test]
     public void Бейдж_без_аргументов_подсказывает_собственным_названием()
     {
         var message = new ChatMessageViewModel(ChatRole.Assistant);

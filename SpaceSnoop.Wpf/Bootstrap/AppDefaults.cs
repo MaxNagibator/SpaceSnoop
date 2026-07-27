@@ -54,6 +54,7 @@ public static class AppDefaults
     public const string McpEndpointPath = "/mcp";
     public const int McpEntryLimitMin = 1;
     public const int McpEntryLimitMax = 10_000;
+    public const int McpEntryLimitDefault = 100;
     public const int McpDispatchTimeoutSeconds = 30;
 
     public const bool AgentEnabledDefault = true;
