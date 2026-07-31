@@ -284,6 +284,12 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 2007, Level = LogLevel.Warning, Message = "MCP-сервер не запущен: токен доступа не задан")]
     public static partial void McpServerTokenMissing(this ILogger logger);
 
+    [LoggerMessage(EventId = 2008, Level = LogLevel.Warning, Message = "MCP-сервер не остановился за {Seconds} с, выход продолжен без него")]
+    public static partial void McpServerStopTimedOut(this ILogger logger, int seconds);
+
+    [LoggerMessage(EventId = 2009, Level = LogLevel.Error, Message = "MCP-сервер не остановился штатно")]
+    public static partial void McpServerStopFailed(this ILogger logger, Exception exception);
+
     [LoggerMessage(EventId = 2100, Level = LogLevel.Information, Message = "CLI агента найден: {Path} ({Version})")]
     public static partial void AgentCliDetected(this ILogger logger, string path, string version);
 

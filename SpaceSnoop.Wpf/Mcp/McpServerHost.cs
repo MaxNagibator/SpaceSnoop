@@ -7,7 +7,7 @@ using System.Net;
 
 namespace SpaceSnoop.Wpf.Mcp;
 
-public sealed partial class McpServerHost : ObservableObject, IAsyncDisposable
+public sealed partial class McpServerHost : ObservableObject, IDisposable
 {
     private readonly McpPreferences _preferences;
     private readonly McpBridge _bridge;
@@ -15,6 +15,7 @@ public sealed partial class McpServerHost : ObservableObject, IAsyncDisposable
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     private WebApplication? _app;
+    private bool _disposed;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsRunning))]
@@ -35,26 +36,45 @@ public sealed partial class McpServerHost : ObservableObject, IAsyncDisposable
 
     public void Apply()
     {
-        _ = ApplyAsync();
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        _preferences.PropertyChanged -= OnPreferencesChanged;
-        await StopAsync().ConfigureAwait(false);
-        _gate.Dispose();
-    }
-
-    private async Task ApplyAsync()
-    {
-        try
-        {
-            await _gate.WaitAsync().ConfigureAwait(false);
-        }
-        catch (ObjectDisposedException)
+        if (_disposed)
         {
             return;
         }
+
+        _ = ApplyAsync();
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _preferences.PropertyChanged -= OnPreferencesChanged;
+
+        try
+        {
+            if (!Task.Run(StopAsync).Wait(TimeSpan.FromSeconds(AppDefaults.McpShutdownTimeoutSeconds)))
+            {
+                _logger.McpServerStopTimedOut(AppDefaults.McpShutdownTimeoutSeconds);
+            }
+        }
+        catch (Exception exception)
+        {
+            _logger.McpServerStopFailed(exception.Unwrap());
+        }
+    }
+
+    private Task ApplyAsync()
+    {
+        return Task.Run(ApplyCoreAsync);
+    }
+
+    private async Task ApplyCoreAsync()
+    {
+        await _gate.WaitAsync().ConfigureAwait(false);
 
         try
         {
@@ -146,14 +166,7 @@ public sealed partial class McpServerHost : ObservableObject, IAsyncDisposable
 
     private async Task StopAsync()
     {
-        try
-        {
-            await _gate.WaitAsync().ConfigureAwait(false);
-        }
-        catch (ObjectDisposedException)
-        {
-            return;
-        }
+        await _gate.WaitAsync().ConfigureAwait(false);
 
         try
         {

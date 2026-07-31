@@ -92,7 +92,6 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        _services?.GetService<McpServerHost>()?.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _services?.GetService<ISettingsStore>()?.Flush();
 
         _services?.Dispose();

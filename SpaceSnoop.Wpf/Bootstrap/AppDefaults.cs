@@ -56,6 +56,7 @@ public static class AppDefaults
     public const int McpEntryLimitMax = 10_000;
     public const int McpEntryLimitDefault = 100;
     public const int McpDispatchTimeoutSeconds = 30;
+    public const int McpShutdownTimeoutSeconds = 3;
 
     public const bool AgentEnabledDefault = true;
     public const bool AgentConsentDefault = false;
