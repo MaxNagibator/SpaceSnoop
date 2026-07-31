@@ -487,8 +487,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto"
                                                   MinWidth="58" />
-                                <ColumnDefinition Width="Auto"
-                                                  MinWidth="46" />
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="172" />
                             </Grid.ColumnDefinitions>
 
@@ -540,14 +539,43 @@
                                            Foreground="{DynamicResource Fg.Muted}" />
                             </StackPanel>
 
-                            <TextBlock Grid.Column="2"
-                                       Text="{Binding ShareText}"
-                                       HorizontalAlignment="Right"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,12,0"
-                                       FontFamily="{DynamicResource Font.Mono}"
-                                       FontSize="{DynamicResource Font.Size.Caption}"
-                                       Foreground="{DynamicResource Fg.Muted}" />
+                            <StackPanel Grid.Column="2"
+                                        Orientation="Horizontal"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Margin="0,0,12,0">
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.HardDrive}"
+                                                          Width="11"
+                                                          Height="11"
+                                                          VerticalAlignment="Center"
+                                                          Margin="0,0,4,0"
+                                                          Foreground="{DynamicResource Fg.Muted}">
+                                    <iconPacks:PackIconLucide.Style>
+                                        <Style TargetType="iconPacks:PackIconLucide">
+                                            <Setter Property="Visibility"
+                                                    Value="Hidden" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ShowsDriveShare}"
+                                                             Value="True">
+                                                    <Setter Property="Visibility"
+                                                            Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </iconPacks:PackIconLucide.Style>
+                                </iconPacks:PackIconLucide>
+                                <Grid VerticalAlignment="Center">
+                                    <TextBlock Text="{x:Static bootstrap:ShareFormatter.WidestSample}"
+                                               Visibility="Hidden"
+                                               FontFamily="{DynamicResource Font.Mono}"
+                                               FontSize="{DynamicResource Font.Size.Caption}" />
+                                    <TextBlock Text="{Binding ShareText}"
+                                               HorizontalAlignment="Right"
+                                               FontFamily="{DynamicResource Font.Mono}"
+                                               FontSize="{DynamicResource Font.Size.Caption}"
+                                               Foreground="{DynamicResource Fg.Muted}" />
+                                </Grid>
+                            </StackPanel>
 
                             <Border x:Name="ScanBarTrack"
                                     Grid.Column="3"

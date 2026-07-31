@@ -53,6 +53,27 @@ public sealed partial class ScanInspectorViewModel : ObservableObject
     private string _shareOfRootText = string.Empty;
 
     [ObservableProperty]
+    private double _driveShare;
+
+    [ObservableProperty]
+    private string _driveShareText = string.Empty;
+
+    [ObservableProperty]
+    private string _driveShareHint = string.Empty;
+
+    [ObservableProperty]
+    private bool _showParentShare;
+
+    [ObservableProperty]
+    private bool _showRootShare;
+
+    [ObservableProperty]
+    private bool _showDriveShare;
+
+    [ObservableProperty]
+    private bool _hasShares;
+
+    [ObservableProperty]
     private string _fileCountText = string.Empty;
 
     [ObservableProperty]
@@ -106,7 +127,7 @@ public sealed partial class ScanInspectorViewModel : ObservableObject
         Persist(() => _settings.SetValue(SettingsKeys.ScanInspectorWidth, clamped.ToString("F0", CultureInfo.InvariantCulture)));
     }
 
-    public void Show(ScanNodeViewModel node, long rootTotal)
+    public void Show(ScanNodeViewModel node)
     {
         Node = node;
         HasSelection = true;
@@ -120,10 +141,7 @@ public sealed partial class ScanInspectorViewModel : ObservableObject
         var total = space?.TotalSize ?? 0;
         TotalSizeText = SizeFormatter.Format(total);
 
-        ShareOfParent = node.Share;
-        ShareOfParentText = node.ShareText;
-        ShareOfRoot = rootTotal > 0 ? Math.Clamp((double)total / rootTotal, 0, 1) : 0;
-        ShareOfRootText = $"{ShareOfRoot * 100:0.#} %";
+        ApplyShares(node);
 
         CreationDateText = space?.CreationDate.ToString("g") ?? string.Empty;
         LastAccessText = space?.LastAccessTime.ToString("g") ?? string.Empty;
@@ -161,6 +179,13 @@ public sealed partial class ScanInspectorViewModel : ObservableObject
         ShareOfParentText = string.Empty;
         ShareOfRoot = 0;
         ShareOfRootText = string.Empty;
+        DriveShare = 0;
+        DriveShareText = string.Empty;
+        DriveShareHint = string.Empty;
+        ShowParentShare = false;
+        ShowRootShare = false;
+        ShowDriveShare = false;
+        HasShares = false;
         FileCountText = string.Empty;
         DirCountText = string.Empty;
         CreationDateText = string.Empty;
@@ -238,6 +263,29 @@ public sealed partial class ScanInspectorViewModel : ObservableObject
         TryCopy(BuildDetails());
     }
 
+    private void ApplyShares(ScanNodeViewModel node)
+    {
+        ShareOfParent = node.Share;
+        ShareOfParentText = ShareFormatter.Format(node.Share);
+        ShareOfRoot = node.ShareOfRoot;
+        ShareOfRootText = ShareFormatter.Format(node.ShareOfRoot);
+
+        ShowParentShare = !node.IsRoot;
+        ShowRootShare = ShowParentShare && !string.Equals(ShareOfParentText, ShareOfRootText, StringComparison.Ordinal);
+
+        ApplyDriveShare(node);
+
+        HasShares = ShowParentShare || ShowRootShare || ShowDriveShare;
+    }
+
+    private void ApplyDriveShare(ScanNodeViewModel node)
+    {
+        ShowDriveShare = node.ShowsDriveShare;
+        DriveShare = node.DriveShare;
+        DriveShareText = ShowDriveShare ? ShareFormatter.Format(node.DriveShare) : string.Empty;
+        DriveShareHint = node.DriveHint;
+    }
+
     private void BuildTopChildren(DirectorySpace dir)
     {
         var children = dir.SubDirectories
@@ -252,7 +300,7 @@ public sealed partial class ScanInspectorViewModel : ObservableObject
             .Take(AppDefaults.TopChildrenLimit)
             .Select(child => new ScanInspectorChild(child.Name,
                 SizeFormatter.Format(child.TotalSize),
-                dir.TotalSize > 0 ? $"{(double)child.TotalSize / dir.TotalSize * 100:0} %" : "0 %",
+                ShareFormatter.Format(dir.TotalSize > 0 ? (double)child.TotalSize / dir.TotalSize : 0),
                 max > 0 ? Math.Clamp((double)child.TotalSize / max, 0, 1) : 0,
                 child is DirectorySpace));
 
@@ -288,8 +336,20 @@ public sealed partial class ScanInspectorViewModel : ObservableObject
             builder.AppendLine($"Свои файлы: {OwnSizeText}");
         }
 
-        builder.AppendLine($"Доля родителя: {ShareOfParentText}");
-        builder.AppendLine($"Доля корня: {ShareOfRootText}");
+        if (ShowParentShare)
+        {
+            builder.AppendLine($"Доля родителя: {ShareOfParentText}");
+        }
+
+        if (ShowRootShare)
+        {
+            builder.AppendLine($"Доля корня: {ShareOfRootText}");
+        }
+
+        if (ShowDriveShare)
+        {
+            builder.AppendLine($"Доля диска: {DriveShareText} ({DriveShareHint})");
+        }
 
         if (IsDirectory)
         {

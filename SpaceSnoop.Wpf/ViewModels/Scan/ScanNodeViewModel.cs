@@ -21,11 +21,13 @@ public sealed partial class ScanNodeViewModel : ObservableObject
     [ObservableProperty]
     private bool _isSelected;
 
-    internal ScanNodeViewModel(SpaceBase space, double siblingMax, double parentTotal, ScanSortState sort, ILogger logger, ScanNodeFactory factory)
+    internal ScanNodeViewModel(SpaceBase space, double siblingMax, double parentTotal, SpaceBase root, DriveCapacity? drive, ScanSortState sort, ILogger logger, ScanNodeFactory factory)
     {
         Space = space;
         Fraction = siblingMax;
         Share = parentTotal;
+        Root = root;
+        Drive = drive;
         _sort = sort;
         _logger = logger;
         _factory = factory;
@@ -61,6 +63,11 @@ public sealed partial class ScanNodeViewModel : ObservableObject
                 return 0;
             }
 
+            if (ShowsDriveShare)
+            {
+                return DriveShare;
+            }
+
             if (field > 0)
             {
                 return Math.Clamp(Space.TotalSize / field, 0, 1);
@@ -74,15 +81,37 @@ public sealed partial class ScanNodeViewModel : ObservableObject
         ? 0
         : Math.Clamp(Space.TotalSize / field, 0, 1);
 
+    public SpaceBase? Root { get; }
+
+    public bool IsRoot => Space is not null && ReferenceEquals(Space, Root);
+
+    public double ShareOfRoot => Space is null || Root is null || Root.TotalSize <= 0
+        ? 0
+        : Math.Clamp((double)Space.TotalSize / Root.TotalSize, 0, 1);
+
+    public DriveCapacity? Drive { get; }
+
+    public bool ShowsDriveShare => IsRoot && Drive is { TotalBytes: > 0 };
+
+    public double DriveShare => ShowsDriveShare && Space is not null
+        ? Math.Clamp((double)Space.TotalSize / Drive!.Value.TotalBytes, 0, 1)
+        : 0;
+
+    public string DriveHint => ShowsDriveShare
+        ? $"Диск {Drive!.Value.Name} – занято {SizeFormatter.Format(Drive.Value.UsedBytes)} из {SizeFormatter.Format(Drive.Value.TotalBytes)}"
+        : string.Empty;
+
     public double Weight => Space?.TotalSize ?? 0;
 
-    public string ShareText => $"{Share * 100:0}%";
+    public string ShareText => ShareFormatter.Format(ShowsDriveShare ? DriveShare : Share);
 
     public string FileCountText => Space is DirectorySpace dir ? dir.TotalFileCount.ToString("N0") : string.Empty;
 
     public string AbsolutePath => Space?.AbsolutePath ?? string.Empty;
 
-    public string Tooltip => Space?.GetTooltipText() ?? string.Empty;
+    public string Tooltip => ShowsDriveShare
+        ? $"{Space!.GetTooltipText()}{Environment.NewLine}Доля диска: {ShareFormatter.Format(DriveShare)} – {DriveHint}"
+        : Space?.GetTooltipText() ?? string.Empty;
 
     public string KindText => IsDirectory ? "Каталог" : "Файл";
 
@@ -146,7 +175,7 @@ public sealed partial class ScanNodeViewModel : ObservableObject
 
         var ordered = items
             .OrderBy(static x => x, _sort)
-            .Select(item => _factory!.Create(item, localMax, dir.TotalSize, _sort));
+            .Select(item => _factory!.Create(item, localMax, dir.TotalSize, Root!, _sort));
 
         Children.ReplaceAll(ordered);
     }

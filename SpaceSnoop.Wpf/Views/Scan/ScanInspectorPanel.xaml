@@ -344,9 +344,55 @@
 
                         <Border Style="{StaticResource Card.Inset}"
                                 Padding="12,10"
-                                Margin="0,8,0,0">
+                                Margin="0,8,0,0"
+                                Visibility="{Binding HasShares, Converter={StaticResource BoolToVisibility}}">
                             <StackPanel>
-                                <Grid Margin="0,2">
+                                <Grid Margin="0,2"
+                                      ToolTip="{Binding DriveShareHint}"
+                                      Visibility="{Binding ShowDriveShare, Converter={StaticResource BoolToVisibility}}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="132" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Text="ОТ ДИСКА"
+                                               Style="{StaticResource Caption}" />
+                                    <Border x:Name="DriveBarTrack"
+                                            Grid.Column="2"
+                                            Height="10"
+                                            Background="{DynamicResource Bg.SurfaceMute}"
+                                            CornerRadius="{DynamicResource Radius.S}"
+                                            VerticalAlignment="Center">
+                                        <Rectangle HorizontalAlignment="Left"
+                                                   Height="10"
+                                                   RadiusX="4"
+                                                   RadiusY="4">
+                                            <Rectangle.Width>
+                                                <MultiBinding Converter="{StaticResource FractionToWidth}">
+                                                    <Binding Path="DriveShare" />
+                                                    <Binding Path="ActualWidth"
+                                                             ElementName="DriveBarTrack" />
+                                                </MultiBinding>
+                                            </Rectangle.Width>
+                                            <Rectangle.Fill>
+                                                <MultiBinding Converter="{StaticResource HeatBrush}">
+                                                    <Binding Path="DriveShare" />
+                                                    <Binding Path="Intensity" />
+                                                </MultiBinding>
+                                            </Rectangle.Fill>
+                                        </Rectangle>
+                                    </Border>
+                                    <TextBlock Grid.Column="3"
+                                               Text="{Binding DriveShareText}"
+                                               Style="{StaticResource Value}"
+                                               MinWidth="42"
+                                               Margin="8,0,0,0"
+                                               TextAlignment="Right" />
+                                </Grid>
+                                <Grid Margin="0,2"
+                                      Visibility="{Binding ShowParentShare, Converter={StaticResource BoolToVisibility}}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
@@ -388,7 +434,8 @@
                                                Margin="8,0,0,0"
                                                TextAlignment="Right" />
                                 </Grid>
-                                <Grid Margin="0,6,0,2">
+                                <Grid Margin="0,6,0,2"
+                                      Visibility="{Binding ShowRootShare, Converter={StaticResource BoolToVisibility}}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />

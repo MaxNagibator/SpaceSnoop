@@ -10,9 +10,14 @@ public sealed class ScanNodeFactory(ILogger<ScanNodeViewModel> logger, ScanPrefe
 
     public bool ChatEnabled => agent.Enabled;
 
-    public ScanNodeViewModel Create(SpaceBase space, double siblingMax, double parentTotal, ScanSortState sort)
+    public ScanNodeViewModel Create(SpaceBase space, double siblingMax, double parentTotal, SpaceBase root, ScanSortState sort)
     {
-        return new(space, siblingMax, parentTotal, sort, logger, this);
+        return new(space, siblingMax, parentTotal, root, null, sort, logger, this);
+    }
+
+    public ScanNodeViewModel CreateRoot(SpaceBase space, ScanSortState sort)
+    {
+        return new(space, space.TotalSize, space.TotalSize, space, DriveCapacity.TryRead(space.AbsolutePath), sort, logger, this);
     }
 
     public void RaiseMarksChanged()

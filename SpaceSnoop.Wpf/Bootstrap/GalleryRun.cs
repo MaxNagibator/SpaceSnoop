@@ -118,6 +118,7 @@ public static class GalleryRun
     {
         var scan = services.GetRequiredService<ScanViewModel>();
         await scan.ScanFromAutomationAsync(fixture.Left, CancellationToken.None).ConfigureAwait(true);
+        scan.SelectedNode = scan.Roots.FirstOrDefault();
 
         var sync = services.GetRequiredService<SyncViewModel>();
         sync.LeftPath = fixture.Left;

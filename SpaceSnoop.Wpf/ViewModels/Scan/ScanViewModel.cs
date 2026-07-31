@@ -36,7 +36,6 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     private Stopwatch? _scanStopwatch;
     private double? _progressFraction;
     private long? _estimatedTotalBytes;
-    private long _rootTotalSize;
 
     [ObservableProperty]
     private string _selectedDrive = string.Empty;
@@ -266,9 +265,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     {
         RemoveRoot(path);
 
-        _rootTotalSize = result.TotalSize;
-
-        var node = _nodeFactory.Create(result, result.TotalSize, result.TotalSize, _sortState);
+        var node = _nodeFactory.CreateRoot(result, _sortState);
         node.IsExpanded = true;
 
         Roots.Insert(0, node);
@@ -577,7 +574,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
         if (SelectedNode is not null)
         {
-            Inspector.Show(SelectedNode, _rootTotalSize);
+            Inspector.Show(SelectedNode);
         }
     }
 
@@ -638,7 +635,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         else
         {
             value.IsSelected = true;
-            Inspector.Show(value, _rootTotalSize);
+            Inspector.Show(value);
         }
     }
 
@@ -1110,7 +1107,6 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
         if (resultRoot?.Space is DirectorySpace resultDir)
         {
-            _rootTotalSize = resultDir.TotalSize;
             ResultSizeText = resultDir.TotalSizeText;
             ResultFileCountText = resultDir.TotalFileCount.ToString("N0");
             ResultDirCountText = resultDir.TotalDirectoryCount.ToString("N0");
