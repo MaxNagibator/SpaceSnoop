@@ -54,41 +54,34 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
 
     public PlannedActions CountPlannedActions()
     {
-        var newCopies = 0;
-        var modifiedCopies = 0;
-        var deletes = 0;
-        var dirCopies = 0;
-        var dirDeletes = 0;
-        CountPlannedRecursive(Root, ref newCopies, ref modifiedCopies, ref deletes, ref dirCopies, ref dirDeletes);
-        return new(newCopies, modifiedCopies, deletes, dirCopies, dirDeletes);
+        var tally = new PlanTally();
+        CountPlannedRecursive(Root, tally);
+
+        return new(tally.NewCopies, tally.ModifiedCopies, tally.Deletes, tally.DirCopies, tally.DirDeletes)
+        {
+            NewCopyBytes = tally.NewCopyBytes,
+            ModifiedCopyBytes = tally.ModifiedCopyBytes,
+            CopyToLeftBytes = tally.CopyToLeftBytes,
+            CopyToRightBytes = tally.CopyToRightBytes,
+            OverwriteLeftBytes = tally.OverwriteLeftBytes,
+            OverwriteRightBytes = tally.OverwriteRightBytes,
+            DeleteFileBytes = tally.DeleteFileBytes,
+            DeleteDirBytes = tally.DeleteDirBytes,
+        };
     }
 
-    private static void CountPlannedRecursive(
-        DirectoryComparison dir,
-        ref int newCopies,
-        ref int modifiedCopies,
-        ref int deletes,
-        ref int dirCopies,
-        ref int dirDeletes)
+    private static void CountPlannedRecursive(DirectoryComparison dir, PlanTally tally)
     {
         foreach (var file in dir.Files)
         {
             switch (file.Action)
             {
                 case SyncAction.CopyToRight or SyncAction.CopyToLeft:
-                    if (file.Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly)
-                    {
-                        newCopies++;
-                    }
-                    else
-                    {
-                        modifiedCopies++;
-                    }
-
+                    tally.AddCopy(file);
                     break;
 
                 case SyncAction.DeleteLeft or SyncAction.DeleteRight:
-                    deletes++;
+                    tally.AddDelete(file);
                     break;
             }
         }
@@ -97,16 +90,30 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
         {
             if (sub.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
             {
-                dirDeletes++;
+                tally.DirDeletes++;
+                AddSubtreeDeleteBytes(sub, sub.Action, tally);
                 continue;
             }
 
             if (sub.Action is SyncAction.CopyToRight or SyncAction.CopyToLeft)
             {
-                dirCopies++;
+                tally.DirCopies++;
             }
 
-            CountPlannedRecursive(sub, ref newCopies, ref modifiedCopies, ref deletes, ref dirCopies, ref dirDeletes);
+            CountPlannedRecursive(sub, tally);
+        }
+    }
+
+    private static void AddSubtreeDeleteBytes(DirectoryComparison dir, SyncAction action, PlanTally tally)
+    {
+        foreach (var file in dir.Files)
+        {
+            tally.AddSubtreeDeleteBytes(action, file);
+        }
+
+        foreach (var sub in dir.SubDirectories)
+        {
+            AddSubtreeDeleteBytes(sub, action, tally);
         }
     }
 
@@ -271,11 +278,99 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
         return dir.Files.Any(x => x.Status == ComparisonStatus.Conflict && x.Action == SyncAction.None)
                || dir.SubDirectories.Any(HasUnresolvedConflictsRecursive);
     }
+
+    private sealed class PlanTally
+    {
+        public int NewCopies { get; private set; }
+        public int ModifiedCopies { get; private set; }
+        public int Deletes { get; private set; }
+        public int DirCopies { get; set; }
+        public int DirDeletes { get; set; }
+        public long NewCopyBytes { get; private set; }
+        public long ModifiedCopyBytes { get; private set; }
+        public long CopyToLeftBytes { get; private set; }
+        public long CopyToRightBytes { get; private set; }
+        public long OverwriteLeftBytes { get; private set; }
+        public long OverwriteRightBytes { get; private set; }
+        public long DeleteFileBytes { get; private set; }
+        public long DeleteDirBytes { get; private set; }
+
+        public void AddCopy(FileComparison file)
+        {
+            var isNew = file.Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly;
+            var toRight = file.Action == SyncAction.CopyToRight;
+            var source = toRight ? file.LeftSize ?? 0 : file.RightSize ?? 0;
+
+            if (isNew)
+            {
+                NewCopies++;
+                NewCopyBytes += source;
+            }
+            else
+            {
+                ModifiedCopies++;
+                ModifiedCopyBytes += source;
+            }
+
+            if (toRight)
+            {
+                CopyToRightBytes += source;
+                OverwriteRightBytes += isNew ? 0 : file.RightSize ?? 0;
+            }
+            else
+            {
+                CopyToLeftBytes += source;
+                OverwriteLeftBytes += isNew ? 0 : file.LeftSize ?? 0;
+            }
+        }
+
+        public void AddDelete(FileComparison file)
+        {
+            Deletes++;
+            DeleteFileBytes += SideBytes(file.Action, file);
+        }
+
+        public void AddSubtreeDeleteBytes(SyncAction action, FileComparison file)
+        {
+            DeleteDirBytes += SideBytes(action, file);
+        }
+
+        private static long SideBytes(SyncAction action, FileComparison file)
+        {
+            return action == SyncAction.DeleteLeft ? file.LeftSize ?? 0 : file.RightSize ?? 0;
+        }
+    }
 }
 
 public sealed record PlannedActions(int NewCopies, int ModifiedCopies, int Deletes, int DirCopies, int DirDeletes)
 {
+    public static PlannedActions Empty { get; } = new(0, 0, 0, 0, 0);
+
+    public long NewCopyBytes { get; init; }
+
+    public long ModifiedCopyBytes { get; init; }
+
+    public long CopyToLeftBytes { get; init; }
+
+    public long CopyToRightBytes { get; init; }
+
+    public long OverwriteLeftBytes { get; init; }
+
+    public long OverwriteRightBytes { get; init; }
+
+    public long DeleteFileBytes { get; init; }
+
+    public long DeleteDirBytes { get; init; }
+
     public int Copies => NewCopies + ModifiedCopies;
 
     public int Total => Copies + Deletes + DirCopies + DirDeletes;
+
+    public long CopyBytes => CopyToLeftBytes + CopyToRightBytes;
+
+    public long DeleteBytes => DeleteFileBytes + DeleteDirBytes;
+
+    public long RequiredLeftBytes => CopyToLeftBytes - OverwriteLeftBytes;
+
+    public long RequiredRightBytes => CopyToRightBytes - OverwriteRightBytes;
 }

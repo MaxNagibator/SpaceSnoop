@@ -231,7 +231,7 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
                     break;
             }
 
-            report.Applied.Add(new(dir.Action, dir.RelativePath, 0));
+            report.AddApplied(dir.Action, dir.RelativePath, 0);
             logger.SyncFileApplied(dir.Action, dir.RelativePath);
         }
         catch (Exception ex)
@@ -254,14 +254,14 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         if (dir.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
         {
             ApplyDirectoryAction(dir, leftBase, rightBase, report);
-            progress?.Report(new(report.SuccessCount + report.Errors.Count, dir.RelativePath));
+            progress?.Report(new(report.SuccessCount + report.Errors.Count, dir.RelativePath, report.CopiedBytes));
             return;
         }
 
         if (dir.Action is SyncAction.CopyToRight or SyncAction.CopyToLeft)
         {
             ApplyDirectoryAction(dir, leftBase, rightBase, report);
-            progress?.Report(new(report.SuccessCount + report.Errors.Count, dir.RelativePath));
+            progress?.Report(new(report.SuccessCount + report.Errors.Count, dir.RelativePath, report.CopiedBytes));
         }
 
         foreach (var file in dir.Files)
@@ -286,7 +286,7 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
                     report.CopiedCount++;
                 }
 
-                report.Applied.Add(new(file.Action, file.RelativePath, AppliedBytes(file)));
+                report.AddApplied(file.Action, file.RelativePath, AppliedBytes(file));
                 logger.SyncFileApplied(file.Action, file.RelativePath);
             }
             catch (Exception ex)
@@ -295,7 +295,7 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
                 logger.SyncFileFailed(ex, file.Action, file.RelativePath);
             }
 
-            progress?.Report(new(report.SuccessCount + report.Errors.Count, file.RelativePath));
+            progress?.Report(new(report.SuccessCount + report.Errors.Count, file.RelativePath, report.CopiedBytes));
         }
 
         foreach (var sub in dir.SubDirectories)
@@ -310,9 +310,25 @@ public sealed class SyncReport
     public int CopiedCount { get; set; }
     public int DeletedCount { get; set; }
     public int SuccessCount => CopiedCount + DeletedCount;
+    public long CopiedBytes { get; private set; }
+    public long DeletedBytes { get; private set; }
     public List<SyncApplied> Applied { get; } = [];
     public List<SyncError> Errors { get; } = [];
     public List<SyncMismatch> Mismatches { get; } = [];
+
+    public void AddApplied(SyncAction action, string relativePath, long bytes)
+    {
+        Applied.Add(new(action, relativePath, bytes));
+
+        if (action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
+        {
+            DeletedBytes += bytes;
+        }
+        else
+        {
+            CopiedBytes += bytes;
+        }
+    }
 
     public void WriteDetails(TextWriter writer)
     {

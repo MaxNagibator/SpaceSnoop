@@ -45,6 +45,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private Dictionary<ComparisonStatus, int> _stats = NewZeroStats();
     private Dictionary<ComparisonStatus, int> _dirStats = NewZeroStats();
     private FreshnessSummary _freshness;
+    private PlannedActions _plan = PlannedActions.Empty;
     private int _total;
 
     [ObservableProperty]
@@ -193,6 +194,18 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     public double ModifiedFraction => Fraction(ComparisonStatus.Modified);
 
     public double ConflictFraction => Fraction(ComparisonStatus.Conflict);
+
+    public bool HasPlanVolume => _plan.CopyBytes > 0 || _plan.DeleteBytes > 0;
+
+    public bool HasPlanCopy => _plan.CopyBytes > 0;
+
+    public bool HasPlanTrash => _plan.DeleteBytes > 0;
+
+    public string PlanCopyText => SizeFormatter.Format(_plan.CopyBytes);
+
+    public string PlanTrashText => SizeFormatter.Format(_plan.DeleteBytes);
+
+    public string PlanVolumeHint => string.Join(Environment.NewLine, BuildPlanLines(_plan, null, BuildReceivers(_plan)));
 
     public bool HasConflicts => ConflictCount > 0;
 
@@ -436,7 +449,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     internal SyncWinner CurrentWinner => WinnerOrder[Math.Clamp(SelectedWinnerIndex, 0, WinnerOrder.Length - 1)];
 
-    private PlannedActions CurrentPlan => _result?.CountPlannedActions() ?? new(0, 0, 0, 0, 0);
+    private PlannedActions CurrentPlan => _result?.CountPlannedActions() ?? PlannedActions.Empty;
 
     public void NotifyActionsChanged()
     {
@@ -1397,7 +1410,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
 
         var planned = CurrentPlan;
-        var lines = BuildPlanLines(planned, true);
+        var lines = BuildPlanLines(planned, DirectionText(), BuildReceivers(planned));
 
         if (planned.ModifiedCopies > 0)
         {
@@ -1463,7 +1476,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             }
 
             return executed;
-        }, planned.Total, external);
+        }, planned.Total, external, planned.CopyBytes);
 
         stopwatch.Stop();
 
@@ -1488,14 +1501,17 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         await ReadGitStateAsync();
 
         var verifyText = verify ? $", расхождений: {report.Mismatches.Count:N0}" : string.Empty;
-        SummaryText = $"Готово за {stopwatch.Elapsed.TotalSeconds:F2} с. Успешно: {report.SuccessCount:N0}, ошибок: {report.Errors.Count:N0}{verifyText}";
+        var volumeText = report.CopiedBytes > 0 ? $" Перенесено: {SizeFormatter.Format(report.CopiedBytes)}." : string.Empty;
+        SummaryText = $"Готово за {stopwatch.Elapsed.TotalSeconds:F2} с.{volumeText} Успешно: {report.SuccessCount:N0}, ошибок: {report.Errors.Count:N0}{verifyText}";
         StatusCaption = SummaryText;
+
+        var toastVolume = report.CopiedBytes > 0 ? $" · {SizeFormatter.Format(report.CopiedBytes)}" : string.Empty;
 
         var syncToastMessage = report.Errors.Count > 0
             ? $"Синхронизация: применено {report.SuccessCount:N0}, ошибок: {report.Errors.Count:N0}"
             : report.Mismatches.Count > 0
                 ? $"Синхронизация: применено {report.SuccessCount:N0} · расхождений: {report.Mismatches.Count:N0}"
-                : $"Синхронизация завершена: применено {report.SuccessCount:N0}";
+                : $"Синхронизация завершена: применено {report.SuccessCount:N0}{toastVolume}";
 
         var syncToastSeverity = report.Errors.Count > 0 ? StatusSeverity.Error
             : report.Mismatches.Count > 0 ? StatusSeverity.Warning
@@ -1543,12 +1559,14 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
             if (report.CopiedCount > 0)
             {
-                done.Add($"скопировано: {report.CopiedCount:N0}");
+                var copied = report.CopiedBytes > 0 ? $" ({SizeFormatter.Format(report.CopiedBytes)})" : string.Empty;
+                done.Add($"скопировано: {report.CopiedCount:N0}{copied}");
             }
 
             if (report.DeletedCount > 0)
             {
-                done.Add($"удалено в корзину: {report.DeletedCount:N0}");
+                var deleted = report.DeletedBytes > 0 ? $" ({SizeFormatter.Format(report.DeletedBytes)})" : string.Empty;
+                done.Add($"удалено в корзину: {report.DeletedCount:N0}{deleted}");
             }
 
             var detail = done.Count > 0 ? string.Join(", ", done) : "изменений не потребовалось";
@@ -1917,7 +1935,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         string caption,
         Func<CancellationToken, IProgress<OperationProgress>, T> work,
         int total = 0,
-        CancellationToken external = default)
+        CancellationToken external = default,
+        long totalBytes = 0)
         where T : class
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(external);
@@ -1957,6 +1976,11 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             else
             {
                 head = $"{caption} {update.Completed}";
+            }
+
+            if (totalBytes > 0)
+            {
+                head += $" · {SizeFormatter.Format(update.Bytes)} из {SizeFormatter.Format(totalBytes)}";
             }
 
             StatusCaption = head;
@@ -2178,6 +2202,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             _stats = NewZeroStats();
             _dirStats = NewZeroStats();
             _freshness = default;
+            _plan = PlannedActions.Empty;
             _total = 0;
             NotifyLedgerChanged();
             HasPending = false;
@@ -2200,6 +2225,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _stats = stats;
         _dirStats = _result.GetDirectoryStatistics();
         _freshness = SyncFreshness.Compute(_result.Root);
+        _plan = _result.CountPlannedActions();
         _total = stats.Values.Sum();
         NotifyLedgerChanged();
 
@@ -2222,6 +2248,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _dirStats = dirs;
         _total = files.Values.Sum();
         _freshness = default;
+        _plan = PlannedActions.Empty;
         NotifyLedgerChanged();
     }
 
@@ -2235,24 +2262,30 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         };
     }
 
-    private List<string> BuildPlanLines(PlannedActions planned, bool includeDirection)
+    internal static List<string> BuildPlanLines(PlannedActions planned, string? direction, IReadOnlyList<PlanReceiver> receivers)
     {
         var lines = new List<string>();
 
-        if (includeDirection)
+        if (direction is not null)
         {
-            lines.Add($"Направление: {DirectionText()}.");
+            lines.Add($"Направление: {direction}.");
             lines.Add(string.Empty);
+        }
+
+        if (planned.Total == 0)
+        {
+            lines.Add("Изменений нет.");
+            return lines;
         }
 
         if (planned.Copies > 0)
         {
-            lines.Add($"Скопировать файлов: {planned.Copies:N0}");
+            lines.Add($"Скопировать файлов: {planned.Copies:N0} ({SizeFormatter.Format(planned.CopyBytes)})");
 
             if (planned.ModifiedCopies > 0)
             {
-                lines.Add($"    – новых: {planned.NewCopies:N0}");
-                lines.Add($"    – изменённых: {planned.ModifiedCopies:N0}");
+                lines.Add($"    – новых: {planned.NewCopies:N0} ({SizeFormatter.Format(planned.NewCopyBytes)})");
+                lines.Add($"    – изменённых: {planned.ModifiedCopies:N0} ({SizeFormatter.Format(planned.ModifiedCopyBytes)})");
             }
         }
 
@@ -2263,20 +2296,99 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         if (planned.Deletes > 0)
         {
-            lines.Add($"Удалить файлов в корзину: {planned.Deletes:N0}");
+            lines.Add($"Удалить файлов в корзину: {planned.Deletes:N0} ({SizeFormatter.Format(planned.DeleteFileBytes)})");
         }
 
         if (planned.DirDeletes > 0)
         {
-            lines.Add($"Удалить каталогов в корзину: {planned.DirDeletes:N0}");
+            lines.Add($"Удалить каталогов в корзину: {planned.DirDeletes:N0} ({SizeFormatter.Format(planned.DeleteDirBytes)})");
         }
 
-        if (planned.Total == 0)
+        var space = DescribeReceivers(receivers);
+
+        if (space.Count > 0)
         {
-            lines.Add("Изменений нет.");
+            lines.Add(string.Empty);
+            lines.AddRange(space);
+        }
+
+        if (planned.DeleteBytes > 0)
+        {
+            lines.Add("Удалённое уходит в корзину – место освободится после её очистки.");
         }
 
         return lines;
+    }
+
+    private static List<string> DescribeReceivers(IReadOnlyList<PlanReceiver> receivers)
+    {
+        var lines = new List<string>();
+
+        foreach (var receiver in receivers)
+        {
+            if (receiver.Required <= 0)
+            {
+                continue;
+            }
+
+            var required = SizeFormatter.Format(receiver.Required);
+
+            if (receiver.Free is not { } free)
+            {
+                lines.Add($"Приёмник {receiver.Path}: потребуется ≈{required}, свободное место неизвестно.");
+                continue;
+            }
+
+            lines.Add(free >= receiver.Required
+                ? $"Приёмник {receiver.Path}: потребуется ≈{required}, свободно {SizeFormatter.Format(free)}."
+                : $"Внимание: на {receiver.Path} не хватает ≈{SizeFormatter.Format(receiver.Required - free)} – потребуется ≈{required}, свободно {SizeFormatter.Format(free)}.");
+        }
+
+        return lines;
+    }
+
+    private static long? TryGetFreeSpace(string path)
+    {
+        // TODO: свободное место на UNC-приёмнике не читается – DriveInfo знает только локальные корни; перейти на GetDiskFreeSpaceEx, когда появятся жалобы на сетевые папки
+        try
+        {
+            var root = Path.GetPathRoot(Path.GetFullPath(path));
+
+            if (string.IsNullOrEmpty(root))
+            {
+                return null;
+            }
+
+            var drive = new DriveInfo(root);
+
+            return drive.IsReady ? drive.AvailableFreeSpace : null;
+        }
+        catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private List<PlanReceiver> BuildReceivers(PlannedActions planned)
+    {
+        if (_result is null)
+        {
+            return [];
+        }
+
+        var receivers = new List<PlanReceiver>();
+
+        if (planned.RequiredLeftBytes > 0)
+        {
+            receivers.Add(new(_result.LeftPath, planned.RequiredLeftBytes, TryGetFreeSpace(_result.LeftPath)));
+        }
+
+        if (planned.RequiredRightBytes > 0)
+        {
+            receivers.Add(new(_result.RightPath, planned.RequiredRightBytes, TryGetFreeSpace(_result.RightPath)));
+        }
+
+        return receivers;
     }
 
     private double Fraction(ComparisonStatus status)
@@ -2303,6 +2415,12 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         OnPropertyChanged(nameof(ConflictFraction));
         OnPropertyChanged(nameof(HasConflicts));
         OnPropertyChanged(nameof(CompositionHint));
+        OnPropertyChanged(nameof(HasPlanVolume));
+        OnPropertyChanged(nameof(HasPlanCopy));
+        OnPropertyChanged(nameof(HasPlanTrash));
+        OnPropertyChanged(nameof(PlanCopyText));
+        OnPropertyChanged(nameof(PlanTrashText));
+        OnPropertyChanged(nameof(PlanVolumeHint));
         NotifyNewerBadgeChanged();
     }
 

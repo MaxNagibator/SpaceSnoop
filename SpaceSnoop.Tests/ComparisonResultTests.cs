@@ -242,6 +242,56 @@ public class ComparisonResultTests
         }
     }
 
+    [Test]
+    public void CountPlannedActions_SumsBytesBySideAndNovelty()
+    {
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("new.txt", "new.txt") { Status = ComparisonStatus.LeftOnly, Action = SyncAction.CopyToRight, LeftSize = 100 });
+        root.Files.Add(new("mod.txt", "mod.txt") { Status = ComparisonStatus.Modified, Action = SyncAction.CopyToRight, LeftSize = 500, RightSize = 200 });
+        root.Files.Add(new("back.txt", "back.txt") { Status = ComparisonStatus.RightOnly, Action = SyncAction.CopyToLeft, RightSize = 70 });
+        root.Files.Add(new("gone.txt", "gone.txt") { Status = ComparisonStatus.LeftOnly, Action = SyncAction.DeleteLeft, LeftSize = 40 });
+
+        var planned = new ComparisonResult("C:\\Left", "C:\\Right", root).CountPlannedActions();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(planned.NewCopyBytes, Is.EqualTo(170));
+            Assert.That(planned.ModifiedCopyBytes, Is.EqualTo(500));
+            Assert.That(planned.CopyBytes, Is.EqualTo(670));
+            Assert.That(planned.CopyToRightBytes, Is.EqualTo(600));
+            Assert.That(planned.CopyToLeftBytes, Is.EqualTo(70));
+            Assert.That(planned.OverwriteRightBytes, Is.EqualTo(200));
+            Assert.That(planned.RequiredRightBytes, Is.EqualTo(400));
+            Assert.That(planned.RequiredLeftBytes, Is.EqualTo(70));
+            Assert.That(planned.DeleteFileBytes, Is.EqualTo(40));
+            Assert.That(planned.DeleteBytes, Is.EqualTo(40));
+        }
+    }
+
+    [Test]
+    public void CountPlannedActions_CountsBytesInsideDeletedDirectory()
+    {
+        var root = new DirectoryComparison("root", "");
+        var extra = new DirectoryComparison("extra", "extra") { Status = ComparisonStatus.RightOnly };
+        extra.Files.Add(new("nested.txt", "extra\\nested.txt") { Status = ComparisonStatus.RightOnly, RightSize = 900 });
+
+        var deeper = new DirectoryComparison("deeper", "extra\\deeper") { Status = ComparisonStatus.RightOnly };
+        deeper.Files.Add(new("deep.txt", "extra\\deeper\\deep.txt") { Status = ComparisonStatus.RightOnly, RightSize = 100 });
+        extra.SubDirectories.Add(deeper);
+        root.SubDirectories.Add(extra);
+
+        var result = new ComparisonResult("C:\\Left", "C:\\Right", root);
+        result.ApplyMode(SyncMode.LeftToRight, true);
+        var planned = result.CountPlannedActions();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(planned.DirDeletes, Is.EqualTo(1));
+            Assert.That(planned.DeleteFileBytes, Is.Zero);
+            Assert.That(planned.DeleteDirBytes, Is.EqualTo(1000));
+        }
+    }
+
     [TestCase(SyncMode.LeftToRight, ComparisonStatus.RightOnly, SyncAction.DeleteRight)]
     [TestCase(SyncMode.RightToLeft, ComparisonStatus.LeftOnly, SyncAction.DeleteLeft)]
     public void Mirror_DeletesOppositeSideOnlyItems(SyncMode mode, ComparisonStatus orphanStatus, SyncAction expected)

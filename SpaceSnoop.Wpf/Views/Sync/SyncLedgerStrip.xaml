@@ -117,6 +117,61 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="PlanVolume"
+               TargetType="StackPanel">
+            <Setter Property="Orientation"
+                    Value="Horizontal" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Setter Property="Margin"
+                    Value="20,0,0,0" />
+            <Setter Property="Visibility"
+                    Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasPlanVolume}"
+                             Value="True">
+                    <Setter Property="Visibility"
+                            Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="PlanCopyPart"
+               TargetType="StackPanel">
+            <Setter Property="Orientation"
+                    Value="Horizontal" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Setter Property="Margin"
+                    Value="0,0,10,0" />
+            <Setter Property="Visibility"
+                    Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasPlanCopy}"
+                             Value="True">
+                    <Setter Property="Visibility"
+                            Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="PlanTrashPart"
+               TargetType="StackPanel">
+            <Setter Property="Orientation"
+                    Value="Horizontal" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Setter Property="Visibility"
+                    Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasPlanTrash}"
+                             Value="True">
+                    <Setter Property="Visibility"
+                            Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="NewerBadge"
                TargetType="StackPanel">
             <Setter Property="Orientation"
@@ -337,6 +392,34 @@
                                                   Foreground="{DynamicResource Fg.Muted}" />
                         <TextBlock Text="{Binding IdenticalDirCount}"
                                    Style="{StaticResource DirTallyValue}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Style="{StaticResource PlanVolume}"
+                            ToolTip="{Binding PlanVolumeHint}">
+                    <TextBlock Text="ОБЪЁМ"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <StackPanel Style="{StaticResource PlanCopyPart}">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Copy}"
+                                                  Width="11"
+                                                  Height="11"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,5,0"
+                                                  Foreground="{DynamicResource Accent.Primary}" />
+                        <TextBlock Text="{Binding PlanCopyText}"
+                                   Style="{StaticResource TallyValue}" />
+                    </StackPanel>
+                    <StackPanel Style="{StaticResource PlanTrashPart}">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                                  Width="11"
+                                                  Height="11"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,5,0"
+                                                  Foreground="{DynamicResource Fg.Muted}" />
+                        <TextBlock Text="{Binding PlanTrashText}"
+                                   Style="{StaticResource TallyValue}"
+                                   Foreground="{DynamicResource Fg.Muted}" />
                     </StackPanel>
                 </StackPanel>
 

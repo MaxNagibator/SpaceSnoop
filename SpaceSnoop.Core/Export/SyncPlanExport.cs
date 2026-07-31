@@ -41,8 +41,7 @@ public static class SyncPlanExport
         var planned = new List<SyncPlanEntry>();
         Collect(result.Root, planned);
 
-        var copyBytes = planned.Where(static x => IsCopy(x.Action)).Sum(static x => x.Bytes);
-        var deleteBytes = planned.Where(static x => !IsCopy(x.Action)).Sum(static x => x.Bytes);
+        var actions = result.CountPlannedActions();
 
         var largest = planned
             .OrderByDescending(static x => x.Bytes)
@@ -56,11 +55,11 @@ public static class SyncPlanExport
             LeftPath = result.LeftPath,
             RightPath = result.RightPath,
             Options = options,
-            Actions = result.CountPlannedActions(),
-            CopyBytes = copyBytes,
-            CopySize = SizeFormatter.Format(copyBytes),
-            DeleteBytes = deleteBytes,
-            DeleteSize = SizeFormatter.Format(deleteBytes),
+            Actions = actions,
+            CopyBytes = actions.CopyBytes,
+            CopySize = SizeFormatter.Format(actions.CopyBytes),
+            DeleteBytes = actions.DeleteBytes,
+            DeleteSize = SizeFormatter.Format(actions.DeleteBytes),
             Largest = largest,
             OmittedEntries = Math.Max(0, planned.Count - largest.Count),
         };
@@ -69,11 +68,6 @@ public static class SyncPlanExport
     public static string ToJson(SyncPlanExportModel model)
     {
         return JsonSerializer.Serialize(model, ExportJson.Options);
-    }
-
-    private static bool IsCopy(SyncAction action)
-    {
-        return action is SyncAction.CopyToLeft or SyncAction.CopyToRight;
     }
 
     private static void Collect(DirectoryComparison dir, List<SyncPlanEntry> entries)
