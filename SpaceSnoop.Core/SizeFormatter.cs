@@ -37,6 +37,6 @@ public static class SizeFormatter
 
         value = Math.Round(value, decimalPlaces);
 
-        return $"{value}{SizeSuffixes[i]}";
+        return $"{value} {SizeSuffixes[i]}";
     }
 }

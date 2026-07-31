@@ -39,6 +39,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private string? _activeProfileId;
     private bool _suppressPersist;
     private bool _gitPromptDeclined;
+    private bool _hashesCompared;
     private bool _gitGroupExpanded;
     private bool _isIndeterminate = true;
     private double _progressValue;
@@ -216,7 +217,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public string PlanTrashText => SizeFormatter.Format(_plan.DeleteBytes);
 
-    public string PlanVolumeHint => string.Join(Environment.NewLine, BuildPlanLines(_plan, null, BuildReceivers(_plan)));
+    public string PlanVolumeHint => ConfirmDialogViewModel.AsText(BuildPlanLines(_plan, null, BuildReceivers(_plan)));
 
     public bool HasConflicts => ConflictCount > 0;
 
@@ -775,59 +776,96 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         return (files, dirs);
     }
 
-    internal static List<string> BuildPlanLines(PlannedActions planned, string? direction, IReadOnlyList<PlanReceiver> receivers)
+    internal static List<ConfirmLine> BuildPlanLines(
+        PlannedActions planned,
+        string? direction,
+        IReadOnlyList<PlanReceiver> receivers,
+        bool bothWays = false)
     {
-        var lines = new List<string>();
+        var lines = new List<ConfirmLine>();
 
         if (direction is not null)
         {
-            lines.Add($"Направление: {direction}.");
-            lines.Add(string.Empty);
+            lines.Add(new ConfirmTextLine($"Направление: {direction}."));
+            lines.Add(new ConfirmGapLine());
         }
 
         if (planned.Total == 0)
         {
-            lines.Add("Изменений нет.");
+            lines.Add(new ConfirmTextLine("Изменений нет."));
             return lines;
         }
 
         if (planned.Copies > 0)
         {
-            lines.Add($"Скопировать файлов: {planned.Copies:N0} ({SizeFormatter.Format(planned.CopyBytes)})");
+            lines.Add(new ConfirmMetricLine(
+                "Скопировать файлов",
+                $"{planned.Copies:N0}",
+                SizeFormatter.Format(planned.CopyBytes)));
 
             if (planned.ModifiedCopies > 0)
             {
-                lines.Add($"    – новых: {planned.NewCopies:N0} ({SizeFormatter.Format(planned.NewCopyBytes)})");
-                lines.Add($"    – изменённых: {planned.ModifiedCopies:N0} ({SizeFormatter.Format(planned.ModifiedCopyBytes)})");
+                lines.Add(new ConfirmMetricLine(
+                    "новых",
+                    $"{planned.NewCopies:N0}",
+                    SizeFormatter.Format(planned.NewCopyBytes),
+                    ConfirmMetricTone.Sub));
+
+                lines.Add(new ConfirmMetricLine(
+                    "изменённых",
+                    $"{planned.ModifiedCopies:N0}",
+                    SizeFormatter.Format(planned.ModifiedCopyBytes),
+                    ConfirmMetricTone.Sub));
             }
         }
 
         if (planned.DirCopies > 0)
         {
-            lines.Add($"Создать каталогов: {planned.DirCopies:N0}");
+            lines.Add(new ConfirmMetricLine("Создать каталогов", $"{planned.DirCopies:N0}", string.Empty));
         }
 
         if (planned.Deletes > 0)
         {
-            lines.Add($"Удалить файлов в корзину: {planned.Deletes:N0} ({SizeFormatter.Format(planned.DeleteFileBytes)})");
+            lines.Add(new ConfirmMetricLine(
+                "Удалить файлов в корзину",
+                $"{planned.Deletes:N0}",
+                SizeFormatter.Format(planned.DeleteFileBytes),
+                ConfirmMetricTone.Danger));
         }
 
         if (planned.DirDeletes > 0)
         {
-            lines.Add($"Удалить каталогов в корзину: {planned.DirDeletes:N0} ({SizeFormatter.Format(planned.DeleteDirBytes)})");
+            lines.Add(new ConfirmMetricLine(
+                "Удалить каталогов целиком",
+                $"{planned.DirDeletes:N0}",
+                SizeFormatter.Format(planned.DeleteDirBytes),
+                ConfirmMetricTone.Danger));
+
+            var whole = planned.DirDeletes == 1
+                ? "Каталог уходит в корзину со всем содержимым"
+                : "Каталоги уходят в корзину со всем содержимым";
+
+            lines.Add(new ConfirmTextLine(
+                planned.Deletes > 0
+                    ? $"{whole} – эти файлы в число {planned.Deletes:N0} не входят."
+                    : $"{whole}.",
+                ConfirmTextTone.Muted));
         }
 
-        var space = DescribeReceivers(receivers);
+        var space = DescribeReceivers(receivers, bothWays);
 
         if (space.Count > 0)
         {
-            lines.Add(string.Empty);
+            lines.Add(new ConfirmGapLine());
             lines.AddRange(space);
         }
 
         if (planned.DeleteBytes > 0)
         {
-            lines.Add("Удалённое уходит в корзину – место освободится после её очистки.");
+            lines.Add(new ConfirmGapLine());
+            lines.Add(new ConfirmTextLine(
+                "Удалённое уходит в корзину – место освободится после её очистки.",
+                ConfirmTextTone.Muted));
         }
 
         return lines;
@@ -1119,6 +1157,32 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         return value is { } stamp ? stamp.ToString("yyyy-MM-dd HH:mm") : "–";
     }
 
+    private static string FormatAge(DateTime value)
+    {
+        var days = (int)(DateTime.Now.Date - value.Date).TotalDays;
+
+        if (days <= 0)
+        {
+            return "сегодня";
+        }
+
+        if (days == 1)
+        {
+            return "вчера";
+        }
+
+        var word = (days % 100) is >= 11 and <= 14
+            ? "дней"
+            : (days % 10) switch
+            {
+                1 => "день",
+                2 or 3 or 4 => "дня",
+                _ => "дней",
+            };
+
+        return $"{days:N0} {word} назад";
+    }
+
     private static string FormatBranch(GitRepoState? git)
     {
         return git is null ? string.Empty : git.IsDetached ? "detached" : git.Branch;
@@ -1188,9 +1252,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             : items.Where(item => path(item).Contains(search, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static List<string> DescribeReceivers(IReadOnlyList<PlanReceiver> receivers)
+    private static List<ConfirmLine> DescribeReceivers(IReadOnlyList<PlanReceiver> receivers, bool bothWays)
     {
-        var lines = new List<string>();
+        var lines = new List<ConfirmLine>();
 
         foreach (var receiver in receivers)
         {
@@ -1199,17 +1263,39 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
                 continue;
             }
 
-            var required = SizeFormatter.Format(receiver.Required);
+            if (lines.Count > 0)
+            {
+                lines.Add(new ConfirmGapLine());
+            }
+
+            lines.Add(new ConfirmTextLine($"Приёмник {receiver.Path}", ConfirmTextTone.Muted));
+            lines.Add(new ConfirmMetricLine("Потребуется", string.Empty, $"≈{SizeFormatter.Format(receiver.Required)}"));
 
             if (receiver.Free is not { } free)
             {
-                lines.Add($"Приёмник {receiver.Path}: потребуется ≈{required}, свободное место неизвестно.");
+                lines.Add(new ConfirmMetricLine("Свободно", string.Empty, "неизвестно"));
                 continue;
             }
 
-            lines.Add(free >= receiver.Required
-                ? $"Приёмник {receiver.Path}: потребуется ≈{required}, свободно {SizeFormatter.Format(free)}."
-                : $"Внимание: на {receiver.Path} не хватает ≈{SizeFormatter.Format(receiver.Required - free)} – потребуется ≈{required}, свободно {SizeFormatter.Format(free)}.");
+            var enough = free >= receiver.Required;
+
+            lines.Add(new ConfirmMetricLine(
+                "Свободно",
+                string.Empty,
+                SizeFormatter.Format(free),
+                enough ? ConfirmMetricTone.None : ConfirmMetricTone.Danger));
+
+            if (!enough)
+            {
+                lines.Add(new ConfirmTextLine(
+                    $"Не хватает ≈{SizeFormatter.Format(receiver.Required - free)}.",
+                    ConfirmTextTone.Danger));
+            }
+        }
+
+        if (bothWays && lines.Count > 0 && receivers.Count(static receiver => receiver.Required > 0) == 1)
+        {
+            lines.Add(new ConfirmTextLine("Во встречном направлении копирования нет.", ConfirmTextTone.Muted));
         }
 
         return lines;
@@ -1255,6 +1341,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _result = comparison;
         _dirSizeCache = BuildDirSizeCache(comparison.Root);
         _outcomes = [];
+        _hashesCompared = false;
         comparison.ApplyMode(CurrentMode, Mirror, CurrentWinner);
         CollapseAllDirectories(comparison.Root);
         RebuildRows();
@@ -1388,6 +1475,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _result = prepared.Result;
         _dirSizeCache = prepared.Sizes;
         _outcomes = [];
+        _hashesCompared = false;
         CollapseAllDirectories(_result.Root);
         RebuildRows();
         UpdateSummary();
@@ -1597,6 +1685,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         _dirSizeCache = sizes;
         _outcomes = [];
+        _hashesCompared = true;
         RebuildRows();
         UpdateSummary();
         SummaryText = $"Хеши вычислены за {stopwatch.Elapsed.TotalSeconds:F2} с";
@@ -1624,43 +1713,88 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             return;
         }
 
-        var planned = CurrentPlan;
-        var lines = BuildPlanLines(planned, DirectionText(), BuildReceivers(planned));
+        var hashes = new ConfirmChoice("Сверить хеши", ConfirmChoiceKind.Secondary);
 
-        if (planned.ModifiedCopies > 0)
+        while (true)
         {
-            lines.Add(string.Empty);
-            lines.Add("Изменённые отличаются размером или датой – кнопка «Хеши» сверит содержимым.");
-        }
-
-        var deletes = planned.Deletes + planned.DirDeletes;
-
-        if (deletes > 0)
-        {
-            var (_, newest) = SyncFreshness.DeletionRecency(_result.Root);
-
-            if (newest is { } when)
+            if (_result is not { } current)
             {
-                lines.Add(string.Empty);
-                lines.Add($"Новейшее из удаляемого: {FormatStamp(when)} – убедитесь, что зеркалите не более свежую папку.");
+                return;
+            }
+
+            var planned = CurrentPlan;
+            var deletes = planned.Deletes + planned.DirDeletes;
+            var offerHashes = planned.ModifiedCopies > 0 && !_hashesCompared;
+            var lines = BuildPlanLines(planned, null, BuildReceivers(planned), CurrentMode == SyncMode.Bidirectional);
+
+            if (offerHashes)
+            {
+                lines.Add(new ConfirmGapLine());
+                lines.Add(new ConfirmTextLine(
+                    "Изменённые отличаются размером или датой. «Сверить хеши» сравнит их содержимым.",
+                    ConfirmTextTone.Muted));
+            }
+
+            var choices = new List<ConfirmChoice> { new("Отмена", ConfirmChoiceKind.Dismissive) };
+
+            if (offerHashes)
+            {
+                choices.Add(hashes);
+            }
+
+            choices.Add(new("Синхронизировать", deletes > 0 ? ConfirmChoiceKind.Destructive : ConfirmChoiceKind.Primary));
+
+            var confirm = new ConfirmDialogViewModel($"Синхронизация {DirectionText()}", DirectionIconKind, lines, choices)
+            {
+                Summary = DescribePlanVolume(planned),
+                Warning = deletes > 0 ? DescribeDeletionRecency(current) : null,
+            };
+
+            if (!await _dialogs.ShowAsync(confirm))
+            {
+                return;
+            }
+
+            if (!ReferenceEquals(confirm.Chosen, hashes))
+            {
+                break;
+            }
+
+            await HashCommand.ExecuteAsync(null);
+
+            if (!HasActionableChanges() || _result is not { } hashed || hashed.HasPendingResolution())
+            {
+                return;
             }
         }
 
-        var confirm = new ConfirmDialogViewModel(
-            "Синхронизация",
-            DirectionIconKind,
-            lines,
-            [
-                new("Отмена", ConfirmChoiceKind.Dismissive),
-                new("Синхронизировать", deletes > 0 ? ConfirmChoiceKind.Destructive : ConfirmChoiceKind.Primary),
-            ]);
+        await ExecuteSyncAsync(true, CancellationToken.None);
+    }
 
-        if (!await _dialogs.ShowAsync(confirm))
+    internal static string DescribePlanVolume(PlannedActions planned)
+    {
+        var parts = new List<string>();
+
+        if (planned.CopyBytes > 0)
         {
-            return;
+            parts.Add($"копирование ≈{SizeFormatter.Format(planned.CopyBytes)}");
         }
 
-        await ExecuteSyncAsync(true, CancellationToken.None);
+        if (planned.DeleteBytes > 0)
+        {
+            parts.Add($"в корзину ≈{SizeFormatter.Format(planned.DeleteBytes)}");
+        }
+
+        return parts.Count > 0 ? string.Join(" · ", parts) : $"действий: {planned.Total:N0}";
+    }
+
+    private static string? DescribeDeletionRecency(ComparisonResult result)
+    {
+        var (_, newest) = SyncFreshness.DeletionRecency(result.Root);
+
+        return newest is { } when
+            ? $"Новейшее из удаляемого изменено {FormatStamp(when)} ({FormatAge(when)}) – убедитесь, что зеркалите не более свежую папку."
+            : null;
     }
 
     private async Task<SyncReport?> ExecuteSyncAsync(bool interactive, CancellationToken external = default)
@@ -2183,6 +2317,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _lastReport = null;
         _dirSizeCache = null;
         _outcomes = [];
+        _hashesCompared = false;
         _collapsed.Clear();
         Rows.ReplaceAll([]);
         ClearGit();
@@ -2510,15 +2645,15 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             return "Сначала выполните сравнение.";
         }
 
-        var lines = BuildPlanLines(_plan, DirectionText(), BuildReceivers(_plan));
+        var lines = BuildPlanLines(_plan, DirectionText(), BuildReceivers(_plan), CurrentMode == SyncMode.Bidirectional);
 
         if (SyncIsDestructive)
         {
-            lines.Add(string.Empty);
-            lines.Add("Удаление идёт в корзину, копирование перезаписывает файлы на приёмнике.");
+            lines.Add(new ConfirmGapLine());
+            lines.Add(new ConfirmTextLine("Удаление идёт в корзину, копирование перезаписывает файлы на приёмнике."));
         }
 
-        return string.Join(Environment.NewLine, lines);
+        return ConfirmDialogViewModel.AsText(lines);
     }
 
     private string DirectionText()

@@ -290,11 +290,11 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
             "Расположение данных",
             PackIconLucideKind.HardDrive,
             [
-                $"Файлы приложения будут храниться {place}:",
-                destination,
-                string.Empty,
-                "Текущие настройки, логи и журналы можно перенести туда или оставить на старом месте.",
-                "После смены приложение перезапустится.",
+                new ConfirmTextLine($"Файлы приложения будут храниться {place}:"),
+                new ConfirmTextLine(destination, ConfirmTextTone.Muted),
+                new ConfirmGapLine(),
+                new ConfirmTextLine("Текущие настройки, логи и журналы можно перенести туда или оставить на старом месте."),
+                new ConfirmTextLine("После смены приложение перезапустится."),
             ],
             [
                 new("Отмена", ConfirmChoiceKind.Dismissive),

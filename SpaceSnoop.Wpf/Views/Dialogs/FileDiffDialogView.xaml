@@ -295,18 +295,23 @@
                     BorderBrush="{DynamicResource Border.Subtle}"
                     BorderThickness="1"
                     Visibility="{Binding HasSummary, Converter={StaticResource BoolToVisibility}}">
-                <StackPanel Orientation="Horizontal">
-                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Info}"
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <iconPacks:PackIconLucide Grid.Column="0"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.Info}"
                                               Width="14"
                                               Height="14"
                                               VerticalAlignment="Top"
                                               Margin="0,1,8,0"
                                               Foreground="{DynamicResource State.Info}" />
-                    <TextBlock Text="{Binding Summary}"
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding Summary}"
                                Style="{StaticResource TextBlock.Subtle}"
-                               TextWrapping="Wrap"
-                               MaxWidth="860" />
-                </StackPanel>
+                               TextWrapping="Wrap" />
+                </Grid>
             </Border>
         </StackPanel>
 

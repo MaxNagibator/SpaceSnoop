@@ -1,4 +1,5 @@
 ﻿using SpaceSnoop.Core.Domain;
+using SpaceSnoop.Wpf.ViewModels.Dialogs;
 using SpaceSnoop.Wpf.ViewModels.Sync;
 
 namespace SpaceSnoop.Wpf.Tests;
@@ -24,12 +25,36 @@ public class SyncPlanLinesTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(lines, Has.Some.EqualTo("Скопировать файлов: 5 (5МБ)"));
-            Assert.That(lines, Has.Some.EqualTo("    – новых: 3 (3МБ)"));
-            Assert.That(lines, Has.Some.EqualTo("    – изменённых: 2 (2МБ)"));
-            Assert.That(lines, Has.Some.EqualTo("Удалить файлов в корзину: 1 (1МБ)"));
-            Assert.That(lines, Has.Some.EqualTo("Удалить каталогов в корзину: 1 (4МБ)"));
-            Assert.That(lines.Any(x => x.Contains("место освободится после её очистки", StringComparison.Ordinal)), Is.True);
+            Assert.That(lines, Has.Some.EqualTo(new ConfirmMetricLine("Скопировать файлов", "5", "5 МБ")));
+            Assert.That(lines, Has.Some.EqualTo(new ConfirmMetricLine("новых", "3", "3 МБ", ConfirmMetricTone.Sub)));
+            Assert.That(lines, Has.Some.EqualTo(new ConfirmMetricLine("изменённых", "2", "2 МБ", ConfirmMetricTone.Sub)));
+            Assert.That(lines, Has.Some.EqualTo(new ConfirmMetricLine("Удалить файлов в корзину", "1", "1 МБ", ConfirmMetricTone.Danger)));
+            Assert.That(lines, Has.Some.EqualTo(new ConfirmMetricLine("Удалить каталогов целиком", "1", "4 МБ", ConfirmMetricTone.Danger)));
+            Assert.That(Text(lines), Does.Contain("место освободится после её очистки"));
+        }
+    }
+
+    [Test]
+    public void Удаляемые_каталоги_оговаривают_своё_содержимое()
+    {
+        var planned = new PlannedActions(0, 0, 2, 0, 1) { DeleteFileBytes = Megabyte, DeleteDirBytes = 4 * Megabyte };
+
+        var lines = SyncViewModel.BuildPlanLines(planned, null, []);
+
+        Assert.That(Text(lines), Does.Contain("эти файлы в число 2 не входят"));
+    }
+
+    [Test]
+    public void Удаление_каталогов_без_файлов_не_ссылается_на_счётчик()
+    {
+        var planned = new PlannedActions(0, 0, 0, 0, 1) { DeleteDirBytes = 4 * Megabyte };
+
+        var lines = SyncViewModel.BuildPlanLines(planned, null, []);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(Text(lines), Does.Contain("Каталог уходит в корзину со всем содержимым."));
+            Assert.That(Text(lines), Does.Not.Contain("не входят"));
         }
     }
 
@@ -41,7 +66,11 @@ public class SyncPlanLinesTests
 
         var lines = SyncViewModel.BuildPlanLines(planned, null, receivers);
 
-        Assert.That(lines, Has.Some.EqualTo("Внимание: на D:\\Backup не хватает ≈6МБ – потребуется ≈10МБ, свободно 4МБ."));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(lines, Has.Some.EqualTo(new ConfirmMetricLine("Свободно", string.Empty, "4 МБ", ConfirmMetricTone.Danger)));
+            Assert.That(lines, Has.Some.EqualTo(new ConfirmTextLine("Не хватает ≈6 МБ.", ConfirmTextTone.Danger)));
+        }
     }
 
     [Test]
@@ -54,8 +83,10 @@ public class SyncPlanLinesTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(lines, Has.Some.EqualTo("Приёмник D:\\Backup: потребуется ≈10МБ, свободно 40МБ."));
-            Assert.That(lines.Any(x => x.Contains("Внимание", StringComparison.Ordinal)), Is.False);
+            Assert.That(lines, Has.Some.EqualTo(new ConfirmTextLine("Приёмник D:\\Backup", ConfirmTextTone.Muted)));
+            Assert.That(lines, Has.Some.EqualTo(new ConfirmMetricLine("Потребуется", string.Empty, "≈10 МБ")));
+            Assert.That(lines, Has.Some.EqualTo(new ConfirmMetricLine("Свободно", string.Empty, "40 МБ")));
+            Assert.That(Text(lines), Does.Not.Contain("Не хватает"));
         }
     }
 
@@ -67,7 +98,18 @@ public class SyncPlanLinesTests
 
         var lines = SyncViewModel.BuildPlanLines(planned, null, receivers);
 
-        Assert.That(lines, Has.Some.EqualTo("Приёмник \\\\server\\share: потребуется ≈1МБ, свободное место неизвестно."));
+        Assert.That(lines, Has.Some.EqualTo(new ConfirmMetricLine("Свободно", string.Empty, "неизвестно")));
+    }
+
+    [Test]
+    public void Односторонний_приёмник_в_двустороннем_режиме_оговаривается()
+    {
+        var planned = new PlannedActions(1, 0, 0, 0, 0) { NewCopyBytes = Megabyte, CopyToRightBytes = Megabyte };
+        var receivers = new PlanReceiver[] { new("D:\\Backup", Megabyte, 40 * Megabyte) };
+
+        var lines = SyncViewModel.BuildPlanLines(planned, null, receivers, bothWays: true);
+
+        Assert.That(Text(lines), Does.Contain("Во встречном направлении копирования нет."));
     }
 
     [Test]
@@ -77,10 +119,15 @@ public class SyncPlanLinesTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(lines, Has.Some.EqualTo("Направление: слева направо."));
-            Assert.That(lines, Has.Some.EqualTo("Изменений нет."));
-            Assert.That(lines.Any(x => x.Contains("Приёмник", StringComparison.Ordinal)), Is.False);
-            Assert.That(lines.Any(x => x.Contains("корзин", StringComparison.Ordinal)), Is.False);
+            Assert.That(lines, Has.Some.EqualTo(new ConfirmTextLine("Направление: слева направо.")));
+            Assert.That(lines, Has.Some.EqualTo(new ConfirmTextLine("Изменений нет.")));
+            Assert.That(Text(lines), Does.Not.Contain("Приёмник"));
+            Assert.That(Text(lines), Does.Not.Contain("корзин"));
         }
+    }
+
+    private static string Text(IEnumerable<ConfirmLine> lines)
+    {
+        return ConfirmDialogViewModel.AsText(lines);
     }
 }

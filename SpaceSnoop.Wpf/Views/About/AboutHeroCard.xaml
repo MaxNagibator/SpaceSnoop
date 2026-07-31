@@ -12,8 +12,13 @@
     <Border Style="{StaticResource Card}"
             Margin="0,0,0,10">
         <StackPanel>
-            <StackPanel Orientation="Horizontal">
-                <Border Width="56"
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0"
+                        Width="56"
                         Height="56"
                         CornerRadius="{DynamicResource Radius.M}"
                         Background="{DynamicResource Bg.SurfaceAlt}"
@@ -26,7 +31,8 @@
                            RenderOptions.BitmapScalingMode="HighQuality" />
                 </Border>
 
-                <StackPanel Margin="16,0,0,0"
+                <StackPanel Grid.Column="1"
+                            Margin="16,0,0,0"
                             VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="{Binding AppName}"
@@ -44,7 +50,7 @@
                                TextWrapping="Wrap"
                                Margin="0,4,0,0" />
                 </StackPanel>
-            </StackPanel>
+            </Grid>
 
             <TextBlock Text="{Binding Description}"
                        Style="{StaticResource TextBlock.Subtle}"

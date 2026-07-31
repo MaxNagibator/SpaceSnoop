@@ -462,7 +462,7 @@ public class SyncEngineTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(report.Applied, Has.Count.EqualTo(2));
-            Assert.That(text, Does.Contain("CopyToRight «copy.txt» (1КБ)"));
+            Assert.That(text, Does.Contain("CopyToRight «copy.txt» (1 КБ)"));
             Assert.That(text, Does.Contain("DeleteLeft «gone.txt»"));
             Assert.That(text, Does.Not.Contain("gone.txt» ("));
         }

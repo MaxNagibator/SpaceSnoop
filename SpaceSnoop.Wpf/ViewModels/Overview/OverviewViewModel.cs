@@ -1,4 +1,5 @@
 ﻿using KeepShell.Services;
+using MahApps.Metro.IconPacks;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -234,17 +235,25 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
             return;
         }
 
-        var lines = new[]
+        var planned = row.Comparison?.CountPlannedActions();
+
+        var lines = new List<ConfirmLine>
         {
-            $"Профиль: {row.Name}",
-            $"{row.Left} → {row.Right}",
-            string.Empty,
-            "Файлы будут скопированы по направлению профиля, удаления – в корзину.",
-            string.Empty,
-            "Продолжить?",
+            new ConfirmTextLine(row.Name, ConfirmTextTone.Strong),
+            new ConfirmTextLine($"{row.Left} → {row.Right}", ConfirmTextTone.Muted),
+            new ConfirmGapLine(),
         };
 
-        if (!_dialogs.Confirm("Синхронизация профиля", string.Join(Environment.NewLine, lines)))
+        if (planned is null)
+        {
+            lines.Add(new ConfirmTextLine("Файлы будут скопированы по направлению профиля, удаления – в корзину."));
+        }
+        else
+        {
+            lines.AddRange(SyncViewModel.BuildPlanLines(planned, null, []));
+        }
+
+        if (!await ConfirmSyncAsync("Синхронизация профиля", lines, planned))
         {
             return;
         }
@@ -291,16 +300,30 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         var targets = BatchTargets();
         var excluded = Rows.Count - targets.Count;
 
-        var lines = new[]
+        var planned = SumPlans(targets);
+
+        var lines = new List<ConfirmLine>
         {
-            $"Синхронизировать профилей: {targets.Count}." + (excluded > 0 ? $" Исключено из пакета: {excluded}." : string.Empty),
-            string.Empty,
-            "Файлы будут скопированы по направлению каждого профиля, удаления – в корзину.",
-            string.Empty,
-            "Продолжить?",
+            new ConfirmMetricLine("Профилей в пакете", $"{targets.Count:N0}", string.Empty),
         };
 
-        if (!_dialogs.Confirm("Синхронизация всех профилей", string.Join(Environment.NewLine, lines)))
+        if (excluded > 0)
+        {
+            lines.Add(new ConfirmMetricLine("Исключено", $"{excluded:N0}", string.Empty, ConfirmMetricTone.Sub));
+        }
+
+        lines.Add(new ConfirmGapLine());
+
+        if (planned is null)
+        {
+            lines.Add(new ConfirmTextLine("Файлы будут скопированы по направлению каждого профиля, удаления – в корзину."));
+        }
+        else
+        {
+            lines.AddRange(SyncViewModel.BuildPlanLines(planned, null, []));
+        }
+
+        if (!await ConfirmSyncAsync("Синхронизация всех профилей", lines, planned))
         {
             return;
         }
@@ -490,6 +513,52 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         row.Error = note;
         row.Status = OverviewRunStatus.Skipped;
         _logger.OverviewRowSkipped(row.Name);
+    }
+
+    private static PlannedActions? SumPlans(IEnumerable<OverviewRowViewModel> rows)
+    {
+        var plans = rows.Select(static row => row.Comparison?.CountPlannedActions()).OfType<PlannedActions>().ToList();
+
+        if (plans.Count == 0)
+        {
+            return null;
+        }
+
+        return plans.Aggregate(PlannedActions.Empty, static (total, plan) => new PlannedActions(
+            total.NewCopies + plan.NewCopies,
+            total.ModifiedCopies + plan.ModifiedCopies,
+            total.Deletes + plan.Deletes,
+            total.DirCopies + plan.DirCopies,
+            total.DirDeletes + plan.DirDeletes)
+        {
+            NewCopyBytes = total.NewCopyBytes + plan.NewCopyBytes,
+            ModifiedCopyBytes = total.ModifiedCopyBytes + plan.ModifiedCopyBytes,
+            CopyToLeftBytes = total.CopyToLeftBytes + plan.CopyToLeftBytes,
+            CopyToRightBytes = total.CopyToRightBytes + plan.CopyToRightBytes,
+            OverwriteLeftBytes = total.OverwriteLeftBytes + plan.OverwriteLeftBytes,
+            OverwriteRightBytes = total.OverwriteRightBytes + plan.OverwriteRightBytes,
+            DeleteFileBytes = total.DeleteFileBytes + plan.DeleteFileBytes,
+            DeleteDirBytes = total.DeleteDirBytes + plan.DeleteDirBytes,
+        });
+    }
+
+    private async Task<bool> ConfirmSyncAsync(string title, IReadOnlyList<ConfirmLine> lines, PlannedActions? planned)
+    {
+        var destructive = planned is null || planned.Deletes + planned.DirDeletes > 0;
+
+        var confirm = new ConfirmDialogViewModel(
+            title,
+            PackIconLucideKind.ArrowRightLeft,
+            lines,
+            [
+                new("Отмена", ConfirmChoiceKind.Dismissive),
+                new("Синхронизировать", destructive ? ConfirmChoiceKind.Destructive : ConfirmChoiceKind.Primary),
+            ])
+        {
+            Summary = planned is null ? null : SyncViewModel.DescribePlanVolume(planned),
+        };
+
+        return await _dialogs.ShowAsync(confirm);
     }
 
     private List<OverviewRowViewModel> BatchTargets()

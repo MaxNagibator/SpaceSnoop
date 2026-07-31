@@ -271,15 +271,18 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
             "Удаление профилей",
             PackIconLucideKind.Trash2,
             [
-                $"Будут удалены выбранные профили: {targets.Length}.",
-                "Вместе с ними уйдут их задачи в Планировщике.",
-                string.Empty,
-                "Синхронизированные файлы не затрагиваются.",
+                new ConfirmMetricLine("Удалить профилей", $"{targets.Length:N0}", string.Empty, ConfirmMetricTone.Danger),
+                new ConfirmTextLine("Вместе с ними уйдут их задачи в Планировщике.", ConfirmTextTone.Muted),
+                new ConfirmGapLine(),
+                new ConfirmTextLine("Синхронизированные файлы не затрагиваются."),
             ],
             [
                 new("Отмена", ConfirmChoiceKind.Dismissive),
                 new("Удалить профили", ConfirmChoiceKind.Destructive),
-            ]);
+            ])
+        {
+            Warning = "Профили удаляются мимо корзины – восстановить их нельзя.",
+        };
 
         if (!await _dialogs.ShowAsync(confirm))
         {

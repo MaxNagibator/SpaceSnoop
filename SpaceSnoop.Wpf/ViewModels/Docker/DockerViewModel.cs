@@ -317,8 +317,10 @@ public sealed partial class DockerViewModel(
             [
                 new("Отмена", ConfirmChoiceKind.Dismissive),
                 new(action, ConfirmChoiceKind.Destructive),
-            ],
-            "Docker удаляет мимо корзины – вернуть удалённое нельзя.");
+            ])
+        {
+            Warning = "Docker удаляет мимо корзины – вернуть удалённое нельзя.",
+        };
 
         if (!await dialogs.ShowAsync(confirm))
         {
