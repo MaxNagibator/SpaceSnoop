@@ -142,14 +142,14 @@ public sealed partial class McpServerHost : ObservableObject, IDisposable
         if (!McpAuth.IsOriginAllowed(context.Request.Headers.Origin.ToString()))
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
-            await context.Response.WriteAsync("SpaceSnoop MCP: запрос с чужого источника").ConfigureAwait(false);
+            await context.Response.WriteAsync("SpaceSnoop MCP: запрос с чужого источника", context.RequestAborted).ConfigureAwait(false);
             return;
         }
 
         if (!IsAuthorized(context, token))
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            await context.Response.WriteAsync("SpaceSnoop MCP: требуется токен доступа").ConfigureAwait(false);
+            await context.Response.WriteAsync("SpaceSnoop MCP: требуется токен доступа", context.RequestAborted).ConfigureAwait(false);
             return;
         }
 

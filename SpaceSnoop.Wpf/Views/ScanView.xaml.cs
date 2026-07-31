@@ -54,12 +54,14 @@ public partial class ScanView : UserControl, IView<ScanViewModel>
 
     private void OnInspectorSplitterDragCompleted(object sender, DragCompletedEventArgs e)
     {
-        if (_vm is null || _vm.Inspector.IsInspectorCollapsed)
+        var inspector = _vm?.Inspector;
+
+        if (inspector is null || inspector.IsInspectorCollapsed)
         {
             return;
         }
 
-        _vm.Inspector.SetInspectorWidth(InspectorColumn.ActualWidth);
+        inspector.SetInspectorWidth(InspectorColumn.ActualWidth);
 
         ApplyInspectorLayout();
     }

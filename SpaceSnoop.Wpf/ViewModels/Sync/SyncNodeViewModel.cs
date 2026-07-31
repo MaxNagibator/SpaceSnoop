@@ -321,39 +321,43 @@ public sealed partial class SyncNodeViewModel : ObservableObject
     private static (bool Actionable, SyncAction? Uniform) ComputeSubtreeAction(DirectoryComparison root)
     {
         var actionable = false;
-        var first = true;
         var mixed = false;
-        var uniform = SyncAction.None;
+        SyncAction? uniform = null;
 
-        Walk(root);
-
-        return (actionable, mixed || !actionable ? null : uniform);
-
-        void Walk(DirectoryComparison dir)
+        foreach (var file in EnumerateFiles(root))
         {
-            foreach (var file in dir.Files)
+            if (file.Status == ComparisonStatus.Identical)
             {
-                if (file.Status == ComparisonStatus.Identical)
-                {
-                    continue;
-                }
-
-                actionable = true;
-
-                if (first)
-                {
-                    uniform = file.Action;
-                    first = false;
-                }
-                else if (file.Action != uniform)
-                {
-                    mixed = true;
-                }
+                continue;
             }
 
-            foreach (var sub in dir.SubDirectories)
+            actionable = true;
+
+            if (uniform is null)
             {
-                Walk(sub);
+                uniform = file.Action;
+            }
+            else if (file.Action != uniform)
+            {
+                mixed = true;
+            }
+        }
+
+        return (actionable, mixed ? null : uniform);
+    }
+
+    private static IEnumerable<FileComparison> EnumerateFiles(DirectoryComparison dir)
+    {
+        foreach (var file in dir.Files)
+        {
+            yield return file;
+        }
+
+        foreach (var sub in dir.SubDirectories)
+        {
+            foreach (var file in EnumerateFiles(sub))
+            {
+                yield return file;
             }
         }
     }

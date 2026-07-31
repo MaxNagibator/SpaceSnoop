@@ -548,7 +548,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         try
         {
-            built = await Task.Run(() => BuildContentDiff(leftPath, rightPath));
+            built = await Task.Run(() => BuildContentDiff(leftPath, rightPath), CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -1430,7 +1430,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         try
         {
-            (_leftGit, _rightGit) = await Task.Run(async () => (await _git.ReadAsync(left), await _git.ReadAsync(right)));
+            (_leftGit, _rightGit) = await Task.Run(
+                async () => (await _git.ReadAsync(left, CancellationToken.None), await _git.ReadAsync(right, CancellationToken.None)),
+                CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -1466,8 +1468,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         try
         {
-            (LeftGitLog, RightGitLog) = await Task.Run(async () =>
-                (await _git.ReadHistoryAsync(left, count), await _git.ReadHistoryAsync(right, count)));
+            (LeftGitLog, RightGitLog) = await Task.Run(
+                async () => (await _git.ReadHistoryAsync(left, count, CancellationToken.None), await _git.ReadHistoryAsync(right, count, CancellationToken.None)),
+                CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -1550,7 +1553,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             var done = 0;
             HashModifiedFiles(result.Root, result.LeftPath, result.RightPath, progress, ref done, token);
             return BuildDirSizeCache(result.Root);
-        }, ModifiedCount);
+        }, ModifiedCount, CancellationToken.None);
 
         stopwatch.Stop();
 
@@ -1616,7 +1619,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             return;
         }
 
-        await ExecuteSyncAsync(true);
+        await ExecuteSyncAsync(true, CancellationToken.None);
     }
 
     private async Task<SyncReport?> ExecuteSyncAsync(bool interactive, CancellationToken external = default)

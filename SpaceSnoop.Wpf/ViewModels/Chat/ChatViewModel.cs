@@ -278,7 +278,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
 
             try
             {
-                info = await Task.Run(backend.Detect);
+                info = await Task.Run(backend.Detect, CancellationToken.None);
             }
             catch (Exception exception)
             {
