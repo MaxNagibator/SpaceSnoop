@@ -7,7 +7,7 @@
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
              d:DesignWidth="900"
-             Visibility="{Binding Sections[update].IsVisible, Converter={StaticResource BoolToVisibility}}">
+             Visibility="{Binding Sections[update].IsSelected, Converter={StaticResource BoolToVisibility}}">
 
     <UserControl.Resources>
         <ResourceDictionary>
@@ -17,9 +17,8 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Expander Style="{StaticResource Setting.Card}"
-              Header="{Binding Sections[update].Title}"
-              IsExpanded="{Binding Sections[update].IsExpanded, Mode=TwoWay}">
+    <HeaderedContentControl Style="{StaticResource Setting.Panel}"
+                            Header="{Binding Sections[update].Title}">
         <StackPanel>
             <TextBlock Text="Репозиторий обновлений"
                        Style="{StaticResource Setting.Label}" />
@@ -98,5 +97,5 @@
                 </StackPanel>
             </Border>
         </StackPanel>
-    </Expander>
+    </HeaderedContentControl>
 </UserControl>

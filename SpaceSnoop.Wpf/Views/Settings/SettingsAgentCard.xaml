@@ -8,7 +8,7 @@
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
              d:DesignWidth="900"
-             Visibility="{Binding Sections[agent].IsVisible, Converter={StaticResource BoolToVisibility}}">
+             Visibility="{Binding Sections[agent].IsSelected, Converter={StaticResource BoolToVisibility}}">
 
     <UserControl.Resources>
         <ResourceDictionary>
@@ -18,9 +18,8 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Expander Style="{StaticResource Setting.Card}"
-              Header="{Binding Sections[agent].Title}"
-              IsExpanded="{Binding Sections[agent].IsExpanded, Mode=TwoWay}">
+    <HeaderedContentControl Style="{StaticResource Setting.Panel}"
+                            Header="{Binding Sections[agent].Title}">
         <StackPanel>
             <TextBlock Style="{StaticResource Setting.Hint}"
                        Margin="0"
@@ -141,5 +140,5 @@
             <TextBlock Style="{StaticResource Setting.Hint}"
                        Text="Пусто – найти автоматически в PATH и типичных местах установки." />
         </StackPanel>
-    </Expander>
+    </HeaderedContentControl>
 </UserControl>

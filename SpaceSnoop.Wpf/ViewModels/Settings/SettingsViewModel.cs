@@ -64,25 +64,24 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
 
         Theme.PropertyChanged += OnThemePropertyChanged;
         Mcp.PropertyChanged += OnMcpPropertyChanged;
+
+        Sections.Restore(settings.GetStringValue(SettingsKeys.SettingsSection));
+        Sections.PropertyChanged += OnSectionsPropertyChanged;
     }
 
-    public IReadOnlyDictionary<string, SettingsSection> Sections { get; } = new Dictionary<string, SettingsSection>(StringComparer.Ordinal)
-    {
-        ["appearance"] = new("Внешний вид", true, "тема оформления светлая тёмная tarkov масштаб шрифта размер текста заголовок страницы уведомления тосты"),
-        ["startup"] = new("Запуск", true, "стартовая страница навигационный рейл свернуть права администратора предупреждение"),
-        ["scan"] = new("Сканирование", true, "многопоточный обход потоки параллелизм тепловая подсветка интенсивность проводник открытие файлов"),
-        ["sync"] = new("Синхронизация", true, "исключения glob паттерны автодополнение путей git репозиторий группировка служебных каталогов плоский вид"),
-        ["delete"] = new("Удаление", true, "корзина безвозвратно подтверждение помеченные элементы"),
-        ["archive"] = new("Архивация", false, "zip сжатие уровень упаковать оригинал корзина"),
-        ["update"] = new("Обновления", false, "github релизы репозиторий версия проверка скачивание изменения changelog"),
-        ["storage"] = new("Файлы и хранение", false, "расположение данных appdata portable settings.toml путь логи журналы"),
-        ["mcp"] = new("MCP-сервер", false, "порт токен подключение json cli адрес изменяющие операции агент"),
-        ["agent"] = new("Агент-чат", false, "шнырь claude codex opencode cli модель глубина рассуждений транскрипт согласие"),
-    };
+    public SettingsSectionList Sections { get; } = new(
+        new SettingsSection("appearance", "Внешний вид", PackIconLucideKind.Palette, "тема оформления светлая тёмная tarkov масштаб шрифта размер текста заголовок страницы уведомления тосты"),
+        new SettingsSection("startup", "Запуск", PackIconLucideKind.Power, "стартовая страница навигационный рейл свернуть права администратора предупреждение"),
+        new SettingsSection("scan", "Сканирование", PackIconLucideKind.HardDrive, "многопоточный обход потоки параллелизм тепловая подсветка интенсивность проводник открытие файлов"),
+        new SettingsSection("sync", "Синхронизация", PackIconLucideKind.FolderSync, "исключения glob паттерны автодополнение путей git репозиторий группировка служебных каталогов плоский вид"),
+        new SettingsSection("delete", "Удаление", PackIconLucideKind.Trash2, "корзина безвозвратно подтверждение помеченные элементы"),
+        new SettingsSection("archive", "Архивация", PackIconLucideKind.FileArchive, "zip сжатие уровень упаковать оригинал корзина"),
+        new SettingsSection("update", "Обновления", PackIconLucideKind.Download, "github релизы репозиторий версия проверка скачивание изменения changelog"),
+        new SettingsSection("storage", "Файлы и хранение", PackIconLucideKind.Folder, "расположение данных appdata portable settings.toml путь логи журналы"),
+        new SettingsSection("mcp", "MCP-сервер", PackIconLucideKind.Plug, "порт токен подключение json cli адрес изменяющие операции агент"),
+        new SettingsSection("agent", "Агент-чат", PackIconLucideKind.MessageCircle, "шнырь claude codex opencode cli модель глубина рассуждений транскрипт согласие"));
 
     public bool SearchTextEmpty => string.IsNullOrWhiteSpace(SearchText);
-
-    public bool NoMatches => Sections.Values.All(section => !section.IsVisible);
 
     public ThemeViewModel Theme { get; }
 
@@ -280,14 +279,15 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
 
     partial void OnSearchTextChanged(string value)
     {
-        var terms = SettingsSection.ParseQuery(value);
+        Sections.Filter(value);
+    }
 
-        foreach (var section in Sections.Values)
+    private void OnSectionsPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SettingsSectionList.Selected) && Sections.Selected is not null)
         {
-            section.Filter(terms);
+            _settings.SetValue(SettingsKeys.SettingsSection, Sections.Selected.Key);
         }
-
-        OnPropertyChanged(nameof(NoMatches));
     }
 
     [RelayCommand]

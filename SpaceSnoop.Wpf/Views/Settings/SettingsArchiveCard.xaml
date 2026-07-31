@@ -7,7 +7,7 @@
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
              d:DesignWidth="900"
-             Visibility="{Binding Sections[archive].IsVisible, Converter={StaticResource BoolToVisibility}}">
+             Visibility="{Binding Sections[archive].IsSelected, Converter={StaticResource BoolToVisibility}}">
 
     <UserControl.Resources>
         <ResourceDictionary>
@@ -17,9 +17,8 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Expander Style="{StaticResource Setting.Card}"
-              Header="{Binding Sections[archive].Title}"
-              IsExpanded="{Binding Sections[archive].IsExpanded, Mode=TwoWay}">
+    <HeaderedContentControl Style="{StaticResource Setting.Panel}"
+                            Header="{Binding Sections[archive].Title}">
         <StackPanel>
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -54,5 +53,5 @@
             <TextBlock Style="{StaticResource Setting.CheckHint}"
                        Text="Только после успешной проверки архива и только в корзину – можно восстановить." />
         </StackPanel>
-    </Expander>
+    </HeaderedContentControl>
 </UserControl>

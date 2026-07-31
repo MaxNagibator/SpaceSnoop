@@ -9,6 +9,7 @@ public static class SettingsKeys
     public const string WarnIfNotAdmin = "wpf.startup.admin_warning";
     public const string LastPage = "wpf.shell.last_page";
     public const string NavCollapsed = "wpf.shell.nav_collapsed";
+    public const string SettingsSection = "wpf.settings.section";
 
     public const string WindowLeft = "wpf.window.left";
     public const string WindowTop = "wpf.window.top";

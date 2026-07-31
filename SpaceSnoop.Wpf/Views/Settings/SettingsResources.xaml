@@ -3,7 +3,8 @@
                     xmlns:sys="clr-namespace:System;assembly=mscorlib"
                     xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks">
 
-    <sys:Double x:Key="Setting.ContentWidth">960</sys:Double>
+    <sys:Double x:Key="Setting.ContentWidth">760</sys:Double>
+    <sys:Double x:Key="Setting.NavWidth">220</sys:Double>
     <sys:Double x:Key="Setting.ControlWidth">280</sys:Double>
     <sys:Double x:Key="Setting.SliderWidth">228</sys:Double>
 
@@ -68,93 +69,39 @@
                 Value="26,2,0,0" />
     </Style>
 
-    <Style x:Key="Setting.Card"
-           TargetType="Expander">
-        <Setter Property="Margin"
-                Value="0,0,0,10" />
+    <Style x:Key="Setting.Panel"
+           TargetType="HeaderedContentControl">
         <Setter Property="Foreground"
                 Value="{DynamicResource Fg.Primary}" />
+        <Setter Property="VerticalAlignment"
+                Value="Top" />
         <Setter Property="Template">
             <Setter.Value>
-                <ControlTemplate TargetType="Expander">
+                <ControlTemplate TargetType="HeaderedContentControl">
                     <Border Style="{StaticResource Card.Inset}">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <ToggleButton Grid.Row="0"
-                                          Cursor="Hand"
-                                          Focusable="True"
-                                          HorizontalContentAlignment="Stretch"
-                                          IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
-                                <ToggleButton.Template>
-                                    <ControlTemplate TargetType="ToggleButton">
-                                        <Border x:Name="HeaderBd"
-                                                Background="Transparent"
-                                                CornerRadius="{DynamicResource Radius.S}"
-                                                Padding="4,2">
-                                            <ContentPresenter />
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver"
-                                                     Value="True">
-                                                <Setter TargetName="HeaderBd"
-                                                        Property="Background"
-                                                        Value="{DynamicResource Bg.Surface}" />
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </ToggleButton.Template>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <ContentPresenter ContentSource="Header"
-                                                      VerticalAlignment="Center"
-                                                      TextElement.Foreground="{DynamicResource Fg.Primary}"
-                                                      TextElement.FontWeight="{DynamicResource Font.Weight.SemiBold}" />
-                                    <iconPacks:PackIconLucide x:Name="ChevronClosed"
-                                                              Grid.Column="1"
-                                                              Kind="{x:Static iconPacks:PackIconLucideKind.ChevronDown}"
-                                                              Width="14"
-                                                              Height="14"
-                                                              VerticalAlignment="Center"
-                                                              Foreground="{DynamicResource Fg.Muted}" />
-                                    <iconPacks:PackIconLucide x:Name="ChevronOpen"
-                                                              Grid.Column="1"
-                                                              Kind="{x:Static iconPacks:PackIconLucideKind.ChevronUp}"
-                                                              Width="14"
-                                                              Height="14"
-                                                              Visibility="Collapsed"
-                                                              VerticalAlignment="Center"
-                                                              Foreground="{DynamicResource Fg.Muted}" />
-                                </Grid>
-                            </ToggleButton>
-                            <ContentPresenter x:Name="ContentArea"
-                                              Grid.Row="1"
-                                              Margin="0,10,0,0"
-                                              Visibility="Collapsed" />
-                        </Grid>
+                        <StackPanel>
+                            <ContentPresenter ContentSource="Header"
+                                              TextElement.Foreground="{DynamicResource Fg.Primary}"
+                                              TextElement.FontWeight="{DynamicResource Font.Weight.SemiBold}"
+                                              TextElement.FontSize="{DynamicResource Font.Size.L}" />
+                            <ContentPresenter Margin="0,14,0,0" />
+                        </StackPanel>
                     </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsExpanded"
-                                 Value="True">
-                            <Setter TargetName="ContentArea"
-                                    Property="Visibility"
-                                    Value="Visible" />
-                            <Setter TargetName="ChevronClosed"
-                                    Property="Visibility"
-                                    Value="Collapsed" />
-                            <Setter TargetName="ChevronOpen"
-                                    Property="Visibility"
-                                    Value="Visible" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <Style x:Key="Setting.NavIcon"
+           TargetType="iconPacks:PackIconLucide">
+        <Setter Property="Width"
+                Value="16" />
+        <Setter Property="Height"
+                Value="16" />
+        <Setter Property="HorizontalAlignment"
+                Value="Center" />
+        <Setter Property="VerticalAlignment"
+                Value="Center" />
     </Style>
 
 </ResourceDictionary>

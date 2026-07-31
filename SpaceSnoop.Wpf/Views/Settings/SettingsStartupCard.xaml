@@ -7,7 +7,7 @@
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
              d:DesignWidth="900"
-             Visibility="{Binding Sections[startup].IsVisible, Converter={StaticResource BoolToVisibility}}">
+             Visibility="{Binding Sections[startup].IsSelected, Converter={StaticResource BoolToVisibility}}">
 
     <UserControl.Resources>
         <ResourceDictionary>
@@ -17,9 +17,8 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Expander Style="{StaticResource Setting.Card}"
-              Header="{Binding Sections[startup].Title}"
-              IsExpanded="{Binding Sections[startup].IsExpanded, Mode=TwoWay}">
+    <HeaderedContentControl Style="{StaticResource Setting.Panel}"
+                            Header="{Binding Sections[startup].Title}">
         <StackPanel>
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -57,5 +56,5 @@
             <TextBlock Style="{StaticResource Setting.CheckHint}"
                        Text="Без повышения прав часть каталогов недоступна, размеры выходят заниженными." />
         </StackPanel>
-    </Expander>
+    </HeaderedContentControl>
 </UserControl>

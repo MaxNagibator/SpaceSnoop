@@ -9,7 +9,7 @@
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
              d:DesignHeight="700"
-             d:DesignWidth="900">
+             d:DesignWidth="1100">
 
     <UserControl.Resources>
         <ResourceDictionary>
@@ -21,68 +21,108 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="*"
                               MaxWidth="{StaticResource Setting.ContentWidth}" />
         </Grid.ColumnDefinitions>
 
-        <DockPanel>
-            <Grid DockPanel.Dock="Top"
-                  Margin="0,0,12,10">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+        <Border Width="{StaticResource Setting.NavWidth}"
+                BorderBrush="{DynamicResource Border.Subtle}"
+                BorderThickness="0,0,1,0"
+                Padding="0,0,10,0">
+            <DockPanel>
+                <Grid DockPanel.Dock="Top"
+                      Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
 
-                <Grid Grid.Column="0">
-                    <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                             Style="{StaticResource TextBox.IconField}"
-                             Tag="{x:Static iconPacks:PackIconLucideKind.Search}"
-                             AutomationProperties.Name="Поиск по настройкам"
-                             ToolTip="Фильтр разделов по названию и ключевым словам" />
-                    <TextBlock Text="Поиск по настройкам"
-                               Margin="36,0,8,0"
-                               VerticalAlignment="Center"
-                               Foreground="{DynamicResource Fg.Muted}"
-                               IsHitTestVisible="False"
-                               Visibility="{Binding SearchTextEmpty, Converter={StaticResource BoolToVisibility}}" />
+                    <Grid Grid.Column="0">
+                        <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource TextBox.IconField}"
+                                 Tag="{x:Static iconPacks:PackIconLucideKind.Search}"
+                                 AutomationProperties.Name="Поиск по настройкам"
+                                 ToolTip="Фильтр разделов по названию и ключевым словам" />
+                        <TextBlock Text="Поиск"
+                                   Margin="36,0,8,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Fg.Muted}"
+                                   IsHitTestVisible="False"
+                                   Visibility="{Binding SearchTextEmpty, Converter={StaticResource BoolToVisibility}}" />
+                    </Grid>
+
+                    <Button Grid.Column="1"
+                            Style="{StaticResource Button.Icon}"
+                            Command="{Binding ClearSearchCommand}"
+                            Margin="6,0,0,0"
+                            AutomationProperties.Name="Очистить поиск"
+                            ToolTip="Очистить поиск"
+                            Visibility="{Binding SearchTextEmpty, Converter={StaticResource InverseBoolToVisibility}}">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.X}"
+                                                  Width="16"
+                                                  Height="16"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center" />
+                    </Button>
                 </Grid>
 
-                <Button Grid.Column="1"
-                        Style="{StaticResource Button.Icon}"
-                        Command="{Binding ClearSearchCommand}"
-                        Margin="8,0,0,0"
-                        AutomationProperties.Name="Очистить поиск"
-                        ToolTip="Очистить поиск"
-                        Visibility="{Binding SearchTextEmpty, Converter={StaticResource InverseBoolToVisibility}}">
-                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.X}"
-                                              Width="16"
-                                              Height="16"
-                                              HorizontalAlignment="Center"
-                                              VerticalAlignment="Center" />
-                </Button>
+                <TextBlock DockPanel.Dock="Top"
+                           Text="Ничего не найдено."
+                           Style="{StaticResource TextBlock.Subtle}"
+                           TextWrapping="Wrap"
+                           Margin="8,2,0,0"
+                           Visibility="{Binding Sections.NoMatches, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <ItemsControl ItemsSource="{Binding Sections.Items}"
+                                  KeyboardNavigation.TabNavigation="Continue">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Style="{StaticResource Nav.RailItem}"
+                                        Command="{Binding DataContext.Sections.SelectCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="{Binding Title}"
+                                        Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibility}}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="26" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <iconPacks:PackIconLucide Style="{StaticResource Setting.NavIcon}"
+                                                                  Kind="{Binding Icon}" />
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding Title}"
+                                                   Margin="6,0,0,0"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </Grid>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+
+        <ScrollViewer Grid.Column="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Margin="16,0,0,0"
+                      Padding="0,0,12,0">
+            <Grid RequestBringIntoView="SuppressAutoScroll">
+                <settings:SettingsAppearanceCard />
+                <settings:SettingsStartupCard />
+                <settings:SettingsScanCard />
+                <settings:SettingsExclusionsCard />
+                <settings:SettingsDeleteCard />
+                <settings:SettingsArchiveCard />
+                <settings:SettingsUpdateCard />
+                <settings:SettingsFileCard />
+                <settings:SettingsMcpCard />
+                <settings:SettingsAgentCard />
             </Grid>
-
-            <ScrollViewer VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled"
-                          Padding="0,0,12,0">
-                <StackPanel RequestBringIntoView="SuppressAutoScroll">
-                    <TextBlock Text="Ничего не найдено."
-                               Style="{StaticResource TextBlock.Subtle}"
-                               Margin="2,2,0,8"
-                               Visibility="{Binding NoMatches, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
-
-                    <settings:SettingsAppearanceCard />
-                    <settings:SettingsStartupCard />
-                    <settings:SettingsScanCard />
-                    <settings:SettingsExclusionsCard />
-                    <settings:SettingsDeleteCard />
-                    <settings:SettingsArchiveCard />
-                    <settings:SettingsUpdateCard />
-                    <settings:SettingsFileCard />
-                    <settings:SettingsMcpCard />
-                    <settings:SettingsAgentCard />
-                </StackPanel>
-            </ScrollViewer>
-        </DockPanel>
+        </ScrollViewer>
     </Grid>
 </UserControl>

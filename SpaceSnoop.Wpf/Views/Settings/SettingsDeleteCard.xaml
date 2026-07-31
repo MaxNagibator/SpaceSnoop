@@ -7,7 +7,7 @@
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
              d:DesignWidth="900"
-             Visibility="{Binding Sections[delete].IsVisible, Converter={StaticResource BoolToVisibility}}">
+             Visibility="{Binding Sections[delete].IsSelected, Converter={StaticResource BoolToVisibility}}">
 
     <UserControl.Resources>
         <ResourceDictionary>
@@ -17,9 +17,8 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Expander Style="{StaticResource Setting.Card}"
-              Header="{Binding Sections[delete].Title}"
-              IsExpanded="{Binding Sections[delete].IsExpanded, Mode=TwoWay}">
+    <HeaderedContentControl Style="{StaticResource Setting.Panel}"
+                            Header="{Binding Sections[delete].Title}">
         <StackPanel>
             <CheckBox Content="Спрашивать подтверждение перед удалением"
                       IsChecked="{Binding Operations.ConfirmBeforeDelete, Mode=TwoWay}"
@@ -49,5 +48,5 @@
                           VerticalAlignment="Center" />
             </Grid>
         </StackPanel>
-    </Expander>
+    </HeaderedContentControl>
 </UserControl>

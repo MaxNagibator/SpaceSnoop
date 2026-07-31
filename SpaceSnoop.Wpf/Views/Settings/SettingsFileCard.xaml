@@ -8,7 +8,7 @@
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
              d:DesignWidth="900"
-             Visibility="{Binding Sections[storage].IsVisible, Converter={StaticResource BoolToVisibility}}">
+             Visibility="{Binding Sections[storage].IsSelected, Converter={StaticResource BoolToVisibility}}">
 
     <UserControl.Resources>
         <ResourceDictionary>
@@ -18,9 +18,8 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Expander Style="{StaticResource Setting.Card}"
-              Header="{Binding Sections[storage].Title}"
-              IsExpanded="{Binding Sections[storage].IsExpanded, Mode=TwoWay}">
+    <HeaderedContentControl Style="{StaticResource Setting.Panel}"
+                            Header="{Binding Sections[storage].Title}">
         <StackPanel>
             <TextBlock Text="Расположение данных"
                        Style="{StaticResource Setting.SectionTitle}" />
@@ -86,5 +85,5 @@
                 </StackPanel>
             </Grid>
         </StackPanel>
-    </Expander>
+    </HeaderedContentControl>
 </UserControl>

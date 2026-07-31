@@ -8,7 +8,7 @@
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
              d:DesignWidth="900"
-             Visibility="{Binding Sections[scan].IsVisible, Converter={StaticResource BoolToVisibility}}">
+             Visibility="{Binding Sections[scan].IsSelected, Converter={StaticResource BoolToVisibility}}">
 
     <UserControl.Resources>
         <ResourceDictionary>
@@ -18,9 +18,8 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Expander Style="{StaticResource Setting.Card}"
-              Header="{Binding Sections[scan].Title}"
-              IsExpanded="{Binding Sections[scan].IsExpanded, Mode=TwoWay}">
+    <HeaderedContentControl Style="{StaticResource Setting.Panel}"
+                            Header="{Binding Sections[scan].Title}">
         <StackPanel>
             <CheckBox Content="Многопоточный обход"
                       IsChecked="{Binding Scan.UseMultithreading, Mode=TwoWay}"
@@ -96,5 +95,5 @@
                            Text="При включённой настройке проводник подсвечивает файл в папке и ничего не выполняет. При выключенной исполняемые файлы запускаются." />
             </Expander>
         </StackPanel>
-    </Expander>
+    </HeaderedContentControl>
 </UserControl>

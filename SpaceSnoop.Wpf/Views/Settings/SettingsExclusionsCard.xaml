@@ -7,7 +7,7 @@
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
              d:DesignWidth="900"
-             Visibility="{Binding Sections[sync].IsVisible, Converter={StaticResource BoolToVisibility}}">
+             Visibility="{Binding Sections[sync].IsSelected, Converter={StaticResource BoolToVisibility}}">
 
     <UserControl.Resources>
         <ResourceDictionary>
@@ -17,9 +17,8 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Expander Style="{StaticResource Setting.Card}"
-              Header="{Binding Sections[sync].Title}"
-              IsExpanded="{Binding Sections[sync].IsExpanded, Mode=TwoWay}">
+    <HeaderedContentControl Style="{StaticResource Setting.Panel}"
+                            Header="{Binding Sections[sync].Title}">
         <StackPanel>
             <CheckBox Content="Автодополнение путей"
                       IsChecked="{Binding Operations.SyncPathSuggest, Mode=TwoWay}"
@@ -77,5 +76,5 @@
                      FontFamily="{DynamicResource Font.Mono}"
                      Margin="0,10,0,0" />
         </StackPanel>
-    </Expander>
+    </HeaderedContentControl>
 </UserControl>
