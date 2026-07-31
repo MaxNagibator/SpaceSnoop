@@ -135,7 +135,7 @@
                        Style="{StaticResource TextBlock.Subtle}"
                        Foreground="{DynamicResource Fg.Muted}"
                        Margin="0,0,0,8"
-                       Text="После очистки образ диска Docker (VHDX) сам не сжимается. Эта кнопка остановит WSL и вернёт освободившееся место системе – потом запустите Docker заново." />
+                       Text="Экспериментальная операция: после очистки образ данных Docker (VHDX) сам не сжимается. Кнопка остановит Docker Desktop и вернёт освободившееся место системе. Сжатие может занять много времени, а после запуска diskpart безопасная отмена недоступна – потом запустите Docker заново. Если штатная остановка не сработает, будет отдельное подтверждение остановки всего WSL." />
             <Button Style="{StaticResource Button.Primary}"
                     Command="{Binding CompactCommand}"
                     IsEnabled="{Binding CanRun}"
