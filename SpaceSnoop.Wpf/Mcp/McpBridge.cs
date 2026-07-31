@@ -277,6 +277,31 @@ public sealed class McpBridge(
             DescribeDeferredNavigation(run.Deferred))));
     }
 
+    public string CaptureView(string? section, string? element, double scale)
+    {
+        section = section?.Trim();
+        element = element?.Trim();
+        scale = Math.Clamp(scale, AppDefaults.ViewCaptureScaleMin, AppDefaults.ViewCaptureScaleMax);
+
+        logger.McpToolInvoked("capture_view", $"страница {(section is { Length: > 0 } ? section : "текущая")}, элемент {(element is { Length: > 0 } ? element : "всё окно")}, масштаб {scale:0.##}");
+
+        var deferred = false;
+
+        if (section is { Length: > 0 })
+        {
+            if (!SectionKey.All.Contains(section, StringComparer.OrdinalIgnoreCase))
+            {
+                throw new McpException($"Неизвестная страница «{section}». Доступны: {string.Join(", ", SectionKey.All)}.");
+            }
+
+            deferred = Dispatch(() => DeferOrNavigate(section));
+        }
+
+        Dispatch(static () => true, DispatcherPriority.ContextIdle);
+
+        return Dispatch(() => CaptureCore(element, scale, deferred));
+    }
+
     public async Task<string> ArchiveDirectoryAsync(string path, bool deleteOriginal, bool dryRun, CancellationToken cancellationToken)
     {
         path = path.Trim();
@@ -765,7 +790,7 @@ public sealed class McpBridge(
         });
     }
 
-    private static T Dispatch<T>(Func<T> action)
+    private static T Dispatch<T>(Func<T> action, DispatcherPriority priority = DispatcherPriority.Normal)
     {
         var dispatcher = Application.Current?.Dispatcher;
 
@@ -778,7 +803,7 @@ public sealed class McpBridge(
         {
             return dispatcher.Invoke(
                 action,
-                DispatcherPriority.Normal,
+                priority,
                 CancellationToken.None,
                 TimeSpan.FromSeconds(AppDefaults.McpDispatchTimeoutSeconds));
         }
@@ -798,6 +823,60 @@ public sealed class McpBridge(
 
         _shell?.TryNavigate(sectionKey);
         return false;
+    }
+
+    private string CaptureCore(string? element, double scale, bool deferred)
+    {
+        if (Application.Current?.MainWindow is not { } window)
+        {
+            throw new McpException("Окно приложения не открыто – снимать нечего.");
+        }
+
+        window.UpdateLayout();
+
+        var named = element is { Length: > 0 };
+
+        var target = named
+            ? ViewCapture.Find(window, element!) ?? throw new McpException(
+                $"В окне нет элемента с именем «{element}». Открыты, например: {string.Join(", ", ViewCapture.Names(window, AppDefaults.ViewCaptureNamesHint))}.")
+            : window;
+
+        var page = _shell?.CurrentSectionKey ?? "-";
+        var label = named ? $"{page}-{element}" : page;
+        var path = Path.Combine(ViewCapture.DirectoryPath, ViewCapture.FileName(label, DateTimeOffset.Now));
+
+        ViewCapture.DropObsolete(ViewCapture.DirectoryPath, AppDefaults.ViewCaptureLimit - 1, logger.ViewCaptureFailed);
+
+        int width;
+        int height;
+
+        try
+        {
+            (width, height) = ViewCapture.Save(target, path, scale);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            logger.ViewCaptureFailed(exception, path);
+            throw new McpException($"Снимок не записан в «{path}»: {exception.Message}");
+        }
+
+        if (width == 0 || height == 0)
+        {
+            throw new McpException(named
+                ? $"Элемент «{element}» не отрисован – он скрыт или ещё не построен на текущей странице."
+                : "Окно не отрисовано – оно свёрнуто или ещё не показано.");
+        }
+
+        logger.ViewCaptured(path, width, height);
+
+        return Serialize(new McpCapture(
+            path,
+            page,
+            named ? element : null,
+            ThemeManager.Current?.Key ?? "-",
+            width,
+            height,
+            DescribeDeferredNavigation(deferred)));
     }
 
     private (DirectorySpace Dir, ArchiveRequest Request) PrepareArchive(string path, bool deleteOriginal)

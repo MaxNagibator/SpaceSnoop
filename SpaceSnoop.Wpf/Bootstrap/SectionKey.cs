@@ -10,4 +10,7 @@ public static class SectionKey
     public const string Chat = "chat";
     public const string Logs = "logs";
     public const string About = "about";
+    public const string Settings = "settings";
+
+    public static IReadOnlyList<string> All { get; } = [Scan, Sync, Overview, Schedule, Docker, Chat, Logs, About, Settings];
 }

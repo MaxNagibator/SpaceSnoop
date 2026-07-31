@@ -58,6 +58,18 @@ public static class AppDefaults
     public const int McpDispatchTimeoutSeconds = 30;
     public const int McpShutdownTimeoutSeconds = 3;
 
+    public const int ViewCaptureLimit = 20;
+    public const int ViewCaptureNamesHint = 20;
+    public const double ViewCaptureScaleDefault = 1;
+    public const double ViewCaptureScaleMin = 0.5;
+    public const double ViewCaptureScaleMax = 3;
+    public const int GalleryWidthDefault = 1280;
+    public const int GalleryHeightDefault = 800;
+    public const int GallerySizeMin = 480;
+    public const int GallerySizeMax = 4096;
+    public const int GalleryFrameDelayMs = 200;
+    public const int GalleryThemeDelayMs = 700;
+
     public const bool AgentEnabledDefault = true;
     public const bool AgentConsentDefault = false;
     public const bool AgentHistoryVisibleDefault = false;

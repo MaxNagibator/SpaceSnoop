@@ -22,6 +22,7 @@ public static class AgentPrompt
         "docker_usage",
         "open_scan",
         "open_sync",
+        "capture_view",
     ];
 
     private static readonly string[] DestructiveTools =
@@ -78,6 +79,7 @@ public static class AgentPrompt
             "docker_usage" => "занятое Docker место",
             "open_scan" => "страница «Сканирование»",
             "open_sync" => "страница «Синхронизация»",
+            "capture_view" => "снимок окна",
             "sync_current" => "синхронизация",
             "archive_directory" => "упаковка в архив",
             "mark_for_deletion" => "пометка на удаление",

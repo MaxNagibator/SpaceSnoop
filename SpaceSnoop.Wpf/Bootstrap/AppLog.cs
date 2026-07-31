@@ -370,4 +370,19 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 2126, Level = LogLevel.Debug, Message = "Переход на страницу «{Page}» отложен до конца хода агента")]
     public static partial void AgentNavigationDeferred(this ILogger logger, string page);
+
+    [LoggerMessage(EventId = 2200, Level = LogLevel.Information, Message = "Снимок сохранён: {Path} ({Width}×{Height})")]
+    public static partial void ViewCaptured(this ILogger logger, string path, int width, int height);
+
+    [LoggerMessage(EventId = 2201, Level = LogLevel.Warning, Message = "Снимок «{Path}» не сохранён")]
+    public static partial void ViewCaptureFailed(this ILogger logger, Exception exception, string path);
+
+    [LoggerMessage(EventId = 2202, Level = LogLevel.Information, Message = "Галерея: {Cases} страниц × {Themes} тем в «{Directory}»")]
+    public static partial void GalleryStarted(this ILogger logger, int cases, int themes, string directory);
+
+    [LoggerMessage(EventId = 2203, Level = LogLevel.Information, Message = "Галерея готова: кадров {Frames}, пропущено {Skipped}, за {ElapsedMs} мс")]
+    public static partial void GalleryFinished(this ILogger logger, int frames, int skipped, long elapsedMs);
+
+    [LoggerMessage(EventId = 2204, Level = LogLevel.Warning, Message = "Галерея: кадр «{Case}» не снят")]
+    public static partial void GalleryCaseFailed(this ILogger logger, Exception exception, string @case);
 }

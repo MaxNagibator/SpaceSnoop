@@ -100,6 +100,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         chat.NavigationRequested += sectionKey => TryNavigate(sectionKey);
 
         _settingsItem = new("Настройки", PackIconLucideKind.Settings, settingsPage);
+        _sectionByKey[SectionKey.Settings] = _settingsItem;
 
         IsNavCollapsed = Preferences.NavCollapsed;
         Selected = ResolveStartupSection();

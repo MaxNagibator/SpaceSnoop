@@ -1,0 +1,159 @@
+﻿namespace SpaceSnoop.Wpf.Bootstrap;
+
+public sealed record GalleryOptions(
+    string Directory,
+    IReadOnlyList<string> Pages,
+    IReadOnlyList<AppTheme> Themes,
+    int Width,
+    int Height,
+    double Scale,
+    IReadOnlyList<string> Unknown)
+{
+    public static IReadOnlyList<string> AllPages { get; } = [.. SectionKey.All];
+
+    public static GalleryOptions Parse(IEnumerable<string> args, string defaultDirectory)
+    {
+        var directory = defaultDirectory;
+        var pages = AllPages;
+        IReadOnlyList<AppTheme> themes = [AppTheme.Light, AppTheme.Dark];
+        var width = AppDefaults.GalleryWidthDefault;
+        var height = AppDefaults.GalleryHeightDefault;
+        var scale = AppDefaults.ViewCaptureScaleDefault;
+        var unknown = new List<string>();
+
+        var rest = args.ToList();
+        var positional = true;
+
+        for (var index = 0; index < rest.Count; index++)
+        {
+            var key = rest[index].Trim();
+            var value = index + 1 < rest.Count ? rest[index + 1].Trim() : string.Empty;
+
+            switch (key.ToLowerInvariant())
+            {
+                case "--pages":
+                    pages = ParsePages(value, unknown);
+                    index++;
+                    positional = false;
+                    break;
+
+                case "--themes":
+                    themes = ParseThemes(value, unknown);
+                    index++;
+                    positional = false;
+                    break;
+
+                case "--size":
+                    (width, height) = ParseSize(value, width, height);
+                    index++;
+                    positional = false;
+                    break;
+
+                case "--scale":
+                    scale = ParseScale(value, scale);
+                    index++;
+                    positional = false;
+                    break;
+
+                default:
+                    if (positional && key.Length > 0 && !key.StartsWith('-'))
+                    {
+                        directory = key;
+                    }
+                    else if (key.Length > 0)
+                    {
+                        unknown.Add(key);
+                    }
+
+                    positional = false;
+                    break;
+            }
+        }
+
+        return new(directory, pages, themes, width, height, scale, unknown);
+    }
+
+    private static double ParseScale(string value, double scale)
+    {
+        return double.TryParse(value, System.Globalization.CultureInfo.InvariantCulture, out var parsed)
+            ? Math.Clamp(parsed, AppDefaults.ViewCaptureScaleMin, AppDefaults.ViewCaptureScaleMax)
+            : scale;
+    }
+
+    private static IReadOnlyList<string> ParsePages(string value, List<string> unknown)
+    {
+        var requested = Split(value);
+
+        if (requested.Count == 0)
+        {
+            return AllPages;
+        }
+
+        var pages = new List<string>();
+
+        foreach (var page in requested)
+        {
+            var match = AllPages.FirstOrDefault(known => string.Equals(known, page, StringComparison.OrdinalIgnoreCase));
+
+            if (match is null)
+            {
+                unknown.Add(page);
+                continue;
+            }
+
+            if (!pages.Contains(match, StringComparer.Ordinal))
+            {
+                pages.Add(match);
+            }
+        }
+
+        return pages.Count > 0 ? pages : AllPages;
+    }
+
+    private static IReadOnlyList<AppTheme> ParseThemes(string value, List<string> unknown)
+    {
+        var themes = new List<AppTheme>();
+
+        foreach (var name in Split(value))
+        {
+            var key = name.ToLowerInvariant();
+
+            if (key is not (AppThemes.LightKey or AppThemes.DarkKey or AppThemes.TarkovKey))
+            {
+                unknown.Add(name);
+                continue;
+            }
+
+            var theme = AppThemes.FromKey(key);
+
+            if (!themes.Contains(theme))
+            {
+                themes.Add(theme);
+            }
+        }
+
+        return themes.Count > 0 ? themes : [AppTheme.Light, AppTheme.Dark];
+    }
+
+    private static (int Width, int Height) ParseSize(string value, int width, int height)
+    {
+        var parts = value.ToLowerInvariant().Split('x', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (parts.Length != 2 || !int.TryParse(parts[0], out var parsedWidth) || !int.TryParse(parts[1], out var parsedHeight))
+        {
+            return (width, height);
+        }
+
+        return (Clamp(parsedWidth), Clamp(parsedHeight));
+    }
+
+    private static int Clamp(int value)
+    {
+        return Math.Clamp(value, AppDefaults.GallerySizeMin, AppDefaults.GallerySizeMax);
+    }
+
+    private static List<string> Split(string value)
+    {
+        return [.. value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+    }
+}

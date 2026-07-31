@@ -113,6 +113,15 @@ internal sealed record McpProfile(
 
 internal sealed record McpNavigationResult(string Page, McpSyncState Sync, string? Navigation, string? IgnoredParameters);
 
+internal sealed record McpCapture(
+    string Path,
+    string Page,
+    string? Element,
+    string Theme,
+    int Width,
+    int Height,
+    string? Navigation);
+
 internal sealed record McpSyncResult(
     int Copied,
     int Deleted,

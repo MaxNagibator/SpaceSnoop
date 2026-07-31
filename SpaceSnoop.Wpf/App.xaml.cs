@@ -30,6 +30,14 @@ public partial class App : Application
             return;
         }
 
+        var galleryIndex = Array.FindIndex(e.Args, static arg => string.Equals(arg, AppInfo.GalleryArgument, StringComparison.OrdinalIgnoreCase));
+
+        if (galleryIndex >= 0)
+        {
+            RunGallery(e.Args.Skip(galleryIndex + 1));
+            return;
+        }
+
         AttachExceptionHandlers();
 
         StyledMessageBox.DefaultTitle = AppInfo.Name;
@@ -192,6 +200,41 @@ public partial class App : Application
         services.AddSingleton<McpServerHost>();
 
         return services.BuildServiceProvider();
+    }
+
+    private void RunGallery(IEnumerable<string> args)
+    {
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+        var directory = Path.Combine(AppStorage.DataDirectory, GalleryRun.FolderName);
+        var options = GalleryOptions.Parse(args, directory);
+
+        _ = Dispatcher.InvokeAsync(async () =>
+        {
+            var exitCode = 1;
+
+            try
+            {
+                var fixture = GalleryFixtures.Create();
+                var settingsPath = Path.Combine(fixture.Root, TomlSettingsFile.PrimaryFileName);
+                ISettingsStore settings = new SettingsStore(settingsPath);
+                SyncProfileStore.Save(settings, GalleryFixtures.Profiles(fixture));
+
+                AppThemes.Register();
+                ThemeManager.Apply(AppThemes.LightKey);
+                ViewLocator.InstallIntoApplication();
+
+                _services = ConfigureServices(settings, _logging!);
+
+                exitCode = await GalleryRun.RenderAsync(options, _services, fixture, _logging!.CreateLogger<App>());
+            }
+            catch (Exception ex)
+            {
+                Log.Fatal(ex.Unwrap(), "Галерея не отрисована");
+            }
+
+            Shutdown(exitCode);
+        });
     }
 
     private void RunHeadlessSync(string? profileId)

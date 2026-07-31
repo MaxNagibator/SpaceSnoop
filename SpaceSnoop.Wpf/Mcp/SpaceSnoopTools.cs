@@ -50,6 +50,17 @@ public sealed class SpaceSnoopTools
         return bridge.OpenScanAsync(path, scan, cancellationToken);
     }
 
+    [McpServerTool(Name = "capture_view")]
+    [Description("Снимает окно приложения в PNG и возвращает путь к файлу – чтобы увидеть страницу глазами человека, а не по данным. Ничего не меняет, кроме открытой страницы, если её попросили. Выпадающие списки, контекстные меню и подсказки живут в отдельных окнах и в кадр не попадают.")]
+    public static string CaptureView(
+        McpBridge bridge,
+        [Description("Ключ страницы: scan, sync, overview, schedule, docker, chat, logs, about; не задан – снимается открытая")] string? section = null,
+        [Description("Имя элемента (x:Name) внутри окна; не задано – снимается всё окно")] string? element = null,
+        [Description("Масштаб кадра: 1 – логический размер окна, 2 – вдвое подробнее и вчетверо тяжелее")] double scale = AppDefaults.ViewCaptureScaleDefault)
+    {
+        return bridge.CaptureView(section, element, scale);
+    }
+
     [McpServerTool(Name = "docker_usage")]
     [Description("Сколько места занял Docker: образы, контейнеры, тома и кэш сборки, с долей, которую можно вернуть. Только чтение – очистка Docker агенту недоступна, она удаляет мимо корзины.")]
     public static Task<string> GetDockerUsageAsync(
