@@ -22,6 +22,11 @@ public sealed class StretchWrapPanel : Panel
         typeof(StretchWrapPanel),
         new FrameworkPropertyMetadata(double.NaN, FrameworkPropertyMetadataOptions.AffectsParentMeasure | FrameworkPropertyMetadataOptions.AffectsParentArrange));
 
+    public static readonly DependencyProperty StandaloneProperty = DependencyProperty.RegisterAttached("Standalone",
+        typeof(bool),
+        typeof(StretchWrapPanel),
+        new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsParentMeasure | FrameworkPropertyMetadataOptions.AffectsParentArrange));
+
     public double ItemWidth
     {
         get => (double)GetValue(ItemWidthProperty);
@@ -54,7 +59,17 @@ public sealed class StretchWrapPanel : Panel
         return (double)element.GetValue(StretchWidthProperty);
     }
 
-    public static List<(int Start, int Count)> PackRows(IReadOnlyList<double> widths, double lineWidth)
+    public static void SetStandalone(UIElement element, bool value)
+    {
+        element.SetValue(StandaloneProperty, value);
+    }
+
+    public static bool GetStandalone(UIElement element)
+    {
+        return (bool)element.GetValue(StandaloneProperty);
+    }
+
+    public static List<(int Start, int Count)> PackRows(IReadOnlyList<double> widths, double lineWidth, IReadOnlyList<bool>? standalone = null)
     {
         var rows = new List<(int, int)>();
         var start = 0;
@@ -62,7 +77,11 @@ public sealed class StretchWrapPanel : Panel
 
         for (var i = 0; i < widths.Count; i++)
         {
-            if (rowWidth + widths[i] > lineWidth && i > start)
+            var alone = standalone is not null && standalone[i];
+            var overflow = rowWidth + widths[i] > lineWidth;
+            var groupOverflow = alone && i + 1 < widths.Count && rowWidth + widths[i] + widths[i + 1] > lineWidth;
+
+            if ((overflow || groupOverflow) && i > start)
             {
                 rows.Add((start, i - start));
                 start = i;
@@ -70,6 +89,13 @@ public sealed class StretchWrapPanel : Panel
             }
 
             rowWidth += widths[i];
+
+            if (alone && (overflow || groupOverflow) && i + 1 < widths.Count)
+            {
+                rows.Add((start, i - start + 1));
+                start = i + 1;
+                rowWidth = 0;
+            }
         }
 
         if (widths.Count > start)
@@ -99,7 +125,7 @@ public sealed class StretchWrapPanel : Panel
         var totalWidth = 0d;
         var totalHeight = 0d;
 
-        foreach (var (start, count) in PackRows(widths, line))
+        foreach (var (start, count) in PackRows(widths, line, StandaloneFlags()))
         {
             var rowWidth = 0d;
             var rowHeight = 0d;
@@ -128,7 +154,7 @@ public sealed class StretchWrapPanel : Panel
 
         var y = 0d;
 
-        foreach (var (start, count) in PackRows(widths, finalSize.Width))
+        foreach (var (start, count) in PackRows(widths, finalSize.Width, StandaloneFlags()))
         {
             var fixedWidth = 0d;
             var rowHeight = 0d;
@@ -151,7 +177,9 @@ public sealed class StretchWrapPanel : Panel
             }
 
             var extra = stretchCount > 0 ? Math.Max(0, finalSize.Width - fixedWidth) / stretchCount : 0;
-            var x = 0d;
+            var x = count == 1 && GetStandalone(InternalChildren[start])
+                ? Math.Max(0, finalSize.Width - fixedWidth) / 2
+                : 0d;
 
             for (var i = start; i < start + count; i++)
             {
@@ -165,6 +193,18 @@ public sealed class StretchWrapPanel : Panel
         }
 
         return finalSize;
+    }
+
+    private bool[] StandaloneFlags()
+    {
+        var flags = new bool[InternalChildren.Count];
+
+        for (var i = 0; i < InternalChildren.Count; i++)
+        {
+            flags[i] = GetStandalone(InternalChildren[i]);
+        }
+
+        return flags;
     }
 
     private double StretchBase(UIElement child)

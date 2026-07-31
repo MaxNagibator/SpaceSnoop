@@ -25,6 +25,8 @@
                     Value="Center" />
             <Setter Property="Margin"
                     Value="8,0,0,0" />
+            <Setter Property="ToolTip"
+                    Value="Каталогов с таким же статусом (файлы внутри посчитаны отдельно)" />
         </Style>
 
         <Style x:Key="DirTallyValue"
@@ -124,11 +126,30 @@
             <Setter Property="VerticalAlignment"
                     Value="Center" />
             <Setter Property="Margin"
-                    Value="20,0,0,0" />
+                    Value="0,0,20,0" />
             <Setter Property="Visibility"
                     Value="Collapsed" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding HasPlanVolume}"
+                             Value="True">
+                    <Setter Property="Visibility"
+                            Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ConflictTally"
+               TargetType="StackPanel">
+            <Setter Property="Orientation"
+                    Value="Horizontal" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Setter Property="Margin"
+                    Value="0,0,20,0" />
+            <Setter Property="Visibility"
+                    Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasConflicts}"
                              Value="True">
                     <Setter Property="Visibility"
                             Value="Visible" />
@@ -179,7 +200,7 @@
             <Setter Property="VerticalAlignment"
                     Value="Center" />
             <Setter Property="Margin"
-                    Value="20,0,0,0" />
+                    Value="0,0,20,0" />
             <Setter Property="Visibility"
                     Value="Collapsed" />
             <Setter Property="Opacity"
@@ -220,6 +241,49 @@
                        Orientation="Horizontal"
                        VerticalAlignment="Center"
                        Margin="14,8,0,8">
+                <StackPanel Style="{StaticResource PlanVolume}"
+                            ToolTip="{Binding PlanVolumeHint}">
+                    <TextBlock Text="ОБЪЁМ"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <StackPanel Style="{StaticResource PlanCopyPart}">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Copy}"
+                                                  Width="11"
+                                                  Height="11"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,5,0"
+                                                  Foreground="{DynamicResource Accent.Primary}" />
+                        <TextBlock Text="{Binding PlanCopyText}"
+                                   Style="{StaticResource TallyValue}" />
+                    </StackPanel>
+                    <StackPanel Style="{StaticResource PlanTrashPart}">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                                  Width="11"
+                                                  Height="11"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,5,0"
+                                                  Foreground="{DynamicResource Fg.Muted}" />
+                        <TextBlock Text="{Binding PlanTrashText}"
+                                   Style="{StaticResource TallyValue}"
+                                   Foreground="{DynamicResource Fg.Muted}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Style="{StaticResource NewerBadge}"
+                            ToolTip="{Binding NewerBadgeTooltip}">
+                    <iconPacks:PackIconLucide Kind="{Binding NewerBadgeIconKind}"
+                                              Width="12"
+                                              Height="12"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,7,0"
+                                              Style="{StaticResource FreshIcon}" />
+                    <TextBlock Text="СВЕЖЕЕ"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding NewerBadgeText}"
+                               Style="{StaticResource FreshValue}" />
+                </StackPanel>
+
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center"
                             Margin="0,0,20,0">
@@ -331,9 +395,7 @@
                     </StackPanel>
                 </StackPanel>
 
-                <StackPanel Orientation="Horizontal"
-                            VerticalAlignment="Center"
-                            Margin="0,0,20,0">
+                <StackPanel Style="{StaticResource ConflictTally}">
                     <Ellipse Width="8"
                              Height="8"
                              VerticalAlignment="Center"
@@ -369,7 +431,7 @@
                                Style="{StaticResource Caption}"
                                Margin="0,0,7,0" />
                     <TextBlock Text="{Binding IdenticalCount}"
-                               Style="{StaticResource TallyValue}"
+                               Style="{StaticResource DirTallyValue}"
                                Foreground="{DynamicResource Fg.Muted}" />
                     <StackPanel>
                         <StackPanel.Style>
@@ -395,57 +457,19 @@
                     </StackPanel>
                 </StackPanel>
 
-                <StackPanel Style="{StaticResource PlanVolume}"
-                            ToolTip="{Binding PlanVolumeHint}">
-                    <TextBlock Text="ОБЪЁМ"
-                               Style="{StaticResource Caption}"
-                               Margin="0,0,7,0" />
-                    <StackPanel Style="{StaticResource PlanCopyPart}">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Copy}"
-                                                  Width="11"
-                                                  Height="11"
-                                                  VerticalAlignment="Center"
-                                                  Margin="0,0,5,0"
-                                                  Foreground="{DynamicResource Accent.Primary}" />
-                        <TextBlock Text="{Binding PlanCopyText}"
-                                   Style="{StaticResource TallyValue}" />
-                    </StackPanel>
-                    <StackPanel Style="{StaticResource PlanTrashPart}">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
-                                                  Width="11"
-                                                  Height="11"
-                                                  VerticalAlignment="Center"
-                                                  Margin="0,0,5,0"
-                                                  Foreground="{DynamicResource Fg.Muted}" />
-                        <TextBlock Text="{Binding PlanTrashText}"
-                                   Style="{StaticResource TallyValue}"
-                                   Foreground="{DynamicResource Fg.Muted}" />
-                    </StackPanel>
-                </StackPanel>
-
-                <StackPanel Style="{StaticResource NewerBadge}"
-                            ToolTip="{Binding NewerBadgeTooltip}">
-                    <iconPacks:PackIconLucide Kind="{Binding NewerBadgeIconKind}"
-                                              Width="12"
-                                              Height="12"
-                                              VerticalAlignment="Center"
-                                              Margin="0,0,7,0"
-                                              Style="{StaticResource FreshIcon}" />
-                    <TextBlock Text="СВЕЖЕЕ"
-                               Style="{StaticResource Caption}"
-                               Margin="0,0,7,0" />
-                    <TextBlock Text="{Binding NewerBadgeText}"
-                               Style="{StaticResource FreshValue}" />
-                </StackPanel>
             </WrapPanel>
 
             <StackPanel Grid.Column="2"
                         Orientation="Horizontal"
                         VerticalAlignment="Center"
                         Margin="20,0,14,0"
-                        ToolTip="{Binding CompositionHint}">
-                <TextBlock Text="СОСТАВ"
+                        ToolTip="{Binding CompositionHint}"
+                        Visibility="{Binding HasDifferences, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Text="РАЗЛИЧИЯ"
                            Style="{StaticResource Caption}"
+                           Margin="0,0,7,0" />
+                <TextBlock Text="{Binding DifferingTotal}"
+                           Style="{StaticResource TallyValue}"
                            Margin="0,0,10,0" />
                 <Border x:Name="SyncCompositionTrack"
                         Width="184"
@@ -489,16 +513,6 @@
                             <Rectangle.Width>
                                 <MultiBinding Converter="{StaticResource FractionToWidth}">
                                     <Binding Path="ConflictFraction" />
-                                    <Binding Path="ActualWidth"
-                                             ElementName="SyncCompositionTrack" />
-                                </MultiBinding>
-                            </Rectangle.Width>
-                        </Rectangle>
-                        <Rectangle Style="{StaticResource CompositionSegment}"
-                                   Fill="{DynamicResource Border.Strong}">
-                            <Rectangle.Width>
-                                <MultiBinding Converter="{StaticResource FractionToWidth}">
-                                    <Binding Path="IdenticalFraction" />
                                     <Binding Path="ActualWidth"
                                              ElementName="SyncCompositionTrack" />
                                 </MultiBinding>

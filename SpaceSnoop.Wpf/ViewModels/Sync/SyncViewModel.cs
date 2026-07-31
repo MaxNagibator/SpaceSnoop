@@ -34,6 +34,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     private Dictionary<object, SyncOutcome> _outcomes = [];
     private Dictionary<DirectoryComparison, (long Left, long Right)>? _dirSizeCache;
+    private HashSet<object>? _searchHits;
     private CancellationTokenSource? _cts;
     private string? _activeProfileId;
     private bool _suppressPersist;
@@ -97,10 +98,10 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private bool _flatView;
 
     [ObservableProperty]
-    private SyncFlatSortField _flatSort = AppDefaults.SyncFlatSortDefault;
+    private SyncSortField _rowSort = AppDefaults.SyncFlatSortDefault;
 
     [ObservableProperty]
-    private bool _flatSortDescending;
+    private bool _rowSortDescending;
 
     [ObservableProperty]
     private string _searchText = string.Empty;
@@ -185,7 +186,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public int ModifiedDirCount => _dirStats[ComparisonStatus.Modified];
 
-    public double IdenticalFraction => Fraction(ComparisonStatus.Identical);
+    public int DifferingTotal => LeftOnlyCount + RightOnlyCount + ModifiedCount + ConflictCount;
+
+    public bool HasDifferences => DifferingTotal > 0;
 
     public double LeftOnlyFraction => Fraction(ComparisonStatus.LeftOnly);
 
@@ -194,6 +197,14 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     public double ModifiedFraction => Fraction(ComparisonStatus.Modified);
 
     public double ConflictFraction => Fraction(ComparisonStatus.Conflict);
+
+    public bool SyncIsDestructive => _plan.Deletes + _plan.DirDeletes > 0;
+
+    public string CompareCommandHint => HasResult
+        ? "Пересчитать различия заново. Файлы не трогает."
+        : "Сравнить каталоги и показать различия. Файлы не трогает.";
+
+    public string SyncCommandHint => BuildSyncCommandHint();
 
     public bool HasPlanVolume => _plan.CopyBytes > 0 || _plan.DeleteBytes > 0;
 
@@ -389,9 +400,20 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public bool SearchTextEmpty => string.IsNullOrWhiteSpace(SearchText);
 
+    public bool SortByPath => RowSort is SyncSortField.Path or SyncSortField.None;
+
+    public bool SortBySize => RowSort == SyncSortField.Size;
+
+    public bool SortByModified => RowSort == SyncSortField.Modified;
+
+    public PackIconLucideKind SortDirectionIconKind => RowSortDescending
+        ? PackIconLucideKind.ArrowDown
+        : PackIconLucideKind.ArrowUp;
+
     public string CompositionHint =>
-        $"Файлы: только слева {LeftOnlyCount:N0}, только справа {RightOnlyCount:N0}, изменены {ModifiedCount:N0}, конфликты {ConflictCount:N0}, одинаковые {IdenticalCount:N0}.{Environment.NewLine}"
-        + $"Каталоги: только слева {LeftOnlyDirCount:N0}, только справа {RightOnlyDirCount:N0}, изменены {ModifiedDirCount:N0}, одинаковые {IdenticalDirCount:N0}.";
+        $"Состав различий ({DifferingTotal:N0} файлов): только слева {LeftOnlyCount:N0}, только справа {RightOnlyCount:N0}, изменены {ModifiedCount:N0}, конфликты {ConflictCount:N0}.{Environment.NewLine}"
+        + $"Каталоги: только слева {LeftOnlyDirCount:N0}, только справа {RightOnlyDirCount:N0}, изменены {ModifiedDirCount:N0}, одинаковые {IdenticalDirCount:N0}.{Environment.NewLine}"
+        + $"Одинаковых файлов {IdenticalCount:N0} – в полосу не входят.";
 
     public bool ShowApplied
     {
@@ -589,16 +611,19 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         StatusCaption = $"Профиль применён: {profile.Name}. Результат сравнения перенесён.";
     }
 
-    internal static IEnumerable<FileComparison> SortFlatFiles(IEnumerable<FileComparison> files, SyncFlatSortField field, bool descending)
+    internal static IEnumerable<FileComparison> SortFiles(IEnumerable<FileComparison> files, SyncSortField field, bool descending)
     {
         return field switch
         {
-            SyncFlatSortField.Size => descending
+            SyncSortField.Size => descending
                 ? files.OrderByDescending(FileSize)
                 : files.OrderBy(FileSize),
-            SyncFlatSortField.Status => descending
+            SyncSortField.Status => descending
                 ? files.OrderByDescending(file => (int)file.Status).ThenBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
                 : files.OrderBy(file => (int)file.Status).ThenBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase),
+            SyncSortField.Modified => descending
+                ? files.OrderByDescending(FileModified).ThenBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
+                : files.OrderBy(FileModified).ThenBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase),
             _ => descending
                 ? files.OrderByDescending(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
                 : files.OrderBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase),
@@ -607,6 +632,14 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         static long FileSize(FileComparison file)
         {
             return Math.Max(file.LeftSize ?? 0, file.RightSize ?? 0);
+        }
+
+        static DateTime FileModified(FileComparison file)
+        {
+            var left = file.LeftModified ?? DateTime.MinValue;
+            var right = file.RightModified ?? DateTime.MinValue;
+
+            return left > right ? left : right;
         }
     }
 
@@ -1970,21 +2003,23 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
     }
 
-    partial void OnFlatSortChanged(SyncFlatSortField value)
+    partial void OnRowSortChanged(SyncSortField value)
     {
         Persist(SettingsKeys.SyncFlatSort, value.ToString());
+        NotifySortChanged();
 
-        if (_result is not null && FlatView)
+        if (_result is not null)
         {
             RebuildRows();
         }
     }
 
-    partial void OnFlatSortDescendingChanged(bool value)
+    partial void OnRowSortDescendingChanged(bool value)
     {
         Persist(SettingsKeys.SyncFlatSortDesc, value ? "true" : "false");
+        NotifySortChanged();
 
-        if (_result is not null && FlatView)
+        if (_result is not null)
         {
             RebuildRows();
         }
@@ -1994,7 +2029,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     {
         OnPropertyChanged(nameof(SearchTextEmpty));
 
-        if (_result is not null && FlatView)
+        if (_result is not null)
         {
             RebuildRows();
         }
@@ -2208,7 +2243,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     {
         var search = SearchText.Trim();
         var files = FilterBySearch(CollectVisibleFiles(root, ShowIdentical, HideApplied, _outcomes), search, static file => file.RelativePath);
-        var sortedFiles = SortFlatFiles(files, FlatSort, FlatSortDescending).ToList();
+        var sortedFiles = SortFiles(files, RowSort, RowSortDescending).ToList();
         var dirs = FilterBySearch(CollectEmptyDirs(root, HideApplied, _outcomes), search, static dir => dir.RelativePath);
         var sortedDirs = dirs.OrderBy(dir => dir.RelativePath, StringComparer.OrdinalIgnoreCase).ToList();
         var groupFolders = ParseGroupFolders(Operations.GroupFolders);
@@ -2222,8 +2257,42 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private List<SyncNodeViewModel> BuildTreeRows(DirectoryComparison root)
     {
         var buffer = new List<SyncNodeViewModel>();
+        var search = SearchText.Trim();
+        _searchHits = search.Length > 0 ? [] : null;
+
+        if (_searchHits is not null)
+        {
+            CollectSearchHits(root, search, _searchHits);
+        }
+
         FlattenDirectory(root, 0, buffer);
+        _searchHits = null;
         return buffer;
+    }
+
+    internal static bool CollectSearchHits(DirectoryComparison dir, string search, HashSet<object> hits)
+    {
+        var matched = false;
+
+        foreach (var sub in dir.SubDirectories)
+        {
+            matched |= CollectSearchHits(sub, search, hits);
+        }
+
+        matched |= dir.Files.Any(file => Matches(file.RelativePath, search));
+
+        if (matched || Matches(dir.RelativePath, search))
+        {
+            hits.Add(dir);
+            matched = true;
+        }
+
+        return matched;
+    }
+
+    private static bool Matches(string path, string search)
+    {
+        return path.Contains(search, StringComparison.OrdinalIgnoreCase);
     }
 
     private void AddUngroupedRows(
@@ -2317,15 +2386,15 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     private void AddVisibleDirectories(DirectoryComparison dir, int indent, List<SyncNodeViewModel> buffer)
     {
-        foreach (var sub in dir.SubDirectories)
+        foreach (var sub in SortDirectories(dir.SubDirectories))
         {
-            if (!IsVisible(sub))
+            if (!IsVisible(sub) || _searchHits?.Contains(sub) == false)
             {
                 continue;
             }
 
             var outcome = _outcomes.GetValueOrDefault(sub);
-            var expanded = !_collapsed.Contains(sub);
+            var expanded = _searchHits is not null || !_collapsed.Contains(sub);
             var sizes = _dirSizeCache?.GetValueOrDefault(sub);
             buffer.Add(new(sub, indent, expanded, sizes?.Left ?? 0, sizes?.Right ?? 0, this) { Outcome = outcome });
 
@@ -2338,15 +2407,40 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     private void AddVisibleFiles(DirectoryComparison dir, int indent, List<SyncNodeViewModel> buffer)
     {
-        foreach (var file in dir.Files)
+        var search = _searchHits is null ? null : SearchText.Trim();
+
+        foreach (var file in SortFiles(dir.Files, RowSort, RowSortDescending))
         {
-            if (!IsVisible(file))
+            if (!IsVisible(file) || (search is not null && !Matches(file.RelativePath, search)))
             {
                 continue;
             }
 
             var outcome = _outcomes.GetValueOrDefault(file);
             buffer.Add(new(file, indent, this) { Outcome = outcome });
+        }
+    }
+
+    private IEnumerable<DirectoryComparison> SortDirectories(IEnumerable<DirectoryComparison> dirs)
+    {
+        return RowSort switch
+        {
+            SyncSortField.Size => RowSortDescending
+                ? dirs.OrderByDescending(DirSize)
+                : dirs.OrderBy(DirSize),
+            SyncSortField.Status => RowSortDescending
+                ? dirs.OrderByDescending(sub => (int)sub.Status).ThenBy(sub => sub.Name, StringComparer.OrdinalIgnoreCase)
+                : dirs.OrderBy(sub => (int)sub.Status).ThenBy(sub => sub.Name, StringComparer.OrdinalIgnoreCase),
+            _ => RowSortDescending
+                ? dirs.OrderByDescending(sub => sub.Name, StringComparer.OrdinalIgnoreCase)
+                : dirs.OrderBy(sub => sub.Name, StringComparer.OrdinalIgnoreCase),
+        };
+
+        long DirSize(DirectoryComparison sub)
+        {
+            var sizes = _dirSizeCache?.GetValueOrDefault(sub);
+
+            return sizes is null ? 0 : Math.Max(sizes.Value.Left, sizes.Value.Right);
         }
     }
 
@@ -2420,6 +2514,24 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         NotifyLedgerChanged();
     }
 
+    private string BuildSyncCommandHint()
+    {
+        if (_result is null)
+        {
+            return "Сначала выполните сравнение.";
+        }
+
+        var lines = BuildPlanLines(_plan, DirectionText(), BuildReceivers(_plan));
+
+        if (SyncIsDestructive)
+        {
+            lines.Add(string.Empty);
+            lines.Add("Удаление идёт в корзину, копирование перезаписывает файлы на приёмнике.");
+        }
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
     private string DirectionText()
     {
         return CurrentMode switch
@@ -2454,7 +2566,30 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     private double Fraction(ComparisonStatus status)
     {
-        return _total > 0 ? (double)_stats[status] / _total : 0;
+        var differing = DifferingTotal;
+
+        return differing > 0 ? (double)_stats[status] / differing : 0;
+    }
+
+    [RelayCommand]
+    private void SortByColumn(SyncSortField field)
+    {
+        if (RowSort == field)
+        {
+            RowSortDescending = !RowSortDescending;
+            return;
+        }
+
+        RowSort = field;
+        RowSortDescending = field is SyncSortField.Size or SyncSortField.Modified;
+    }
+
+    private void NotifySortChanged()
+    {
+        OnPropertyChanged(nameof(SortByPath));
+        OnPropertyChanged(nameof(SortBySize));
+        OnPropertyChanged(nameof(SortByModified));
+        OnPropertyChanged(nameof(SortDirectionIconKind));
     }
 
     private void NotifyLedgerChanged()
@@ -2469,13 +2604,17 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         OnPropertyChanged(nameof(LeftOnlyDirCount));
         OnPropertyChanged(nameof(RightOnlyDirCount));
         OnPropertyChanged(nameof(ModifiedDirCount));
-        OnPropertyChanged(nameof(IdenticalFraction));
+        OnPropertyChanged(nameof(DifferingTotal));
+        OnPropertyChanged(nameof(HasDifferences));
         OnPropertyChanged(nameof(LeftOnlyFraction));
         OnPropertyChanged(nameof(RightOnlyFraction));
         OnPropertyChanged(nameof(ModifiedFraction));
         OnPropertyChanged(nameof(ConflictFraction));
         OnPropertyChanged(nameof(HasConflicts));
         OnPropertyChanged(nameof(CompositionHint));
+        OnPropertyChanged(nameof(SyncIsDestructive));
+        OnPropertyChanged(nameof(CompareCommandHint));
+        OnPropertyChanged(nameof(SyncCommandHint));
         OnPropertyChanged(nameof(HasPlanVolume));
         OnPropertyChanged(nameof(HasPlanCopy));
         OnPropertyChanged(nameof(HasPlanTrash));
@@ -2537,8 +2676,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         GitHistoryCount = _settings.GetInt(SettingsKeys.SyncGitHistoryCount, AppDefaults.GitHistoryCountDefault);
         HideApplied = _settings.GetBool(SettingsKeys.SyncHideApplied);
         FlatView = _settings.GetBool(SettingsKeys.SyncFlatView);
-        FlatSort = _settings.GetEnum(SettingsKeys.SyncFlatSort, AppDefaults.SyncFlatSortDefault);
-        FlatSortDescending = _settings.GetBool(SettingsKeys.SyncFlatSortDesc);
+        RowSort = _settings.GetEnum(SettingsKeys.SyncFlatSort, AppDefaults.SyncFlatSortDefault);
+        RowSortDescending = _settings.GetBool(SettingsKeys.SyncFlatSortDesc);
 
         _suppressPersist = false;
     }

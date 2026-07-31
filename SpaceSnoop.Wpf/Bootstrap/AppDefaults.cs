@@ -31,7 +31,7 @@ public static class AppDefaults
     public const bool SyncShowModifiedDefault = false;
     public const bool SyncVerifyDefault = true;
     public const int GitHistoryCountDefault = 4;
-    public const SyncFlatSortField SyncFlatSortDefault = SyncFlatSortField.Path;
+    public const SyncSortField SyncFlatSortDefault = SyncSortField.Path;
     public const double SyncIndentStep = 16;
 
     public const bool SyncDiffCollapseDefault = true;

@@ -62,6 +62,27 @@
                              Duration="0:0:0.18" />
         </Storyboard>
 
+        <Style x:Key="SyncDeleteMark"
+               TargetType="iconPacks:PackIconLucide">
+            <Setter Property="Width"
+                    Value="13" />
+            <Setter Property="Height"
+                    Value="13" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Setter Property="Margin"
+                    Value="8,0,0,0" />
+            <Setter Property="Visibility"
+                    Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding SyncIsDestructive}"
+                             Value="True">
+                    <Setter Property="Visibility"
+                            Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="CompareLabel"
                TargetType="TextBlock">
             <Style.Triggers>
@@ -146,7 +167,8 @@
                     </Grid>
                 </DockPanel>
 
-                <Button VerticalAlignment="Center"
+                <Button views:StretchWrapPanel.Standalone="True"
+                        VerticalAlignment="Center"
                         HorizontalAlignment="Center"
                         Cursor="Hand"
                         Margin="0,0,12,8"
@@ -239,11 +261,12 @@
 
             <views:StretchWrapPanel Margin="0,12,0,0"
                                     ItemWidth="240">
-                <Button Style="{StaticResource Button.Primary}"
+                <Button Style="{StaticResource Button.Secondary}"
                         Command="{Binding CompareCommand}"
                         VerticalAlignment="Center"
                         Margin="0,0,8,8"
-                        ToolTip="Сравнить">
+                        ToolTip="{Binding CompareCommandHint}"
+                        AutomationProperties.Name="Сравнить каталоги">
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.GitCompare}"
                                                   Width="15"
@@ -262,9 +285,10 @@
                         Command="{Binding SyncCommand}"
                         VerticalAlignment="Center"
                         Margin="0,0,16,8"
-                        ToolTip="Синхронизировать">
+                        ToolTip="{Binding SyncCommandHint}"
+                        AutomationProperties.Name="Синхронизировать каталоги">
                     <StackPanel Orientation="Horizontal">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ArrowRightLeft}"
+                        <iconPacks:PackIconLucide Kind="{Binding DirectionIconKind}"
                                                   Width="15"
                                                   Height="15"
                                                   VerticalAlignment="Center" />
@@ -276,6 +300,8 @@
                                 <ScaleTransform ScaleX="0" />
                             </TextBlock.LayoutTransform>
                         </TextBlock>
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                                  Style="{StaticResource SyncDeleteMark}" />
                     </StackPanel>
                 </Button>
                 <ToggleButton Style="{StaticResource MirrorToggle}"

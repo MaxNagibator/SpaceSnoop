@@ -38,4 +38,28 @@ public class StretchWrapPanelTests
         Assert.That(rows, Has.Count.EqualTo(expectedRows));
         Assert.That(rows.Sum(r => r.Count), Is.EqualTo(widths.Length));
     }
+
+    [Test]
+    public void Одиночный_элемент_остаётся_в_общей_строке_пока_группа_помещается()
+    {
+        var rows = StretchWrapPanel.PackRows([400, 34, 400], 880, [false, true, false]);
+
+        Assert.That(rows, Is.EqualTo([(0, 3)]));
+    }
+
+    [Test]
+    public void Одиночный_элемент_уходит_на_свою_строку_между_соседями()
+    {
+        var rows = StretchWrapPanel.PackRows([400, 34, 400], 620, [false, true, false]);
+
+        Assert.That(rows, Is.EqualTo([(0, 1), (1, 1), (2, 1)]));
+    }
+
+    [Test]
+    public void Одиночный_элемент_в_конце_списка_не_рвёт_строку()
+    {
+        var rows = StretchWrapPanel.PackRows([400, 34], 620, [false, true]);
+
+        Assert.That(rows, Is.EqualTo([(0, 2)]));
+    }
 }

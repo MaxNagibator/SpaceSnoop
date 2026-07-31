@@ -14,6 +14,73 @@
              d:DesignWidth="1040">
 
     <UserControl.Resources>
+        <Style x:Key="ToggleButton.Filter"
+               TargetType="ToggleButton"
+               BasedOn="{StaticResource ToggleButton.Toolbar}">
+            <Setter Property="MinWidth"
+                    Value="0" />
+            <Setter Property="Padding"
+                    Value="9,0" />
+            <Setter Property="Margin"
+                    Value="0,0,8,4" />
+            <Setter Property="BorderBrush"
+                    Value="{DynamicResource Border.Subtle}" />
+            <Style.Triggers>
+                <Trigger Property="IsChecked"
+                         Value="True">
+                    <Setter Property="FontWeight"
+                            Value="{DynamicResource Font.Weight.Bold}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SortHeader"
+               TargetType="Button"
+               BasedOn="{StaticResource Button.Ghost}">
+            <Setter Property="Command"
+                    Value="{Binding SortByColumnCommand}" />
+            <Setter Property="Padding"
+                    Value="2,0" />
+            <Setter Property="MinWidth"
+                    Value="0" />
+            <Setter Property="MinHeight"
+                    Value="16" />
+            <Setter Property="HorizontalAlignment"
+                    Value="Left" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+        </Style>
+
+        <Style x:Key="SortMark"
+               TargetType="iconPacks:PackIconLucide">
+            <Setter Property="Kind"
+                    Value="{Binding SortDirectionIconKind}" />
+            <Setter Property="Width"
+                    Value="10" />
+            <Setter Property="Height"
+                    Value="10" />
+            <Setter Property="Margin"
+                    Value="4,0,0,0" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Accent.Primary}" />
+        </Style>
+
+        <Style x:Key="FilterDivider"
+               TargetType="Border">
+            <Setter Property="Width"
+                    Value="1" />
+            <Setter Property="Height"
+                    Value="18" />
+            <Setter Property="Margin"
+                    Value="4,0,12,4" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Setter Property="Background"
+                    Value="{DynamicResource Border.Strong}" />
+        </Style>
+
         <Style x:Key="NodeName"
                TargetType="TextBlock">
             <Setter Property="VerticalAlignment"
@@ -600,12 +667,43 @@
 
             <Grid Grid.Row="0"
                   Margin="6,4,18,8"
-                  Visibility="{Binding FlatView, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                  Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
+                            Margin="8,0,0,0">
+                    <Button Style="{StaticResource Button.Secondary}"
+                            Command="{Binding ExpandAllCommand}"
+                            MinWidth="0"
+                            Padding="9,0"
+                            Margin="0,0,8,0"
+                            ToolTip="Развернуть все каталоги в дереве"
+                            AutomationProperties.Name="Развернуть все каталоги"
+                            Visibility="{Binding FlatView, Converter={StaticResource InverseBoolToVisibility}}">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ChevronsUpDown}"
+                                                  Width="14"
+                                                  Height="14" />
+                    </Button>
+                    <Button Style="{StaticResource Button.Secondary}"
+                            Command="{Binding CollapseAllCommand}"
+                            MinWidth="0"
+                            Padding="9,0"
+                            ToolTip="Свернуть все каталоги в дереве"
+                            AutomationProperties.Name="Свернуть все каталоги"
+                            Visibility="{Binding FlatView, Converter={StaticResource InverseBoolToVisibility}}">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ChevronsDownUp}"
+                                                  Width="14"
+                                                  Height="14" />
+                    </Button>
+                </StackPanel>
 
                 <Grid Grid.Column="0"
                       Width="240"
@@ -613,7 +711,7 @@
                     <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                              Style="{StaticResource TextBox.IconField}"
                              Tag="{x:Static iconPacks:PackIconLucideKind.Search}"
-                             ToolTip="Фильтр списка по пути файла" />
+                             ToolTip="Фильтр по пути – в дереве оставляет только совпавшие ветки" />
                     <TextBlock Text="Фильтр по пути"
                                Margin="36,0,8,0"
                                VerticalAlignment="Center"
@@ -622,25 +720,27 @@
                                Visibility="{Binding SearchTextEmpty, Converter={StaticResource BoolToVisibility}}" />
                 </Grid>
 
-                <ComboBox Grid.Column="1"
+                <ComboBox Grid.Column="2"
                           SelectedValuePath="Tag"
-                          SelectedValue="{Binding FlatSort}"
+                          SelectedValue="{Binding RowSort}"
                           Style="{StaticResource ComboBox.Toolbar}"
                           MinWidth="150"
                           Margin="8,0,0,0"
                           VerticalAlignment="Center"
                           ToolTip="Сортировка списка">
                     <ComboBoxItem Content="По пути"
-                                  Tag="{x:Static vm:SyncFlatSortField.Path}" />
+                                  Tag="{x:Static vm:SyncSortField.Path}" />
                     <ComboBoxItem Content="По размеру"
-                                  Tag="{x:Static vm:SyncFlatSortField.Size}" />
+                                  Tag="{x:Static vm:SyncSortField.Size}" />
+                    <ComboBoxItem Content="По дате"
+                                  Tag="{x:Static vm:SyncSortField.Modified}" />
                     <ComboBoxItem Content="По статусу"
-                                  Tag="{x:Static vm:SyncFlatSortField.Status}" />
+                                  Tag="{x:Static vm:SyncSortField.Status}" />
                 </ComboBox>
 
-                <ToggleButton Grid.Column="2"
+                <ToggleButton Grid.Column="3"
                               Style="{StaticResource ToggleButton.Toolbar}"
-                              IsChecked="{Binding FlatSortDescending}"
+                              IsChecked="{Binding RowSortDescending}"
                               MinWidth="0"
                               Padding="9,0"
                               Margin="8,0,0,0"
@@ -669,19 +769,42 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="ЛЕВАЯ"
-                               Style="{StaticResource Caption}"
-                               HorizontalAlignment="Left" />
-                    <TextBlock Grid.Column="1"
-                               Text="ДАТА"
-                               Style="{StaticResource Caption}"
-                               Margin="0,0,18,0"
-                               Visibility="{Binding ShowModified, Converter={StaticResource BoolToVisibility}}" />
-                    <TextBlock Grid.Column="2"
-                               Text="РАЗМЕР"
-                               Style="{StaticResource Caption}"
-                               HorizontalAlignment="Right"
-                               Visibility="{Binding ShowSizes, Converter={StaticResource BoolToVisibility}}" />
+                    <Button Style="{StaticResource SortHeader}"
+                            CommandParameter="{x:Static vm:SyncSortField.Path}"
+                            ToolTip="Сортировать по пути">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="ЛЕВАЯ"
+                                       Style="{StaticResource Caption}" />
+                            <iconPacks:PackIconLucide Style="{StaticResource SortMark}"
+                                                      Visibility="{Binding SortByPath, Converter={StaticResource BoolToVisibility}}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="1"
+                            Style="{StaticResource SortHeader}"
+                            CommandParameter="{x:Static vm:SyncSortField.Modified}"
+                            Margin="0,0,18,0"
+                            ToolTip="Сортировать по дате изменения"
+                            Visibility="{Binding ShowModified, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="ДАТА"
+                                       Style="{StaticResource Caption}" />
+                            <iconPacks:PackIconLucide Style="{StaticResource SortMark}"
+                                                      Visibility="{Binding SortByModified, Converter={StaticResource BoolToVisibility}}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="2"
+                            Style="{StaticResource SortHeader}"
+                            CommandParameter="{x:Static vm:SyncSortField.Size}"
+                            HorizontalAlignment="Right"
+                            ToolTip="Сортировать по размеру"
+                            Visibility="{Binding ShowSizes, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="РАЗМЕР"
+                                       Style="{StaticResource Caption}" />
+                            <iconPacks:PackIconLucide Style="{StaticResource SortMark}"
+                                                      Visibility="{Binding SortBySize, Converter={StaticResource BoolToVisibility}}" />
+                        </StackPanel>
+                    </Button>
                 </Grid>
 
                 <iconPacks:PackIconLucide Grid.Column="1"
@@ -700,19 +823,42 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="ПРАВАЯ"
-                               Style="{StaticResource Caption}"
-                               HorizontalAlignment="Left" />
-                    <TextBlock Grid.Column="1"
-                               Text="ДАТА"
-                               Style="{StaticResource Caption}"
-                               Margin="0,0,18,0"
-                               Visibility="{Binding ShowModified, Converter={StaticResource BoolToVisibility}}" />
-                    <TextBlock Grid.Column="2"
-                               Text="РАЗМЕР"
-                               Style="{StaticResource Caption}"
-                               HorizontalAlignment="Right"
-                               Visibility="{Binding ShowSizes, Converter={StaticResource BoolToVisibility}}" />
+                    <Button Style="{StaticResource SortHeader}"
+                            CommandParameter="{x:Static vm:SyncSortField.Path}"
+                            ToolTip="Сортировать по пути">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="ПРАВАЯ"
+                                       Style="{StaticResource Caption}" />
+                            <iconPacks:PackIconLucide Style="{StaticResource SortMark}"
+                                                      Visibility="{Binding SortByPath, Converter={StaticResource BoolToVisibility}}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="1"
+                            Style="{StaticResource SortHeader}"
+                            CommandParameter="{x:Static vm:SyncSortField.Modified}"
+                            Margin="0,0,18,0"
+                            ToolTip="Сортировать по дате изменения"
+                            Visibility="{Binding ShowModified, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="ДАТА"
+                                       Style="{StaticResource Caption}" />
+                            <iconPacks:PackIconLucide Style="{StaticResource SortMark}"
+                                                      Visibility="{Binding SortByModified, Converter={StaticResource BoolToVisibility}}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="2"
+                            Style="{StaticResource SortHeader}"
+                            CommandParameter="{x:Static vm:SyncSortField.Size}"
+                            HorizontalAlignment="Right"
+                            ToolTip="Сортировать по размеру"
+                            Visibility="{Binding ShowSizes, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="РАЗМЕР"
+                                       Style="{StaticResource Caption}" />
+                            <iconPacks:PackIconLucide Style="{StaticResource SortMark}"
+                                                      Visibility="{Binding SortBySize, Converter={StaticResource BoolToVisibility}}" />
+                        </StackPanel>
+                    </Button>
                 </Grid>
             </Grid>
 
@@ -964,35 +1110,8 @@
                                HorizontalAlignment="Right"
                                VerticalAlignment="Center"
                                Margin="12,0,0,-4">
-                        <Button Style="{StaticResource Button.Secondary}"
-                                Command="{Binding ExpandAllCommand}"
-                                MinWidth="0"
-                                Padding="9,0"
-                                Margin="0,0,8,4"
-                                ToolTip="Развернуть все каталоги в дереве"
-                                AutomationProperties.Name="Развернуть все каталоги"
-                                Visibility="{Binding FlatView, Converter={StaticResource InverseBoolToVisibility}}">
-                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ChevronsUpDown}"
-                                                      Width="14"
-                                                      Height="14" />
-                        </Button>
-                        <Button Style="{StaticResource Button.Secondary}"
-                                Command="{Binding CollapseAllCommand}"
-                                MinWidth="0"
-                                Padding="9,0"
-                                Margin="0,0,8,4"
-                                ToolTip="Свернуть все каталоги в дереве"
-                                AutomationProperties.Name="Свернуть все каталоги"
-                                Visibility="{Binding FlatView, Converter={StaticResource InverseBoolToVisibility}}">
-                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ChevronsDownUp}"
-                                                      Width="14"
-                                                      Height="14" />
-                        </Button>
-                        <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
+                        <ToggleButton Style="{StaticResource ToggleButton.Filter}"
                                       IsChecked="{Binding FlatView}"
-                                      MinWidth="0"
-                                      Padding="9,0"
-                                      Margin="0,0,8,4"
                                       ToolTip="Плоский список различающихся файлов вместо дерева каталогов"
                                       AutomationProperties.Name="Плоский список файлов вместо дерева">
                             <StackPanel Orientation="Horizontal">
@@ -1001,15 +1120,15 @@
                                                           Height="14"
                                                           VerticalAlignment="Center"
                                                           Margin="0,0,6,0" />
-                                <TextBlock Text="Файлы"
+                                <TextBlock Text="Список"
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </ToggleButton>
-                        <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
+
+                        <Border Style="{StaticResource FilterDivider}" />
+
+                        <ToggleButton Style="{StaticResource ToggleButton.Filter}"
                                       IsChecked="{Binding ShowIdentical}"
-                                      MinWidth="0"
-                                      Padding="9,0"
-                                      Margin="0,0,8,4"
                                       ToolTip="Показывать одинаковые файлы"
                                       AutomationProperties.Name="Показывать одинаковые файлы">
                             <StackPanel Orientation="Horizontal">
@@ -1022,11 +1141,25 @@
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </ToggleButton>
-                        <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
+                        <ToggleButton Style="{StaticResource ToggleButton.Filter}"
+                                      IsChecked="{Binding ShowApplied}"
+                                      ToolTip="Показывать строки, успешно применённые при последней синхронизации"
+                                      AutomationProperties.Name="Показывать успешно применённые строки">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.CheckCheck}"
+                                                          Width="14"
+                                                          Height="14"
+                                                          VerticalAlignment="Center"
+                                                          Margin="0,0,6,0" />
+                                <TextBlock Text="Применённые"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </ToggleButton>
+
+                        <Border Style="{StaticResource FilterDivider}" />
+
+                        <ToggleButton Style="{StaticResource ToggleButton.Filter}"
                                       IsChecked="{Binding ShowSizes}"
-                                      MinWidth="0"
-                                      Padding="9,0"
-                                      Margin="0,0,8,4"
                                       ToolTip="Показывать размеры файлов"
                                       AutomationProperties.Name="Показывать размеры файлов">
                             <StackPanel Orientation="Horizontal">
@@ -1039,11 +1172,8 @@
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </ToggleButton>
-                        <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
+                        <ToggleButton Style="{StaticResource ToggleButton.Filter}"
                                       IsChecked="{Binding ShowModified}"
-                                      MinWidth="0"
-                                      Padding="9,0"
-                                      Margin="0,0,8,4"
                                       ToolTip="Показывать время последнего изменения файла"
                                       AutomationProperties.Name="Показывать время последнего изменения файла">
                             <StackPanel Orientation="Horizontal">
@@ -1056,10 +1186,8 @@
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </ToggleButton>
-                        <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
+                        <ToggleButton Style="{StaticResource ToggleButton.Filter}"
                                       IsChecked="{Binding BlankAbsent}"
-                                      MinWidth="0"
-                                      Padding="9,0"
                                       Margin="0,0,0,4"
                                       ToolTip="Отсутствующую сторону показывать пустой, а не зачёркнутым именем"
                                       AutomationProperties.Name="Отсутствующую сторону показывать пустой">
@@ -1069,24 +1197,7 @@
                                                           Height="14"
                                                           VerticalAlignment="Center"
                                                           Margin="0,0,6,0" />
-                                <TextBlock Text="Пустота"
-                                           VerticalAlignment="Center" />
-                            </StackPanel>
-                        </ToggleButton>
-                        <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
-                                      IsChecked="{Binding ShowApplied}"
-                                      MinWidth="0"
-                                      Padding="9,0"
-                                      Margin="8,0,0,4"
-                                      ToolTip="Показывать строки, успешно применённые при последней синхронизации"
-                                      AutomationProperties.Name="Показывать успешно применённые строки">
-                            <StackPanel Orientation="Horizontal">
-                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.CheckCheck}"
-                                                          Width="14"
-                                                          Height="14"
-                                                          VerticalAlignment="Center"
-                                                          Margin="0,0,6,0" />
-                                <TextBlock Text="Применённые"
+                                <TextBlock Text="Отсутствующие"
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </ToggleButton>
