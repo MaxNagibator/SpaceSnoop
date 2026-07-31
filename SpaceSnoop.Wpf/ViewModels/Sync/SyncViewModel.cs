@@ -1633,7 +1633,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             lines.Add("Изменённые отличаются размером или датой – кнопка «Хеши» сверит содержимым.");
         }
 
-        if (planned.Deletes + planned.DirDeletes > 0)
+        var deletes = planned.Deletes + planned.DirDeletes;
+
+        if (deletes > 0)
         {
             var (_, newest) = SyncFreshness.DeletionRecency(_result.Root);
 
@@ -1644,10 +1646,16 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             }
         }
 
-        lines.Add(string.Empty);
-        lines.Add("Продолжить?");
+        var confirm = new ConfirmDialogViewModel(
+            "Синхронизация",
+            DirectionIconKind,
+            lines,
+            [
+                new("Отмена", ConfirmChoiceKind.Dismissive),
+                new("Синхронизировать", deletes > 0 ? ConfirmChoiceKind.Destructive : ConfirmChoiceKind.Primary),
+            ]);
 
-        if (!_dialogs.Confirm("Синхронизация", string.Join(Environment.NewLine, lines)))
+        if (!await _dialogs.ShowAsync(confirm))
         {
             return;
         }
@@ -1726,13 +1734,13 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         if (interactive)
         {
-            ShowSyncOutcome(report, stopwatch.Elapsed);
+            ShowSyncOutcome(report);
         }
 
         return report;
     }
 
-    private void ShowSyncOutcome(SyncReport report, TimeSpan elapsed)
+    private void ShowSyncOutcome(SyncReport report)
     {
         if (report.Errors.Count > 0)
         {
@@ -1757,25 +1765,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             }
 
             _dialogs.Warning("Расхождения после синхронизации", $"После применения проверка нашла расхождения:{Environment.NewLine}{list}");
-        }
-        else
-        {
-            var done = new List<string>();
-
-            if (report.CopiedCount > 0)
-            {
-                var copied = report.CopiedBytes > 0 ? $" ({SizeFormatter.Format(report.CopiedBytes)})" : string.Empty;
-                done.Add($"скопировано: {report.CopiedCount:N0}{copied}");
-            }
-
-            if (report.DeletedCount > 0)
-            {
-                var deleted = report.DeletedBytes > 0 ? $" ({SizeFormatter.Format(report.DeletedBytes)})" : string.Empty;
-                done.Add($"удалено в корзину: {report.DeletedCount:N0}{deleted}");
-            }
-
-            var detail = done.Count > 0 ? string.Join(", ", done) : "изменений не потребовалось";
-            _dialogs.Info("Синхронизация", $"Готово за {elapsed.TotalSeconds:F1} с. {char.ToUpperInvariant(detail[0])}{detail[1..]}.");
         }
     }
 

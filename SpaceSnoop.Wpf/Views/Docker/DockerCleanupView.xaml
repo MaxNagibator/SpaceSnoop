@@ -40,7 +40,7 @@
         <StackPanel>
             <TextBlock Text="Очистка"
                        Style="{StaticResource Docker.SectionTitle}" />
-            <TextBlock Text="Операции Docker безвозвратны – мимо корзины. После клика подтвердите действие галочкой."
+            <TextBlock Text="Операции Docker безвозвратны – мимо корзины. Каждая спросит подтверждение."
                        Style="{StaticResource TextBlock.Subtle}"
                        Foreground="{DynamicResource Fg.Muted}"
                        TextWrapping="Wrap"
@@ -52,7 +52,7 @@
             <WrapPanel>
                 <Button Style="{StaticResource Button.Base}"
                         Command="{Binding PruneBuildCacheCommand}"
-                        IsEnabled="{Binding CanArmCleanup}"
+                        IsEnabled="{Binding CanRun}"
                         Margin="0,0,8,8"
                         ToolTip="docker builder prune">
                     <StackPanel Orientation="Horizontal">
@@ -64,7 +64,7 @@
                 </Button>
                 <Button Style="{StaticResource Button.Base}"
                         Command="{Binding PruneDanglingImagesCommand}"
-                        IsEnabled="{Binding CanArmCleanup}"
+                        IsEnabled="{Binding CanRun}"
                         Margin="0,0,8,8"
                         ToolTip="docker image prune">
                     <StackPanel Orientation="Horizontal">
@@ -76,7 +76,7 @@
                 </Button>
                 <Button Style="{StaticResource Button.Base}"
                         Command="{Binding PruneStoppedContainersCommand}"
-                        IsEnabled="{Binding CanArmCleanup}"
+                        IsEnabled="{Binding CanRun}"
                         Margin="0,0,8,8"
                         ToolTip="docker container prune">
                     <StackPanel Orientation="Horizontal">
@@ -95,7 +95,7 @@
             <WrapPanel>
                 <Button Style="{StaticResource Button.Destructive}"
                         Command="{Binding PruneUnusedImagesCommand}"
-                        IsEnabled="{Binding CanArmCleanup}"
+                        IsEnabled="{Binding CanRun}"
                         Margin="0,0,8,8"
                         ToolTip="docker image prune -a">
                     <StackPanel Orientation="Horizontal">
@@ -107,7 +107,7 @@
                 </Button>
                 <Button Style="{StaticResource Button.Destructive}"
                         Command="{Binding PruneVolumesCommand}"
-                        IsEnabled="{Binding CanArmCleanup}"
+                        IsEnabled="{Binding CanRun}"
                         Margin="0,0,8,8"
                         ToolTip="docker volume prune – в томах лежат данные!">
                     <StackPanel Orientation="Horizontal">
@@ -119,7 +119,7 @@
                 </Button>
                 <CheckBox Content="включая именованные (-a)"
                           IsChecked="{Binding PruneAllVolumes}"
-                          IsEnabled="{Binding CanArmCleanup}"
+                          IsEnabled="{Binding CanRun}"
                           VerticalAlignment="Center"
                           Margin="0,0,8,8"
                           ToolTip="docker volume prune -a – снесёт и именованные тома, не только анонимные" />
@@ -138,7 +138,7 @@
                        Text="После очистки образ диска Docker (VHDX) сам не сжимается. Эта кнопка остановит WSL и вернёт освободившееся место системе – потом запустите Docker заново." />
             <Button Style="{StaticResource Button.Primary}"
                     Command="{Binding CompactCommand}"
-                    IsEnabled="{Binding CanArmCleanup}"
+                    IsEnabled="{Binding CanRun}"
                     HorizontalAlignment="Left">
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Shrink}"
@@ -147,53 +147,6 @@
                                VerticalAlignment="Center" />
                 </StackPanel>
             </Button>
-
-            <Border Visibility="{Binding HasPendingCleanup, Converter={StaticResource BoolToVisibility}}"
-                    Background="{DynamicResource Bg.SurfaceAlt}"
-                    BorderBrush="{DynamicResource State.Warning}"
-                    BorderThickness="1"
-                    CornerRadius="{DynamicResource Radius.M}"
-                    Padding="12"
-                    Margin="0,14,0,0">
-                <StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
-                                                  Width="16"
-                                                  Height="16"
-                                                  VerticalAlignment="Top"
-                                                  Margin="0,1,8,0"
-                                                  Foreground="{DynamicResource State.Warning}" />
-                        <TextBlock Text="{Binding PendingCleanupMessage}"
-                                   Foreground="{DynamicResource Fg.Primary}"
-                                   TextWrapping="Wrap"
-                                   MaxWidth="560"
-                                   HorizontalAlignment="Left" />
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal"
-                                Margin="0,12,0,0">
-                        <Button Style="{StaticResource Button.Destructive}"
-                                Command="{Binding ConfirmCleanupCommand}"
-                                IsEnabled="{Binding CanRun}">
-                            <StackPanel Orientation="Horizontal">
-                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Check}"
-                                                          Style="{StaticResource Docker.ActionButtonContent}" />
-                                <TextBlock Text="Подтвердить"
-                                           VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Button>
-                        <Button Style="{StaticResource Button.Base}"
-                                Command="{Binding CancelCleanupCommand}"
-                                Margin="8,0,0,0">
-                            <StackPanel Orientation="Horizontal">
-                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.X}"
-                                                          Style="{StaticResource Docker.ActionButtonContent}" />
-                                <TextBlock Text="Отмена"
-                                           VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
         </StackPanel>
     </Border>
 </UserControl>

@@ -1,4 +1,5 @@
 ﻿using KeepShell.Services;
+using MahApps.Metro.IconPacks;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 
@@ -12,17 +13,13 @@ public sealed partial class DockerViewModel(
 {
     private bool _loadedOnce;
 
-    private Func<Task>? _pendingCleanupAction;
-
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanRun))]
     [NotifyPropertyChangedFor(nameof(IsIdle))]
-    [NotifyPropertyChangedFor(nameof(CanArmCleanup))]
     private bool _isBusy;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanRun))]
-    [NotifyPropertyChangedFor(nameof(CanArmCleanup))]
     private bool _isAvailable = true;
 
     [ObservableProperty]
@@ -34,20 +31,11 @@ public sealed partial class DockerViewModel(
     [ObservableProperty]
     private bool _pruneAllVolumes;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasPendingCleanup))]
-    [NotifyPropertyChangedFor(nameof(CanArmCleanup))]
-    private string? _pendingCleanupMessage;
-
     public ObservableCollection<DockerUsage> Buckets { get; } = [];
 
     public ObservableCollection<DockerGroupViewModel> Groups { get; } = [];
 
     public bool CanRun => !IsBusy && IsAvailable;
-
-    public bool CanArmCleanup => CanRun && !HasPendingCleanup;
-
-    public bool HasPendingCleanup => PendingCleanupMessage is not null;
 
     public bool IsIdle => !IsBusy;
 
@@ -221,77 +209,123 @@ public sealed partial class DockerViewModel(
     }
 
     [RelayCommand]
-    private void PruneBuildCache()
+    private Task PruneBuildCacheAsync()
     {
-        ArmCleanup("Удалить весь кэш сборки Docker? Это безопасно, но следующая сборка займёт больше времени.",
+        return ConfirmCleanupAsync(
+            "Кэш сборки",
+            PackIconLucideKind.Hammer,
+            ["Будет удалён весь кэш сборки Docker.", "Следующая сборка займёт больше времени."],
+            "Очистить кэш",
             () => RunCleanupAsync(DockerCleanupTarget.BuildCache, "Очистить кэш сборки"));
     }
 
     [RelayCommand]
-    private void PruneDanglingImages()
+    private Task PruneDanglingImagesAsync()
     {
-        ArmCleanup("Удалить образы без тегов (dangling)? Безвозвратно.",
+        return ConfirmCleanupAsync(
+            "Висячие образы",
+            PackIconLucideKind.Image,
+            ["Будут удалены образы без тегов (dangling).", "Образы, привязанные к контейнерам, не тронуты."],
+            "Удалить образы",
             () => RunCleanupAsync(DockerCleanupTarget.DanglingImages, "Удалить «висячие» образы"));
     }
 
     [RelayCommand]
-    private void PruneStoppedContainers()
+    private Task PruneStoppedContainersAsync()
     {
-        ArmCleanup("Удалить все остановленные контейнеры? Безвозвратно.",
+        return ConfirmCleanupAsync(
+            "Остановленные контейнеры",
+            PackIconLucideKind.Box,
+            ["Будут удалены все остановленные контейнеры.", "Данные внутри них пропадут вместе с контейнером."],
+            "Удалить контейнеры",
             () => RunCleanupAsync(DockerCleanupTarget.StoppedContainers, "Удалить остановленные контейнеры"));
     }
 
     [RelayCommand]
-    private void PruneUnusedImages()
+    private Task PruneUnusedImagesAsync()
     {
-        ArmCleanup("Удалить ВСЕ образы, не привязанные к контейнерам? Их придётся скачивать заново. Безвозвратно.",
+        return ConfirmCleanupAsync(
+            "Неиспользуемые образы",
+            PackIconLucideKind.Trash2,
+            ["Будут удалены все образы, не привязанные к контейнерам.", "Нужные придётся скачивать заново."],
+            "Удалить образы",
             () => RunCleanupAsync(DockerCleanupTarget.UnusedImages, "Удалить неиспользуемые образы"));
     }
 
     [RelayCommand]
-    private void PruneVolumes()
+    private Task PruneVolumesAsync()
     {
-        var scope = PruneAllVolumes ? "ВСЕ неиспользуемые тома (включая именованные)" : "неиспользуемые анонимные тома";
         var allUnused = PruneAllVolumes;
-        ArmCleanup($"⚠ Удалить {scope}? В них лежат данные (БД и т.п.) – они пропадут БЕЗВОЗВРАТНО.",
+
+        var scope = allUnused
+            ? "Будут удалены все неиспользуемые тома, включая именованные."
+            : "Будут удалены неиспользуемые анонимные тома.";
+
+        return ConfirmCleanupAsync(
+            "Неиспользуемые тома",
+            PackIconLucideKind.Database,
+            [scope, "В томах лежат данные приложений – базы, кэши, загруженные файлы."],
+            "Удалить тома",
             () => RunCleanupAsync(DockerCleanupTarget.UnusedVolumes, "Удалить неиспользуемые тома", allUnused));
     }
 
     [RelayCommand]
-    private void Compact()
-    {
-        ArmCleanup("WSL и Docker будут остановлены, образ диска (VHDX) сожмётся, место вернётся на диск. "
-            + "После этого запустите Docker заново.",
-            CompactCoreAsync);
-    }
-
-    private void ArmCleanup(string message, Func<Task> action)
+    private async Task CompactAsync()
     {
         if (!CanRun)
         {
             return;
         }
 
-        _pendingCleanupAction = action;
-        PendingCleanupMessage = message;
-    }
+        var confirm = new ConfirmDialogViewModel(
+            "Сжать диск Docker",
+            PackIconLucideKind.Shrink,
+            [
+                "WSL и Docker будут остановлены.",
+                "Образ диска (VHDX) сожмётся, освободившееся место вернётся системе.",
+                "После этого Docker нужно запустить заново.",
+            ],
+            [
+                new("Отмена", ConfirmChoiceKind.Dismissive),
+                new("Сжать диск", ConfirmChoiceKind.Primary),
+            ]);
 
-    [RelayCommand]
-    private void CancelCleanup()
-    {
-        _pendingCleanupAction = null;
-        PendingCleanupMessage = null;
-    }
-
-    [RelayCommand]
-    private async Task ConfirmCleanup()
-    {
-        var action = _pendingCleanupAction;
-        CancelCleanup();
-        if (action is not null)
+        if (!await dialogs.ShowAsync(confirm))
         {
-            await action();
+            return;
         }
+
+        await CompactCoreAsync();
+    }
+
+    private async Task ConfirmCleanupAsync(
+        string title,
+        PackIconLucideKind iconKind,
+        IReadOnlyList<string> lines,
+        string action,
+        Func<Task> run)
+    {
+        if (!CanRun)
+        {
+            return;
+        }
+
+        var confirm = new ConfirmDialogViewModel(
+            title,
+            iconKind,
+            lines,
+            [
+                new("Отмена", ConfirmChoiceKind.Dismissive),
+                new(action, ConfirmChoiceKind.Destructive),
+            ],
+            "Docker удаляет мимо корзины – вернуть удалённое нельзя.");
+
+        if (!await dialogs.ShowAsync(confirm))
+        {
+            return;
+        }
+
+        await run();
     }
 
     private async Task CompactCoreAsync()

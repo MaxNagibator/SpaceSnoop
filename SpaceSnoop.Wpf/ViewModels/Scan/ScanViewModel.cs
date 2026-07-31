@@ -425,7 +425,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         }
         finally
         {
-            dialog.RequestStop();
+            await dialog.StopAsync();
         }
 
         ApplyArchiveResult(dir, dialog);
@@ -1048,7 +1048,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         }
         finally
         {
-            dialog.RequestStop();
+            await dialog.StopAsync();
         }
 
         ApplyDeletionResult(dialog.DeletedItems);

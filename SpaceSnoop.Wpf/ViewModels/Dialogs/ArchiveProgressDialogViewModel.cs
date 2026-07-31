@@ -3,7 +3,7 @@ using System.IO;
 
 namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
 
-public sealed partial class ArchiveProgressDialogViewModel : ObservableObject, IDialogViewModel
+public sealed partial class ArchiveProgressDialogViewModel : ObservableObject, IDialogViewModel, ICancelableDialog
 {
     private readonly ArchiveRequest _request;
     private readonly ArchiveService _service;
@@ -80,9 +80,29 @@ public sealed partial class ArchiveProgressDialogViewModel : ObservableObject, I
 
     public bool IsIndeterminate => _total == 0;
 
+    public bool CanCancel => !IsRunning;
+
     public void RequestStop()
     {
         _cts?.Cancel();
+    }
+
+    public async Task StopAsync()
+    {
+        _cts?.Cancel();
+
+        if (StartCommand.ExecutionTask is not { } run)
+        {
+            return;
+        }
+
+        try
+        {
+            await run;
+        }
+        catch (OperationCanceledException)
+        {
+        }
     }
 
     private bool CanStart()

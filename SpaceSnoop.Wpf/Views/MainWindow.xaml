@@ -39,7 +39,7 @@
                     Command="{Binding CurrentPageStatus.CancelCommand}" />
     </Window.InputBindings>
 
-    <keepshell:ShellLayout>
+    <keepshell:ShellLayout ModalCoversShell="True">
         <keepshell:ShellLayout.TitleBar>
             <views:TitleBarView />
         </keepshell:ShellLayout.TitleBar>

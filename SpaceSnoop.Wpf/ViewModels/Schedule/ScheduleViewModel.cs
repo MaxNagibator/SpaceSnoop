@@ -1,4 +1,5 @@
 ﻿using KeepShell.Services;
+using MahApps.Metro.IconPacks;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 
@@ -257,7 +258,7 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
     }
 
     [RelayCommand]
-    private void BulkDelete()
+    private async Task BulkDeleteAsync()
     {
         var targets = SelectedProfiles();
 
@@ -266,16 +267,21 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
             return;
         }
 
-        var choice = StyledMessageBox.Show($"""
-                                            Удалить выбранные профили ({targets.Length}) и их задачи в Планировщике?
-
-                                            Синхронизированные файлы не затрагиваются.
-                                            """,
+        var confirm = new ConfirmDialogViewModel(
             "Удаление профилей",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning);
+            PackIconLucideKind.Trash2,
+            [
+                $"Будут удалены выбранные профили: {targets.Length}.",
+                "Вместе с ними уйдут их задачи в Планировщике.",
+                string.Empty,
+                "Синхронизированные файлы не затрагиваются.",
+            ],
+            [
+                new("Отмена", ConfirmChoiceKind.Dismissive),
+                new("Удалить профили", ConfirmChoiceKind.Destructive),
+            ]);
 
-        if (choice != MessageBoxResult.Yes)
+        if (!await _dialogs.ShowAsync(confirm))
         {
             return;
         }
@@ -327,7 +333,8 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
                                             """,
             "Смена направления",
             MessageBoxButton.YesNo,
-            MessageBoxImage.Warning);
+            MessageBoxImage.Warning,
+            MessageBoxResult.No);
 
         return choice == MessageBoxResult.Yes;
     }

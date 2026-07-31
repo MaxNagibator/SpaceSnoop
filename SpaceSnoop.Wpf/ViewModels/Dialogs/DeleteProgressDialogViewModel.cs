@@ -5,7 +5,7 @@ using System.IO;
 
 namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
 
-public sealed partial class DeleteProgressDialogViewModel : ObservableObject, IDialogViewModel
+public sealed partial class DeleteProgressDialogViewModel : ObservableObject, IDialogViewModel, ICancelableDialog
 {
     private readonly bool _permanent;
     private readonly long _totalBytes;
@@ -74,9 +74,29 @@ public sealed partial class DeleteProgressDialogViewModel : ObservableObject, ID
 
     public bool IsIdle => !IsRunning && !IsFinished;
 
+    public bool CanCancel => !IsRunning;
+
     public void RequestStop()
     {
         _cts?.Cancel();
+    }
+
+    public async Task StopAsync()
+    {
+        _cts?.Cancel();
+
+        if (StartCommand.ExecutionTask is not { } run)
+        {
+            return;
+        }
+
+        try
+        {
+            await run;
+        }
+        catch (OperationCanceledException)
+        {
+        }
     }
 
     private bool CanStart()

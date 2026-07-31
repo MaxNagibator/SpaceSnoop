@@ -11,7 +11,8 @@
              d:DataContext="{d:DesignInstance vm:BatchCreateProfilesDialogViewModel}"
              d:DesignHeight="560"
              d:DesignWidth="720"
-             Width="720">
+             Width="720"
+             AutomationProperties.Name="{Binding Title}">
 
     <UserControl.Resources>
         <Style x:Key="EndpointChip"
@@ -149,6 +150,7 @@
                          behaviors:PathSuggest.Enabled="{Binding PathSuggest}"
                          Style="{StaticResource TextBox.Toolbar}"
                          VerticalAlignment="Center"
+                         AutomationProperties.Name="Родитель-источник"
                          ToolTip="Родитель-источник" />
                 <Button Grid.Row="0"
                         Grid.Column="2"
@@ -158,6 +160,7 @@
                         Padding="10,6"
                         Margin="8,0,0,0"
                         VerticalAlignment="Center"
+                        AutomationProperties.Name="Выбрать родителя-источник"
                         ToolTip="Обзор">
                     <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderOpen}"
                                               Width="14"
@@ -171,6 +174,7 @@
                          Style="{StaticResource TextBox.Toolbar}"
                          VerticalAlignment="Center"
                          Margin="0,16,0,0"
+                         AutomationProperties.Name="Родитель-приёмник"
                          ToolTip="Родитель-приёмник" />
                 <Button Grid.Row="1"
                         Grid.Column="2"
@@ -180,6 +184,7 @@
                         Padding="10,6"
                         Margin="8,16,0,0"
                         VerticalAlignment="Center"
+                        AutomationProperties.Name="Выбрать родителя-приёмник"
                         ToolTip="Обзор">
                     <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderOpen}"
                                               Width="14"
@@ -223,6 +228,7 @@
                       SelectedIndex="{Binding SelectedSort}"
                       VerticalAlignment="Center"
                       Margin="0,0,16,8"
+                      AutomationProperties.Name="Сортировка пар"
                       ToolTip="Сортировка пар"
                       Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}" />
             <TextBox views:StretchWrapPanel.Stretch="True"
@@ -230,6 +236,7 @@
                      Style="{StaticResource TextBox.Toolbar}"
                      VerticalAlignment="Center"
                      Margin="0,0,0,8"
+                     AutomationProperties.Name="Исключения"
                      ToolTip="Исключения (через запятую)" />
         </views:StretchWrapPanel>
 
@@ -246,6 +253,7 @@
                            Visibility="{Binding HasRows, Converter={StaticResource InverseBoolToVisibility}}" />
 
                 <ListBox ItemsSource="{Binding Rows}"
+                         AutomationProperties.Name="Пары профилей"
                          HorizontalContentAlignment="Stretch"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}">
@@ -261,7 +269,8 @@
                                 <CheckBox Grid.Column="0"
                                           IsChecked="{Binding Include}"
                                           VerticalAlignment="Center"
-                                          Margin="0,0,10,0" />
+                                          Margin="0,0,10,0"
+                                          AutomationProperties.Name="{Binding Name, StringFormat='Создавать профиль {0}'}" />
 
                                 <StackPanel Grid.Column="1">
                                     <TextBlock Text="{Binding Name}"

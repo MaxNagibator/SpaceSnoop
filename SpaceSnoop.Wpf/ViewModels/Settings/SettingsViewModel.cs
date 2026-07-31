@@ -19,6 +19,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     private static readonly AgentBackendKind[] AgentBackendOrder = [AgentBackendKind.Claude, AgentBackendKind.Codex, AgentBackendKind.OpenCode];
 
     private readonly ISettingsStore _settings;
+    private readonly IDialogService _dialogs;
     private readonly AgentBackends _agentBackends;
     private readonly ILogger<SettingsViewModel> _logger;
 
@@ -39,6 +40,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         AgentModelSelector agentModels,
         AgentBackends agentBackends,
         ISettingsStore settings,
+        IDialogService dialogs,
         ILogger<SettingsViewModel> logger)
     {
         Agent = agent;
@@ -53,6 +55,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         Mcp = mcp;
         McpServer = mcpServer;
         _settings = settings;
+        _dialogs = dialogs;
         _logger = logger;
 
         Theme.PropertyChanged += OnThemePropertyChanged;
@@ -275,31 +278,38 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         }
     }
 
-    private void ChangeStorageLocation(bool useAppData)
+    private async void ChangeStorageLocation(bool useAppData)
     {
         var source = AppStorage.DataDirectory;
         var destination = AppStorage.DirectoryFor(useAppData);
         var place = useAppData ? "в папке AppData" : "рядом с программой";
 
-        var choice = StyledMessageBox.Show($"""
-                                            Хранить файлы приложения {place}:
-                                            {destination}
+        var migrate = new ConfirmChoice("Перенести файлы", ConfirmChoiceKind.Primary);
 
-                                            Перенести туда текущие настройки, логи и журналы (Нет – оставить их на старом месте)?
-                                            После смены приложение будет перезапущено.
-                                            """,
+        var confirm = new ConfirmDialogViewModel(
             "Расположение данных",
-            MessageBoxButton.YesNoCancel,
-            MessageBoxImage.Question);
+            PackIconLucideKind.HardDrive,
+            [
+                $"Файлы приложения будут храниться {place}:",
+                destination,
+                string.Empty,
+                "Текущие настройки, логи и журналы можно перенести туда или оставить на старом месте.",
+                "После смены приложение перезапустится.",
+            ],
+            [
+                new("Отмена", ConfirmChoiceKind.Dismissive),
+                new("Оставить файлы на месте", ConfirmChoiceKind.Secondary),
+                migrate,
+            ]);
 
-        if (choice == MessageBoxResult.Cancel)
+        if (!await _dialogs.ShowAsync(confirm))
         {
             return;
         }
 
         try
         {
-            if (choice == MessageBoxResult.Yes)
+            if (ReferenceEquals(confirm.Chosen, migrate))
             {
                 _settings.Flush();
                 AppStorage.Migrate(source, destination);

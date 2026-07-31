@@ -10,7 +10,8 @@
              d:DesignHeight="520"
              d:DesignWidth="640"
              Width="{DynamicResource Dialog.Width.Medium}"
-             MinHeight="380">
+             MinHeight="380"
+             AutomationProperties.Name="{Binding Title}">
 
     <UserControl.Resources>
         <Style x:Key="RowGlyph"
@@ -115,6 +116,7 @@
             <TextBlock Text="{Binding StatusText}"
                        Style="{StaticResource TextBlock.Subtle}"
                        TextWrapping="Wrap"
+                       AutomationProperties.LiveSetting="Polite"
                        Visibility="{Binding IsIdle, Converter={StaticResource InverseBoolToVisibility}}" />
         </Grid>
 
@@ -125,7 +127,8 @@
                 MinHeight="150">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <ItemsControl ItemsSource="{Binding Items}"
-                              Grid.IsSharedSizeScope="True">
+                              Grid.IsSharedSizeScope="True"
+                              AutomationProperties.Name="Помеченные объекты">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Grid Margin="6,3"
@@ -171,9 +174,12 @@
                              VerticalAlignment="Center"
                              Minimum="0"
                              Maximum="1"
+                             AutomationProperties.Name="Ход удаления"
                              Value="{Binding ProgressValue, Mode=OneWay}" />
                 <TextBlock Grid.Column="1"
                            Text="{Binding CountText}"
+                           AutomationProperties.Name="Удалено объектов"
+                           AutomationProperties.LiveSetting="Polite"
                            Margin="12,0,0,0"
                            VerticalAlignment="Center"
                            FontFamily="{DynamicResource Font.Mono}"
@@ -190,6 +196,7 @@
 
                 <TextBlock Grid.Column="0"
                            Text="{Binding CurrentPath}"
+                           AutomationProperties.Name="Текущий объект"
                            TextTrimming="CharacterEllipsis"
                            VerticalAlignment="Center"
                            Margin="0,0,12,0"

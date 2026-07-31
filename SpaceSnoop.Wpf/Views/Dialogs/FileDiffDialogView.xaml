@@ -12,7 +12,8 @@
              d:DesignHeight="600"
              d:DesignWidth="980"
              Width="980"
-             MinHeight="560">
+             MinHeight="560"
+             AutomationProperties.Name="Сравнение содержимого файла">
 
     <UserControl.Resources>
         <!-- TODO: фиксированные тинты под схему направлений дерева (левое/удалено = зелёный Success как LeftOnly, правое/добавлено = синий Info как RightOnly); в теме нет subtle-фон токенов для +/−, апгрейд на токены KeepShell, если появятся -->
@@ -192,6 +193,7 @@
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center"
                             Margin="14,0,0,0"
+                            AutomationProperties.Name="Различий строк"
                             ToolTip="«−N» – строки есть слева, но нет справа; «+N» – есть справа, но нет слева. Показана разница сторон, а не направление синхронизации."
                             Visibility="{Binding HasChanges, Converter={StaticResource BoolToVisibility}}">
                     <TextBlock Text="{Binding Removed, StringFormat=−{0}}"
@@ -267,6 +269,7 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0"
                            Text="{Binding LeftPath}"
+                           AutomationProperties.Name="Путь слева"
                            Style="{StaticResource TextBlock.Subtle}"
                            TextTrimming="CharacterEllipsis"
                            ToolTip="{Binding LeftPath, StringFormat='Левая сторона: {0}'}" />
@@ -279,6 +282,7 @@
                                           Foreground="{DynamicResource Fg.Muted}" />
                 <TextBlock Grid.Column="2"
                            Text="{Binding RightPath}"
+                           AutomationProperties.Name="Путь справа"
                            Style="{StaticResource TextBlock.Subtle}"
                            TextTrimming="CharacterEllipsis"
                            ToolTip="{Binding RightPath, StringFormat='Правая сторона: {0}'}" />
@@ -346,6 +350,7 @@
                                HorizontalAlignment="Center" />
                 </StackPanel>
                 <ListBox ItemsSource="{Binding Items}"
+                         AutomationProperties.Name="Строки сравнения"
                          Visibility="{Binding HasLineView, Converter={StaticResource BoolToVisibility}}"
                          Background="Transparent"
                          BorderThickness="0"
