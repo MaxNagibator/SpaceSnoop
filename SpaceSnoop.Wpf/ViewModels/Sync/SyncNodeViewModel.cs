@@ -418,14 +418,7 @@ public sealed partial class SyncNodeViewModel : ObservableObject
     {
         if (_file is not null)
         {
-            if (Status == ComparisonStatus.Identical)
-            {
-                return;
-            }
-
-            var cycle = FileActionCycle;
-            var index = Array.IndexOf(cycle, _file.Action);
-            SetAction(index < 0 ? cycle[0] : cycle[(index + 1) % cycle.Length]);
+            CycleFileAction();
             return;
         }
 
@@ -434,9 +427,26 @@ public sealed partial class SyncNodeViewModel : ObservableObject
             return;
         }
 
+        CycleDirectoryAction();
+    }
+
+    private void CycleFileAction()
+    {
+        if (Status == ComparisonStatus.Identical)
+        {
+            return;
+        }
+
+        var cycle = FileActionCycle;
+        var index = Array.IndexOf(cycle, _file!.Action);
+        SetAction(index < 0 ? cycle[0] : cycle[(index + 1) % cycle.Length]);
+    }
+
+    private void CycleDirectoryAction()
+    {
         if (IsOneSidedDir)
         {
-            var cycle = _dir.Status == ComparisonStatus.LeftOnly ? OneSidedLeftCycle : OneSidedRightCycle;
+            var cycle = _dir!.Status == ComparisonStatus.LeftOnly ? OneSidedLeftCycle : OneSidedRightCycle;
             var index = Array.IndexOf(cycle, _dir.Action);
             ApplyToSubtree(index < 0 ? cycle[0] : cycle[(index + 1) % cycle.Length]);
             return;

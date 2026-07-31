@@ -74,34 +74,42 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
     {
         foreach (var file in dir.Files)
         {
-            switch (file.Action)
-            {
-                case SyncAction.CopyToRight or SyncAction.CopyToLeft:
-                    tally.AddCopy(file);
-                    break;
-
-                case SyncAction.DeleteLeft or SyncAction.DeleteRight:
-                    tally.AddDelete(file);
-                    break;
-            }
+            AddFilePlan(file, tally);
         }
 
         foreach (var sub in dir.SubDirectories)
         {
-            if (sub.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
-            {
-                tally.DirDeletes++;
-                AddSubtreeDeleteBytes(sub, sub.Action, tally);
-                continue;
-            }
-
-            if (sub.Action is SyncAction.CopyToRight or SyncAction.CopyToLeft)
-            {
-                tally.DirCopies++;
-            }
-
-            CountPlannedRecursive(sub, tally);
+            AddDirectoryPlan(sub, tally);
         }
+    }
+
+    private static void AddFilePlan(FileComparison file, PlanTally tally)
+    {
+        if (file.Action is SyncAction.CopyToRight or SyncAction.CopyToLeft)
+        {
+            tally.AddCopy(file);
+        }
+        else if (file.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
+        {
+            tally.AddDelete(file);
+        }
+    }
+
+    private static void AddDirectoryPlan(DirectoryComparison dir, PlanTally tally)
+    {
+        if (dir.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
+        {
+            tally.DirDeletes++;
+            AddSubtreeDeleteBytes(dir, dir.Action, tally);
+            return;
+        }
+
+        if (dir.Action is SyncAction.CopyToRight or SyncAction.CopyToLeft)
+        {
+            tally.DirCopies++;
+        }
+
+        CountPlannedRecursive(dir, tally);
     }
 
     private static void AddSubtreeDeleteBytes(DirectoryComparison dir, SyncAction action, PlanTally tally)
@@ -171,25 +179,35 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
     {
         foreach (var file in dir.Files)
         {
-            if (file.Status == ComparisonStatus.Conflict)
-            {
-                file.Status = ComparisonStatus.Modified;
-            }
-
-            file.Action = mode switch
-            {
-                SyncMode.LeftToRight => ApplyLeftToRight(file, mirror),
-                SyncMode.RightToLeft => ApplyRightToLeft(file, mirror),
-                SyncMode.Bidirectional => ApplyBidirectional(file, mirror, winner),
-                _ => SyncAction.Skip,
-            };
+            ApplyFileMode(file, mode, mirror, winner);
         }
 
         foreach (var sub in dir.SubDirectories)
         {
-            sub.Action = ApplyDirMode(sub, mode, mirror, winner);
-            ApplyModeRecursive(sub, mode, mirror, winner);
+            ApplyDirectoryMode(sub, mode, mirror, winner);
         }
+    }
+
+    private static void ApplyFileMode(FileComparison file, SyncMode mode, bool mirror, SyncWinner winner)
+    {
+        if (file.Status == ComparisonStatus.Conflict)
+        {
+            file.Status = ComparisonStatus.Modified;
+        }
+
+        file.Action = mode switch
+        {
+            SyncMode.LeftToRight => ApplyLeftToRight(file, mirror),
+            SyncMode.RightToLeft => ApplyRightToLeft(file, mirror),
+            SyncMode.Bidirectional => ApplyBidirectional(file, mirror, winner),
+            _ => SyncAction.Skip,
+        };
+    }
+
+    private static void ApplyDirectoryMode(DirectoryComparison dir, SyncMode mode, bool mirror, SyncWinner winner)
+    {
+        dir.Action = ApplyDirMode(dir, mode, mirror, winner);
+        ApplyModeRecursive(dir, mode, mirror, winner);
     }
 
     private static SyncAction ApplyDirMode(DirectoryComparison dir, SyncMode mode, bool mirror, SyncWinner winner)

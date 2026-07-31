@@ -52,118 +52,126 @@ internal static class SyncFreshness
 {
     internal static FreshnessSummary Compute(DirectoryComparison root)
     {
-        var leftNewer = 0;
-        var rightNewer = 0;
-        DateTime? leftMax = null;
-        DateTime? rightMax = null;
-        var leftOnly = 0;
-        var rightOnly = 0;
-        DateTime? leftChangedMax = null;
-        DateTime? rightChangedMax = null;
-        var tolerance = DirectoryComparer.FatTimestampTolerance;
-
-        void Walk(DirectoryComparison dir)
-        {
-            foreach (var file in dir.Files)
-            {
-                Bump(ref leftMax, file.LeftModified);
-                Bump(ref rightMax, file.RightModified);
-
-                switch (file.Status)
-                {
-                    case ComparisonStatus.LeftOnly:
-                        leftOnly++;
-                        Bump(ref leftChangedMax, file.LeftModified);
-                        break;
-
-                    case ComparisonStatus.RightOnly:
-                        rightOnly++;
-                        Bump(ref rightChangedMax, file.RightModified);
-                        break;
-
-                    case ComparisonStatus.Modified or ComparisonStatus.Conflict:
-                        Bump(ref leftChangedMax, file.LeftModified);
-                        Bump(ref rightChangedMax, file.RightModified);
-
-                        if (file.LeftModified is { } l && file.RightModified is { } r)
-                        {
-                            var delta = l - r;
-
-                            if (delta.Duration() > tolerance)
-                            {
-                                if (delta > TimeSpan.Zero)
-                                {
-                                    leftNewer++;
-                                }
-                                else
-                                {
-                                    rightNewer++;
-                                }
-                            }
-                        }
-
-                        break;
-                }
-            }
-
-            foreach (var sub in dir.SubDirectories)
-            {
-                Walk(sub);
-            }
-        }
-
-        Walk(root);
-        return new(leftNewer, rightNewer, leftMax, rightMax, leftOnly, rightOnly, leftChangedMax, rightChangedMax);
-
-        static void Bump(ref DateTime? max, DateTime? value)
-        {
-            if (value is { } v && (max is null || v > max))
-            {
-                max = v;
-            }
-        }
+        var accumulator = new FreshnessAccumulator(DirectoryComparer.FatTimestampTolerance);
+        accumulator.Walk(root);
+        return accumulator.Build();
     }
 
     internal static (int Count, DateTime? Newest) DeletionRecency(DirectoryComparison root)
     {
-        var count = 0;
-        DateTime? newest = null;
+        var accumulator = new DeletionAccumulator();
+        accumulator.Walk(root);
+        return accumulator.Result;
+    }
 
-        void Consider(DateTime? when)
-        {
-            count++;
+    private sealed class FreshnessAccumulator(TimeSpan tolerance)
+    {
+        private int _leftNewer;
+        private int _rightNewer;
+        private DateTime? _leftMax;
+        private DateTime? _rightMax;
+        private int _leftOnly;
+        private int _rightOnly;
+        private DateTime? _leftChangedMax;
+        private DateTime? _rightChangedMax;
 
-            if (when is { } value && (newest is null || value > newest))
-            {
-                newest = value;
-            }
-        }
-
-        void Walk(DirectoryComparison dir)
+        public void Walk(DirectoryComparison dir)
         {
             foreach (var file in dir.Files)
             {
-                if (file.Action == SyncAction.DeleteRight)
-                {
-                    Consider(file.RightModified);
-                }
-                else if (file.Action == SyncAction.DeleteLeft)
-                {
-                    Consider(file.LeftModified);
-                }
+                AddFile(file);
             }
 
             foreach (var sub in dir.SubDirectories)
             {
-                if (sub.Action == SyncAction.DeleteRight)
-                {
-                    Consider(sub.RightModified);
-                    continue;
-                }
+                Walk(sub);
+            }
+        }
 
-                if (sub.Action == SyncAction.DeleteLeft)
+        public FreshnessSummary Build()
+        {
+            return new(_leftNewer, _rightNewer, _leftMax, _rightMax, _leftOnly, _rightOnly, _leftChangedMax, _rightChangedMax);
+        }
+
+        private static void Bump(ref DateTime? max, DateTime? value)
+        {
+            if (value is { } current && (max is null || current > max))
+            {
+                max = current;
+            }
+        }
+
+        private void AddFile(FileComparison file)
+        {
+            Bump(ref _leftMax, file.LeftModified);
+            Bump(ref _rightMax, file.RightModified);
+
+            switch (file.Status)
+            {
+                case ComparisonStatus.LeftOnly:
+                    _leftOnly++;
+                    Bump(ref _leftChangedMax, file.LeftModified);
+                    break;
+
+                case ComparisonStatus.RightOnly:
+                    _rightOnly++;
+                    Bump(ref _rightChangedMax, file.RightModified);
+                    break;
+
+                case ComparisonStatus.Modified or ComparisonStatus.Conflict:
+                    AddChangedFile(file);
+                    break;
+            }
+        }
+
+        private void AddChangedFile(FileComparison file)
+        {
+            Bump(ref _leftChangedMax, file.LeftModified);
+            Bump(ref _rightChangedMax, file.RightModified);
+
+            if (file.LeftModified is { } left && file.RightModified is { } right)
+            {
+                CountNewer(left - right);
+            }
+        }
+
+        private void CountNewer(TimeSpan delta)
+        {
+            if (delta.Duration() <= tolerance)
+            {
+                return;
+            }
+
+            if (delta > TimeSpan.Zero)
+            {
+                _leftNewer++;
+            }
+            else
+            {
+                _rightNewer++;
+            }
+        }
+    }
+
+    private sealed class DeletionAccumulator
+    {
+        private int _count;
+        private DateTime? _newest;
+
+        public (int Count, DateTime? Newest) Result => (_count, _newest);
+
+        public void Walk(DirectoryComparison dir)
+        {
+            foreach (var file in dir.Files)
+            {
+                Consider(file.Action, file.LeftModified, file.RightModified);
+            }
+
+            foreach (var sub in dir.SubDirectories)
+            {
+                if (sub.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
                 {
-                    Consider(sub.LeftModified);
+                    Consider(sub.Action, sub.LeftModified, sub.RightModified);
                     continue;
                 }
 
@@ -171,7 +179,28 @@ internal static class SyncFreshness
             }
         }
 
-        Walk(root);
-        return (count, newest);
+        private void Consider(SyncAction action, DateTime? left, DateTime? right)
+        {
+            if (action is not (SyncAction.DeleteLeft or SyncAction.DeleteRight))
+            {
+                return;
+            }
+
+            _count++;
+
+            var when = action switch
+            {
+                SyncAction.DeleteLeft => left,
+                SyncAction.DeleteRight => right,
+                _ => null,
+            };
+
+            if (when is not { } value || _newest is not null && value <= _newest)
+            {
+                return;
+            }
+
+            _newest = value;
+        }
     }
 }

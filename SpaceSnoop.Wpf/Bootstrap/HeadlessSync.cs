@@ -9,72 +9,21 @@ internal sealed class HeadlessSync
     public static int Run(ISettingsStore settings, KeepShellLogging logging, string? profileId = null)
     {
         var logger = logging.CreateLogger<HeadlessSync>();
+        var options = LoadOptions(settings, profileId, logger);
 
-        string name, left, right, exclusions;
-        SyncMode mode;
-        bool mirror;
-        SyncWinner winner;
-
-        if (!string.IsNullOrEmpty(profileId))
+        if (options is null)
         {
-            var profile = SyncProfileStore.Find(settings, profileId);
-
-            if (profile is null)
-            {
-                logger.HeadlessSyncAborted($"профиль не найден: {profileId}");
-                return 2;
-            }
-
-            name = profile.Name;
-            left = profile.Left.Trim();
-            right = profile.Right.Trim();
-            mode = MapMode(profile.Mode);
-            mirror = profile.Mirror;
-            winner = profile.Winner;
-            exclusions = profile.Exclusions;
-        }
-        else
-        {
-            name = "глобальные настройки";
-            left = (settings.GetStringValue(SettingsKeys.SyncLeft) ?? string.Empty).Trim();
-            right = (settings.GetStringValue(SettingsKeys.SyncRight) ?? string.Empty).Trim();
-            mode = MapMode(settings.GetInt(SettingsKeys.SyncMode));
-            mirror = settings.GetBool(SettingsKeys.SyncMirror);
-            winner = SyncProfile.WinnerFromIndex(settings.GetInt(SettingsKeys.SyncWinner));
-            exclusions = settings.GetStringValue(SettingsKeys.SyncExclusions) ?? string.Empty;
-
-            if (string.IsNullOrEmpty(exclusions))
-            {
-                exclusions = settings.GetStringValue(SettingsKeys.DefaultExclusions) ?? string.Empty;
-            }
-        }
-
-        if (string.IsNullOrEmpty(left) || string.IsNullOrEmpty(right))
-        {
-            logger.HeadlessSyncAborted("каталоги не настроены");
             return 2;
         }
 
-        if (SyncProfile.SourceMissing(left, right, mode))
+        var validationCode = Validate(options, logger);
+
+        if (validationCode != 0)
         {
-            logger.HeadlessSyncAborted("каталог-источник недоступен");
-            return 3;
+            return validationCode;
         }
 
-        if (SyncProfile.PathsOverlap(left, right))
-        {
-            logger.HeadlessSyncAborted("каталоги совпадают или вложены");
-            return 5;
-        }
-
-        if (mirror && SyncProfile.MirrorSource(mode, winner, left, right) is { } mirrorSource
-            && (!Directory.Exists(mirrorSource) || !Directory.EnumerateFileSystemEntries(mirrorSource).Any()))
-        {
-            logger.HeadlessSyncAborted("зеркало отменено: источник пуст");
-            return 4;
-        }
-
-        logger.HeadlessSyncStarted(left, right, mode, mirror);
+        logger.HeadlessSyncStarted(options.Left, options.Right, options.Mode, options.Mirror);
         var stopwatch = Stopwatch.StartNew();
 
         using var mutex = new Mutex(false, @"Global\SpaceSnoop_HeadlessSync");
@@ -82,14 +31,7 @@ internal sealed class HeadlessSync
 
         try
         {
-            try
-            {
-                acquired = mutex.WaitOne(TimeSpan.FromMinutes(10));
-            }
-            catch (AbandonedMutexException)
-            {
-                acquired = true;
-            }
+            acquired = TryAcquire(mutex);
 
             if (!acquired)
             {
@@ -97,18 +39,18 @@ internal sealed class HeadlessSync
                 return 1;
             }
 
-            var filter = new ExclusionFilter(exclusions);
+            var filter = new ExclusionFilter(options.Exclusions);
             var comparer = new DirectoryComparer(filter, NullLogger<DirectoryComparer>.Instance);
-            var result = comparer.Compare(left, right, CancellationToken.None);
+            var result = comparer.Compare(options.Left, options.Right, CancellationToken.None);
 
-            result.ApplyMode(mode, mirror, winner);
+            result.ApplyMode(options.Mode, options.Mirror, options.Winner);
             result.ResolveAllConflicts(SyncAction.Skip);
 
             var engine = new SyncEngine(NullLogger<SyncEngine>.Instance, false);
             var report = engine.Execute(result, CancellationToken.None);
 
             stopwatch.Stop();
-            WriteLog(name, report, logger);
+            WriteLog(options.Name, report, logger);
             logger.HeadlessSyncFinished(report.SuccessCount, report.Errors.Count, (long)stopwatch.Elapsed.TotalMilliseconds);
 
             return report.Errors.Count == 0 ? 0 : 1;
@@ -137,6 +79,84 @@ internal sealed class HeadlessSync
         };
     }
 
+    private static RunOptions? LoadOptions(ISettingsStore settings, string? profileId, ILogger logger)
+    {
+        if (!string.IsNullOrEmpty(profileId))
+        {
+            var profile = SyncProfileStore.Find(settings, profileId);
+
+            if (profile is null)
+            {
+                logger.HeadlessSyncAborted($"профиль не найден: {profileId}");
+                return null;
+            }
+
+            return new(profile.Name, profile.Left.Trim(), profile.Right.Trim(), MapMode(profile.Mode), profile.Mirror, profile.Winner, profile.Exclusions);
+        }
+
+        var exclusions = settings.GetStringValue(SettingsKeys.SyncExclusions) ?? string.Empty;
+
+        if (string.IsNullOrEmpty(exclusions))
+        {
+            exclusions = settings.GetStringValue(SettingsKeys.DefaultExclusions) ?? string.Empty;
+        }
+
+        return new("глобальные настройки",
+            (settings.GetStringValue(SettingsKeys.SyncLeft) ?? string.Empty).Trim(),
+            (settings.GetStringValue(SettingsKeys.SyncRight) ?? string.Empty).Trim(),
+            MapMode(settings.GetInt(SettingsKeys.SyncMode)),
+            settings.GetBool(SettingsKeys.SyncMirror),
+            SyncProfile.WinnerFromIndex(settings.GetInt(SettingsKeys.SyncWinner)),
+            exclusions);
+    }
+
+    private static int Validate(RunOptions options, ILogger logger)
+    {
+        if (string.IsNullOrEmpty(options.Left) || string.IsNullOrEmpty(options.Right))
+        {
+            logger.HeadlessSyncAborted("каталоги не настроены");
+            return 2;
+        }
+
+        if (SyncProfile.SourceMissing(options.Left, options.Right, options.Mode))
+        {
+            logger.HeadlessSyncAborted("каталог-источник недоступен");
+            return 3;
+        }
+
+        if (SyncProfile.PathsOverlap(options.Left, options.Right))
+        {
+            logger.HeadlessSyncAborted("каталоги совпадают или вложены");
+            return 5;
+        }
+
+        if (options.Mirror && IsMirrorSourceEmpty(options))
+        {
+            logger.HeadlessSyncAborted("зеркало отменено: источник пуст");
+            return 4;
+        }
+
+        return 0;
+    }
+
+    private static bool IsMirrorSourceEmpty(RunOptions options)
+    {
+        return SyncProfile.MirrorSource(options.Mode, options.Winner, options.Left, options.Right) is { } mirrorSource
+               && (!Directory.Exists(mirrorSource) || !Directory.EnumerateFileSystemEntries(mirrorSource).Any());
+    }
+
+    private static bool TryAcquire(Mutex mutex)
+    {
+        try
+        {
+            return mutex.WaitOne(TimeSpan.FromMinutes(10));
+        }
+        catch (AbandonedMutexException)
+        {
+            return true;
+        }
+    }
+
     private static void WriteLog(string name, SyncReport report, ILogger logger)
     {
         try
@@ -148,4 +168,13 @@ internal sealed class HeadlessSync
             logger.SyncLogWriteFailed(exception);
         }
     }
+
+    private sealed record RunOptions(
+        string Name,
+        string Left,
+        string Right,
+        SyncMode Mode,
+        bool Mirror,
+        SyncWinner Winner,
+        string Exclusions);
 }

@@ -42,8 +42,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
     private string _inputText = string.Empty;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(
-        nameof(SendCommand),
+    [NotifyCanExecuteChangedFor(nameof(SendCommand),
         nameof(CancelCommand),
         nameof(NewConversationCommand),
         nameof(RetryCommand),
@@ -198,6 +197,50 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         await DetectCliAsync();
     }
 
+    private void OnNavigationDeferred(string sectionKey)
+    {
+        if (ChatPendingNavigation.For(sectionKey) is not { } pending)
+        {
+            return;
+        }
+
+        PendingNavigation = pending;
+        _logger.AgentNavigationDeferred(pending.Page);
+    }
+
+    private void OnGateSourceChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (ReferenceEquals(sender, _preferences))
+        {
+            if (e.PropertyName == nameof(AgentPreferences.Enabled) && !_preferences.Enabled)
+            {
+                _cts?.Cancel();
+            }
+
+            if (e.PropertyName == nameof(AgentPreferences.Backend))
+            {
+                SwitchBackend();
+                return;
+            }
+        }
+
+        if (ReferenceEquals(sender, Mcp) && e.PropertyName == nameof(McpPreferences.AllowMutations) && !Backend.SendsSystemPromptEachTurn)
+        {
+            _sessionId = null;
+            _sessionDropped = IsBusy;
+        }
+
+        var dispatcher = Application.Current?.Dispatcher;
+
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            dispatcher.BeginInvoke(NotifyGatesChanged);
+            return;
+        }
+
+        NotifyGatesChanged();
+    }
+
     [RelayCommand]
     private async Task RecheckCliAsync()
     {
@@ -220,17 +263,6 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
     private void DismissPendingPage()
     {
         PendingNavigation = null;
-    }
-
-    private void OnNavigationDeferred(string sectionKey)
-    {
-        if (ChatPendingNavigation.For(sectionKey) is not { } pending)
-        {
-            return;
-        }
-
-        PendingNavigation = pending;
-        _logger.AgentNavigationDeferred(pending.Page);
     }
 
     private async Task DetectCliAsync()
@@ -555,7 +587,46 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
 
     private async Task RunTurnAsync(string prompt)
     {
-        Messages.Add(new ChatMessageViewModel(ChatRole.User, prompt));
+        var turn = PrepareTurn(prompt);
+
+        try
+        {
+            await foreach (var turnEvent in turn.Backend.RunAsync(turn.Request, turn.Token).WithCancellation(turn.Token))
+            {
+                ApplyTurnEvent(turn.Assistant, turnEvent);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            turn.Assistant.IsCancelled = true;
+        }
+        catch (Exception exception)
+        {
+            turn.Assistant.IsError = true;
+            turn.Assistant.Append(turn.Assistant.Text.Length > 0 ? $"\n\n{exception.Message}" : exception.Message);
+        }
+        finally
+        {
+            FinishTurn(turn);
+        }
+
+        if (turn.ResumedFromDisk)
+        {
+            _resumedFromDisk = false;
+
+            if (turn.Assistant.IsError)
+            {
+                _sessionId = null;
+                _logger.ChatRestoredSessionDropped();
+            }
+        }
+
+        CaptureTurn();
+    }
+
+    private TurnContext PrepareTurn(string prompt)
+    {
+        Messages.Add(new(ChatRole.User, prompt));
 
         var assistant = new ChatMessageViewModel(ChatRole.Assistant) { IsStreaming = true };
         Messages.Add(assistant);
@@ -581,91 +652,68 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
             SystemPrompt = AgentPrompt.Build(mutations, backend.HasBuiltInShell),
             Model = _preferences.ModelFor(backend.Kind) is { Length: > 0 } model ? model : null,
             Effort = _preferences.EffortFor(backend.Kind) is { Length: > 0 } effort ? effort : null,
-            Mcp = new AgentMcpConfig(AgentPrompt.ServerName, McpServer.Endpoint ?? string.Empty, Mcp.Token, allowed, AgentPrompt.DeniedTools(mutations)),
+            Mcp = new(AgentPrompt.ServerName, McpServer.Endpoint ?? string.Empty, Mcp.Token, allowed, AgentPrompt.DeniedTools(mutations)),
             Transcript = transcript,
         };
 
-        _cts = new CancellationTokenSource();
-        var token = _cts.Token;
+        _cts = new();
         var resumedFromDisk = _resumedFromDisk && _sessionId is { Length: > 0 };
 
         _sessionDropped = false;
         IsBusy = true;
         _bridge.DeferNavigation = true;
 
-        try
+        return new(assistant, backend, request, _cts.Token, transcript, resumedFromDisk);
+    }
+
+    private void ApplyTurnEvent(ChatMessageViewModel assistant, AgentEvent turnEvent)
+    {
+        switch (turnEvent.Kind)
         {
-            await foreach (var turnEvent in backend.RunAsync(request, token).WithCancellation(token))
-            {
-                switch (turnEvent.Kind)
+            case AgentEventKind.Started:
+                if (!_sessionDropped)
                 {
-                    case AgentEventKind.Started:
-                        if (!_sessionDropped)
-                        {
-                            _sessionId = turnEvent.SessionId;
-                        }
-
-                        break;
-
-                    case AgentEventKind.Text:
-                        assistant.Append(turnEvent.Text);
-                        break;
-
-                    case AgentEventKind.ToolCall:
-                        assistant.DropPreamble();
-                        assistant.ToolCalls.Add(ChatToolCall.From(turnEvent));
-                        break;
-
-                    case AgentEventKind.Completed:
-                        if (!_sessionDropped)
-                        {
-                            _sessionId = turnEvent.SessionId ?? _sessionId;
-                        }
-
-                        assistant.CostUsd = turnEvent.CostUsd;
-                        assistant.Tokens = turnEvent.Tokens;
-                        break;
-
-                    case AgentEventKind.Failed:
-                        assistant.IsError = true;
-                        assistant.Append(assistant.Text.Length > 0 ? $"\n\n{turnEvent.Text}" : turnEvent.Text);
-                        break;
+                    _sessionId = turnEvent.SessionId;
                 }
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            assistant.IsCancelled = true;
-        }
-        catch (Exception exception)
-        {
-            assistant.IsError = true;
-            assistant.Append(assistant.Text.Length > 0 ? $"\n\n{exception.Message}" : exception.Message);
-        }
-        finally
-        {
-            assistant.IsStreaming = false;
-            IsBusy = false;
-            _bridge.DeferNavigation = false;
-            _cts?.Dispose();
-            _cts = null;
 
-            transcript?.Write(AgentTranscriptKind.Message, assistant.Text);
-            transcript?.Dispose();
+                break;
+
+            case AgentEventKind.Text:
+                assistant.Append(turnEvent.Text);
+                break;
+
+            case AgentEventKind.ToolCall:
+                assistant.DropPreamble();
+                assistant.ToolCalls.Add(ChatToolCall.From(turnEvent));
+                break;
+
+            case AgentEventKind.Completed:
+                if (!_sessionDropped)
+                {
+                    _sessionId = turnEvent.SessionId ?? _sessionId;
+                }
+
+                assistant.CostUsd = turnEvent.CostUsd;
+                assistant.Tokens = turnEvent.Tokens;
+                break;
+
+            case AgentEventKind.Failed:
+                assistant.IsError = true;
+                assistant.Append(assistant.Text.Length > 0 ? $"\n\n{turnEvent.Text}" : turnEvent.Text);
+                break;
         }
+    }
 
-        if (resumedFromDisk)
-        {
-            _resumedFromDisk = false;
+    private void FinishTurn(TurnContext turn)
+    {
+        turn.Assistant.IsStreaming = false;
+        IsBusy = false;
+        _bridge.DeferNavigation = false;
+        _cts?.Dispose();
+        _cts = null;
 
-            if (assistant.IsError)
-            {
-                _sessionId = null;
-                _logger.ChatRestoredSessionDropped();
-            }
-        }
-
-        CaptureTurn();
+        turn.Transcript?.Write(AgentTranscriptKind.Message, turn.Assistant.Text);
+        turn.Transcript?.Dispose();
     }
 
     private void LoadHistory()
@@ -760,39 +808,6 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         }
     }
 
-    private void OnGateSourceChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (ReferenceEquals(sender, _preferences))
-        {
-            if (e.PropertyName == nameof(AgentPreferences.Enabled) && !_preferences.Enabled)
-            {
-                _cts?.Cancel();
-            }
-
-            if (e.PropertyName == nameof(AgentPreferences.Backend))
-            {
-                SwitchBackend();
-                return;
-            }
-        }
-
-        if (ReferenceEquals(sender, Mcp) && e.PropertyName == nameof(McpPreferences.AllowMutations) && !Backend.SendsSystemPromptEachTurn)
-        {
-            _sessionId = null;
-            _sessionDropped = IsBusy;
-        }
-
-        var dispatcher = Application.Current?.Dispatcher;
-
-        if (dispatcher is not null && !dispatcher.CheckAccess())
-        {
-            dispatcher.BeginInvoke(NotifyGatesChanged);
-            return;
-        }
-
-        NotifyGatesChanged();
-    }
-
     private void SwitchBackend()
     {
         _cts?.Cancel();
@@ -843,4 +858,12 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         OnPropertyChanged(nameof(EmptyStateHint));
         SendCommand.NotifyCanExecuteChanged();
     }
+
+    private sealed record TurnContext(
+        ChatMessageViewModel Assistant,
+        IAgentBackend Backend,
+        AgentRequest Request,
+        CancellationToken Token,
+        IAgentTranscript? Transcript,
+        bool ResumedFromDisk);
 }

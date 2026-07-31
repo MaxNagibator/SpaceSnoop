@@ -100,7 +100,7 @@ public sealed class TreemapView : FrameworkElement
 
     public IEnumerable? ItemsSource
     {
-        get => (IEnumerable?)GetValue(ItemsSourceProperty);
+        get => ReadDependencyValue<IEnumerable>(ItemsSourceProperty);
         set => SetValue(ItemsSourceProperty, value);
     }
 
@@ -118,7 +118,7 @@ public sealed class TreemapView : FrameworkElement
 
     public ICommand? DrillCommand
     {
-        get => (ICommand?)GetValue(DrillCommandProperty);
+        get => ReadDependencyValue<ICommand>(DrillCommandProperty);
         set => SetValue(DrillCommandProperty, value);
     }
 
@@ -505,6 +505,20 @@ public sealed class TreemapView : FrameworkElement
                 beak.Margin = new(16, 1, 0, 0);
                 break;
         }
+    }
+
+    private T? ReadDependencyValue<T>(DependencyProperty property) where T : class
+    {
+        var value = GetValue(property);
+
+        if (value is null)
+        {
+            return null;
+        }
+
+        return value is T typed
+            ? typed
+            : throw new InvalidCastException($"Значение свойства {property.Name} имеет тип {value.GetType().FullName}, ожидался {typeof(T).FullName}.");
     }
 
     private void ShowTooltip(ScanNodeViewModel? node)

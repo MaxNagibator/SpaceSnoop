@@ -214,6 +214,8 @@ public partial class MainForm : Form
         _infoTextBox.AppendText(Environment.NewLine);
 
         StopProgressBar();
+        _cancellationTokenSource?.Dispose();
+        _cancellationTokenSource = null;
     }
 
     private void StartWorker(string disk)
@@ -311,6 +313,7 @@ public partial class MainForm : Form
 
     private void FinalizeWorker()
     {
+        StopWorker();
         _workerService.WorkCompleted -= OnWorkCompleted;
     }
 

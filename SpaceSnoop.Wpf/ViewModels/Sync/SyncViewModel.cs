@@ -145,9 +145,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _settings.Changed += OnSettingsChanged;
     }
 
-    public event Action<SyncProfileRun>? ProfileRunCompleted;
-
     public event Action<string>? AskAgentRequested;
+
+    public event Action<SyncProfileRun>? ProfileRunCompleted;
 
     public static int[] GitHistoryCounts { get; } = [4, 8, 16, 32];
 
@@ -445,10 +445,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
     }
 
-    internal SyncMode CurrentMode => ModeOrder[Math.Clamp(SelectedModeIndex, 0, ModeOrder.Length - 1)];
-
-    internal SyncWinner CurrentWinner => WinnerOrder[Math.Clamp(SelectedWinnerIndex, 0, WinnerOrder.Length - 1)];
-
     private PlannedActions CurrentPlan => _result?.CountPlannedActions() ?? PlannedActions.Empty;
 
     public void NotifyActionsChanged()
@@ -463,8 +459,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public void AskAgentAbout(SyncNodeViewModel node)
     {
-        AskAgentRequested?.Invoke(ChatQuestion.ForSyncNode(
-            node.RelativePath,
+        AskAgentRequested?.Invoke(ChatQuestion.ForSyncNode(node.RelativePath,
             node.Status,
             node.IsDirectory,
             node.LeftSizeText,
@@ -743,45 +738,119 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     {
         var files = NewZeroStats();
         var dirs = NewZeroStats();
-        Walk(root, outcomes, files, dirs);
+        WalkRemaining(root, outcomes, files, dirs);
         return (files, dirs);
+    }
 
-        static void Walk(DirectoryComparison dir, IReadOnlyDictionary<object, SyncOutcome> outcomes, Dictionary<ComparisonStatus, int> files, Dictionary<ComparisonStatus, int> dirs)
+    internal static List<string> BuildPlanLines(PlannedActions planned, string? direction, IReadOnlyList<PlanReceiver> receivers)
+    {
+        var lines = new List<string>();
+
+        if (direction is not null)
         {
-            foreach (var file in dir.Files)
+            lines.Add($"Направление: {direction}.");
+            lines.Add(string.Empty);
+        }
+
+        if (planned.Total == 0)
+        {
+            lines.Add("Изменений нет.");
+            return lines;
+        }
+
+        if (planned.Copies > 0)
+        {
+            lines.Add($"Скопировать файлов: {planned.Copies:N0} ({SizeFormatter.Format(planned.CopyBytes)})");
+
+            if (planned.ModifiedCopies > 0)
             {
-                if (outcomes.GetValueOrDefault(file) == SyncOutcome.Applied)
-                {
-                    if (file.Action is not (SyncAction.DeleteLeft or SyncAction.DeleteRight))
-                    {
-                        files[ComparisonStatus.Identical]++;
-                    }
-
-                    continue;
-                }
-
-                files[file.Status]++;
-            }
-
-            foreach (var sub in dir.SubDirectories)
-            {
-                if (outcomes.GetValueOrDefault(sub) == SyncOutcome.Applied)
-                {
-                    if (sub.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
-                    {
-                        continue;
-                    }
-
-                    dirs[ComparisonStatus.Identical]++;
-                }
-                else
-                {
-                    dirs[sub.Status]++;
-                }
-
-                Walk(sub, outcomes, files, dirs);
+                lines.Add($"    – новых: {planned.NewCopies:N0} ({SizeFormatter.Format(planned.NewCopyBytes)})");
+                lines.Add($"    – изменённых: {planned.ModifiedCopies:N0} ({SizeFormatter.Format(planned.ModifiedCopyBytes)})");
             }
         }
+
+        if (planned.DirCopies > 0)
+        {
+            lines.Add($"Создать каталогов: {planned.DirCopies:N0}");
+        }
+
+        if (planned.Deletes > 0)
+        {
+            lines.Add($"Удалить файлов в корзину: {planned.Deletes:N0} ({SizeFormatter.Format(planned.DeleteFileBytes)})");
+        }
+
+        if (planned.DirDeletes > 0)
+        {
+            lines.Add($"Удалить каталогов в корзину: {planned.DirDeletes:N0} ({SizeFormatter.Format(planned.DeleteDirBytes)})");
+        }
+
+        var space = DescribeReceivers(receivers);
+
+        if (space.Count > 0)
+        {
+            lines.Add(string.Empty);
+            lines.AddRange(space);
+        }
+
+        if (planned.DeleteBytes > 0)
+        {
+            lines.Add("Удалённое уходит в корзину – место освободится после её очистки.");
+        }
+
+        return lines;
+    }
+
+    internal Task CompareFromAutomationAsync(CancellationToken cancellationToken)
+    {
+        return ExecuteCompareAsync(cancellationToken);
+    }
+
+    internal Task<SyncReport?> SyncFromAutomationAsync(CancellationToken cancellationToken)
+    {
+        return ExecuteSyncAsync(false, cancellationToken);
+    }
+
+    internal ComparisonExportModel? BuildExportModel(int entryLimit)
+    {
+        return CaptureExportBuilder(entryLimit)?.Invoke();
+    }
+
+    internal Func<SyncPlanExportModel>? CapturePlanBuilder(int entryLimit)
+    {
+        if (_result is null)
+        {
+            return null;
+        }
+
+        var result = _result;
+        var options = new ComparisonExportOptions(CurrentMode, CurrentWinner, Mirror, Exclusions.Trim());
+
+        return () => SyncPlanExport.Build(result, options, AppInfo.Version, entryLimit);
+    }
+
+    internal Func<ComparisonExportModel>? CaptureExportBuilder(int entryLimit)
+    {
+        if (_result is null)
+        {
+            return null;
+        }
+
+        var result = _result;
+        var options = new ComparisonExportOptions(CurrentMode, CurrentWinner, Mirror, Exclusions.Trim());
+
+        var git = _leftGit is null && _rightGit is null
+            ? null
+            : new ComparisonExportGit(_leftGit, _rightGit, GitVerdictText);
+
+        var lastSync = _lastReport is null
+            ? null
+            : new ComparisonExportSync(_lastReport.CopiedCount, _lastReport.DeletedCount, _lastReport.Errors, _lastReport.Mismatches);
+
+        return () => ComparisonExport.Build(result, options, AppInfo.Version, entryLimit) with
+        {
+            Git = git,
+            LastSync = lastSync,
+        };
     }
 
     private void OnSettingsChanged(object? sender, string key)
@@ -794,6 +863,60 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         {
             RebuildRows();
         }
+    }
+
+    private static void WalkRemaining(
+        DirectoryComparison dir,
+        IReadOnlyDictionary<object, SyncOutcome> outcomes,
+        Dictionary<ComparisonStatus, int> files,
+        Dictionary<ComparisonStatus, int> dirs)
+    {
+        foreach (var file in dir.Files)
+        {
+            CountRemainingFile(file, outcomes, files);
+        }
+
+        foreach (var sub in dir.SubDirectories)
+        {
+            CountRemainingDirectory(sub, outcomes, dirs);
+            WalkRemaining(sub, outcomes, files, dirs);
+        }
+    }
+
+    private static void CountRemainingFile(
+        FileComparison file,
+        IReadOnlyDictionary<object, SyncOutcome> outcomes,
+        Dictionary<ComparisonStatus, int> files)
+    {
+        if (outcomes.GetValueOrDefault(file) == SyncOutcome.Applied)
+        {
+            if (file.Action is not (SyncAction.DeleteLeft or SyncAction.DeleteRight))
+            {
+                files[ComparisonStatus.Identical]++;
+            }
+
+            return;
+        }
+
+        files[file.Status]++;
+    }
+
+    private static void CountRemainingDirectory(
+        DirectoryComparison dir,
+        IReadOnlyDictionary<object, SyncOutcome> outcomes,
+        Dictionary<ComparisonStatus, int> dirs)
+    {
+        if (outcomes.GetValueOrDefault(dir) == SyncOutcome.Applied)
+        {
+            if (dir.Action is not (SyncAction.DeleteLeft or SyncAction.DeleteRight))
+            {
+                dirs[ComparisonStatus.Identical]++;
+            }
+
+            return;
+        }
+
+        dirs[dir.Status]++;
     }
 
     private static void ApplyActionRecursive(DirectoryComparison dir, SyncAction action)
@@ -1023,6 +1146,62 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
 
         return span.TotalMinutes >= 1 ? $"{(int)span.TotalMinutes} мин." : "<1 мин.";
+    }
+
+    private static IEnumerable<T> FilterBySearch<T>(IEnumerable<T> items, string search, Func<T, string> path)
+    {
+        return search.Length == 0
+            ? items
+            : items.Where(item => path(item).Contains(search, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static List<string> DescribeReceivers(IReadOnlyList<PlanReceiver> receivers)
+    {
+        var lines = new List<string>();
+
+        foreach (var receiver in receivers)
+        {
+            if (receiver.Required <= 0)
+            {
+                continue;
+            }
+
+            var required = SizeFormatter.Format(receiver.Required);
+
+            if (receiver.Free is not { } free)
+            {
+                lines.Add($"Приёмник {receiver.Path}: потребуется ≈{required}, свободное место неизвестно.");
+                continue;
+            }
+
+            lines.Add(free >= receiver.Required
+                ? $"Приёмник {receiver.Path}: потребуется ≈{required}, свободно {SizeFormatter.Format(free)}."
+                : $"Внимание: на {receiver.Path} не хватает ≈{SizeFormatter.Format(receiver.Required - free)} – потребуется ≈{required}, свободно {SizeFormatter.Format(free)}.");
+        }
+
+        return lines;
+    }
+
+    private static long? TryGetFreeSpace(string path)
+    {
+        // TODO: свободное место на UNC-приёмнике не читается – DriveInfo знает только локальные корни; перейти на GetDiskFreeSpaceEx, когда появятся жалобы на сетевые папки
+        try
+        {
+            var root = Path.GetPathRoot(Path.GetFullPath(path));
+
+            if (string.IsNullOrEmpty(root))
+            {
+                return null;
+            }
+
+            var drive = new DriveInfo(root);
+
+            return drive.IsReady ? drive.AvailableFreeSpace : null;
+        }
+        catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            return null;
+        }
     }
 
     [RelayCommand]
@@ -1440,16 +1619,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         await ExecuteSyncAsync(true);
     }
 
-    internal Task CompareFromAutomationAsync(CancellationToken cancellationToken)
-    {
-        return ExecuteCompareAsync(cancellationToken);
-    }
-
-    internal Task<SyncReport?> SyncFromAutomationAsync(CancellationToken cancellationToken)
-    {
-        return ExecuteSyncAsync(false, cancellationToken);
-    }
-
     private async Task<SyncReport?> ExecuteSyncAsync(bool interactive, CancellationToken external = default)
     {
         if (_result is null)
@@ -1648,49 +1817,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             _logger.ComparisonExportFailed(ex, dialog.FileName);
             _dialogs.Error("Экспорт сравнения", ex.Message);
         }
-    }
-
-    internal ComparisonExportModel? BuildExportModel(int entryLimit)
-    {
-        return CaptureExportBuilder(entryLimit)?.Invoke();
-    }
-
-    internal Func<SyncPlanExportModel>? CapturePlanBuilder(int entryLimit)
-    {
-        if (_result is null)
-        {
-            return null;
-        }
-
-        var result = _result;
-        var options = new ComparisonExportOptions(CurrentMode, CurrentWinner, Mirror, Exclusions.Trim());
-
-        return () => SyncPlanExport.Build(result, options, AppInfo.Version, entryLimit);
-    }
-
-    internal Func<ComparisonExportModel>? CaptureExportBuilder(int entryLimit)
-    {
-        if (_result is null)
-        {
-            return null;
-        }
-
-        var result = _result;
-        var options = new ComparisonExportOptions(CurrentMode, CurrentWinner, Mirror, Exclusions.Trim());
-
-        var git = _leftGit is null && _rightGit is null
-            ? null
-            : new ComparisonExportGit(_leftGit, _rightGit, GitVerdictText);
-
-        var lastSync = _lastReport is null
-            ? null
-            : new ComparisonExportSync(_lastReport.CopiedCount, _lastReport.DeletedCount, _lastReport.Errors, _lastReport.Mismatches);
-
-        return () => ComparisonExport.Build(result, options, AppInfo.Version, entryLimit) with
-        {
-            Git = git,
-            LastSync = lastSync,
-        };
     }
 
     private string BuildExportFileName()
@@ -2062,110 +2188,140 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     private void RebuildRows()
     {
-        if (_result is null)
+        var result = _result;
+
+        if (result is null)
         {
             Rows.ReplaceAll([]);
             return;
         }
 
-        var buffer = new List<SyncNodeViewModel>();
-
-        if (FlatView)
-        {
-            var files = CollectVisibleFiles(_result.Root, ShowIdentical, HideApplied, _outcomes);
-            var search = SearchText.Trim();
-
-            if (search.Length > 0)
-            {
-                files = files.Where(file => file.RelativePath.Contains(search, StringComparison.OrdinalIgnoreCase));
-            }
-
-            var sortedFiles = SortFlatFiles(files, FlatSort, FlatSortDescending).ToList();
-
-            var dirs = CollectEmptyDirs(_result.Root, HideApplied, _outcomes);
-
-            if (search.Length > 0)
-            {
-                dirs = dirs.Where(dir => dir.RelativePath.Contains(search, StringComparison.OrdinalIgnoreCase));
-            }
-
-            var sortedDirs = dirs.OrderBy(dir => dir.RelativePath, StringComparer.OrdinalIgnoreCase).ToList();
-            var groupFolders = ParseGroupFolders(Operations.GroupFolders);
-
-            foreach (var file in sortedFiles.Where(f => !IsGroupedPath(f.RelativePath, groupFolders)))
-            {
-                buffer.Add(new(file, 0, this, true) { Outcome = _outcomes.GetValueOrDefault(file) });
-            }
-
-            foreach (var dir in sortedDirs.Where(d => !IsGroupedPath(d.RelativePath, groupFolders)))
-            {
-                buffer.Add(new(dir, 0, false, 0, 0, this, true) { Outcome = _outcomes.GetValueOrDefault(dir) });
-            }
-
-            var groupedFiles = sortedFiles.Where(f => IsGroupedPath(f.RelativePath, groupFolders)).ToList();
-            var groupedDirs = sortedDirs.Where(d => IsGroupedPath(d.RelativePath, groupFolders)).ToList();
-
-            if (groupedFiles.Count + groupedDirs.Count > 0)
-            {
-                buffer.Add(SyncNodeViewModel.CreateGroupHeader(groupedFiles.Count + groupedDirs.Count, _gitGroupExpanded, this));
-
-                if (_gitGroupExpanded)
-                {
-                    foreach (var folder in groupFolders.Distinct(StringComparer.OrdinalIgnoreCase))
-                    {
-                        var subFiles = groupedFiles.Where(f => string.Equals(GroupedKey(f.RelativePath, groupFolders), folder, StringComparison.OrdinalIgnoreCase)).ToList();
-                        var subDirs = groupedDirs.Where(d => string.Equals(GroupedKey(d.RelativePath, groupFolders), folder, StringComparison.OrdinalIgnoreCase)).ToList();
-
-                        if (subFiles.Count + subDirs.Count == 0)
-                        {
-                            continue;
-                        }
-
-                        var expanded = !_collapsedSubGroups.Contains(folder);
-                        buffer.Add(SyncNodeViewModel.CreateSubGroupHeader(folder, subFiles.Count + subDirs.Count, expanded, this));
-
-                        if (!expanded)
-                        {
-                            continue;
-                        }
-
-                        foreach (var file in subFiles)
-                        {
-                            buffer.Add(new(file, 2, this, true) { Outcome = _outcomes.GetValueOrDefault(file) });
-                        }
-
-                        foreach (var dir in subDirs)
-                        {
-                            buffer.Add(new(dir, 2, false, 0, 0, this, true) { Outcome = _outcomes.GetValueOrDefault(dir) });
-                        }
-                    }
-                }
-            }
-        }
-        else
-        {
-            FlattenDirectory(_result.Root, 0, buffer);
-        }
+        var buffer = FlatView ? BuildFlatRows(result.Root) : BuildTreeRows(result.Root);
 
         Rows.ReplaceAll(buffer);
     }
 
+    private List<SyncNodeViewModel> BuildFlatRows(DirectoryComparison root)
+    {
+        var search = SearchText.Trim();
+        var files = FilterBySearch(CollectVisibleFiles(root, ShowIdentical, HideApplied, _outcomes), search, static file => file.RelativePath);
+        var sortedFiles = SortFlatFiles(files, FlatSort, FlatSortDescending).ToList();
+        var dirs = FilterBySearch(CollectEmptyDirs(root, HideApplied, _outcomes), search, static dir => dir.RelativePath);
+        var sortedDirs = dirs.OrderBy(dir => dir.RelativePath, StringComparer.OrdinalIgnoreCase).ToList();
+        var groupFolders = ParseGroupFolders(Operations.GroupFolders);
+        var buffer = new List<SyncNodeViewModel>();
+
+        AddUngroupedRows(buffer, sortedFiles, sortedDirs, groupFolders);
+        AddGroupedRows(buffer, sortedFiles, sortedDirs, groupFolders);
+        return buffer;
+    }
+
+    private List<SyncNodeViewModel> BuildTreeRows(DirectoryComparison root)
+    {
+        var buffer = new List<SyncNodeViewModel>();
+        FlattenDirectory(root, 0, buffer);
+        return buffer;
+    }
+
+    private void AddUngroupedRows(
+        List<SyncNodeViewModel> buffer,
+        IReadOnlyList<FileComparison> files,
+        IReadOnlyList<DirectoryComparison> dirs,
+        IReadOnlyCollection<string> groupFolders)
+    {
+        foreach (var file in files.Where(file => !IsGroupedPath(file.RelativePath, groupFolders)))
+        {
+            buffer.Add(new(file, 0, this, true) { Outcome = _outcomes.GetValueOrDefault(file) });
+        }
+
+        foreach (var dir in dirs.Where(dir => !IsGroupedPath(dir.RelativePath, groupFolders)))
+        {
+            buffer.Add(new(dir, 0, false, 0, 0, this, true) { Outcome = _outcomes.GetValueOrDefault(dir) });
+        }
+    }
+
+    private void AddGroupedRows(
+        List<SyncNodeViewModel> buffer,
+        IReadOnlyList<FileComparison> files,
+        IReadOnlyList<DirectoryComparison> dirs,
+        IReadOnlyCollection<string> groupFolders)
+    {
+        var groupedFiles = files.Where(file => IsGroupedPath(file.RelativePath, groupFolders)).ToList();
+        var groupedDirs = dirs.Where(dir => IsGroupedPath(dir.RelativePath, groupFolders)).ToList();
+        var total = groupedFiles.Count + groupedDirs.Count;
+
+        if (total == 0)
+        {
+            return;
+        }
+
+        buffer.Add(SyncNodeViewModel.CreateGroupHeader(total, _gitGroupExpanded, this));
+
+        if (!_gitGroupExpanded)
+        {
+            return;
+        }
+
+        foreach (var folder in groupFolders.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            AddGroup(buffer, folder, groupedFiles, groupedDirs, groupFolders);
+        }
+    }
+
+    private void AddGroup(
+        List<SyncNodeViewModel> buffer,
+        string folder,
+        IReadOnlyList<FileComparison> files,
+        IReadOnlyList<DirectoryComparison> dirs,
+        IReadOnlyCollection<string> groupFolders)
+    {
+        var subFiles = files.Where(file => string.Equals(GroupedKey(file.RelativePath, groupFolders), folder, StringComparison.OrdinalIgnoreCase)).ToList();
+        var subDirs = dirs.Where(dir => string.Equals(GroupedKey(dir.RelativePath, groupFolders), folder, StringComparison.OrdinalIgnoreCase)).ToList();
+        var total = subFiles.Count + subDirs.Count;
+
+        if (total == 0)
+        {
+            return;
+        }
+
+        var expanded = !_collapsedSubGroups.Contains(folder);
+        buffer.Add(SyncNodeViewModel.CreateSubGroupHeader(folder, total, expanded, this));
+
+        if (expanded)
+        {
+            AddGroupItems(buffer, subFiles, subDirs);
+        }
+    }
+
+    private void AddGroupItems(List<SyncNodeViewModel> buffer, IReadOnlyList<FileComparison> files, IReadOnlyList<DirectoryComparison> dirs)
+    {
+        foreach (var file in files)
+        {
+            buffer.Add(new(file, 2, this, true) { Outcome = _outcomes.GetValueOrDefault(file) });
+        }
+
+        foreach (var dir in dirs)
+        {
+            buffer.Add(new(dir, 2, false, 0, 0, this, true) { Outcome = _outcomes.GetValueOrDefault(dir) });
+        }
+    }
+
     private void FlattenDirectory(DirectoryComparison dir, int indent, List<SyncNodeViewModel> buffer)
+    {
+        AddVisibleDirectories(dir, indent, buffer);
+        AddVisibleFiles(dir, indent, buffer);
+    }
+
+    private void AddVisibleDirectories(DirectoryComparison dir, int indent, List<SyncNodeViewModel> buffer)
     {
         foreach (var sub in dir.SubDirectories)
         {
-            if (!ShowIdentical && sub.Status == ComparisonStatus.Identical)
+            if (!IsVisible(sub))
             {
                 continue;
             }
 
             var outcome = _outcomes.GetValueOrDefault(sub);
-
-            if (HideApplied && outcome == SyncOutcome.Applied)
-            {
-                continue;
-            }
-
             var expanded = !_collapsed.Contains(sub);
             var sizes = _dirSizeCache?.GetValueOrDefault(sub);
             buffer.Add(new(sub, indent, expanded, sizes?.Left ?? 0, sizes?.Right ?? 0, this) { Outcome = outcome });
@@ -2175,23 +2331,32 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
                 FlattenDirectory(sub, indent + 1, buffer);
             }
         }
+    }
 
+    private void AddVisibleFiles(DirectoryComparison dir, int indent, List<SyncNodeViewModel> buffer)
+    {
         foreach (var file in dir.Files)
         {
-            if (!ShowIdentical && file.Status == ComparisonStatus.Identical)
+            if (!IsVisible(file))
             {
                 continue;
             }
 
             var outcome = _outcomes.GetValueOrDefault(file);
-
-            if (HideApplied && outcome == SyncOutcome.Applied)
-            {
-                continue;
-            }
-
             buffer.Add(new(file, indent, this) { Outcome = outcome });
         }
+    }
+
+    private bool IsVisible(DirectoryComparison dir)
+    {
+        return (ShowIdentical || dir.Status != ComparisonStatus.Identical)
+               && (!HideApplied || _outcomes.GetValueOrDefault(dir) != SyncOutcome.Applied);
+    }
+
+    private bool IsVisible(FileComparison file)
+    {
+        return (ShowIdentical || file.Status != ComparisonStatus.Identical)
+               && (!HideApplied || _outcomes.GetValueOrDefault(file) != SyncOutcome.Applied);
     }
 
     private void UpdateSummary()
@@ -2260,113 +2425,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             SyncMode.Bidirectional => "в обе стороны",
             _ => "слева направо",
         };
-    }
-
-    internal static List<string> BuildPlanLines(PlannedActions planned, string? direction, IReadOnlyList<PlanReceiver> receivers)
-    {
-        var lines = new List<string>();
-
-        if (direction is not null)
-        {
-            lines.Add($"Направление: {direction}.");
-            lines.Add(string.Empty);
-        }
-
-        if (planned.Total == 0)
-        {
-            lines.Add("Изменений нет.");
-            return lines;
-        }
-
-        if (planned.Copies > 0)
-        {
-            lines.Add($"Скопировать файлов: {planned.Copies:N0} ({SizeFormatter.Format(planned.CopyBytes)})");
-
-            if (planned.ModifiedCopies > 0)
-            {
-                lines.Add($"    – новых: {planned.NewCopies:N0} ({SizeFormatter.Format(planned.NewCopyBytes)})");
-                lines.Add($"    – изменённых: {planned.ModifiedCopies:N0} ({SizeFormatter.Format(planned.ModifiedCopyBytes)})");
-            }
-        }
-
-        if (planned.DirCopies > 0)
-        {
-            lines.Add($"Создать каталогов: {planned.DirCopies:N0}");
-        }
-
-        if (planned.Deletes > 0)
-        {
-            lines.Add($"Удалить файлов в корзину: {planned.Deletes:N0} ({SizeFormatter.Format(planned.DeleteFileBytes)})");
-        }
-
-        if (planned.DirDeletes > 0)
-        {
-            lines.Add($"Удалить каталогов в корзину: {planned.DirDeletes:N0} ({SizeFormatter.Format(planned.DeleteDirBytes)})");
-        }
-
-        var space = DescribeReceivers(receivers);
-
-        if (space.Count > 0)
-        {
-            lines.Add(string.Empty);
-            lines.AddRange(space);
-        }
-
-        if (planned.DeleteBytes > 0)
-        {
-            lines.Add("Удалённое уходит в корзину – место освободится после её очистки.");
-        }
-
-        return lines;
-    }
-
-    private static List<string> DescribeReceivers(IReadOnlyList<PlanReceiver> receivers)
-    {
-        var lines = new List<string>();
-
-        foreach (var receiver in receivers)
-        {
-            if (receiver.Required <= 0)
-            {
-                continue;
-            }
-
-            var required = SizeFormatter.Format(receiver.Required);
-
-            if (receiver.Free is not { } free)
-            {
-                lines.Add($"Приёмник {receiver.Path}: потребуется ≈{required}, свободное место неизвестно.");
-                continue;
-            }
-
-            lines.Add(free >= receiver.Required
-                ? $"Приёмник {receiver.Path}: потребуется ≈{required}, свободно {SizeFormatter.Format(free)}."
-                : $"Внимание: на {receiver.Path} не хватает ≈{SizeFormatter.Format(receiver.Required - free)} – потребуется ≈{required}, свободно {SizeFormatter.Format(free)}.");
-        }
-
-        return lines;
-    }
-
-    private static long? TryGetFreeSpace(string path)
-    {
-        // TODO: свободное место на UNC-приёмнике не читается – DriveInfo знает только локальные корни; перейти на GetDiskFreeSpaceEx, когда появятся жалобы на сетевые папки
-        try
-        {
-            var root = Path.GetPathRoot(Path.GetFullPath(path));
-
-            if (string.IsNullOrEmpty(root))
-            {
-                return null;
-            }
-
-            var drive = new DriveInfo(root);
-
-            return drive.IsReady ? drive.AvailableFreeSpace : null;
-        }
-        catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException or NotSupportedException)
-        {
-            return null;
-        }
     }
 
     private List<PlanReceiver> BuildReceivers(PlannedActions planned)
@@ -2491,6 +2549,10 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         _settings.SetValue(key, value);
     }
+
+    internal SyncMode CurrentMode => ModeOrder[Math.Clamp(SelectedModeIndex, 0, ModeOrder.Length - 1)];
+
+    internal SyncWinner CurrentWinner => WinnerOrder[Math.Clamp(SelectedWinnerIndex, 0, WinnerOrder.Length - 1)];
 
     private sealed record ComparePreparation(ComparisonResult Result, Dictionary<DirectoryComparison, (long Left, long Right)> Sizes);
 

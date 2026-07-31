@@ -42,12 +42,9 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
 
     protected abstract IReadOnlyList<string> ExtraDirectories { get; }
 
-    protected abstract AgentLaunch CreateLaunch(AgentRequest request);
-
-    protected abstract IAgentStreamParser CreateParser();
-
-    protected virtual void InspectLine(string line)
+    public virtual IReadOnlyList<AgentModelOption> LoadModels()
     {
+        return AgentModels.For(Kind);
     }
 
     public void Dispose()
@@ -66,11 +63,6 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
         }
 
         GC.SuppressFinalize(this);
-    }
-
-    public virtual IReadOnlyList<AgentModelOption> LoadModels()
-    {
-        return AgentModels.For(Kind);
     }
 
     public AgentCliInfo? Detect()
@@ -110,159 +102,9 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
             yield break;
         }
 
-        var launch = CreateLaunch(request);
-        var transcript = request.Transcript;
-        Process? process = null;
-        var stderrTail = new List<string>();
-        var resultYielded = false;
-        var stopwatch = Stopwatch.StartNew();
-        var parser = CreateParser();
-
-        _logger.AgentTurnStarted(DisplayName, request.Mcp?.AllowedTools.Count ?? 0, !string.IsNullOrEmpty(request.ResumeSessionId));
-
-        try
+        await foreach (var agentEvent in RunProcessAsync(cli, request, cancellationToken).ConfigureAwait(false))
         {
-            transcript?.Write(AgentTranscriptKind.Launch, DescribeLaunch(DisplayName, cli, request, launch));
-
-            foreach (var file in launch.TempFiles)
-            {
-                await File.WriteAllTextAsync(file.Path, file.Content, cancellationToken).ConfigureAwait(false);
-                transcript?.Write(AgentTranscriptKind.Config, $"{file.Path}\n{file.Content}");
-            }
-
-            var info = BuildProcessStartInfo(cli.ExecutablePath, launch);
-
-            try
-            {
-                process = Process.Start(info);
-            }
-            catch (Exception exception) when (exception is Win32Exception or InvalidOperationException)
-            {
-                _logger.AgentTurnFailed(exception, "не удалось запустить процесс CLI");
-                process = null;
-            }
-
-            if (process is null)
-            {
-                var reason = $"Не удалось запустить CLI {DisplayName}.";
-                yield return AgentEvent.Fail(reason);
-                yield break;
-            }
-
-            lock (_live)
-            {
-                _live.Add(process);
-            }
-
-            using var kill = cancellationToken.Register(() => TryKill(process));
-
-            var mcpToken = request.Mcp?.Token;
-            var stderrTask = DrainStderrAsync(process, stderrTail, mcpToken, transcript);
-
-            Exception? stdinFailure = null;
-
-            try
-            {
-                transcript?.Write(AgentTranscriptKind.Stdin, launch.Stdin);
-                await process.StandardInput.WriteAsync(launch.Stdin).ConfigureAwait(false);
-                await process.StandardInput.FlushAsync().ConfigureAwait(false);
-                process.StandardInput.Close();
-            }
-            catch (IOException exception)
-            {
-                stdinFailure = exception;
-            }
-
-            if (stdinFailure is not null)
-            {
-                await stderrTask.ConfigureAwait(false);
-
-                var reason = BuildExitReason(process, stderrTail, parser.FailureHint);
-                _logger.AgentTurnFailed(stdinFailure, reason);
-                yield return AgentEvent.Fail(reason);
-                yield break;
-            }
-
-            while (true)
-            {
-                var line = await process.StandardOutput.ReadLineAsync(cancellationToken).ConfigureAwait(false);
-
-                if (line is null)
-                {
-                    break;
-                }
-
-                transcript?.Write(AgentTranscriptKind.Stdout, line);
-                InspectLine(line);
-
-                var agentEvent = parser.Parse(line);
-
-                if (agentEvent is null)
-                {
-                    continue;
-                }
-
-                switch (agentEvent.Kind)
-                {
-                    case AgentEventKind.ToolCall:
-                        _logger.AgentToolInvoked(agentEvent.ToolName ?? string.Empty);
-                        break;
-
-                    case AgentEventKind.Completed:
-                        resultYielded = true;
-                        _logger.AgentTurnCompleted(stopwatch.ElapsedMilliseconds, agentEvent.CostUsd, agentEvent.Tokens);
-                        break;
-
-                    case AgentEventKind.Failed:
-                        resultYielded = true;
-                        _logger.AgentTurnFailed(null, agentEvent.Text);
-                        break;
-                }
-
-                yield return agentEvent;
-            }
-
-            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-            await stderrTask.ConfigureAwait(false);
-
-            if (!resultYielded && process.ExitCode == 0 && parser.Complete() is { } completion)
-            {
-                resultYielded = true;
-                _logger.AgentTurnCompleted(stopwatch.ElapsedMilliseconds, completion.CostUsd, completion.Tokens);
-                yield return completion;
-            }
-
-            if (!resultYielded)
-            {
-                var reason = BuildExitReason(process, stderrTail, parser.FailureHint);
-                _logger.AgentTurnFailed(null, reason);
-                yield return AgentEvent.Fail(reason);
-            }
-        }
-        finally
-        {
-            if (cancellationToken.IsCancellationRequested)
-            {
-                _logger.AgentTurnCancelled();
-            }
-
-            if (process is not null)
-            {
-                transcript?.Write(AgentTranscriptKind.Exit, $"код {(process.HasExited ? process.ExitCode : -1)}, {stopwatch.ElapsedMilliseconds} мс, отмена {cancellationToken.IsCancellationRequested}");
-
-                lock (_live)
-                {
-                    _live.Remove(process);
-                }
-
-                TryKill(process);
-                process.Dispose();
-            }
-
-            foreach (var file in launch.TempFiles)
-            {
-                TryDelete(file.Path);
-            }
+            yield return agentEvent;
         }
     }
 
@@ -307,18 +149,40 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
         return Path.Combine(Path.GetTempPath(), $"spacesnoop-mcp-{Guid.NewGuid():N}.{extension}");
     }
 
-    private string BuildExitReason(Process process, IReadOnlyList<string> stderrTail, string? failureHint)
+    protected virtual void InspectLine(string line)
     {
-        var exitCode = process.HasExited ? process.ExitCode : -1;
+    }
 
-        if (!string.IsNullOrWhiteSpace(failureHint))
+    protected abstract AgentLaunch CreateLaunch(AgentRequest request);
+
+    protected abstract IAgentStreamParser CreateParser();
+
+    private static async Task WriteTempFilesAsync(
+        AgentLaunch launch,
+        IAgentTranscript? transcript,
+        CancellationToken cancellationToken)
+    {
+        foreach (var file in launch.TempFiles)
         {
-            return $"CLI {DisplayName} завершился с кодом {exitCode}: {failureHint}";
+            await File.WriteAllTextAsync(file.Path, file.Content, cancellationToken).ConfigureAwait(false);
+            transcript?.Write(AgentTranscriptKind.Config, $"{file.Path}\n{file.Content}");
         }
+    }
 
-        return stderrTail.Count > 0
-            ? $"CLI {DisplayName} завершился с кодом {exitCode}: {string.Join(" ", stderrTail)}"
-            : $"CLI {DisplayName} завершился с кодом {exitCode} без ответа.";
+    private static async Task<Exception?> WriteStdinAsync(Process process, string input, IAgentTranscript? transcript)
+    {
+        try
+        {
+            transcript?.Write(AgentTranscriptKind.Stdin, input);
+            await process.StandardInput.WriteAsync(input).ConfigureAwait(false);
+            await process.StandardInput.FlushAsync().ConfigureAwait(false);
+            process.StandardInput.Close();
+            return null;
+        }
+        catch (IOException exception)
+        {
+            return exception;
+        }
     }
 
     private static string Named(string? value)
@@ -400,5 +264,184 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
         }
 
         return info;
+    }
+
+    private async IAsyncEnumerable<AgentEvent> RunProcessAsync(
+        AgentCliInfo cli,
+        AgentRequest request,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var launch = CreateLaunch(request);
+        var transcript = request.Transcript;
+        Process? process = null;
+        var stderrTail = new List<string>();
+        var resultYielded = false;
+        var stopwatch = Stopwatch.StartNew();
+        var parser = CreateParser();
+
+        _logger.AgentTurnStarted(DisplayName, request.Mcp?.AllowedTools.Count ?? 0, !string.IsNullOrEmpty(request.ResumeSessionId));
+
+        try
+        {
+            transcript?.Write(AgentTranscriptKind.Launch, DescribeLaunch(DisplayName, cli, request, launch));
+
+            await WriteTempFilesAsync(launch, transcript, cancellationToken).ConfigureAwait(false);
+
+            var info = BuildProcessStartInfo(cli.ExecutablePath, launch);
+            process = TryStartProcess(info);
+
+            if (process is null)
+            {
+                var reason = $"Не удалось запустить CLI {DisplayName}.";
+                yield return AgentEvent.Fail(reason);
+                yield break;
+            }
+
+            lock (_live)
+            {
+                _live.Add(process);
+            }
+
+            using var kill = cancellationToken.Register(() => TryKill(process));
+
+            var mcpToken = request.Mcp?.Token;
+            var stderrTask = DrainStderrAsync(process, stderrTail, mcpToken, transcript);
+
+            var stdinFailure = await WriteStdinAsync(process, launch.Stdin, transcript).ConfigureAwait(false);
+
+            if (stdinFailure is not null)
+            {
+                await stderrTask.ConfigureAwait(false);
+
+                var reason = BuildExitReason(process, stderrTail, parser.FailureHint);
+                _logger.AgentTurnFailed(stdinFailure, reason);
+                yield return AgentEvent.Fail(reason);
+                yield break;
+            }
+
+            await foreach (var agentEvent in ReadEventsAsync(process, parser, transcript, cancellationToken).ConfigureAwait(false))
+            {
+                resultYielded |= LogAgentEvent(agentEvent, stopwatch);
+                yield return agentEvent;
+            }
+
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            await stderrTask.ConfigureAwait(false);
+
+            if (!resultYielded && process.ExitCode == 0 && parser.Complete() is { } completion)
+            {
+                resultYielded = true;
+                _logger.AgentTurnCompleted(stopwatch.ElapsedMilliseconds, completion.CostUsd, completion.Tokens);
+                yield return completion;
+            }
+
+            if (!resultYielded)
+            {
+                var reason = BuildExitReason(process, stderrTail, parser.FailureHint);
+                _logger.AgentTurnFailed(null, reason);
+                yield return AgentEvent.Fail(reason);
+            }
+        }
+        finally
+        {
+            Cleanup(process, launch, transcript, stopwatch, cancellationToken);
+        }
+    }
+
+    private Process? TryStartProcess(ProcessStartInfo info)
+    {
+        try
+        {
+            return Process.Start(info);
+        }
+        catch (Exception exception) when (exception is Win32Exception or InvalidOperationException)
+        {
+            _logger.AgentTurnFailed(exception, "не удалось запустить процесс CLI");
+            return null;
+        }
+    }
+
+    private async IAsyncEnumerable<AgentEvent> ReadEventsAsync(
+        Process process,
+        IAgentStreamParser parser,
+        IAgentTranscript? transcript,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        while (await process.StandardOutput.ReadLineAsync(cancellationToken).ConfigureAwait(false) is { } line)
+        {
+            transcript?.Write(AgentTranscriptKind.Stdout, line);
+            InspectLine(line);
+
+            if (parser.Parse(line) is { } agentEvent)
+            {
+                yield return agentEvent;
+            }
+        }
+    }
+
+    private bool LogAgentEvent(AgentEvent agentEvent, Stopwatch stopwatch)
+    {
+        switch (agentEvent.Kind)
+        {
+            case AgentEventKind.ToolCall:
+                _logger.AgentToolInvoked(agentEvent.ToolName ?? string.Empty);
+                return false;
+
+            case AgentEventKind.Completed:
+                _logger.AgentTurnCompleted(stopwatch.ElapsedMilliseconds, agentEvent.CostUsd, agentEvent.Tokens);
+                return true;
+
+            case AgentEventKind.Failed:
+                _logger.AgentTurnFailed(null, agentEvent.Text);
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    private void Cleanup(
+        Process? process,
+        AgentLaunch launch,
+        IAgentTranscript? transcript,
+        Stopwatch stopwatch,
+        CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            _logger.AgentTurnCancelled();
+        }
+
+        if (process is not null)
+        {
+            transcript?.Write(AgentTranscriptKind.Exit, $"код {(process.HasExited ? process.ExitCode : -1)}, {stopwatch.ElapsedMilliseconds} мс, отмена {cancellationToken.IsCancellationRequested}");
+
+            lock (_live)
+            {
+                _live.Remove(process);
+            }
+
+            TryKill(process);
+            process.Dispose();
+        }
+
+        foreach (var file in launch.TempFiles)
+        {
+            TryDelete(file.Path);
+        }
+    }
+
+    private string BuildExitReason(Process process, IReadOnlyList<string> stderrTail, string? failureHint)
+    {
+        var exitCode = process.HasExited ? process.ExitCode : -1;
+
+        if (!string.IsNullOrWhiteSpace(failureHint))
+        {
+            return $"CLI {DisplayName} завершился с кодом {exitCode}: {failureHint}";
+        }
+
+        return stderrTail.Count > 0
+            ? $"CLI {DisplayName} завершился с кодом {exitCode}: {string.Join(" ", stderrTail)}"
+            : $"CLI {DisplayName} завершился с кодом {exitCode} без ответа.";
     }
 }

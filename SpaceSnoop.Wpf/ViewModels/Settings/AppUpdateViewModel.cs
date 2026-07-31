@@ -163,19 +163,6 @@ public sealed partial class AppUpdateViewModel : ObservableObject
         return text.Replace("\n", Environment.NewLine, StringComparison.Ordinal).Trim();
     }
 
-    private static string RemoveSection(string text, string heading)
-    {
-        var start = text.IndexOf(heading, StringComparison.OrdinalIgnoreCase);
-
-        if (start < 0)
-        {
-            return text;
-        }
-
-        var end = text.IndexOf("\n## ", start + heading.Length, StringComparison.Ordinal);
-        return (end < 0 ? text[..start] : text[..start] + text[(end + 1)..]).Trim();
-    }
-
     internal static IReadOnlyList<ReleaseChangeViewModel> ExtractChangeItems(string? body)
     {
         var changes = ExtractChanges(body);
@@ -220,12 +207,80 @@ public sealed partial class AppUpdateViewModel : ObservableObject
         return items.Select(static item => new ReleaseChangeViewModel(item.Summary, item.Details)).ToList();
     }
 
+    internal static string BuildReleaseNotes(JsonElement releases)
+    {
+        var notes = new List<(string Tag, string Changes)>();
+
+        foreach (var release in releases.EnumerateArray())
+        {
+            var tag = release.TryGetProperty("tag_name", out var tagProperty) ? tagProperty.GetString() : null;
+
+            if (!UpdateCheck.IsNewer(tag, AppInfo.Version))
+            {
+                continue;
+            }
+
+            var body = release.TryGetProperty("body", out var bodyProperty) ? bodyProperty.GetString() : null;
+            var changes = ExtractChanges(body).Replace("**", string.Empty, StringComparison.Ordinal);
+
+            if (string.IsNullOrWhiteSpace(changes))
+            {
+                continue;
+            }
+
+            notes.Add((tag ?? string.Empty, changes));
+        }
+
+        return notes.Count == 1
+            ? notes[0].Changes
+            : string.Join($"{Environment.NewLine}{Environment.NewLine}", notes.Select(static note => $"{note.Tag}{Environment.NewLine}{note.Changes}"));
+    }
+
+    internal static IReadOnlyList<ReleaseNoteViewModel> BuildChangelogEntries(JsonElement releases)
+    {
+        var entries = new List<ReleaseNoteViewModel>();
+
+        foreach (var release in releases.EnumerateArray())
+        {
+            if (BuildChangelogEntry(release) is { } entry)
+            {
+                entries.Add(entry);
+            }
+        }
+
+        return entries;
+    }
+
+    internal static string? ExtractCompareUrl(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return null;
+        }
+
+        var match = CompareUrlRegex().Match(body);
+        return match.Success ? match.Value.TrimEnd('.') : null;
+    }
+
     private void OnPreferencesChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(UpdatePreferences.Repository) && _started)
         {
             _ = CheckAsync();
         }
+    }
+
+    private static string RemoveSection(string text, string heading)
+    {
+        var start = text.IndexOf(heading, StringComparison.OrdinalIgnoreCase);
+
+        if (start < 0)
+        {
+            return text;
+        }
+
+        var end = text.IndexOf("\n## ", start + heading.Length, StringComparison.Ordinal);
+        return (end < 0 ? text[..start] : text[..start] + text[(end + 1)..]).Trim();
     }
 
     private static HttpClient CreateClient()
@@ -261,35 +316,6 @@ public sealed partial class AppUpdateViewModel : ObservableObject
         }
     }
 
-    internal static string BuildReleaseNotes(JsonElement releases)
-    {
-        var notes = new List<(string Tag, string Changes)>();
-
-        foreach (var release in releases.EnumerateArray())
-        {
-            var tag = release.TryGetProperty("tag_name", out var tagProperty) ? tagProperty.GetString() : null;
-
-            if (!UpdateCheck.IsNewer(tag, AppInfo.Version))
-            {
-                continue;
-            }
-
-            var body = release.TryGetProperty("body", out var bodyProperty) ? bodyProperty.GetString() : null;
-            var changes = ExtractChanges(body).Replace("**", string.Empty, StringComparison.Ordinal);
-
-            if (string.IsNullOrWhiteSpace(changes))
-            {
-                continue;
-            }
-
-            notes.Add((tag ?? string.Empty, changes));
-        }
-
-        return notes.Count == 1
-            ? notes[0].Changes
-            : string.Join($"{Environment.NewLine}{Environment.NewLine}", notes.Select(static note => $"{note.Tag}{Environment.NewLine}{note.Changes}"));
-    }
-
     private static string BuildChangelog(IReadOnlyList<ReleaseNoteViewModel> entries)
     {
         return string.Join($"{Environment.NewLine}{Environment.NewLine}", entries
@@ -304,43 +330,29 @@ public sealed partial class AppUpdateViewModel : ObservableObject
         return string.Join(Environment.NewLine, lines);
     }
 
-    internal static IReadOnlyList<ReleaseNoteViewModel> BuildChangelogEntries(JsonElement releases)
+    private static ReleaseNoteViewModel? BuildChangelogEntry(JsonElement release)
     {
-        var entries = new List<ReleaseNoteViewModel>();
+        var tag = StringProperty(release, "tag_name");
+        var name = StringProperty(release, "name");
+        var date = StringProperty(release, "published_at");
+        var body = StringProperty(release, "body");
+        var title = string.IsNullOrWhiteSpace(name) ? tag : name;
 
-        foreach (var release in releases.EnumerateArray())
-        {
-            var tag = release.TryGetProperty("tag_name", out var tagProperty) ? tagProperty.GetString() : null;
-            var name = release.TryGetProperty("name", out var nameProperty) ? nameProperty.GetString() : null;
-            var date = release.TryGetProperty("published_at", out var dateProperty) ? dateProperty.GetString() : null;
-            var body = release.TryGetProperty("body", out var bodyProperty) ? bodyProperty.GetString() : null;
-            var url = release.TryGetProperty("html_url", out var urlProperty) ? urlProperty.GetString() : null;
-            var title = string.IsNullOrWhiteSpace(name) ? tag : name;
-
-            if (string.IsNullOrWhiteSpace(title))
-            {
-                continue;
-            }
-
-            var publishedDate = string.IsNullOrWhiteSpace(date) || date.Length < 10 ? "без даты" : date[..10];
-            var changes = ExtractChangeItems(body);
-            var compareUrl = ExtractCompareUrl(body);
-
-            entries.Add(new(title, publishedDate, changes.Count == 0 ? [new("Изменения не описаны.", [])] : changes, compareUrl ?? url));
-        }
-
-        return entries;
-    }
-
-    internal static string? ExtractCompareUrl(string? body)
-    {
-        if (string.IsNullOrWhiteSpace(body))
+        if (string.IsNullOrWhiteSpace(title))
         {
             return null;
         }
 
-        var match = CompareUrlRegex().Match(body);
-        return match.Success ? match.Value.TrimEnd('.') : null;
+        var publishedDate = string.IsNullOrWhiteSpace(date) || date.Length < 10 ? "без даты" : date[..10];
+        var changes = ExtractChangeItems(body);
+        var compareUrl = ExtractCompareUrl(body);
+
+        return new(title, publishedDate, changes.Count == 0 ? [new("Изменения не описаны.", [])] : changes, compareUrl ?? StringProperty(release, "html_url"));
+    }
+
+    private static string? StringProperty(JsonElement owner, string name)
+    {
+        return owner.TryGetProperty(name, out var property) ? property.GetString() : null;
     }
 
     [GeneratedRegex(@"https://\S+/compare/\S+")]

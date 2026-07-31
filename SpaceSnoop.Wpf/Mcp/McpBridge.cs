@@ -46,8 +46,7 @@ public sealed class McpBridge(
     {
         logger.McpToolInvoked("get_app_state", "-");
 
-        return Dispatch(() => Serialize(new McpAppState(
-            AppInfo.Name,
+        return Dispatch(() => Serialize(new McpAppState(AppInfo.Name,
             AppInfo.Version,
             AdminElevation.IsElevated,
             _shell?.CurrentSectionKey,
@@ -62,8 +61,7 @@ public sealed class McpBridge(
         logger.McpToolInvoked("list_profiles", "-");
 
         var profiles = SyncProfileStore.Load(settings)
-            .Select(static profile => new McpProfile(
-                profile.Id,
+            .Select(static profile => new McpProfile(profile.Id,
                 profile.Name,
                 profile.Left,
                 profile.Right,
@@ -100,16 +98,15 @@ public sealed class McpBridge(
 
         var patterns = exclusions?.Trim() ?? string.Empty;
 
-        var model = await Task.Run(
-            () =>
-            {
-                var comparer = new DirectoryComparer(new ExclusionFilter(patterns), comparerLogger);
-                var result = comparer.Compare(left, right, cancellationToken);
-                result.ApplyMode(mode, mirror, winner);
+        var model = await Task.Run(() =>
+                {
+                    var comparer = new DirectoryComparer(new(patterns), comparerLogger);
+                    var result = comparer.Compare(left, right, cancellationToken);
+                    result.ApplyMode(mode, mirror, winner);
 
-                return ComparisonExport.Build(result, new(mode, winner, mirror, patterns), AppInfo.Version, entryLimit);
-            },
-            cancellationToken)
+                    return ComparisonExport.Build(result, new(mode, winner, mirror, patterns), AppInfo.Version, entryLimit);
+                },
+                cancellationToken)
             .ConfigureAwait(false);
 
         return ComparisonExport.ToJson(model);
@@ -142,18 +139,17 @@ public sealed class McpBridge(
         var parallelism = scanPreferences.MaxParallelism;
         var stopwatch = Stopwatch.StartNew();
 
-        var (tree, model) = await Task.Run(
-            () =>
-            {
-                var directory = new DirectoryInfo(path);
+        var (tree, model) = await Task.Run(() =>
+                {
+                    var directory = new DirectoryInfo(path);
 
-                var root = multithreaded
-                    ? calculator.CalculateMultithreaded(directory, parallelism, cancellationToken)
-                    : calculator.Calculate(directory, cancellationToken);
+                    var root = multithreaded
+                        ? calculator.CalculateMultithreaded(directory, parallelism, cancellationToken)
+                        : calculator.Calculate(directory, cancellationToken);
 
-                return (root, ScanExport.Build(root, directory.FullName, new(depth, multithreaded, parallelism), AppInfo.Version, entryLimit));
-            },
-            cancellationToken)
+                    return (root, ScanExport.Build(root, directory.FullName, new(depth, multithreaded, parallelism), AppInfo.Version, entryLimit));
+                },
+                cancellationToken)
             .ConfigureAwait(false);
 
         stopwatch.Stop();
@@ -233,37 +229,7 @@ public sealed class McpBridge(
     {
         logger.McpToolInvoked("open_scan", $"«{path ?? "как есть"}», сканирование {start}");
 
-        var run = Dispatch(() =>
-        {
-            if (scan.IsScanning)
-            {
-                logger.McpToolRejected("open_scan", "страница занята операцией");
-                throw new McpException("Страница «Сканирование» сейчас занята другой операцией.");
-            }
-
-            var explicitPath = !string.IsNullOrWhiteSpace(path);
-            var target = explicitPath ? path!.Trim() : scan.SelectedDrive.Trim();
-
-            if (start || explicitPath)
-            {
-                ValidateScanPath(target);
-            }
-
-            if (target.Length > 0)
-            {
-                scan.SelectPathForAutomation(target);
-            }
-
-            var deferred = DeferOrNavigate(SectionKey.Scan);
-
-            notifier.Notify(start
-                ? $"Агент запустил сканирование: {target}"
-                : deferred
-                    ? "Агент подготовил страницу «Сканирование»"
-                    : "Агент открыл страницу «Сканирование»");
-
-            return (Run: start ? scan.ScanFromAutomationAsync(target, cancellationToken) : null, Deferred: deferred);
-        });
+        var run = Dispatch(() => PrepareScanNavigation(path, start, cancellationToken));
 
         if (run.Run is not null)
         {
@@ -271,8 +237,7 @@ public sealed class McpBridge(
             cancellationToken.ThrowIfCancellationRequested();
         }
 
-        return Dispatch(() => Serialize(new McpScanNavigation(
-            _shell?.CurrentSectionKey ?? SectionKey.Scan,
+        return Dispatch(() => Serialize(new McpScanNavigation(_shell?.CurrentSectionKey ?? SectionKey.Scan,
             ReadScanState(),
             DescribeDeferredNavigation(run.Deferred))));
     }
@@ -310,18 +275,7 @@ public sealed class McpBridge(
         {
             logger.McpToolInvoked("archive_directory", $"«{path}», план");
 
-            return Dispatch(() =>
-            {
-                var (_, request) = PrepareArchive(path, deleteOriginal);
-
-                return Serialize(new McpArchivePlan(
-                    request.SourcePath,
-                    request.TargetPath,
-                    request.Files.Count,
-                    request.TotalBytes,
-                    SizeFormatter.Format(request.TotalBytes),
-                    request.DeleteOriginal));
-            });
+            return Dispatch(() => BuildArchivePlan(path, deleteOriginal));
         }
 
         if (!preferences.AllowMutations)
@@ -330,21 +284,7 @@ public sealed class McpBridge(
             throw new McpException("Изменяющие операции запрещены. Включите «Разрешить изменяющие операции» в настройках приложения.");
         }
 
-        var (prepared, run) = Dispatch(() =>
-        {
-            if (scan.IsScanning)
-            {
-                logger.McpToolRejected("archive_directory", "страница занята операцией");
-                throw new McpException("Страница «Сканирование» сейчас занята другой операцией.");
-            }
-
-            var (dir, request) = PrepareArchive(path, deleteOriginal);
-
-            logger.McpMutationRequested("archive_directory", $"«{request.SourcePath}» → «{request.TargetPath}», файлов {request.Files.Count}, оригинал в корзину {request.DeleteOriginal}");
-            notifier.Notify($"Агент упаковывает в архив: {request.SourcePath}", StatusSeverity.Warning);
-
-            return (request, scan.ArchiveFromAutomationAsync(dir, request, cancellationToken));
-        });
+        var (prepared, run) = Dispatch(() => PrepareArchiveRun(path, deleteOriginal, cancellationToken));
 
         var dialog = await run.ConfigureAwait(false);
 
@@ -355,8 +295,7 @@ public sealed class McpBridge(
                 throw new McpException($"Архив не создан: {dialog.StatusText}");
             }
 
-            return Serialize(new McpArchiveResult(
-                prepared.SourcePath,
+            return Serialize(new McpArchiveResult(prepared.SourcePath,
                 dialog.CreatedArchivePath,
                 prepared.Files.Count,
                 dialog.OriginalDeleted,
@@ -431,8 +370,7 @@ public sealed class McpBridge(
                     StatusSeverity.Warning);
             }
 
-            return Serialize(new McpMarkResult(
-                changed,
+            return Serialize(new McpMarkResult(changed,
                 missing,
                 rejected,
                 rejected.Count == 0 ? null : "Корень открытого сканирования пометить целиком нельзя – выберите подкаталоги.",
@@ -450,31 +388,8 @@ public sealed class McpBridge(
 
         var snapshot = await docker.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
 
-        var buckets = snapshot.Buckets
-            .Select(static bucket => new McpDockerBucket(
-                bucket.Type,
-                bucket.TotalCount,
-                bucket.Active,
-                bucket.Size,
-                DockerSize.ToBytes(bucket.Size),
-                bucket.Reclaimable,
-                DockerSize.ToBytes(bucket.Reclaimable)))
-            .ToList();
-
-        if (!snapshot.Available || !includeObjects)
-        {
-            return Serialize(new McpDockerReport(snapshot.Available, snapshot.Error, buckets, null, 0));
-        }
-
-        var inventory = await docker.GetInventoryAsync(cancellationToken).ConfigureAwait(false);
-
-        var objects = inventory
-            .OrderByDescending(static item => item.SizeBytes)
-            .Take(entryLimit)
-            .Select(static item => new McpDockerObject(item.Kind, item.Id, item.Name, item.Size, item.SizeBytes, item.InUse, item.Detail))
-            .ToList();
-
-        return Serialize(new McpDockerReport(true, snapshot.Error, buckets, objects, Math.Max(0, inventory.Count - objects.Count)));
+        var report = await BuildDockerReportAsync(snapshot, includeObjects, entryLimit, cancellationToken).ConfigureAwait(false);
+        return Serialize(report);
     }
 
     public Task<string> GetCurrentComparisonAsync(int entryLimit, CancellationToken cancellationToken)
@@ -582,8 +497,7 @@ public sealed class McpBridge(
             cancellationToken.ThrowIfCancellationRequested();
         }
 
-        return Dispatch(() => Serialize(new McpNavigationResult(
-            _shell?.CurrentSectionKey ?? SectionKey.Sync,
+        return Dispatch(() => Serialize(new McpNavigationResult(_shell?.CurrentSectionKey ?? SectionKey.Sync,
             ReadSyncState(),
             DescribeDeferredNavigation(comparison.Deferred),
             comparison.Ignored.Count == 0 ? null : $"Параметры {string.Join(", ", comparison.Ignored)} не применены: изменяющие операции выключены в настройках приложения.")));
@@ -646,8 +560,7 @@ public sealed class McpBridge(
             throw new McpException("Синхронизация не доведена до конца: операция отменена или сравнение сброшено. Часть файлов могла быть уже перенесена – сравните каталоги заново.");
         }
 
-        return Dispatch(() => Serialize(new McpSyncResult(
-            report.CopiedCount,
+        return Dispatch(() => Serialize(new McpSyncResult(report.CopiedCount,
             report.DeletedCount,
             report.SuccessCount,
             report.Errors,
@@ -696,16 +609,6 @@ public sealed class McpBridge(
         }
     }
 
-    private static string? DescribeUnavailable(SyncProfile profile)
-    {
-        return OverviewPipeline.Classify(profile) switch
-        {
-            OverviewRunStatus.Unavailable => "каталог недоступен или не задан",
-            OverviewRunStatus.Overlap => "каталоги совпадают или вложены",
-            _ => null,
-        };
-    }
-
     internal static string DescribePage(string? sectionKey)
     {
         return sectionKey switch
@@ -722,21 +625,31 @@ public sealed class McpBridge(
         };
     }
 
+    private static string? DescribeUnavailable(SyncProfile profile)
+    {
+        return OverviewPipeline.Classify(profile) switch
+        {
+            OverviewRunStatus.Unavailable => "каталог недоступен или не задан",
+            OverviewRunStatus.Overlap => "каталоги совпадают или вложены",
+            _ => null,
+        };
+    }
+
     private static McpDrive Describe(DriveInfo drive)
     {
         try
         {
             if (!drive.IsReady)
             {
-                return new(drive.Name, string.Empty, drive.DriveType.ToString(), null, false, 0, 0, 0, "–", "–", "–", "диск не готов");
+                return new(drive.Name, string.Empty, drive.DriveType.ToString(), null, false, 0, 0, 0,
+                    "–", "–", "–", "диск не готов");
             }
 
             var total = drive.TotalSize;
             var free = drive.TotalFreeSpace;
             var used = Math.Max(0, total - free);
 
-            return new(
-                drive.Name,
+            return new(drive.Name,
                 drive.VolumeLabel,
                 drive.DriveType.ToString(),
                 drive.DriveFormat,
@@ -751,7 +664,8 @@ public sealed class McpBridge(
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException)
         {
-            return new(drive.Name, string.Empty, drive.DriveType.ToString(), null, false, 0, 0, 0, "–", "–", "–", exception.Message);
+            return new(drive.Name, string.Empty, drive.DriveType.ToString(), null, false, 0, 0, 0,
+                "–", "–", "–", exception.Message);
         }
     }
 
@@ -801,8 +715,7 @@ public sealed class McpBridge(
 
         try
         {
-            return dispatcher.Invoke(
-                action,
+            return dispatcher.Invoke(action,
                 priority,
                 CancellationToken.None,
                 TimeSpan.FromSeconds(AppDefaults.McpDispatchTimeoutSeconds));
@@ -811,6 +724,95 @@ public sealed class McpBridge(
         {
             throw new McpException("Окно приложения занято и не ответило вовремя – повторите позже.");
         }
+    }
+
+    private (Task? Run, bool Deferred) PrepareScanNavigation(string? path, bool start, CancellationToken cancellationToken)
+    {
+        if (scan.IsScanning)
+        {
+            logger.McpToolRejected("open_scan", "страница занята операцией");
+            throw new McpException("Страница «Сканирование» сейчас занята другой операцией.");
+        }
+
+        var explicitPath = !string.IsNullOrWhiteSpace(path);
+        var target = explicitPath ? path!.Trim() : scan.SelectedDrive.Trim();
+
+        if (start || explicitPath)
+        {
+            ValidateScanPath(target);
+        }
+
+        if (target.Length > 0)
+        {
+            scan.SelectPathForAutomation(target);
+        }
+
+        var deferred = DeferOrNavigate(SectionKey.Scan);
+        notifier.Notify(start
+            ? $"Агент запустил сканирование: {target}"
+            : deferred
+                ? "Агент подготовил страницу «Сканирование»"
+                : "Агент открыл страницу «Сканирование»");
+
+        return (start ? scan.ScanFromAutomationAsync(target, cancellationToken) : null, deferred);
+    }
+
+    private string BuildArchivePlan(string path, bool deleteOriginal)
+    {
+        var (_, request) = PrepareArchive(path, deleteOriginal);
+
+        return Serialize(new McpArchivePlan(request.SourcePath,
+            request.TargetPath,
+            request.Files.Count,
+            request.TotalBytes,
+            SizeFormatter.Format(request.TotalBytes),
+            request.DeleteOriginal));
+    }
+
+    private (ArchiveRequest Request, Task<ArchiveProgressDialogViewModel> Run) PrepareArchiveRun(string path, bool deleteOriginal, CancellationToken cancellationToken)
+    {
+        if (scan.IsScanning)
+        {
+            logger.McpToolRejected("archive_directory", "страница занята операцией");
+            throw new McpException("Страница «Сканирование» сейчас занята другой операцией.");
+        }
+
+        var (dir, request) = PrepareArchive(path, deleteOriginal);
+        logger.McpMutationRequested("archive_directory", $"«{request.SourcePath}» → «{request.TargetPath}», файлов {request.Files.Count}, оригинал в корзину {request.DeleteOriginal}");
+        notifier.Notify($"Агент упаковывает в архив: {request.SourcePath}", StatusSeverity.Warning);
+
+        return (request, scan.ArchiveFromAutomationAsync(dir, request, cancellationToken));
+    }
+
+    private async Task<McpDockerReport> BuildDockerReportAsync(
+        DockerSnapshot snapshot,
+        bool includeObjects,
+        int entryLimit,
+        CancellationToken cancellationToken)
+    {
+        var buckets = snapshot.Buckets
+            .Select(static bucket => new McpDockerBucket(bucket.Type,
+                bucket.TotalCount,
+                bucket.Active,
+                bucket.Size,
+                DockerSize.ToBytes(bucket.Size),
+                bucket.Reclaimable,
+                DockerSize.ToBytes(bucket.Reclaimable)))
+            .ToList();
+
+        if (!snapshot.Available || !includeObjects)
+        {
+            return new(snapshot.Available, snapshot.Error, buckets, null, 0);
+        }
+
+        var inventory = await docker.GetInventoryAsync(cancellationToken).ConfigureAwait(false);
+        var objects = inventory
+            .OrderByDescending(static item => item.SizeBytes)
+            .Take(entryLimit)
+            .Select(static item => new McpDockerObject(item.Kind, item.Id, item.Name, item.Size, item.SizeBytes, item.InUse, item.Detail))
+            .ToList();
+
+        return new(true, snapshot.Error, buckets, objects, Math.Max(0, inventory.Count - objects.Count));
     }
 
     private bool DeferOrNavigate(string sectionKey)
@@ -837,8 +839,7 @@ public sealed class McpBridge(
         var named = element is { Length: > 0 };
 
         var target = named
-            ? ViewCapture.Find(window, element!) ?? throw new McpException(
-                $"В окне нет элемента с именем «{element}». Открыты, например: {string.Join(", ", ViewCapture.Names(window, AppDefaults.ViewCaptureNamesHint))}.")
+            ? ViewCapture.Find(window, element!) ?? throw new McpException($"В окне нет элемента с именем «{element}». Открыты, например: {string.Join(", ", ViewCapture.Names(window, AppDefaults.ViewCaptureNamesHint))}.")
             : window;
 
         var page = _shell?.CurrentSectionKey ?? "-";
@@ -869,8 +870,7 @@ public sealed class McpBridge(
 
         logger.ViewCaptured(path, width, height);
 
-        return Serialize(new McpCapture(
-            path,
+        return Serialize(new McpCapture(path,
             page,
             named ? element : null,
             ThemeManager.Current?.Key ?? "-",
@@ -918,8 +918,7 @@ public sealed class McpBridge(
 
     private McpScanState ReadScanState()
     {
-        return new(
-            scan.SelectedDrive,
+        return new(scan.SelectedDrive,
             scan.ResultPath,
             scan.IsScanning,
             scan.HasResult,
@@ -931,8 +930,7 @@ public sealed class McpBridge(
 
     private McpSyncState ReadSyncState()
     {
-        return new(
-            sync.LeftPath,
+        return new(sync.LeftPath,
             sync.RightPath,
             sync.CurrentMode,
             sync.CurrentWinner,

@@ -184,70 +184,90 @@ public sealed partial class DeleteProgressDialogViewModel : ObservableObject, ID
             token.ThrowIfCancellationRequested();
 
             var space = Items[i].Space;
-            var path = space.AbsolutePath;
             progress.Report(new(i, DeleteRowState.Deleting, null, freed, completed, failed));
 
-            try
+            var result = DeleteItem(space, writer);
+
+            if (result.Removed)
             {
-                bool removed;
-
-                if (Directory.Exists(path))
-                {
-                    if (_permanent)
-                    {
-                        Directory.Delete(path, true);
-                    }
-                    else
-                    {
-                        FileSystem.DeleteDirectory(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
-                    }
-
-                    removed = true;
-                }
-                else if (File.Exists(path))
-                {
-                    if (_permanent)
-                    {
-                        File.Delete(path);
-                    }
-                    else
-                    {
-                        FileSystem.DeleteFile(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
-                    }
-
-                    removed = true;
-                }
-                else
-                {
-                    removed = false;
-                }
-
-                if (removed)
-                {
-                    writer.WriteLine(path);
-                    completed++;
-                    freed += space.TotalSize;
-                    deletedItems.Add(space);
-                    progress.Report(new(i, DeleteRowState.Done, null, freed, completed, failed));
-                }
-                else
-                {
-                    writer.WriteLine($"ПРОПУЩЕНО (не найден) {path}");
-                    _logger.DeleteItemMissing(path);
-                    failed++;
-                    progress.Report(new(i, DeleteRowState.Failed, "Путь не найден", freed, completed, failed));
-                }
+                completed++;
+                freed += space.TotalSize;
+                deletedItems.Add(space);
+                progress.Report(new(i, DeleteRowState.Done, null, freed, completed, failed));
             }
-            catch (Exception exception)
+            else
             {
-                writer.WriteLine($"ОШИБКА {path}: {exception.Message}");
-                _logger.DeleteItemFailed(exception, path);
                 failed++;
-                progress.Report(new(i, DeleteRowState.Failed, exception.Message, freed, completed, failed));
+                progress.Report(new(i, DeleteRowState.Failed, result.Error, freed, completed, failed));
             }
         }
 
         return deletedItems;
+    }
+
+    private DeleteResult DeleteItem(SpaceBase space, TextWriter writer)
+    {
+        var path = space.AbsolutePath;
+
+        try
+        {
+            if (!DeletePath(path))
+            {
+                writer.WriteLine($"ПРОПУЩЕНО (не найден) {path}");
+                _logger.DeleteItemMissing(path);
+                return new(false, "Путь не найден");
+            }
+
+            writer.WriteLine(path);
+            return new(true, null);
+        }
+        catch (Exception exception)
+        {
+            writer.WriteLine($"ОШИБКА {path}: {exception.Message}");
+            _logger.DeleteItemFailed(exception, path);
+            return new(false, exception.Message);
+        }
+    }
+
+    private bool DeletePath(string path)
+    {
+        if (Directory.Exists(path))
+        {
+            DeleteDirectoryPath(path);
+            return true;
+        }
+
+        if (File.Exists(path))
+        {
+            DeleteFilePath(path);
+            return true;
+        }
+
+        return false;
+    }
+
+    private void DeleteDirectoryPath(string path)
+    {
+        if (_permanent)
+        {
+            Directory.Delete(path, true);
+        }
+        else
+        {
+            FileSystem.DeleteDirectory(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+        }
+    }
+
+    private void DeleteFilePath(string path)
+    {
+        if (_permanent)
+        {
+            File.Delete(path);
+        }
+        else
+        {
+            FileSystem.DeleteFile(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+        }
     }
 
     private string BuildSummary()
@@ -265,4 +285,6 @@ public sealed partial class DeleteProgressDialogViewModel : ObservableObject, ID
         long Freed,
         int Completed,
         int Failed);
+
+    private readonly record struct DeleteResult(bool Removed, string? Error);
 }
