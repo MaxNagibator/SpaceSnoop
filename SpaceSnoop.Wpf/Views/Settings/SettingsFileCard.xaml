@@ -7,7 +7,8 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
-             d:DesignWidth="900">
+             d:DesignWidth="900"
+             Visibility="{Binding Sections[storage].IsVisible, Converter={StaticResource BoolToVisibility}}">
 
     <UserControl.Resources>
         <ResourceDictionary>
@@ -17,20 +18,25 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource Card.Inset}"
-            Margin="0,0,0,2">
+    <Expander Style="{StaticResource Setting.Card}"
+              Header="{Binding Sections[storage].Title}"
+              IsExpanded="{Binding Sections[storage].IsExpanded, Mode=TwoWay}">
         <StackPanel>
             <TextBlock Text="Расположение данных"
                        Style="{StaticResource Setting.SectionTitle}" />
             <CheckBox Content="Хранить файлы приложения в папке AppData"
                       IsChecked="{Binding StoreInAppData, Mode=TwoWay}"
-                      Margin="0,14,0,0"
+                      Margin="0,12,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="По умолчанию настройки, логи и журналы хранятся в %LOCALAPPDATA%\SpaceSnoop. Выключите, чтобы держать их рядом с программой (portable-режим). Смена расположения перезапустит приложение." />
+            <TextBlock Style="{StaticResource Setting.CheckHint}"
+                       Text="Смена расположения перезапустит приложение." />
+            <Expander Style="{StaticResource Setting.CheckDetails}">
+                <TextBlock Style="{StaticResource Setting.Hint}"
+                           Text="По умолчанию настройки, логи и журналы лежат в %LOCALAPPDATA%\SpaceSnoop. Выключите, чтобы держать их рядом с программой – portable-режим. Файлы можно перенести на новое место или оставить на старом, об этом спросит диалог." />
+            </Expander>
             <TextBlock Text="{Binding DataDirectory}"
                        Style="{StaticResource TextBlock.Mono}"
-                       Margin="0,8,0,0"
+                       Margin="26,8,0,0"
                        TextWrapping="Wrap" />
 
             <TextBlock Text="Файл настроек"
@@ -49,7 +55,7 @@
                                Margin="0,8,0,0"
                                TextWrapping="Wrap" />
                     <TextBlock Style="{StaticResource Setting.Hint}"
-                               Text="Формат TOML. Можно править вручную, но удобнее через эту форму. Изменения сохраняются автоматически." />
+                               Text="Формат TOML, изменения сохраняются автоматически." />
                 </StackPanel>
 
                 <StackPanel Grid.Column="1"
@@ -80,5 +86,5 @@
                 </StackPanel>
             </Grid>
         </StackPanel>
-    </Border>
+    </Expander>
 </UserControl>

@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Settings"
              xmlns:settings="clr-namespace:SpaceSnoop.Wpf.Views.Settings"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
@@ -10,20 +11,78 @@
              d:DesignHeight="700"
              d:DesignWidth="900">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto"
-                  HorizontalScrollBarVisibility="Disabled"
-                  Padding="0,0,12,0">
-        <StackPanel>
-            <settings:SettingsAppearanceCard />
-            <settings:SettingsScanCard />
-            <settings:SettingsDeleteCard />
-            <settings:SettingsArchiveCard />
-            <settings:SettingsExclusionsCard />
-            <settings:SettingsUpdateCard />
-            <settings:SettingsMcpCard />
-            <settings:SettingsAgentCard />
-            <settings:SettingsStartupCard />
-            <settings:SettingsFileCard />
-        </StackPanel>
-    </ScrollViewer>
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Views/Settings/SettingsResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"
+                              MaxWidth="{StaticResource Setting.ContentWidth}" />
+        </Grid.ColumnDefinitions>
+
+        <DockPanel>
+            <Grid DockPanel.Dock="Top"
+                  Margin="0,0,12,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Grid Grid.Column="0">
+                    <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource TextBox.IconField}"
+                             Tag="{x:Static iconPacks:PackIconLucideKind.Search}"
+                             AutomationProperties.Name="Поиск по настройкам"
+                             ToolTip="Фильтр разделов по названию и ключевым словам" />
+                    <TextBlock Text="Поиск по настройкам"
+                               Margin="36,0,8,0"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource Fg.Muted}"
+                               IsHitTestVisible="False"
+                               Visibility="{Binding SearchTextEmpty, Converter={StaticResource BoolToVisibility}}" />
+                </Grid>
+
+                <Button Grid.Column="1"
+                        Style="{StaticResource Button.Icon}"
+                        Command="{Binding ClearSearchCommand}"
+                        Margin="8,0,0,0"
+                        AutomationProperties.Name="Очистить поиск"
+                        ToolTip="Очистить поиск"
+                        Visibility="{Binding SearchTextEmpty, Converter={StaticResource InverseBoolToVisibility}}">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.X}"
+                                              Width="16"
+                                              Height="16"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                </Button>
+            </Grid>
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Padding="0,0,12,0">
+                <StackPanel RequestBringIntoView="SuppressAutoScroll">
+                    <TextBlock Text="Ничего не найдено."
+                               Style="{StaticResource TextBlock.Subtle}"
+                               Margin="2,2,0,8"
+                               Visibility="{Binding NoMatches, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+
+                    <settings:SettingsAppearanceCard />
+                    <settings:SettingsStartupCard />
+                    <settings:SettingsScanCard />
+                    <settings:SettingsExclusionsCard />
+                    <settings:SettingsDeleteCard />
+                    <settings:SettingsArchiveCard />
+                    <settings:SettingsUpdateCard />
+                    <settings:SettingsFileCard />
+                    <settings:SettingsMcpCard />
+                    <settings:SettingsAgentCard />
+                </StackPanel>
+            </ScrollViewer>
+        </DockPanel>
+    </Grid>
 </UserControl>

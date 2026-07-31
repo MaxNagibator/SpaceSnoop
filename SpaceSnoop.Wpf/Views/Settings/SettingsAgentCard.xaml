@@ -7,7 +7,8 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
-             d:DesignWidth="900">
+             d:DesignWidth="900"
+             Visibility="{Binding Sections[agent].IsVisible, Converter={StaticResource BoolToVisibility}}">
 
     <UserControl.Resources>
         <ResourceDictionary>
@@ -17,13 +18,17 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource Card.Inset}"
-            Margin="0,0,0,10">
+    <Expander Style="{StaticResource Setting.Card}"
+              Header="{Binding Sections[agent].Title}"
+              IsExpanded="{Binding Sections[agent].IsExpanded, Mode=TwoWay}">
         <StackPanel>
-            <TextBlock Text="Агент-чат"
-                       Style="{StaticResource Setting.SectionTitle}" />
             <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="Страница «Чат» говорит с уже установленным на этой машине CLI – по вашей подписке, без ключей и токенов в настройках приложения. Сообщение и то, что агент запрашивает у инструментов (пути, размеры, результаты сравнения), уходит в CLI и дальше поставщику модели под вашей подпиской." />
+                       Margin="0"
+                       Text="Страница «Чат» говорит с установленным на этой машине CLI по вашей подписке." />
+            <Expander Style="{StaticResource Setting.Details}">
+                <TextBlock Style="{StaticResource Setting.Hint}"
+                           Text="Ключи и токены поставщика модели в настройках приложения не хранятся. Сообщение и то, что агент запрашивает у инструментов – пути, размеры, результаты сравнения, – уходит в CLI и дальше поставщику модели под вашей подпиской." />
+            </Expander>
 
             <CheckBox Content="Показывать страницу чата"
                       IsChecked="{Binding Agent.Enabled, Mode=TwoWay}"
@@ -34,15 +39,19 @@
                       IsChecked="{Binding Agent.Consent, Mode=TwoWay}"
                       Margin="0,12,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="Снимите галку, чтобы отозвать согласие – страница чата снова покажет предупреждение и спросит его перед следующим сообщением." />
+            <TextBlock Style="{StaticResource Setting.CheckHint}"
+                       Text="Снимите галку, чтобы отозвать согласие – чат спросит его перед следующим сообщением." />
 
             <CheckBox Content="Записывать транскрипт хода"
                       IsChecked="{Binding Agent.Transcript, Mode=TwoWay}"
                       Margin="0,12,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="Для разбора странных ответов: всё, что уходит в CLI и приходит от него, ложится в logs/chat отдельным файлом на ход, кнопка на сообщении его открывает. Токен доступа затирается, остальное сохраняется как есть – вопрос, состояние окна и ответы инструментов. Хранятся последние 20 ходов." />
+            <TextBlock Style="{StaticResource Setting.CheckHint}"
+                       Text="Для разбора странных ответов: ход целиком ложится в logs/chat." />
+            <Expander Style="{StaticResource Setting.CheckDetails}">
+                <TextBlock Style="{StaticResource Setting.Hint}"
+                           Text="Всё, что уходит в CLI и приходит от него, пишется отдельным файлом на ход, кнопка на сообщении его открывает. Токен доступа затирается, остальное сохраняется как есть – вопрос, состояние окна и ответы инструментов. Хранятся последние 20 ходов." />
+            </Expander>
 
             <TextBlock Text="CLI"
                        Style="{StaticResource Setting.Label}"
@@ -54,10 +63,17 @@
                      Margin="0,8,0,0" />
             <TextBlock Style="{StaticResource Setting.Hint}"
                        Text="Модель и путь ниже относятся к выбранному CLI – у каждого свои." />
-            <TextBlock Style="{StaticResource Setting.Hint}"
-                       Foreground="{DynamicResource State.Warning}"
-                       Text="У codex есть собственная оболочка операционной системы, и отключить её нечем: помимо инструментов приложения агент может выполнять команды с правами SpaceSnoop, а оно обычно запущено от администратора. Инструменты приложения при этом работают только с полным доступом – при песочнице codex не может дозваться разрешения и гасит вызов сам. Из-за оболочки запрет отдельных инструментов для codex – подсказка, а не преграда: настоящий барьер один и тот же для обоих CLI – галка «Разрешить изменяющие операции» ниже, её проверяет сам MCP-сервер."
-                       Visibility="{Binding AgentShellWarning, Converter={StaticResource BoolToVisibility}}" />
+
+            <StackPanel Visibility="{Binding AgentShellWarning, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Style="{StaticResource Setting.Hint}"
+                           Foreground="{DynamicResource State.Warning}"
+                           Text="У codex есть собственная оболочка системы, отключить её нечем: агент может выполнять команды с правами приложения." />
+                <Expander Style="{StaticResource Setting.Details}">
+                    <TextBlock Style="{StaticResource Setting.Hint}"
+                               Foreground="{DynamicResource State.Warning}"
+                               Text="Приложение обычно запущено от администратора, значит команды выполняются с его правами. Инструменты приложения при этом работают только с полным доступом – в песочнице codex не может дозваться разрешения и гасит вызов сам. Из-за оболочки запрет отдельных инструментов для codex остаётся подсказкой, а не преградой: настоящий барьер один для обоих CLI – галка «Разрешить изменяющие операции» в разделе «MCP-сервер», её проверяет сам сервер." />
+                </Expander>
+            </StackPanel>
 
             <TextBlock Text="Модель"
                        Style="{StaticResource Setting.Label}"
@@ -67,7 +83,7 @@
                 <ComboBox Style="{StaticResource ComboBox.Form}"
                           ItemsSource="{Binding AgentModel.ModelOptions}"
                           SelectedItem="{Binding AgentModel.SelectedModel, Mode=TwoWay}"
-                          Width="320">
+                          Width="{StaticResource Setting.ControlWidth}">
                     <ComboBox.ItemTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Title}"
@@ -96,7 +112,7 @@
                        Margin="0,16,0,0" />
             <TextBox Style="{StaticResource TextBox.Form}"
                      Text="{Binding Agent.Model, UpdateSourceTrigger=LostFocus}"
-                     Width="320"
+                     Width="{StaticResource Setting.ControlWidth}"
                      HorizontalAlignment="Left"
                      Margin="0,8,0,0" />
             <TextBlock Style="{StaticResource Setting.Hint}"
@@ -109,11 +125,11 @@
                       ItemsSource="{Binding AgentModel.EffortOptions}"
                       SelectedItem="{Binding AgentModel.SelectedEffort, Mode=TwoWay}"
                       DisplayMemberPath="Title"
-                      Width="320"
+                      Width="{StaticResource Setting.ControlWidth}"
                       HorizontalAlignment="Left"
                       Margin="0,8,0,0" />
             <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="Чем выше уровень, тем дольше и дороже ответ. «По умолчанию» – уровень, выбранный самим CLI для этой модели." />
+                       Text="Чем выше уровень, тем дольше и дороже ответ. «По умолчанию» – уровень самого CLI." />
 
             <TextBlock Text="{Binding AgentCliPathLabel}"
                        Style="{StaticResource Setting.Label}"
@@ -125,5 +141,5 @@
             <TextBlock Style="{StaticResource Setting.Hint}"
                        Text="Пусто – найти автоматически в PATH и типичных местах установки." />
         </StackPanel>
-    </Border>
+    </Expander>
 </UserControl>

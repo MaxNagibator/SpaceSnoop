@@ -6,7 +6,8 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
-             d:DesignWidth="900">
+             d:DesignWidth="900"
+             Visibility="{Binding Sections[startup].IsVisible, Converter={StaticResource BoolToVisibility}}">
 
     <UserControl.Resources>
         <ResourceDictionary>
@@ -16,16 +17,14 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource Card.Inset}"
-            Margin="0,0,0,10">
+    <Expander Style="{StaticResource Setting.Card}"
+              Header="{Binding Sections[startup].Title}"
+              IsExpanded="{Binding Sections[startup].IsExpanded, Mode=TwoWay}">
         <StackPanel>
-            <TextBlock Text="Запуск"
-                       Style="{StaticResource Setting.SectionTitle}" />
-
-            <Grid Margin="0,14,0,0">
+            <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="240" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="Стартовая страница"
@@ -39,20 +38,24 @@
                           ItemsSource="{Binding StartupOptions}"
                           SelectedItem="{Binding SelectedStartupOption}"
                           DisplayMemberPath="Label"
+                          Width="{StaticResource Setting.ControlWidth}"
+                          Margin="16,0,0,0"
                           VerticalAlignment="Center" />
             </Grid>
 
-            <CheckBox Content="Запускать со свёрнутым навигационным рейлом"
+            <CheckBox Content="Свёрнутый навигационный рейл"
                       IsChecked="{Binding Shell.NavCollapsed, Mode=TwoWay}"
-                      Margin="0,14,0,0"
+                      Margin="0,16,0,0"
                       VerticalAlignment="Center" />
+            <TextBlock Style="{StaticResource Setting.CheckHint}"
+                       Text="Применяется сразу и запоминается до следующего запуска. То же делает кнопка в верхней части рейла." />
 
             <CheckBox Content="Предупреждать о запуске без прав администратора"
                       IsChecked="{Binding Shell.WarnIfNotAdministrator, Mode=TwoWay}"
                       Margin="0,14,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="При запуске без повышения прав показывать предложение перезапуститься от имени администратора. Без прав часть директорий может быть недоступна." />
+            <TextBlock Style="{StaticResource Setting.CheckHint}"
+                       Text="Без повышения прав часть каталогов недоступна, размеры выходят заниженными." />
         </StackPanel>
-    </Border>
+    </Expander>
 </UserControl>

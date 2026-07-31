@@ -6,4 +6,12 @@ public partial class SettingsView : UserControl, IView<SettingsViewModel>
     {
         InitializeComponent();
     }
+
+    private void SuppressAutoScroll(object sender, RequestBringIntoViewEventArgs e)
+    {
+        if (e.OriginalSource is not TextBox)
+        {
+            e.Handled = true;
+        }
+    }
 }

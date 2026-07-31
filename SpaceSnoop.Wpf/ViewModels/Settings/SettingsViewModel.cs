@@ -27,6 +27,10 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     [NotifyPropertyChangedFor(nameof(McpConnectSnippet))]
     private int _selectedMcpFormatIndex;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SearchTextEmpty))]
+    private string _searchText = string.Empty;
+
     public SettingsViewModel(
         ThemeViewModel theme,
         ShellPreferences shell,
@@ -61,6 +65,24 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         Theme.PropertyChanged += OnThemePropertyChanged;
         Mcp.PropertyChanged += OnMcpPropertyChanged;
     }
+
+    public IReadOnlyDictionary<string, SettingsSection> Sections { get; } = new Dictionary<string, SettingsSection>(StringComparer.Ordinal)
+    {
+        ["appearance"] = new("Внешний вид", true, "тема оформления светлая тёмная tarkov масштаб шрифта размер текста заголовок страницы уведомления тосты"),
+        ["startup"] = new("Запуск", true, "стартовая страница навигационный рейл свернуть права администратора предупреждение"),
+        ["scan"] = new("Сканирование", true, "многопоточный обход потоки параллелизм тепловая подсветка интенсивность проводник открытие файлов"),
+        ["sync"] = new("Синхронизация", true, "исключения glob паттерны автодополнение путей git репозиторий группировка служебных каталогов плоский вид"),
+        ["delete"] = new("Удаление", true, "корзина безвозвратно подтверждение помеченные элементы"),
+        ["archive"] = new("Архивация", false, "zip сжатие уровень упаковать оригинал корзина"),
+        ["update"] = new("Обновления", false, "github релизы репозиторий версия проверка скачивание изменения changelog"),
+        ["storage"] = new("Файлы и хранение", false, "расположение данных appdata portable settings.toml путь логи журналы"),
+        ["mcp"] = new("MCP-сервер", false, "порт токен подключение json cli адрес изменяющие операции агент"),
+        ["agent"] = new("Агент-чат", false, "шнырь claude codex opencode cli модель глубина рассуждений транскрипт согласие"),
+    };
+
+    public bool SearchTextEmpty => string.IsNullOrWhiteSpace(SearchText);
+
+    public bool NoMatches => Sections.Values.All(section => !section.IsVisible);
 
     public ThemeViewModel Theme { get; }
 
@@ -254,6 +276,24 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
             _settings.SetEnum(SettingsKeys.SyncGitFolders, value.Value);
             OnPropertyChanged();
         }
+    }
+
+    partial void OnSearchTextChanged(string value)
+    {
+        var terms = SettingsSection.ParseQuery(value);
+
+        foreach (var section in Sections.Values)
+        {
+            section.Filter(terms);
+        }
+
+        OnPropertyChanged(nameof(NoMatches));
+    }
+
+    [RelayCommand]
+    private void ClearSearch()
+    {
+        SearchText = string.Empty;
     }
 
     private void OnMcpPropertyChanged(object? sender, PropertyChangedEventArgs e)

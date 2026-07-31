@@ -7,7 +7,8 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
-             d:DesignWidth="900">
+             d:DesignWidth="900"
+             Visibility="{Binding Sections[mcp].IsVisible, Converter={StaticResource BoolToVisibility}}">
 
     <UserControl.Resources>
         <ResourceDictionary>
@@ -36,19 +37,21 @@
                    TargetType="TextBlock">
                 <Setter Property="Foreground" Value="{DynamicResource Fg.Primary}" />
                 <Setter Property="TextWrapping" Value="Wrap" />
-                <Setter Property="MaxWidth" Value="560" />
-                <Setter Property="HorizontalAlignment" Value="Left" />
             </Style>
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource Card.Inset}"
-            Margin="0,0,0,10">
+    <Expander Style="{StaticResource Setting.Card}"
+              Header="{Binding Sections[mcp].Title}"
+              IsExpanded="{Binding Sections[mcp].IsExpanded, Mode=TwoWay}">
         <StackPanel>
-            <TextBlock Text="MCP-сервер"
-                       Style="{StaticResource Setting.SectionTitle}" />
             <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="Даёт агенту доступ к запущенному приложению: состояние, профили, сравнение каталогов и открытие страницы «Синхронизация» с нужными путями. Слушает только 127.0.0.1 и требует токен." />
+                       Margin="0"
+                       Text="Даёт агенту доступ к запущенному приложению. Слушает только 127.0.0.1 и требует токен." />
+            <Expander Style="{StaticResource Setting.Details}">
+                <TextBlock Style="{StaticResource Setting.Hint}"
+                           Text="Через сервер агент читает состояние приложения и профили, сравнивает каталоги и открывает страницу «Синхронизация» с нужными путями. Подключаются любые MCP-клиенты – формат строки подключения ниже." />
+            </Expander>
 
             <CheckBox Content="Включить сервер"
                       IsChecked="{Binding Mcp.Enabled, Mode=TwoWay}"
@@ -59,8 +62,12 @@
                       IsChecked="{Binding Mcp.AllowMutations, Mode=TwoWay}"
                       Margin="0,12,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="Без этой галки агент может только читать и открывать страницы. С ней он может запускать синхронизацию (копировать файлы и удалять лишние в корзину), упаковывать каталоги в архив и ставить пометки на удаление. Само удаление помеченного остаётся за вами." />
+            <TextBlock Style="{StaticResource Setting.CheckHint}"
+                       Text="Без галки агент только читает и открывает страницы." />
+            <Expander Style="{StaticResource Setting.CheckDetails}">
+                <TextBlock Style="{StaticResource Setting.Hint}"
+                           Text="С галкой агент может запускать синхронизацию (копировать файлы и удалять лишние в корзину), упаковывать каталоги в архив и ставить пометки на удаление. Само удаление помеченного остаётся за вами." />
+            </Expander>
 
             <TextBlock Text="Порт"
                        Style="{StaticResource Setting.Label}"
@@ -94,13 +101,18 @@
             <Border Style="{StaticResource Mcp.Notice}"
                     BorderBrush="{DynamicResource State.Error}"
                     Visibility="{Binding Mcp.TokenMissing, Converter={StaticResource BoolToVisibility}}">
-                <StackPanel Orientation="Horizontal">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
                     <iconPacks:PackIconLucide Style="{StaticResource Mcp.NoticeIcon}"
                                               Kind="{x:Static iconPacks:PackIconLucideKind.ShieldAlert}"
                                               Foreground="{DynamicResource State.Error}" />
-                    <TextBlock Style="{StaticResource Mcp.NoticeText}"
+                    <TextBlock Grid.Column="1"
+                               Style="{StaticResource Mcp.NoticeText}"
                                Text="Без токена сервер не запускается: подключение без секрета приняло бы кого угодно. Нажмите «Обновить», чтобы выдать новый." />
-                </StackPanel>
+                </Grid>
             </Border>
 
             <TextBlock Text="Подключение"
@@ -144,14 +156,25 @@
             <Border Style="{StaticResource Mcp.Notice}"
                     BorderBrush="{DynamicResource State.Warning}"
                     Visibility="{Binding McpElevatedWarning, Converter={StaticResource BoolToVisibility}}">
-                <StackPanel Orientation="Horizontal">
-                    <iconPacks:PackIconLucide Style="{StaticResource Mcp.NoticeIcon}"
-                                              Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
-                                              Foreground="{DynamicResource State.Warning}" />
-                    <TextBlock Style="{StaticResource Mcp.NoticeText}"
-                               Text="Приложение запущено с правами администратора, значит с этими правами работает и сервер. Токен лежит в settings.toml вашего профиля – любая программа, запущенная от вашего имени, может его прочитать и обратиться к серверу. Держите сервер выключенным, когда он не нужен." />
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <iconPacks:PackIconLucide Style="{StaticResource Mcp.NoticeIcon}"
+                                                  Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
+                                                  Foreground="{DynamicResource State.Warning}" />
+                        <TextBlock Grid.Column="1"
+                                   Style="{StaticResource Mcp.NoticeText}"
+                                   Text="Приложение запущено от администратора – с теми же правами работает и сервер." />
+                    </Grid>
+                    <Expander Style="{StaticResource Setting.Details}">
+                        <TextBlock Style="{StaticResource Mcp.NoticeText}"
+                                   Text="Токен лежит в settings.toml вашего профиля – любая программа, запущенная от вашего имени, может его прочитать и обратиться к серверу с правами администратора. Держите сервер выключенным, когда он не нужен." />
+                    </Expander>
                 </StackPanel>
             </Border>
         </StackPanel>
-    </Border>
+    </Expander>
 </UserControl>

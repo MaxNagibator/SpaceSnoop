@@ -6,7 +6,8 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
-             d:DesignWidth="900">
+             d:DesignWidth="900"
+             Visibility="{Binding Sections[update].IsVisible, Converter={StaticResource BoolToVisibility}}">
 
     <UserControl.Resources>
         <ResourceDictionary>
@@ -16,17 +17,14 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource Card.Inset}"
-            Margin="0,0,0,10">
+    <Expander Style="{StaticResource Setting.Card}"
+              Header="{Binding Sections[update].Title}"
+              IsExpanded="{Binding Sections[update].IsExpanded, Mode=TwoWay}">
         <StackPanel>
-            <TextBlock Text="Обновления"
-                       Style="{StaticResource Setting.SectionTitle}" />
-
             <TextBlock Text="Репозиторий обновлений"
-                       Style="{StaticResource Setting.Label}"
-                       Margin="0,14,0,0" />
+                       Style="{StaticResource Setting.Label}" />
             <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="Откуда брать релизы (формат owner/repo). Проверка идёт по последнему релизу этого репозитория на GitHub." />
+                       Text="Откуда брать релизы, формат owner/repo." />
             <TextBox Style="{StaticResource TextBox.Form}"
                      Text="{Binding Update.Repository, UpdateSourceTrigger=LostFocus}"
                      FontFamily="{DynamicResource Font.Mono}"
@@ -62,8 +60,12 @@
                       IsChecked="{Binding Update.AutoDownload, Mode=TwoWay}"
                       Margin="0,14,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="Найденная версия в той же редакции (exe или portable) скачивается в папку программы. Файл не запускается – установка остаётся за вами." />
+            <TextBlock Style="{StaticResource Setting.CheckHint}"
+                       Text="Файл не запускается – установка остаётся за вами." />
+            <Expander Style="{StaticResource Setting.CheckDetails}">
+                <TextBlock Style="{StaticResource Setting.Hint}"
+                           Text="Скачивается ассет той же редакции, что и запущенная программа (exe или portable), в её папку. Проверка идёт по релизам указанного выше репозитория на GitHub." />
+            </Expander>
 
             <StackPanel Orientation="Horizontal"
                         Margin="0,16,0,0">
@@ -96,5 +98,5 @@
                 </StackPanel>
             </Border>
         </StackPanel>
-    </Border>
+    </Expander>
 </UserControl>

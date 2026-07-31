@@ -103,6 +103,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         _sectionByKey[SectionKey.Settings] = _settingsItem;
 
         IsNavCollapsed = Preferences.NavCollapsed;
+        Preferences.PropertyChanged += OnPreferencesChanged;
         Selected = ResolveStartupSection();
 
         AppUpdate.Start();
@@ -152,6 +153,14 @@ public sealed partial class ShellViewModel : ShellViewModelBase
     protected override void OnNavCollapsedChanged(bool value)
     {
         Preferences.NavCollapsed = value;
+    }
+
+    private void OnPreferencesChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ShellPreferences.NavCollapsed))
+        {
+            IsNavCollapsed = Preferences.NavCollapsed;
+        }
     }
 
     protected override void NavigateToSettings()

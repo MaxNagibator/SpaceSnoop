@@ -6,7 +6,8 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
-             d:DesignWidth="900">
+             d:DesignWidth="900"
+             Visibility="{Binding Sections[delete].IsVisible, Converter={StaticResource BoolToVisibility}}">
 
     <UserControl.Resources>
         <ResourceDictionary>
@@ -16,23 +17,20 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource Card.Inset}"
-            Margin="0,0,0,10">
+    <Expander Style="{StaticResource Setting.Card}"
+              Header="{Binding Sections[delete].Title}"
+              IsExpanded="{Binding Sections[delete].IsExpanded, Mode=TwoWay}">
         <StackPanel>
-            <TextBlock Text="Удаление"
-                       Style="{StaticResource Setting.SectionTitle}" />
-
             <CheckBox Content="Спрашивать подтверждение перед удалением"
                       IsChecked="{Binding Operations.ConfirmBeforeDelete, Mode=TwoWay}"
-                      Margin="0,14,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
+            <TextBlock Style="{StaticResource Setting.CheckHint}"
                        Text="Перед переносом помеченных элементов показывать диалог со списком и объёмом." />
 
             <Grid Margin="0,16,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="240" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="Куда удалять помеченные элементы"
@@ -46,8 +44,10 @@
                           ItemsSource="{Binding DeleteModeOptions}"
                           SelectedItem="{Binding SelectedDeleteModeOption}"
                           DisplayMemberPath="Label"
+                          Width="{StaticResource Setting.ControlWidth}"
+                          Margin="16,0,0,0"
                           VerticalAlignment="Center" />
             </Grid>
         </StackPanel>
-    </Border>
+    </Expander>
 </UserControl>

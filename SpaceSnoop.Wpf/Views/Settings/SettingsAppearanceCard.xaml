@@ -7,7 +7,8 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
-             d:DesignWidth="900">
+             d:DesignWidth="900"
+             Visibility="{Binding Sections[appearance].IsVisible, Converter={StaticResource BoolToVisibility}}">
 
     <UserControl.Resources>
         <ResourceDictionary>
@@ -17,16 +18,14 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource Card.Inset}"
-            Margin="0,0,0,10">
+    <Expander Style="{StaticResource Setting.Card}"
+              Header="{Binding Sections[appearance].Title}"
+              IsExpanded="{Binding Sections[appearance].IsExpanded, Mode=TwoWay}">
         <StackPanel>
-            <TextBlock Text="Внешний вид"
-                       Style="{StaticResource Setting.SectionTitle}" />
-
-            <Grid Margin="0,14,0,0">
+            <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="240" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="Тема оформления"
@@ -40,39 +39,52 @@
                           ItemsSource="{Binding ThemeOptions}"
                           SelectedItem="{Binding SelectedThemeOption}"
                           DisplayMemberPath="Label"
+                          Width="{StaticResource Setting.ControlWidth}"
+                          Margin="16,0,0,0"
                           VerticalAlignment="Center" />
             </Grid>
 
-            <StackPanel Margin="0,16,0,0">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0"
-                               Text="Масштаб шрифта"
+            <Grid Margin="0,16,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Масштаб шрифта"
                                Style="{StaticResource Setting.Label}" />
-                    <TextBlock Grid.Column="1"
-                               Text="{Binding Shell.FontScale, StringFormat={}{0:P0}}"
-                               Style="{StaticResource TextBlock.Mono}"
-                               VerticalAlignment="Center" />
-                </Grid>
-                <Slider Minimum="{x:Static keepshell:FontScaleManager.MinScale}"
-                        Maximum="{x:Static keepshell:FontScaleManager.MaxScale}"
-                        Value="{Binding Shell.FontScale, Mode=TwoWay}"
-                        TickFrequency="0.1"
-                        IsSnapToTickEnabled="True"
-                        Margin="0,6,0,0" />
-                <TextBlock Style="{StaticResource Setting.Hint}"
-                           Text="Увеличивает размер текста по всему приложению. 100% – стандартный размер." />
-            </StackPanel>
+                    <TextBlock Text="Размер текста по всему приложению. 100% – стандартный."
+                               Style="{StaticResource Setting.Hint}"
+                               Margin="0,2,0,0" />
+                </StackPanel>
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            Margin="16,0,0,0"
+                            VerticalAlignment="Center">
+                    <Slider Minimum="{x:Static keepshell:FontScaleManager.MinScale}"
+                            Maximum="{x:Static keepshell:FontScaleManager.MaxScale}"
+                            Value="{Binding Shell.FontScale, Mode=TwoWay}"
+                            TickFrequency="0.1"
+                            IsSnapToTickEnabled="True"
+                            Width="{StaticResource Setting.SliderWidth}"
+                            VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding Shell.FontScale, StringFormat={}{0:P0}}"
+                               Style="{StaticResource Setting.Value}" />
+                </StackPanel>
+            </Grid>
 
             <CheckBox Content="Показывать заголовок страницы"
                       IsChecked="{Binding Shell.ShowPageHeader, Mode=TwoWay}"
+                      Margin="0,16,0,0"
+                      VerticalAlignment="Center" />
+            <TextBlock Style="{StaticResource Setting.CheckHint}"
+                       Text="Плашка с названием раздела и описанием над содержимым страницы." />
+
+            <CheckBox Content="Показывать всплывающие уведомления"
+                      IsChecked="{Binding Shell.EnableToastNotifications, Mode=TwoWay}"
                       Margin="0,14,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="Скрывает плашку с названием раздела и кратким описанием над содержимым каждой страницы." />
+            <TextBlock Style="{StaticResource Setting.CheckHint}"
+                       Text="Итоги операций (сканирование, синхронизация, действия агента) в углу окна." />
         </StackPanel>
-    </Border>
+    </Expander>
 </UserControl>

@@ -7,7 +7,8 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
-             d:DesignWidth="900">
+             d:DesignWidth="900"
+             Visibility="{Binding Sections[scan].IsVisible, Converter={StaticResource BoolToVisibility}}">
 
     <UserControl.Resources>
         <ResourceDictionary>
@@ -17,72 +18,83 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource Card.Inset}"
-            Margin="0,0,0,10">
+    <Expander Style="{StaticResource Setting.Card}"
+              Header="{Binding Sections[scan].Title}"
+              IsExpanded="{Binding Sections[scan].IsExpanded, Mode=TwoWay}">
         <StackPanel>
-            <TextBlock Text="Сканирование"
-                       Style="{StaticResource Setting.SectionTitle}" />
-
             <CheckBox Content="Многопоточный обход"
                       IsChecked="{Binding Scan.UseMultithreading, Mode=TwoWay}"
-                      Margin="0,14,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
+            <TextBlock Style="{StaticResource Setting.CheckHint}"
                        Text="Параллельный обход каталогов – быстрее, но выше расход памяти." />
 
-            <StackPanel Margin="0,16,0,0"
-                        IsEnabled="{Binding Scan.UseMultithreading}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0"
-                               Text="Число параллельных потоков"
+            <Grid Margin="0,16,0,0"
+                  IsEnabled="{Binding Scan.UseMultithreading}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Число параллельных потоков"
                                Style="{StaticResource Setting.Label}" />
-                    <TextBlock Grid.Column="1"
-                               Text="{Binding Scan.MaxParallelism, StringFormat=N0}"
-                               Style="{StaticResource TextBlock.Mono}"
-                               VerticalAlignment="Center" />
-                </Grid>
-                <Slider Minimum="1"
-                        Maximum="{Binding Scan.ProcessorCount}"
-                        Value="{Binding Scan.MaxParallelism, Mode=TwoWay}"
-                        TickFrequency="1"
-                        IsSnapToTickEnabled="True"
-                        Margin="0,6,0,0" />
-                <TextBlock Style="{StaticResource Setting.Hint}"
-                           Text="{Binding Scan.ParallelismHint}" />
-            </StackPanel>
+                    <TextBlock Style="{StaticResource Setting.Hint}"
+                               Margin="0,2,0,0"
+                               Text="{Binding Scan.ParallelismHint}" />
+                </StackPanel>
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            Margin="16,0,0,0"
+                            VerticalAlignment="Center">
+                    <Slider Minimum="1"
+                            Maximum="{Binding Scan.ProcessorCount}"
+                            Value="{Binding Scan.MaxParallelism, Mode=TwoWay}"
+                            TickFrequency="1"
+                            IsSnapToTickEnabled="True"
+                            Width="{StaticResource Setting.SliderWidth}"
+                            VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding Scan.MaxParallelism, StringFormat=N0}"
+                               Style="{StaticResource Setting.Value}" />
+                </StackPanel>
+            </Grid>
 
-            <StackPanel Margin="0,16,0,0">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0"
-                               Text="Интенсивность тепловой подсветки"
+            <Grid Margin="0,16,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Интенсивность тепловой подсветки"
                                Style="{StaticResource Setting.Label}" />
-                    <TextBlock Grid.Column="1"
-                               Text="{Binding Scan.Intensity, StringFormat=N0}"
-                               Style="{StaticResource TextBlock.Mono}"
-                               VerticalAlignment="Center" />
-                </Grid>
-                <Slider Minimum="{x:Static bootstrap:AppDefaults.IntensityMin}"
-                        Maximum="{x:Static bootstrap:AppDefaults.IntensityMax}"
-                        Value="{Binding Scan.Intensity, Mode=TwoWay}"
-                        TickFrequency="1"
-                        IsSnapToTickEnabled="True"
-                        Margin="0,6,0,0" />
-            </StackPanel>
+                    <TextBlock Style="{StaticResource Setting.Hint}"
+                               Margin="0,2,0,0"
+                               Text="Насколько ярко строка дерева окрашена по доле размера." />
+                </StackPanel>
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            Margin="16,0,0,0"
+                            VerticalAlignment="Center">
+                    <Slider Minimum="{x:Static bootstrap:AppDefaults.IntensityMin}"
+                            Maximum="{x:Static bootstrap:AppDefaults.IntensityMax}"
+                            Value="{Binding Scan.Intensity, Mode=TwoWay}"
+                            TickFrequency="1"
+                            IsSnapToTickEnabled="True"
+                            Width="{StaticResource Setting.SliderWidth}"
+                            VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding Scan.Intensity, StringFormat=N0}"
+                               Style="{StaticResource Setting.Value}" />
+                </StackPanel>
+            </Grid>
 
             <CheckBox Content="Выделять файлы в проводнике, не запускать"
                       IsChecked="{Binding Scan.RevealFiles, Mode=TwoWay}"
                       Margin="0,16,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="При открытии файла из дерева проводник подсвечивает его в папке. Выключите, чтобы файл открывался программой по умолчанию (исполняемые при этом запускаются)." />
+            <TextBlock Style="{StaticResource Setting.CheckHint}"
+                       Text="Выключите, чтобы файл из дерева открывался программой по умолчанию." />
+            <Expander Style="{StaticResource Setting.CheckDetails}">
+                <TextBlock Style="{StaticResource Setting.Hint}"
+                           Text="При включённой настройке проводник подсвечивает файл в папке и ничего не выполняет. При выключенной исполняемые файлы запускаются." />
+            </Expander>
         </StackPanel>
-    </Border>
+    </Expander>
 </UserControl>

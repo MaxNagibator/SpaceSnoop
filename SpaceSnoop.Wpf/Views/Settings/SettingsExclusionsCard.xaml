@@ -6,7 +6,8 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
-             d:DesignWidth="900">
+             d:DesignWidth="900"
+             Visibility="{Binding Sections[sync].IsVisible, Converter={StaticResource BoolToVisibility}}">
 
     <UserControl.Resources>
         <ResourceDictionary>
@@ -16,37 +17,39 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource Card.Inset}"
-            Margin="0,0,0,10">
+    <Expander Style="{StaticResource Setting.Card}"
+              Header="{Binding Sections[sync].Title}"
+              IsExpanded="{Binding Sections[sync].IsExpanded, Mode=TwoWay}">
         <StackPanel>
-            <TextBlock Text="Синхронизация"
-                       Style="{StaticResource Setting.SectionTitle}" />
-
             <CheckBox Content="Автодополнение путей"
                       IsChecked="{Binding Operations.SyncPathSuggest, Mode=TwoWay}"
-                      Margin="0,14,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="Подсказывает существующие каталоги при вводе пути; перебор вариантов – стрелками ↑/↓." />
+            <TextBlock Style="{StaticResource Setting.CheckHint}"
+                       Text="Подсказывает существующие каталоги при вводе пути; перебор – стрелками ↑/↓." />
 
             <Grid Margin="0,16,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="240" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="Git-папки (.git)"
                                Style="{StaticResource Setting.Label}" />
-                    <TextBlock
-                        Text="Что делать, если при сравнении найдены служебные каталоги репозитория. Состояние репозитория (ветка, коммит) показывается над списком в любом случае."
-                        Style="{StaticResource Setting.Hint}"
-                        Margin="0,2,0,0" />
+                    <TextBlock Text="Что делать, если при сравнении найден служебный каталог репозитория."
+                               Style="{StaticResource Setting.Hint}"
+                               Margin="0,2,0,0" />
+                    <Expander Style="{StaticResource Setting.Details}">
+                        <TextBlock Style="{StaticResource Setting.Hint}"
+                                   Text="Настройка решает только, копировать ли сам каталог .git. Состояние репозитория – ветка, коммит, изменения – показывается над списком в любом случае." />
+                    </Expander>
                 </StackPanel>
                 <ComboBox Grid.Column="1"
                           Style="{StaticResource ComboBox.Form}"
                           ItemsSource="{Binding GitFolderOptions}"
                           SelectedItem="{Binding SelectedGitFolderOption}"
                           DisplayMemberPath="Label"
+                          Width="{StaticResource Setting.ControlWidth}"
+                          Margin="16,0,0,0"
                           VerticalAlignment="Center" />
             </Grid>
 
@@ -54,7 +57,7 @@
                        Style="{StaticResource Setting.Label}"
                        Margin="0,16,0,0" />
             <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="Glob-паттерны через запятую (напр. bin,obj,*.tmp). Подставляются в «Синхронизацию» при пустом поле исключений." />
+                       Text="Glob-паттерны через запятую (напр. bin,obj,*.tmp). Подставляются при пустом поле исключений." />
             <TextBox Style="{StaticResource TextBox.Form}"
                      Text="{Binding Operations.DefaultExclusions, UpdateSourceTrigger=PropertyChanged}"
                      FontFamily="{DynamicResource Font.Mono}"
@@ -64,11 +67,15 @@
                        Style="{StaticResource Setting.Label}"
                        Margin="0,16,0,0" />
             <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="Имена каталогов через запятую (напр. .git,bin,obj). В плоском виде «Синхронизации» их файлы собираются в свёрнутую группу «Служебные файлы» внизу списка. Пусто – без группировки." />
+                       Text="Имена каталогов через запятую (напр. .git,bin,obj). Пусто – без группировки." />
+            <Expander Style="{StaticResource Setting.Details}">
+                <TextBlock Style="{StaticResource Setting.Hint}"
+                           Text="В плоском виде «Синхронизации» файлы перечисленных каталогов собираются в свёрнутую группу «Служебные файлы» внизу списка. Из сравнения они при этом не исключаются – это делают исключения выше." />
+            </Expander>
             <TextBox Style="{StaticResource TextBox.Form}"
                      Text="{Binding Operations.GroupFolders, UpdateSourceTrigger=PropertyChanged}"
                      FontFamily="{DynamicResource Font.Mono}"
                      Margin="0,10,0,0" />
         </StackPanel>
-    </Border>
+    </Expander>
 </UserControl>

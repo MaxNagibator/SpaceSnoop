@@ -6,7 +6,8 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
-             d:DesignWidth="900">
+             d:DesignWidth="900"
+             Visibility="{Binding Sections[archive].IsVisible, Converter={StaticResource BoolToVisibility}}">
 
     <UserControl.Resources>
         <ResourceDictionary>
@@ -16,30 +17,33 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource Card.Inset}"
-            Margin="0,0,0,10">
+    <Expander Style="{StaticResource Setting.Card}"
+              Header="{Binding Sections[archive].Title}"
+              IsExpanded="{Binding Sections[archive].IsExpanded, Mode=TwoWay}">
         <StackPanel>
-            <TextBlock Text="Архивация"
-                       Style="{StaticResource Setting.SectionTitle}" />
-
-            <Grid Margin="0,14,0,0">
+            <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="240" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="Уровень сжатия .zip"
                                Style="{StaticResource Setting.Label}" />
-                    <TextBlock
-                        Text="Применяется при «Упаковать в архив». Уже сжатые данные (видео, фото, архивы) почти не уменьшаются."
-                        Style="{StaticResource Setting.Hint}"
-                        Margin="0,2,0,0" />
+                    <TextBlock Text="Применяется при «Упаковать в архив»."
+                               Style="{StaticResource Setting.Hint}"
+                               Margin="0,2,0,0" />
+                    <Expander Style="{StaticResource Setting.Details}">
+                        <TextBlock Style="{StaticResource Setting.Hint}"
+                                   Text="Уже сжатые данные – видео, фото, архивы – почти не уменьшаются, для них выигрыш даёт только упаковка множества файлов в один." />
+                    </Expander>
                 </StackPanel>
                 <ComboBox Grid.Column="1"
                           Style="{StaticResource ComboBox.Form}"
                           ItemsSource="{Binding CompressionOptions}"
                           SelectedItem="{Binding SelectedCompressionOption}"
                           DisplayMemberPath="Label"
+                          Width="{StaticResource Setting.ControlWidth}"
+                          Margin="16,0,0,0"
                           VerticalAlignment="Center" />
             </Grid>
 
@@ -47,8 +51,8 @@
                       IsChecked="{Binding Operations.DeleteOriginalAfterArchive, Mode=TwoWay}"
                       Margin="0,16,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="Оригинальная папка удаляется только после успешной проверки архива и попадает в корзину (можно восстановить)." />
+            <TextBlock Style="{StaticResource Setting.CheckHint}"
+                       Text="Только после успешной проверки архива и только в корзину – можно восстановить." />
         </StackPanel>
-    </Border>
+    </Expander>
 </UserControl>
