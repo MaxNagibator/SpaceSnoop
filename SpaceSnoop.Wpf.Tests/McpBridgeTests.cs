@@ -84,7 +84,7 @@ public class McpBridgeTests
     {
         var snapshot = PerformanceSnapshot.Empty with { SampleCount = 20, ObservedSpanSeconds = 13.5 };
 
-        Assert.That(McpBridge.DescribeWindow(snapshot), Does.StartWith("последние 13").And.EndWith("с (20 замеров)"));
+        Assert.That(McpBridge.DescribeWindow(snapshot), Does.StartWith("последние 13").And.Contains("(20 замеров)"));
     }
 
     [Test]
@@ -104,15 +104,18 @@ public class McpBridgeTests
     [Test]
     public void История_выходит_в_JSON_рядом_со_снимком()
     {
-        var json = JsonDocument.Parse(McpBridge.Serialize(Performance(McpBridge.DescribeHistory(History())))).RootElement;
+        var json = JsonDocument.Parse(McpBridge.Serialize(Performance(McpBridge.DescribeHistory(History(), 60, 240)))).RootElement;
         var history = json.GetProperty("history");
         var timeline = history.GetProperty("timeline");
 
         Assert.Multiple(() =>
         {
             Assert.That(history.GetProperty("points").GetInt32(), Is.EqualTo(2));
-            Assert.That(history.GetProperty("omitted").GetInt32(), Is.EqualTo(3));
-            Assert.That(history.GetProperty("gen0Collections").GetInt32(), Is.EqualTo(4));
+            Assert.That(history.GetProperty("folded").GetInt32(), Is.EqualTo(3));
+            Assert.That(history.GetProperty("requestedSeconds").GetInt32(), Is.EqualTo(60));
+            Assert.That(history.GetProperty("requestedPoints").GetInt32(), Is.EqualTo(240));
+            Assert.That(history.GetProperty("gen0CollectionsInWindow").GetInt32(), Is.EqualTo(4));
+            Assert.That(timeline[0].GetProperty("gen0CollectionsTotal").GetInt32(), Is.EqualTo(1));
             Assert.That(timeline.GetArrayLength(), Is.EqualTo(2));
             Assert.That(timeline[0].GetProperty("operation").GetString(), Is.EqualTo("Сканирование"));
             Assert.That(timeline[1].TryGetProperty("operation", out _), Is.False);
@@ -120,9 +123,43 @@ public class McpBridgeTests
     }
 
     [Test]
+    public void Накопительные_и_оконные_счётчики_GC_названы_по_разному()
+    {
+        var json = JsonDocument.Parse(McpBridge.Serialize(Performance(McpBridge.DescribeHistory(History(), 60, 240)))).RootElement;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(json.GetProperty("gen0CollectionsTotal").GetInt32(), Is.EqualTo(4));
+            Assert.That(json.TryGetProperty("gen0Collections", out _), Is.False);
+            Assert.That(json.GetProperty("history").TryGetProperty("gen0Collections", out _), Is.False);
+        });
+    }
+
+    [TestCase(0, 0)]
+    [TestCase(-5, 0)]
+    [TestCase(60, 60)]
+    [TestCase(int.MaxValue, AppDefaults.PerformanceHistorySecondsMax)]
+    public void Окно_истории_зажимается_в_диапазон(int requested, int expected)
+    {
+        Assert.That(McpBridge.ClampHistorySeconds(requested), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void Возраст_снимка_виден_агенту_чтобы_отличить_протухший()
+    {
+        var fresh = PerformanceSnapshot.Empty with { CapturedAtUtc = DateTime.UtcNow.AddSeconds(-30) };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(McpBridge.SnapshotAge(fresh).TotalSeconds, Is.EqualTo(30).Within(1));
+            Assert.That(McpBridge.SnapshotAge(PerformanceSnapshot.Empty), Is.EqualTo(TimeSpan.Zero));
+        });
+    }
+
+    [Test]
     public void Возраст_и_задержка_точки_округляются_до_десятых()
     {
-        var history = McpBridge.DescribeHistory(History());
+        var history = McpBridge.DescribeHistory(History(), 60, 240);
 
         Assert.Multiple(() =>
         {
@@ -203,6 +240,8 @@ public class McpBridgeTests
     private static McpPerformance Performance(McpPerformanceHistory? history)
     {
         return new(true,
+            DateTime.UnixEpoch,
+            0,
             "последние 10,0 с (20 замеров)",
             20,
             10,

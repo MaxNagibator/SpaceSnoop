@@ -26,6 +26,8 @@ internal sealed record McpScanNavigation(string Page, McpScanState Scan, string?
 
 internal sealed record McpPerformance(
     bool Collecting,
+    DateTime CapturedAtUtc,
+    double SnapshotAgeMs,
     string Window,
     int SampleCount,
     double ObservedSpanSeconds,
@@ -36,9 +38,9 @@ internal sealed record McpPerformance(
     string Managed,
     long WorkingSetBytes,
     string WorkingSet,
-    int Gen0Collections,
-    int Gen1Collections,
-    int Gen2Collections,
+    int Gen0CollectionsTotal,
+    int Gen1CollectionsTotal,
+    int Gen2CollectionsTotal,
     double StartupSeconds,
     McpPerformanceOperation? Operation,
     McpPerformanceHistory? History);
@@ -46,11 +48,13 @@ internal sealed record McpPerformance(
 internal sealed record McpPerformanceHistory(
     DateTime CapturedAtUtc,
     double SpanSeconds,
+    int RequestedSeconds,
+    int RequestedPoints,
     int Points,
-    int Omitted,
-    int Gen0Collections,
-    int Gen1Collections,
-    int Gen2Collections,
+    int Folded,
+    int Gen0CollectionsInWindow,
+    int Gen1CollectionsInWindow,
+    int Gen2CollectionsInWindow,
     IReadOnlyList<McpPerformancePoint> Timeline);
 
 internal sealed record McpPerformancePoint(
@@ -58,9 +62,9 @@ internal sealed record McpPerformancePoint(
     double UiDelayMs,
     long ManagedBytes,
     long WorkingSetBytes,
-    int Gen0Collections,
-    int Gen1Collections,
-    int Gen2Collections,
+    int Gen0CollectionsTotal,
+    int Gen1CollectionsTotal,
+    int Gen2CollectionsTotal,
     string? Operation);
 
 internal sealed record McpPerformanceOperation(
@@ -182,6 +186,10 @@ internal sealed record McpSyncResult(
     long CopiedBytes,
     string CopiedSize,
     bool Verified,
+    int ErrorCount,
+    int MismatchCount,
+    int OmittedErrors,
+    int OmittedMismatches,
     IReadOnlyList<SyncError> Errors,
     IReadOnlyList<SyncMismatch> Mismatches,
     string Summary,

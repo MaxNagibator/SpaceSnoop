@@ -64,6 +64,8 @@ public sealed class McpBridge(
         var snapshot = performance.Snapshot;
 
         return Serialize(new McpPerformance(performance.IsRunning,
+            snapshot.CapturedAtUtc,
+            Math.Round(SnapshotAge(snapshot).TotalMilliseconds),
             DescribeWindow(snapshot),
             snapshot.SampleCount,
             Math.Round(snapshot.ObservedSpanSeconds, 1),
@@ -465,8 +467,12 @@ public sealed class McpBridge(
             report.CopiedBytes,
             SizeFormatter.Format(report.CopiedBytes),
             report.Verified,
-            report.Errors,
-            report.Mismatches,
+            report.Errors.Count,
+            report.Mismatches.Count,
+            Math.Max(0, report.Errors.Count - entryLimit),
+            Math.Max(0, report.Mismatches.Count - entryLimit),
+            [.. report.Errors.Take(entryLimit)],
+            [.. report.Mismatches.Take(entryLimit)],
             sync.SummaryText,
             ReadSyncState())));
     }
@@ -478,17 +484,29 @@ public sealed class McpBridge(
 
     internal static int ClampHistoryPoints(int points)
     {
-        return Math.Clamp(points, 1, AppDefaults.PerformanceHistoryPointsMax);
+        return Math.Clamp(points, AppDefaults.PerformanceHistoryPointsMin, AppDefaults.PerformanceHistoryPointsMax);
+    }
+
+    internal static int ClampHistorySeconds(int seconds)
+    {
+        return Math.Clamp(seconds, 0, AppDefaults.PerformanceHistorySecondsMax);
+    }
+
+    internal static TimeSpan SnapshotAge(PerformanceSnapshot snapshot)
+    {
+        return snapshot.CapturedAtUtc == DateTime.MinValue
+            ? TimeSpan.Zero
+            : DateTime.UtcNow - snapshot.CapturedAtUtc;
     }
 
     internal static string DescribeWindow(PerformanceSnapshot snapshot)
     {
         return snapshot.SampleCount == 0
             ? "замеров ещё нет"
-            : $"последние {snapshot.ObservedSpanSeconds:N1} с ({snapshot.SampleCount:N0} замеров)";
+            : $"последние {snapshot.ObservedSpanSeconds:N1} с ({Plural.Format(snapshot.SampleCount, "замер", "замера", "замеров")}), история – отдельно по historySeconds";
     }
 
-    internal static McpPerformanceHistory DescribeHistory(PerformanceHistory history)
+    internal static McpPerformanceHistory DescribeHistory(PerformanceHistory history, int requestedSeconds, int requestedPoints)
     {
         var timeline = history.Points
             .Select(static point => new McpPerformancePoint(Math.Round(point.AgeMs, 1),
@@ -503,8 +521,10 @@ public sealed class McpBridge(
 
         return new(history.CapturedAtUtc,
             Math.Round(history.SpanSeconds, 1),
+            requestedSeconds,
+            requestedPoints,
             timeline.Count,
-            history.Omitted,
+            history.Folded,
             history.Gen0Collections,
             history.Gen1Collections,
             history.Gen2Collections,
@@ -575,12 +595,16 @@ public sealed class McpBridge(
 
     private McpPerformanceHistory? ReadHistory(int historySeconds, int historyPoints)
     {
-        if (historySeconds <= 0)
+        var seconds = ClampHistorySeconds(historySeconds);
+
+        if (seconds == 0)
         {
             return null;
         }
 
-        return DescribeHistory(performance.CaptureHistory(TimeSpan.FromSeconds(historySeconds), ClampHistoryPoints(historyPoints)));
+        var points = ClampHistoryPoints(historyPoints);
+
+        return DescribeHistory(performance.CaptureHistory(TimeSpan.FromSeconds(seconds), points), seconds, points);
     }
 
     private static McpPerformanceOperation? DescribeOperation(PerformanceOperation? operation)
