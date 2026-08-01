@@ -4,9 +4,11 @@ namespace SpaceSnoop.Wpf.Converters;
 
 public static class HeatColor
 {
-    private const double HueGreen = 130.0;
-    private const double Saturation = 0.62;
-    private const double Value = 0.82;
+    private const double ClayHue = 15.0;
+    private const double SaturationCool = 0.14;
+    private const double SaturationHot = 0.78;
+    private const double ValueCool = 0.88;
+    private const double ValueHot = 0.66;
     private const double ExponentBase = 8.0;
 
     public static Color From(double fraction, double intensity)
@@ -15,9 +17,10 @@ public static class HeatColor
         intensity = Math.Clamp(intensity, AppDefaults.IntensityMin, AppDefaults.IntensityMax);
 
         var adjusted = Math.Pow(fraction, ExponentBase / intensity);
-        var hue = HueGreen * (1 - adjusted);
+        var saturation = SaturationCool + ((SaturationHot - SaturationCool) * adjusted);
+        var value = ValueCool - ((ValueCool - ValueHot) * adjusted);
 
-        return FromHsv(hue, Saturation, Value);
+        return FromHsv(ClayHue, saturation, value);
     }
 
     private static Color FromHsv(double hue, double saturation, double value)
