@@ -25,18 +25,21 @@
             </StackPanel>
         </StackPanel.ToolTip>
 
-        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Activity}"
-                                  Width="11"
+        <iconPacks:PackIconLucide Width="11"
                                   Height="11"
                                   VerticalAlignment="Center"
                                   Margin="0,0,6,0">
             <iconPacks:PackIconLucide.Style>
                 <Style TargetType="iconPacks:PackIconLucide">
+                    <Setter Property="Kind"
+                            Value="{x:Static iconPacks:PackIconLucideKind.Activity}" />
                     <Setter Property="Foreground"
                             Value="{DynamicResource Fg.Muted}" />
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding IsHitch}"
                                      Value="True">
+                            <Setter Property="Kind"
+                                    Value="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}" />
                             <Setter Property="Foreground"
                                     Value="{DynamicResource State.Warning}" />
                         </DataTrigger>

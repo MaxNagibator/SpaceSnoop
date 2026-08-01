@@ -178,11 +178,6 @@ public sealed class PerformanceChartCanvas : FrameworkElement
             pen.DashCap = PenLineCap.Flat;
         }
 
-        if (pen.CanFreeze)
-        {
-            pen.Freeze();
-        }
-
         return pen;
     }
 

@@ -16,15 +16,11 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <DockPanel Grid.Row="0"
+        <WrapPanel Grid.Row="0"
                    Margin="0,0,0,6"
                    Visibility="{Binding Data.HasData, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
-            <TextBlock DockPanel.Dock="Right"
-                       Text="{Binding WindowText}"
-                       Style="{StaticResource TextBlock.Subtle}"
-                       VerticalAlignment="Center" />
-
-            <StackPanel Orientation="Horizontal">
+            <StackPanel Orientation="Horizontal"
+                        Margin="0,0,16,0">
                 <Line X1="0"
                       Y1="0"
                       X2="16"
@@ -36,8 +32,12 @@
 
                 <TextBlock Text="{Binding DelayText}"
                            Style="{StaticResource TextBlock.Subtle}"
-                           VerticalAlignment="Center" />
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" />
+            </StackPanel>
 
+            <StackPanel Orientation="Horizontal"
+                        Margin="0,0,16,0">
                 <Line X1="0"
                       Y1="0"
                       X2="16"
@@ -46,13 +46,48 @@
                       StrokeThickness="1"
                       StrokeDashArray="3 3"
                       VerticalAlignment="Center"
-                      Margin="16,0,6,0" />
+                      Margin="0,0,6,0" />
 
                 <TextBlock Text="{Binding MemoryText}"
                            Style="{StaticResource TextBlock.Subtle}"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal"
+                        Margin="0,0,16,0">
+                <Line X1="0"
+                      Y1="0"
+                      X2="16"
+                      Y2="0"
+                      Stroke="{DynamicResource State.Warning}"
+                      StrokeThickness="1"
+                      StrokeDashArray="2 4"
+                      VerticalAlignment="Center"
+                      Margin="0,0,6,0" />
+
+                <TextBlock Text="{Binding ThresholdText}"
+                           Style="{StaticResource TextBlock.Subtle}"
                            VerticalAlignment="Center" />
             </StackPanel>
-        </DockPanel>
+
+            <StackPanel Orientation="Horizontal"
+                        Margin="0,0,16,0">
+                <Rectangle Width="16"
+                           Height="10"
+                           Fill="{DynamicResource Accent.Soft}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,6,0" />
+
+                <TextBlock Text="шла операция"
+                           Style="{StaticResource TextBlock.Subtle}"
+                           VerticalAlignment="Center" />
+            </StackPanel>
+
+            <TextBlock Text="{Binding WindowText}"
+                       Style="{StaticResource TextBlock.Subtle}"
+                       VerticalAlignment="Center" />
+        </WrapPanel>
 
         <Border Grid.Row="1"
                 Height="120"
@@ -60,18 +95,14 @@
                 BorderBrush="{DynamicResource Border.Subtle}"
                 BorderThickness="1"
                 CornerRadius="{DynamicResource Radius.S}"
-                ClipToBounds="True">
+                ClipToBounds="True"
+                Focusable="True"
+                AutomationProperties.Name="График производительности"
+                AutomationProperties.HelpText="{Binding ChartDescription}">
             <Border.ToolTip>
-                <StackPanel MaxWidth="420">
-                    <TextBlock Text="Сплошная линия – задержка UI-потока: чем выше, тем дольше поток был занят. Поперечный пунктир – порог просадки 500 мс, с которого просадка попадает в журнал."
-                               TextWrapping="Wrap" />
-                    <TextBlock Text="Пунктирная линия – занятая управляемая память, растянутая по диапазону от минимума к максимуму окна: она показывает форму роста, а не абсолютную величину."
-                               TextWrapping="Wrap"
-                               Margin="0,6,0,0" />
-                    <TextBlock Text="Заливка – промежутки, когда шла операция: сканирование, сравнение, синхронизация."
-                               TextWrapping="Wrap"
-                               Margin="0,6,0,0" />
-                </StackPanel>
+                <TextBlock Text="{Binding ChartDescription}"
+                           MaxWidth="420"
+                           TextWrapping="Wrap" />
             </Border.ToolTip>
 
             <Grid>
@@ -86,6 +117,9 @@
                            Style="{StaticResource TextBlock.Subtle}"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center"
+                           Margin="12,0"
+                           TextWrapping="Wrap"
+                           TextAlignment="Center"
                            Visibility="{Binding Data.HasData, Converter={StaticResource InverseBoolToVisibility}, FallbackValue=Visible}" />
             </Grid>
         </Border>

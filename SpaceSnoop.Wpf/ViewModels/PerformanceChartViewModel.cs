@@ -31,7 +31,7 @@ public sealed partial class PerformanceChartViewModel : ObservableObject, ILogsP
         _monitor = monitor;
         _settings = settings;
 
-        _timer = new(DispatcherPriority.Background)
+        _timer = new(DispatcherPriority.Background, Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher)
         {
             Interval = TimeSpan.FromMilliseconds(AppDefaults.PerformanceChartRefreshMs),
         };
@@ -42,6 +42,14 @@ public sealed partial class PerformanceChartViewModel : ObservableObject, ILogsP
     }
 
     public string Title => "График производительности";
+
+    public string ThresholdText => $"порог {AppDefaults.PerformanceHitchMs} мс";
+
+    public string ChartDescription =>
+        "Сплошная линия – задержка UI-потока: чем выше, тем дольше поток был занят, шкала идёт от нуля до пика окна. "
+        + $"Поперечный пунктир – порог просадки {AppDefaults.PerformanceHitchMs} мс, с которого просадка попадает в журнал; он виден, только когда пик до него дошёл. "
+        + "Частый пунктир – занятая управляемая память, растянутая от минимума окна к максимуму: он показывает форму роста, а не абсолютную величину. "
+        + "Заливка – промежутки, когда шла операция: сканирование, сравнение, синхронизация.";
 
     public void SetActive(bool active)
     {
@@ -63,6 +71,11 @@ public sealed partial class PerformanceChartViewModel : ObservableObject, ILogsP
 
     private void OnTick(object? sender, EventArgs e)
     {
+        if (Application.Current?.MainWindow?.WindowState == WindowState.Minimized)
+        {
+            return;
+        }
+
         Refresh();
     }
 
@@ -70,7 +83,7 @@ public sealed partial class PerformanceChartViewModel : ObservableObject, ILogsP
     {
         _monitor.Start();
 
-        var data = PerformanceChartLayout.Build(_monitor.CaptureHistory(TimeSpan.Zero, AppDefaults.PerformanceHistorySamples));
+        var data = PerformanceChartLayout.Build(_monitor.CaptureHistory(TimeSpan.Zero, AppDefaults.PerformanceHistoryPointsMax));
 
         Data = data;
         DelayText = PerformanceFormat.ChartDelay(data);
