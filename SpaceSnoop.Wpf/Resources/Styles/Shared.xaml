@@ -34,6 +34,20 @@
                 Value="Center" />
     </Style>
 
+    <Style x:Key="DialogTitle"
+           TargetType="TextBlock">
+        <Setter Property="FontFamily"
+                Value="{DynamicResource Font.Display}" />
+        <Setter Property="FontSize"
+                Value="{DynamicResource Font.Size.XL}" />
+        <Setter Property="FontWeight"
+                Value="SemiBold" />
+        <Setter Property="Foreground"
+                Value="{DynamicResource Fg.Primary}" />
+        <Setter Property="TextWrapping"
+                Value="Wrap" />
+    </Style>
+
     <Style x:Key="StatValue"
            TargetType="TextBlock">
         <Setter Property="FontFamily"
@@ -85,6 +99,21 @@
 
     <SolidColorBrush x:Key="Sync.Modified"
                      Color="{StaticResource Heat.Color1}" />
+
+    <SolidColorBrush x:Key="Diff.RemovedBg"
+                     Color="#38A84625" />
+
+    <SolidColorBrush x:Key="Diff.AddedBg"
+                     Color="#4D6E8CA8" />
+
+    <SolidColorBrush x:Key="Diff.RemovedStrong"
+                     Color="#70A84625" />
+
+    <SolidColorBrush x:Key="Diff.AddedStrong"
+                     Color="#856E8CA8" />
+
+    <SolidColorBrush x:Key="Diff.EmptyBg"
+                     Color="#14808080" />
 
     <LinearGradientBrush x:Key="HeatSpectrum"
                          StartPoint="0,0"

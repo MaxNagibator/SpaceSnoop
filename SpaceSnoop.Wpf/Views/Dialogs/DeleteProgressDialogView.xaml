@@ -10,7 +10,7 @@
              d:DesignHeight="520"
              d:DesignWidth="640"
              Width="{DynamicResource Dialog.Width.Medium}"
-             MinHeight="380"
+             MinHeight="260"
              AutomationProperties.Name="{Binding Title}">
 
     <UserControl.Resources>
@@ -58,6 +58,20 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="RowParent"
+               TargetType="TextBlock">
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Setter Property="Margin"
+                    Value="10,0,0,0" />
+            <Setter Property="TextTrimming"
+                    Value="CharacterEllipsis" />
+            <Setter Property="FontSize"
+                    Value="{DynamicResource Font.Size.Caption}" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Muted}" />
+        </Style>
+
         <Style x:Key="RowPath"
                TargetType="TextBlock">
             <Setter Property="VerticalAlignment"
@@ -103,7 +117,7 @@
                                       Margin="0,0,10,0"
                                       Foreground="{DynamicResource State.Error}" />
             <TextBlock Text="{Binding Title}"
-                       Style="{StaticResource TextBlock.Heading}"
+                       Style="{StaticResource DialogTitle}"
                        VerticalAlignment="Center" />
         </StackPanel>
 
@@ -124,7 +138,7 @@
                 Style="{StaticResource Card.Inset}"
                 Padding="6"
                 Margin="0,14,0,0"
-                MinHeight="150">
+                MinHeight="88">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <ItemsControl ItemsSource="{Binding Items}"
                               Grid.IsSharedSizeScope="True"
@@ -143,9 +157,18 @@
                                 <iconPacks:PackIconLucide Grid.Column="0"
                                                           Style="{StaticResource RowGlyph}" />
 
-                                <TextBlock Grid.Column="1"
-                                           Text="{Binding Path}"
-                                           Style="{StaticResource RowPath}" />
+                                <Grid Grid.Column="1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Text="{Binding Name}"
+                                               Style="{StaticResource RowPath}" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding ParentPath}"
+                                               Style="{StaticResource RowParent}" />
+                                </Grid>
 
                                 <TextBlock Grid.Column="2"
                                            Text="{Binding SizeText}"
@@ -227,7 +250,7 @@
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Visibility="{Binding IsIdle, Converter={StaticResource BoolToVisibility}}">
-                <Button Style="{StaticResource Button.Ghost}"
+                <Button Style="{StaticResource Button.Secondary}"
                         Command="{Binding CloseCommand}"
                         Content="Отмена"
                         MinWidth="96"
@@ -254,7 +277,7 @@
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
-                <Button Style="{StaticResource Button.Ghost}"
+                <Button Style="{StaticResource Button.Secondary}"
                         Command="{Binding CancelRunCommand}"
                         Content="Отменить удаление"
                         MinWidth="96"
@@ -265,7 +288,7 @@
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Visibility="{Binding IsFinished, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
-                <Button Style="{StaticResource Button.Primary}"
+                <Button Style="{StaticResource Button.Secondary}"
                         Command="{Binding CloseCommand}"
                         Content="Закрыть"
                         MinWidth="96"

@@ -30,7 +30,7 @@
                                       Margin="0,0,10,0"
                                       Foreground="{DynamicResource Accent.Primary}" />
             <TextBlock Text="{Binding Title}"
-                       Style="{StaticResource TextBlock.Heading}"
+                       Style="{StaticResource DialogTitle}"
                        VerticalAlignment="Center" />
         </StackPanel>
 
@@ -147,7 +147,7 @@
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Visibility="{Binding IsIdle, Converter={StaticResource BoolToVisibility}}">
-                <Button Style="{StaticResource Button.Ghost}"
+                <Button Style="{StaticResource Button.Secondary}"
                         Command="{Binding CloseCommand}"
                         Content="Отмена"
                         MinWidth="96"
@@ -174,7 +174,7 @@
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
-                <Button Style="{StaticResource Button.Ghost}"
+                <Button Style="{StaticResource Button.Secondary}"
                         Command="{Binding CancelRunCommand}"
                         Content="Отменить"
                         MinWidth="96"
@@ -185,7 +185,7 @@
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Visibility="{Binding IsFinished, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
-                <Button Style="{StaticResource Button.Primary}"
+                <Button Style="{StaticResource Button.Secondary}"
                         Command="{Binding CloseCommand}"
                         Content="Закрыть"
                         MinWidth="96"

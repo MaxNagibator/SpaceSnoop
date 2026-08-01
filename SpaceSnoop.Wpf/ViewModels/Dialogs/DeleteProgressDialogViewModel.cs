@@ -55,7 +55,7 @@ public sealed partial class DeleteProgressDialogViewModel : ObservableObject, ID
         _totalBytes = items.Sum(static item => item.TotalSize);
 
         ActionVerb = permanent ? "удалены безвозвратно" : "перемещены в корзину";
-        IntroText = $"Будут {ActionVerb}: {Items.Count} элемент(ов) · {SizeFormatter.Format(_totalBytes)}";
+        IntroText = $"Будут {ActionVerb}: {Plural.Format(Items.Count, "объект", "объекта", "объектов")} · {SizeFormatter.Format(_totalBytes)}";
         _countText = $"0 / {Items.Count}";
         _freedText = SizeFormatter.Format(0);
     }

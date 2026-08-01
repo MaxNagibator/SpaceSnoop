@@ -12,22 +12,10 @@
              d:DesignHeight="600"
              d:DesignWidth="980"
              Width="980"
-             MinHeight="560"
+             MinHeight="260"
              AutomationProperties.Name="Сравнение содержимого файла">
 
     <UserControl.Resources>
-        <!-- TODO: фиксированные тинты под схему направлений дерева (левое/удалено = зелёный Success как LeftOnly, правое/добавлено = синий Info как RightOnly); в теме нет subtle-фон токенов для +/−, апгрейд на токены KeepShell, если появятся -->
-        <SolidColorBrush x:Key="Diff.AddedBg"
-                         Color="#333B82F6" />
-        <SolidColorBrush x:Key="Diff.RemovedBg"
-                         Color="#3327C93F" />
-        <SolidColorBrush x:Key="Diff.EmptyBg"
-                         Color="#14808080" />
-        <SolidColorBrush x:Key="Diff.AddedStrong"
-                         Color="#663B82F6" />
-        <SolidColorBrush x:Key="Diff.RemovedStrong"
-                         Color="#6627C93F" />
-
         <Style x:Key="DiffNum"
                TargetType="TextBlock">
             <Setter Property="FontFamily"
@@ -83,7 +71,7 @@
                 <DataTrigger Binding="{Binding Kind}"
                              Value="Removed">
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Success}" />
+                            Value="{DynamicResource Sync.LeftOnly}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -96,12 +84,12 @@
                 <DataTrigger Binding="{Binding Kind}"
                              Value="Added">
                     <Setter Property="Background"
-                            Value="{StaticResource Diff.AddedBg}" />
+                            Value="{DynamicResource Diff.AddedBg}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Kind}"
                              Value="Removed">
                     <Setter Property="Background"
-                            Value="{StaticResource Diff.RemovedBg}" />
+                            Value="{DynamicResource Diff.RemovedBg}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -114,12 +102,12 @@
                 <DataTrigger Binding="{Binding LeftKind}"
                              Value="Removed">
                     <Setter Property="Background"
-                            Value="{StaticResource Diff.RemovedBg}" />
+                            Value="{DynamicResource Diff.RemovedBg}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding LeftKind}"
                              Value="None">
                     <Setter Property="Background"
-                            Value="{StaticResource Diff.EmptyBg}" />
+                            Value="{DynamicResource Diff.EmptyBg}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -132,12 +120,12 @@
                 <DataTrigger Binding="{Binding RightKind}"
                              Value="Added">
                     <Setter Property="Background"
-                            Value="{StaticResource Diff.AddedBg}" />
+                            Value="{DynamicResource Diff.AddedBg}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding RightKind}"
                              Value="None">
                     <Setter Property="Background"
-                            Value="{StaticResource Diff.EmptyBg}" />
+                            Value="{DynamicResource Diff.EmptyBg}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -186,9 +174,9 @@
                                           Height="20"
                                           VerticalAlignment="Center"
                                           Margin="0,0,10,0"
-                                          Foreground="{DynamicResource State.Info}" />
+                                          Foreground="{DynamicResource Fg.Secondary}" />
                 <TextBlock Text="{Binding Name}"
-                           Style="{StaticResource TextBlock.Heading}"
+                           Style="{StaticResource DialogTitle}"
                            VerticalAlignment="Center" />
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center"
@@ -202,7 +190,7 @@
                                FontWeight="Medium"
                                VerticalAlignment="Center"
                                Margin="0,0,8,0"
-                               Foreground="{DynamicResource State.Success}" />
+                               Foreground="{DynamicResource Sync.LeftOnly}" />
                     <TextBlock Text="{Binding Added, StringFormat=+{0}}"
                                FontFamily="{DynamicResource Font.Mono}"
                                FontSize="{DynamicResource Font.Size.S}"
@@ -390,7 +378,7 @@
                                            Style="{StaticResource DiffNum}" />
                                 <TextBlock Grid.Column="1"
                                            behaviors:DiffInline.Spans="{Binding LeftSpans}"
-                                           behaviors:DiffInline.ChangedBrush="{StaticResource Diff.RemovedStrong}"
+                                           behaviors:DiffInline.ChangedBrush="{DynamicResource Diff.RemovedStrong}"
                                            Style="{StaticResource DiffText}"
                                            ToolTip="{Binding LeftText}" />
                                 <Border Grid.Column="2"
@@ -400,7 +388,7 @@
                                            Style="{StaticResource DiffNum}" />
                                 <TextBlock Grid.Column="4"
                                            behaviors:DiffInline.Spans="{Binding RightSpans}"
-                                           behaviors:DiffInline.ChangedBrush="{StaticResource Diff.AddedStrong}"
+                                           behaviors:DiffInline.ChangedBrush="{DynamicResource Diff.AddedStrong}"
                                            Style="{StaticResource DiffText}"
                                            ToolTip="{Binding RightText}" />
                             </Grid>
@@ -471,7 +459,7 @@
         <Grid Grid.Row="4"
               Margin="0,18,0,0">
             <Button HorizontalAlignment="Right"
-                    Style="{StaticResource Button.Primary}"
+                    Style="{StaticResource Button.Secondary}"
                     Command="{Binding CloseCommand}"
                     Content="Закрыть"
                     MinWidth="96"

@@ -17,7 +17,7 @@
             <docker:DockerUnavailableView />
             <docker:DockerBucketsView />
             <docker:DockerGroupsView />
-            <docker:DockerCleanupView />
+            <docker:DockerCleanupView x:Name="Cleanup" />
         </StackPanel>
     </ScrollViewer>
 </UserControl>

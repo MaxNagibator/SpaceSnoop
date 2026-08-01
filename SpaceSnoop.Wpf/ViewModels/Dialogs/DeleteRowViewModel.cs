@@ -12,6 +12,10 @@ public sealed partial class DeleteRowViewModel(SpaceBase space) : ObservableObje
 
     public string Path { get; } = space.AbsolutePath;
 
+    public string Name { get; } = space.Name;
+
+    public string ParentPath { get; } = System.IO.Path.GetDirectoryName(space.AbsolutePath) ?? string.Empty;
+
     public string SizeText { get; } = SizeFormatter.Format(space.TotalSize);
 
     public bool IsDirectory { get; } = space is DirectorySpace;

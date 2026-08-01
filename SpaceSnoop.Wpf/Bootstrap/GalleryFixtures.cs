@@ -10,6 +10,32 @@ public static class GalleryFixtures
 
     private static readonly DateTime Base = new(2025, 3, 14, 9, 30, 0, DateTimeKind.Local);
 
+    private static readonly string[] LeftNotes =
+    [
+        "# Заметки по переносу",
+        string.Empty,
+        "Каталог проекта переезжает на внешний диск раз в сутки.",
+        "Исключения: bin, obj, временные файлы сборки.",
+        string.Empty,
+        "## Проверить перед запуском",
+        "- свободное место на приёмнике",
+        "- расписание задачи в планировщике",
+        "- журнал прошлого прогона",
+    ];
+
+    private static readonly string[] RightNotes =
+    [
+        "# Заметки по переносу",
+        string.Empty,
+        "Каталог проекта переезжает на внешний диск раз в сутки.",
+        "Исключения: bin, obj, кэш пакетов, временные файлы сборки.",
+        string.Empty,
+        "## Проверить перед запуском",
+        "- свободное место на приёмнике",
+        "- журнал прошлого прогона",
+        "- отчёт сверки после переноса",
+    ];
+
     public static GalleryFixture Create()
     {
         var root = Path.Combine(Path.GetTempPath(), FolderName);
@@ -22,6 +48,7 @@ public static class GalleryFixtures
         WriteTree(right);
 
         File.Delete(Path.Combine(right, "docs", "план.txt"));
+        WriteText(Path.Combine(right, "docs", "заметки.md"), RightNotes, Base.AddHours(-1));
         Write(Path.Combine(right, "media", "обложка.png"), 512_000, Base.AddDays(-2));
         Write(Path.Combine(right, "docs", "README.md"), 12_000, Base.AddHours(-30));
         Write(Path.Combine(right, "архив", "прошлый-год.zip"), 3_400_000, Base.AddDays(-40));
@@ -85,6 +112,7 @@ public static class GalleryFixtures
         Write(Path.Combine(root, "docs", "README.md"), 11_800, Base.AddHours(-4));
         Write(Path.Combine(root, "docs", "спецификация.docx"), 348_000, Base.AddDays(-9));
         Write(Path.Combine(root, "docs", "план.txt"), 2_400, Base.AddDays(-1));
+        WriteText(Path.Combine(root, "docs", "заметки.md"), LeftNotes, Base.AddHours(-6));
 
         Write(Path.Combine(root, "media", "разбор-логов.mp4"), 6_200_000, Base.AddDays(-3));
         Write(Path.Combine(root, "media", "обложка.png"), 806_000, Base.AddDays(-2));
@@ -96,6 +124,13 @@ public static class GalleryFixtures
         {
             Write(Path.Combine(root, "cache", $"chunk-{index:00}.bin"), 4_096 + (index * 512), Base.AddMinutes(-index));
         }
+    }
+
+    private static void WriteText(string path, IReadOnlyList<string> lines, DateTime modified)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllLines(path, lines);
+        File.SetLastWriteTime(path, modified);
     }
 
     private static void Write(string path, int size, DateTime modified)

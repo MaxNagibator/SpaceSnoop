@@ -16,6 +16,8 @@ public class GalleryOptionsTests
         {
             Assert.That(options.Directory, Is.EqualTo(Default));
             Assert.That(options.Pages, Is.EqualTo(SectionKey.All));
+            Assert.That(options.Dialogs, Is.EqualTo(GalleryDialogs.All));
+            Assert.That(options.Element, Is.Empty);
             Assert.That(options.Themes, Is.EqualTo(new[] { AppTheme.Light, AppTheme.Dark }));
             Assert.That(options.Width, Is.EqualTo(AppDefaults.GalleryWidthDefault));
             Assert.That(options.Scale, Is.EqualTo(AppDefaults.ViewCaptureScaleDefault));
@@ -33,6 +35,38 @@ public class GalleryOptionsTests
             Assert.That(options.Directory, Is.EqualTo(@"D:\out"));
             Assert.That(options.Themes, Is.EqualTo(new[] { AppTheme.Dark }));
         });
+    }
+
+    [Test]
+    public void Диалоги_разбираются_без_повторов_а_none_отключает_их_съёмку()
+    {
+        var picked = GalleryOptions.Parse(["--dialogs", "diff,confirm,diff"], Default);
+        var off = GalleryOptions.Parse(["--dialogs", GalleryOptions.NoneValue], Default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(picked.Dialogs, Is.EqualTo(new[] { GalleryDialogs.Diff, GalleryDialogs.Confirm }));
+            Assert.That(off.Dialogs, Is.Empty);
+            Assert.That(off.Unknown, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Незнакомый_диалог_докладывается_а_остальные_снимаются()
+    {
+        var options = GalleryOptions.Parse(["--dialogs", "diff,вьюха"], Default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(options.Dialogs, Is.EqualTo(new[] { GalleryDialogs.Diff }));
+            Assert.That(options.Unknown, Is.EqualTo(new[] { "вьюха" }));
+        });
+    }
+
+    [Test]
+    public void Элемент_снимка_берётся_из_ключа_как_есть()
+    {
+        Assert.That(GalleryOptions.Parse(["--element", "Cleanup"], Default).Element, Is.EqualTo("Cleanup"));
     }
 
     [Test]

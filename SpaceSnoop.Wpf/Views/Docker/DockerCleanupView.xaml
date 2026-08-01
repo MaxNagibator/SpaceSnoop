@@ -8,20 +8,6 @@
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:DockerViewModel}">
     <UserControl.Resources>
-        <Style x:Key="Docker.SectionTitle"
-               TargetType="TextBlock">
-            <Setter Property="FontWeight"
-                    Value="{DynamicResource Font.Weight.SemiBold}" />
-            <Setter Property="Foreground"
-                    Value="{DynamicResource Fg.Primary}" />
-        </Style>
-        <Style x:Key="Docker.ColumnHeader"
-               TargetType="TextBlock">
-            <Setter Property="Foreground"
-                    Value="{DynamicResource Fg.Muted}" />
-            <Setter Property="FontSize"
-                    Value="{DynamicResource Font.Size.S}" />
-        </Style>
         <Style x:Key="Docker.ActionButtonContent"
                TargetType="iconPacks:PackIconLucide">
             <Setter Property="Width"
@@ -33,21 +19,26 @@
             <Setter Property="Margin"
                     Value="0,0,8,0" />
         </Style>
+        <Style x:Key="Docker.DangerGlyph"
+               TargetType="iconPacks:PackIconLucide"
+               BasedOn="{StaticResource Docker.ActionButtonContent}">
+            <Setter Property="Foreground"
+                    Value="{DynamicResource State.Error}" />
+        </Style>
     </UserControl.Resources>
 
     <Border Style="{StaticResource Card.Inset}"
             Margin="0,0,0,2">
         <StackPanel>
             <TextBlock Text="Очистка"
-                       Style="{StaticResource Docker.SectionTitle}" />
+                       Style="{StaticResource SectionTitle}" />
             <TextBlock Text="Операции Docker безвозвратны – мимо корзины. Каждая спросит подтверждение."
                        Style="{StaticResource TextBlock.Subtle}"
-                       Foreground="{DynamicResource Fg.Muted}"
                        TextWrapping="Wrap"
                        Margin="0,4,0,0" />
 
             <TextBlock Text="Безопасно"
-                       Style="{StaticResource Docker.ColumnHeader}"
+                       Style="{StaticResource Caption}"
                        Margin="0,14,0,6" />
             <WrapPanel>
                 <Button Style="{StaticResource Button.Base}"
@@ -88,58 +79,77 @@
                 </Button>
             </WrapPanel>
 
-            <TextBlock Text="Агрессивно – безвозвратно"
-                       Style="{StaticResource Docker.ColumnHeader}"
-                       Foreground="{DynamicResource State.Warning}"
-                       Margin="0,10,0,6" />
+            <Grid Margin="0,10,0,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <iconPacks:PackIconLucide Grid.Column="0"
+                                          Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
+                                          Width="13"
+                                          Height="13"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,7,0"
+                                          AutomationProperties.Name="Предупреждение"
+                                          Foreground="{DynamicResource State.Error}" />
+                <TextBlock Grid.Column="1"
+                           Text="Уберут и то, что ещё может понадобиться"
+                           Style="{StaticResource Caption}" />
+            </Grid>
             <WrapPanel>
-                <Button Style="{StaticResource Button.Destructive}"
+                <Button Style="{StaticResource Button.Base}"
                         Command="{Binding PruneUnusedImagesCommand}"
                         IsEnabled="{Binding CanRun}"
                         Margin="0,0,8,8"
                         ToolTip="docker image prune -a">
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
-                                                  Style="{StaticResource Docker.ActionButtonContent}" />
+                                                  Style="{StaticResource Docker.DangerGlyph}" />
                         <TextBlock Text="Неиспользуемые образы"
                                    VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>
-                <Button Style="{StaticResource Button.Destructive}"
+                <Button Style="{StaticResource Button.Base}"
                         Command="{Binding PruneVolumesCommand}"
                         IsEnabled="{Binding CanRun}"
                         Margin="0,0,8,8"
                         ToolTip="docker volume prune – в томах лежат данные!">
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Database}"
-                                                  Style="{StaticResource Docker.ActionButtonContent}" />
+                                                  Style="{StaticResource Docker.DangerGlyph}" />
                         <TextBlock Text="Неиспользуемые тома"
                                    VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>
-                <CheckBox Content="включая именованные (-a)"
-                          IsChecked="{Binding PruneAllVolumes}"
-                          IsEnabled="{Binding CanRun}"
-                          VerticalAlignment="Center"
-                          Margin="0,0,8,8"
-                          ToolTip="docker volume prune -a – снесёт и именованные тома, не только анонимные" />
             </WrapPanel>
+            <CheckBox Content="Удалять и именованные тома, не только анонимные"
+                      IsChecked="{Binding PruneAllVolumes}"
+                      IsEnabled="{Binding CanRun}"
+                      HorizontalAlignment="Left"
+                      Margin="0,0,0,2"
+                      ToolTip="docker volume prune -a" />
 
-            <Separator Margin="0,10"
+            <Separator Margin="0,12"
                        Background="{DynamicResource Border.Subtle}" />
 
             <TextBlock Text="Вернуть место на диск"
-                       Style="{StaticResource Docker.ColumnHeader}"
-                       Margin="0,0,0,2" />
+                       Style="{StaticResource Caption}"
+                       Margin="0,0,0,4" />
             <TextBlock TextWrapping="Wrap"
                        Style="{StaticResource TextBlock.Subtle}"
-                       Foreground="{DynamicResource Fg.Muted}"
-                       Margin="0,0,0,8"
-                       Text="Экспериментальная операция: после очистки образ данных Docker (VHDX) сам не сжимается. Кнопка остановит Docker Desktop и вернёт освободившееся место системе. Сжатие может занять много времени, а после запуска diskpart безопасная отмена недоступна – потом запустите Docker заново. Если штатная остановка не сработает, будет отдельное подтверждение остановки всего WSL." />
-            <Button Style="{StaticResource Button.Primary}"
+                       Text="Очистка освобождает место внутри образа данных Docker, но сам файл VHDX не уменьшается. Кнопка остановит Docker Desktop и вернёт освободившееся системе." />
+            <Expander Style="{StaticResource Expander.Section}"
+                      Header="Подробнее"
+                      Margin="0,4,0,0">
+                <TextBlock TextWrapping="Wrap"
+                           Style="{StaticResource TextBlock.Subtle}"
+                           Text="Операция экспериментальная и может занять много времени. После запуска diskpart безопасная отмена недоступна – дождитесь конца и запустите Docker заново. Если штатная остановка не сработает, приложение отдельно спросит про остановку всего WSL." />
+            </Expander>
+            <Button Style="{StaticResource Button.Secondary}"
                     Command="{Binding CompactCommand}"
                     IsEnabled="{Binding CanRun}"
-                    HorizontalAlignment="Left">
+                    HorizontalAlignment="Left"
+                    Margin="0,10,0,0">
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Shrink}"
                                               Style="{StaticResource Docker.ActionButtonContent}" />

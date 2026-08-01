@@ -69,6 +69,8 @@ public static class AppDefaults
     public const int GallerySizeMax = 4096;
     public const int GalleryFrameDelayMs = 200;
     public const int GalleryThemeDelayMs = 700;
+    public const int GalleryModalPollMs = 50;
+    public const int GalleryModalAttempts = 80;
 
     public const bool AgentEnabledDefault = true;
     public const bool AgentConsentDefault = false;

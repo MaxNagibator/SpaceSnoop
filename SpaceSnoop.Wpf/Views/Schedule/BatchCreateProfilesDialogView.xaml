@@ -50,7 +50,7 @@
                                       Margin="0,0,10,0"
                                       Foreground="{DynamicResource Accent.Primary}" />
             <TextBlock Text="{Binding Title}"
-                       Style="{StaticResource TextBlock.Heading}"
+                       Style="{StaticResource DialogTitle}"
                        VerticalAlignment="Center" />
         </StackPanel>
 
@@ -313,7 +313,7 @@
             <StackPanel Grid.Column="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right">
-                <Button Style="{StaticResource Button.Ghost}"
+                <Button Style="{StaticResource Button.Secondary}"
                         Command="{Binding CancelCommand}"
                         Content="Отмена"
                         MinWidth="96"
@@ -323,7 +323,7 @@
                         IsCancel="True" />
                 <Button Style="{StaticResource Button.Primary}"
                         Command="{Binding CreateCommand}"
-                        Content="{Binding SelectedCount, StringFormat='Создать ({0})'}"
+                        Content="{Binding CreateCaption}"
                         MinWidth="120"
                         MinHeight="{DynamicResource Control.Height.Default}"
                         Padding="14,6"

@@ -194,7 +194,7 @@
             <StackPanel Grid.Column="1"
                         VerticalAlignment="Center">
                 <TextBlock Text="{Binding Title}"
-                           Style="{StaticResource TextBlock.Heading}"
+                           Style="{StaticResource DialogTitle}"
                            TextWrapping="Wrap" />
                 <TextBlock Text="{Binding Summary}"
                            TextWrapping="Wrap"

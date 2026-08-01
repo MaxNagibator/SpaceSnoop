@@ -8,7 +8,7 @@ using System.Windows.Threading;
 
 namespace SpaceSnoop.Wpf.Bootstrap;
 
-internal sealed record GalleryFrame(string Page, string Theme, string File, int Width, int Height);
+internal sealed record GalleryFrame(string Kind, string Name, string Theme, string File, int Width, int Height);
 
 internal sealed record GalleryIndex(
     string App,
@@ -25,6 +25,9 @@ public static class GalleryRun
     public const string IndexFileName = "index.json";
 
     private const double OffScreen = -32000;
+    private const string PageKind = "page";
+    private const string DialogKind = "dialog";
+    private const string DialogFilePrefix = "dialog-";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -42,9 +45,10 @@ public static class GalleryRun
         var stopwatch = Stopwatch.StartNew();
         var window = services.GetRequiredService<MainWindow>();
         var shell = services.GetRequiredService<ShellViewModel>();
+        var modals = shell.Modal;
 
         Directory.CreateDirectory(options.Directory);
-        logger.GalleryStarted(options.Pages.Count, options.Themes.Count, options.Directory);
+        logger.GalleryStarted(options.Pages.Count + options.Dialogs.Count, options.Themes.Count, options.Directory);
 
         window.WindowStartupLocation = WindowStartupLocation.Manual;
         window.Left = OffScreen;
@@ -79,6 +83,20 @@ public static class GalleryRun
                     logger.GalleryCaseFailed(exception.Unwrap(), $"{page}/{themeKey}");
                 }
             }
+
+            foreach (var dialog in options.Dialogs)
+            {
+                try
+                {
+                    shell.Toasts.Toasts.Clear();
+                    frames.Add(await CaptureDialogAsync(window, shell, modals, services, fixture, options, dialog, themeKey).ConfigureAwait(true));
+                }
+                catch (Exception exception)
+                {
+                    skipped++;
+                    logger.GalleryCaseFailed(exception.Unwrap(), $"{dialog}/{themeKey}");
+                }
+            }
         }
 
         WriteIndex(options, frames);
@@ -104,14 +122,88 @@ public static class GalleryRun
         await SettleAsync(window).ConfigureAwait(true);
 
         var file = $"{ViewCapture.Slug(page)}-{themeKey}{ViewCapture.FileExtension}";
-        var (width, height) = ViewCapture.Save(window, Path.Combine(options.Directory, file), options.Scale);
+        var (width, height) = ViewCapture.Save(Target(window, options), Path.Combine(options.Directory, file), options.Scale);
 
         if (width == 0 || height == 0)
         {
             throw new InvalidOperationException("Окно не отрисовано – нулевой размер кадра.");
         }
 
-        return new(page, themeKey, file, width, height);
+        return new(PageKind, page, themeKey, file, width, height);
+    }
+
+    private static async Task<GalleryFrame> CaptureDialogAsync(
+        Window window,
+        ShellViewModel shell,
+        ModalHostViewModel modals,
+        IServiceProvider services,
+        GalleryFixture fixture,
+        GalleryOptions options,
+        string dialog,
+        string themeKey)
+    {
+        var section = GalleryDialogs.Section(dialog);
+
+        if (!shell.TryNavigate(section))
+        {
+            throw new InvalidOperationException($"Страница «{section}» не открылась – диалог «{dialog}» негде показать.");
+        }
+
+        await SettleAsync(window).ConfigureAwait(true);
+        GalleryDialogs.Open(dialog, services, fixture, modals);
+
+        try
+        {
+            if (!await WaitForModalAsync(modals, true).ConfigureAwait(true))
+            {
+                throw new InvalidOperationException($"Диалог «{dialog}» не открылся за отведённое время.");
+            }
+
+            await SettleAsync(window).ConfigureAwait(true);
+
+            var file = $"{DialogFilePrefix}{ViewCapture.Slug(dialog)}-{themeKey}{ViewCapture.FileExtension}";
+            var (width, height) = ViewCapture.Save(window, Path.Combine(options.Directory, file), options.Scale);
+
+            if (width == 0 || height == 0)
+            {
+                throw new InvalidOperationException("Окно не отрисовано – нулевой размер кадра.");
+            }
+
+            return new(DialogKind, dialog, themeKey, file, width, height);
+        }
+        finally
+        {
+            modals.RequestCancel();
+            await WaitForModalAsync(modals, false).ConfigureAwait(true);
+            GalleryDialogs.Cleanup(dialog, services);
+            await SettleAsync(window).ConfigureAwait(true);
+        }
+    }
+
+    private static FrameworkElement Target(Window window, GalleryOptions options)
+    {
+        if (options.Element.Length == 0)
+        {
+            return window;
+        }
+
+        return ViewCapture.Find(window, options.Element)
+            ?? throw new InvalidOperationException($"Элемент «{options.Element}» не найден на этой странице.");
+    }
+
+    private static async Task<bool> WaitForModalAsync(ModalHostViewModel modals, bool active)
+    {
+        for (var attempt = 0; attempt < AppDefaults.GalleryModalAttempts; attempt++)
+        {
+            if (modals.HasActive == active)
+            {
+                return true;
+            }
+
+            await Task.Delay(AppDefaults.GalleryModalPollMs).ConfigureAwait(true);
+        }
+
+        return modals.HasActive == active;
     }
 
     private static async Task ArrangeAsync(IServiceProvider services, GalleryFixture fixture)

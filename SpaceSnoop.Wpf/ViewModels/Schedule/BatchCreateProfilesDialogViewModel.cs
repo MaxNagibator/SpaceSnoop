@@ -85,6 +85,10 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
 
     public string SelectionSummary => $"Отмечено: {SelectedCount} из {Rows.Count}";
 
+    public string CreateCaption => SelectedCount > 0
+        ? $"Создать {Plural.Format(SelectedCount, "профиль", "профиля", "профилей")}"
+        : "Создать профили";
+
     public bool? AllSelected
     {
         get
@@ -150,6 +154,7 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
     {
         OnPropertyChanged(nameof(SelectedCount));
         OnPropertyChanged(nameof(SelectionSummary));
+        OnPropertyChanged(nameof(CreateCaption));
         OnPropertyChanged(nameof(AllSelected));
         CreateCommand.NotifyCanExecuteChanged();
     }

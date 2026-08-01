@@ -3,22 +3,28 @@
 public sealed record GalleryOptions(
     string Directory,
     IReadOnlyList<string> Pages,
+    IReadOnlyList<string> Dialogs,
     IReadOnlyList<AppTheme> Themes,
     int Width,
     int Height,
     double Scale,
+    string Element,
     IReadOnlyList<string> Unknown)
 {
+    public const string NoneValue = "none";
+
     public static IReadOnlyList<string> AllPages { get; } = [.. SectionKey.All];
 
     public static GalleryOptions Parse(IEnumerable<string> args, string defaultDirectory)
     {
         var directory = defaultDirectory;
         var pages = AllPages;
+        var dialogs = GalleryDialogs.All;
         IReadOnlyList<AppTheme> themes = [AppTheme.Light, AppTheme.Dark];
         var width = AppDefaults.GalleryWidthDefault;
         var height = AppDefaults.GalleryHeightDefault;
         var scale = AppDefaults.ViewCaptureScaleDefault;
+        var element = string.Empty;
         var unknown = new List<string>();
 
         var rest = args.ToList();
@@ -37,6 +43,12 @@ public sealed record GalleryOptions(
                     positional = false;
                     break;
 
+                case "--dialogs":
+                    dialogs = ParseDialogs(value, unknown);
+                    index++;
+                    positional = false;
+                    break;
+
                 case "--themes":
                     themes = ParseThemes(value, unknown);
                     index++;
@@ -45,6 +57,12 @@ public sealed record GalleryOptions(
 
                 case "--size":
                     (width, height) = ParseSize(value, width, height);
+                    index++;
+                    positional = false;
+                    break;
+
+                case "--element":
+                    element = value;
                     index++;
                     positional = false;
                     break;
@@ -70,7 +88,7 @@ public sealed record GalleryOptions(
             }
         }
 
-        return new(directory, pages, themes, width, height, scale, unknown);
+        return new(directory, pages, dialogs, themes, width, height, scale, element, unknown);
     }
 
     private static double ParseScale(string value, double scale)
@@ -108,6 +126,36 @@ public sealed record GalleryOptions(
         }
 
         return pages.Count > 0 ? pages : AllPages;
+    }
+
+    private static IReadOnlyList<string> ParseDialogs(string value, List<string> unknown)
+    {
+        var requested = Split(value);
+
+        if (requested.Count == 1 && string.Equals(requested[0], NoneValue, StringComparison.OrdinalIgnoreCase))
+        {
+            return [];
+        }
+
+        var dialogs = new List<string>();
+
+        foreach (var dialog in requested)
+        {
+            var match = GalleryDialogs.All.FirstOrDefault(known => string.Equals(known, dialog, StringComparison.OrdinalIgnoreCase));
+
+            if (match is null)
+            {
+                unknown.Add(dialog);
+                continue;
+            }
+
+            if (!dialogs.Contains(match, StringComparer.Ordinal))
+            {
+                dialogs.Add(match);
+            }
+        }
+
+        return dialogs.Count > 0 ? dialogs : GalleryDialogs.All;
     }
 
     private static IReadOnlyList<AppTheme> ParseThemes(string value, List<string> unknown)
