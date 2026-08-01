@@ -291,4 +291,28 @@ public class PerformanceTests
     {
         Assert.That(PerformanceFormat.Duration(TimeSpan.FromSeconds(-5)), Is.EqualTo("0:00"));
     }
+
+    [Test]
+    public void Несбыточный_остаток_не_показывается_вовсе()
+    {
+        var operation = new PerformanceOperation("Сканирование", 1, 0, TimeSpan.FromSeconds(1), TotalItems: 1_000_000_000, Basis: EtaBasis.Items);
+
+        Assert.That(operation.Remaining(), Is.Null);
+    }
+
+    [Test]
+    public void Остаток_в_пределах_суток_остаётся_виден()
+    {
+        var operation = new PerformanceOperation("Сканирование", 100, 0, TimeSpan.FromSeconds(1), TotalItems: 1000, Basis: EtaBasis.Items);
+
+        Assert.That(operation.Remaining(), Is.EqualTo(TimeSpan.FromSeconds(9)));
+    }
+
+    [Test]
+    public void Просадка_называет_пик_а_не_только_красит_строку()
+    {
+        var snapshot = PerformanceSnapshot.Empty with { UiDelayMs = 3, UiPeakMs = 800 };
+
+        Assert.That(PerformanceFormat.Summary(snapshot), Does.Contain("пик 800 мс"));
+    }
 }

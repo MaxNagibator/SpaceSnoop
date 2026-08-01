@@ -72,7 +72,7 @@ public class PerformanceHistoryTests
     }
 
     [Test]
-    public void Ограничение_по_числу_точек_оставляет_свежие()
+    public void Свёртка_в_бакеты_покрывает_всё_окно_а_не_его_хвост()
     {
         var now = Stopwatch.GetTimestamp();
         var buffer = new PerformanceHistoryBuffer(8);
@@ -86,13 +86,33 @@ public class PerformanceHistoryTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(history.Points.Select(static point => point.Operation), Is.EqualTo(new[] { "точка 2", "точка 1" }));
-            Assert.That(history.Omitted, Is.EqualTo(3));
+            Assert.That(history.Points, Has.Length.EqualTo(2));
+            Assert.That(history.Folded, Is.EqualTo(3));
+            Assert.That(history.Points[0].AgeMs, Is.EqualTo(4000).Within(50));
+            Assert.That(history.SpanSeconds, Is.EqualTo(4).Within(0.05));
         });
     }
 
     [Test]
-    public void Предел_точек_не_считает_отброшенным_то_что_вне_окна()
+    public void Свёртка_оставляет_в_бакете_худшую_задержку()
+    {
+        var now = Stopwatch.GetTimestamp();
+        var buffer = new PerformanceHistoryBuffer(8);
+
+        buffer.Add(Sample(now, 6, "тихо", delayMs: 1));
+        buffer.Add(Sample(now, 5, "просадка", delayMs: 900));
+        buffer.Add(Sample(now, 4, "тихо", delayMs: 2));
+        buffer.Add(Sample(now, 3, "тихо", delayMs: 3));
+        buffer.Add(Sample(now, 2, "тихо", delayMs: 4));
+        buffer.Add(Sample(now, 1, "тихо", delayMs: 5));
+
+        var history = buffer.Capture(now, DateTime.UnixEpoch, TimeSpan.Zero, 2);
+
+        Assert.That(history.Points.Select(static point => point.UiDelayMs), Does.Contain(900));
+    }
+
+    [Test]
+    public void Свёрнутыми_считаются_только_замеры_внутри_окна()
     {
         var now = Stopwatch.GetTimestamp();
         var buffer = new PerformanceHistoryBuffer(8);
@@ -106,8 +126,48 @@ public class PerformanceHistoryTests
         Assert.Multiple(() =>
         {
             Assert.That(history.Points.Select(static point => point.Operation), Is.EqualTo(new[] { "свежая" }));
-            Assert.That(history.Omitted, Is.EqualTo(1));
+            Assert.That(history.Folded, Is.EqualTo(1));
         });
+    }
+
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(3)]
+    public void Кольцо_любой_ёмкости_отдаёт_точки_от_старой_к_новой(int capacity)
+    {
+        var now = Stopwatch.GetTimestamp();
+        var buffer = new PerformanceHistoryBuffer(capacity);
+
+        for (var ago = 3; ago >= 1; ago--)
+        {
+            buffer.Add(Sample(now, ago, $"точка {ago}"));
+        }
+
+        var history = buffer.Capture(now, DateTime.UnixEpoch, TimeSpan.Zero, NoLimit);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(history.Points, Has.Length.EqualTo(Math.Max(1, Math.Min(capacity, 3))));
+            Assert.That(history.Points[^1].Operation, Is.EqualTo("точка 1"));
+            Assert.That(history.Points.Select(static point => point.AgeMs), Is.Ordered.Descending);
+        });
+    }
+
+    [Test]
+    public void Заполненное_под_завязку_кольцо_не_путает_порядок()
+    {
+        var now = Stopwatch.GetTimestamp();
+        var buffer = new PerformanceHistoryBuffer(3);
+
+        for (var ago = 3; ago >= 1; ago--)
+        {
+            buffer.Add(Sample(now, ago, $"точка {ago}"));
+        }
+
+        var history = buffer.Capture(now, DateTime.UnixEpoch, TimeSpan.Zero, NoLimit);
+
+        Assert.That(history.Points.Select(static point => point.Operation),
+            Is.EqualTo(new[] { "точка 3", "точка 2", "точка 1" }));
     }
 
     [Test]
@@ -208,8 +268,52 @@ public class PerformanceHistoryTests
         Assert.That(monitor.Snapshot.StartupSeconds, Is.EqualTo(1.25));
     }
 
-    private static PerformanceSample Sample(long now, double agoSeconds, string operation, int gen0 = 0)
+    [Test]
+    public void Повторный_старт_не_сбрасывает_наблюдение()
     {
-        return new(now - (long)(agoSeconds * Stopwatch.Frequency), 0, 0, 0, gen0, 0, 0, operation);
+        using var monitor = new PerformanceMonitor(NullLogger<PerformanceMonitor>.Instance);
+
+        monitor.Start();
+        var first = monitor.Snapshot.CapturedAtUtc;
+        monitor.Start();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(monitor.Snapshot.CapturedAtUtc, Is.EqualTo(first));
+            Assert.That(monitor.IsRunning, Is.True);
+        });
+    }
+
+    [Test]
+    public void Остановка_не_оставляет_наблюдение_прежним()
+    {
+        using var monitor = new PerformanceMonitor(NullLogger<PerformanceMonitor>.Instance);
+
+        monitor.ReportOperation(new("Сканирование", 10, 20, TimeSpan.FromSeconds(1)));
+        monitor.Start();
+        monitor.Stop();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(monitor.IsRunning, Is.False);
+            Assert.That(monitor.Snapshot.Operation, Is.Null);
+        });
+    }
+
+    [Test]
+    public void После_освобождения_монитор_не_запускается_заново()
+    {
+        var monitor = new PerformanceMonitor(NullLogger<PerformanceMonitor>.Instance);
+
+        monitor.Start();
+        monitor.Dispose();
+        monitor.Start();
+
+        Assert.That(monitor.IsRunning, Is.False);
+    }
+
+    private static PerformanceSample Sample(long now, double agoSeconds, string operation, int gen0 = 0, double delayMs = 0)
+    {
+        return new(now - (long)(agoSeconds * Stopwatch.Frequency), delayMs, 0, 0, gen0, 0, 0, operation);
     }
 }

@@ -130,6 +130,22 @@ public class PerformanceChartTests
     }
 
     [Test]
+    public void Операция_после_паузы_даёт_две_полосы_а_не_одну()
+    {
+        var data = PerformanceChartLayout.Build(History(
+            Point(2000, operation: "Сканирование"),
+            Point(1500),
+            Point(1000),
+            Point(500, operation: "Сканирование")));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(data.Bands, Has.Count.EqualTo(2));
+            Assert.That(data.Bands[0].End, Is.LessThan(data.Bands[1].Start));
+        });
+    }
+
+    [Test]
     public void Окно_без_операций_полос_не_даёт()
     {
         Assert.That(PerformanceChartLayout.Build(History(Point(1000), Point(500))).Bands, Is.Empty);
@@ -154,7 +170,7 @@ public class PerformanceChartTests
         var history = new PerformanceHistory(DateTime.UnixEpoch, 95, 0, 0, 0, 0,
             [Point(1000), Point(500)]);
 
-        Assert.That(PerformanceFormat.ChartWindow(PerformanceChartLayout.Build(history)), Is.EqualTo("за 1:35 · 2 замеров"));
+        Assert.That(PerformanceFormat.ChartWindow(PerformanceChartLayout.Build(history)), Is.EqualTo("за 1:35 · 2 замера"));
     }
 
     private static PerformanceHistory History(params PerformancePoint[] points)

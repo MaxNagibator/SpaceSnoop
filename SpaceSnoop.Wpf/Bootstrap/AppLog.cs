@@ -391,4 +391,7 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 2300, Level = LogLevel.Warning, Message = "Интерфейс не отвечал {DelayMs} мс ({Operation})")]
     public static partial void PerformanceHitch(this ILogger logger, long delayMs, string operation);
+
+    [LoggerMessage(EventId = 2301, Level = LogLevel.Warning, Message = "Подписчик на замер производительности бросил исключение")]
+    public static partial void PerformanceListenerFailed(this ILogger logger, Exception exception);
 }

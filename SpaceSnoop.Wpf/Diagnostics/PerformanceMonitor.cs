@@ -11,7 +11,7 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
 
     private readonly PerformanceHistoryBuffer _history = new(AppDefaults.PerformanceHistorySamples);
 
-    private readonly Lock _historyLock = new();
+    private readonly Lock _lock = new();
 
     private readonly int[] _baseCollections = new int[3];
 
@@ -29,6 +29,8 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
 
     private volatile bool _running;
 
+    private volatile bool _disposed;
+
     public event EventHandler? Updated;
 
     public PerformanceSnapshot Snapshot => Volatile.Read(ref _snapshot);
@@ -37,7 +39,7 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
 
     public void Start()
     {
-        if (_running)
+        if (_running || _disposed)
         {
             return;
         }
@@ -47,18 +49,19 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
             _baseCollections[generation] = GC.CollectionCount(generation);
         }
 
-        _delays.Clear();
+        var operation = Volatile.Read(ref _operation);
 
-        lock (_historyLock)
+        lock (_lock)
         {
+            _delays.Clear();
             _history.Clear();
+
+            _lastTick = Stopwatch.GetTimestamp();
+            _lastHitchLog = 0;
+            _running = true;
+
+            Publish(Sample(_lastTick, 0, operation), operation);
         }
-
-        _lastTick = Stopwatch.GetTimestamp();
-        _lastHitchLog = 0;
-        _running = true;
-
-        Publish(_lastTick, 0, Volatile.Read(ref _operation));
 
         _timer ??= CreateTimer();
         _timer.Start();
@@ -68,6 +71,9 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
     {
         _running = false;
         _timer?.Stop();
+
+        Volatile.Write(ref _operation, null);
+        Volatile.Write(ref _snapshot, PerformanceSnapshot.Empty with { StartupSeconds = _startup.TotalSeconds });
     }
 
     public void ReportStartup(TimeSpan elapsed)
@@ -82,18 +88,17 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
 
     public PerformanceHistory CaptureHistory(TimeSpan since, int maxPoints)
     {
-        var now = Stopwatch.GetTimestamp();
-        var capturedAtUtc = DateTime.UtcNow;
-
-        lock (_historyLock)
+        lock (_lock)
         {
-            return _history.Capture(now, capturedAtUtc, since, maxPoints);
+            return _history.Capture(Stopwatch.GetTimestamp(), DateTime.UtcNow, since, maxPoints);
         }
     }
 
     public void Dispose()
     {
+        _disposed = true;
         _running = false;
+        Updated = null;
 
         if (_timer is null)
         {
@@ -120,28 +125,39 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
     private void OnTick(object? sender, EventArgs e)
     {
         var now = Stopwatch.GetTimestamp();
-        var sinceLastTick = Stopwatch.GetElapsedTime(_lastTick, now);
-        _lastTick = now;
-
-        var delay = Math.Max(0, sinceLastTick.TotalMilliseconds - SampleInterval.TotalMilliseconds);
-        _delays.Add(delay);
-
         var operation = Volatile.Read(ref _operation);
-        var sample = Publish(now, delay, operation);
+        double delay;
 
-        lock (_historyLock)
+        lock (_lock)
         {
+            delay = Math.Max(0, Stopwatch.GetElapsedTime(_lastTick, now).TotalMilliseconds - SampleInterval.TotalMilliseconds);
+            _lastTick = now;
+            _delays.Add(delay);
+
+            var sample = Sample(now, delay, operation);
             _history.Add(sample);
+            Publish(sample, operation);
         }
 
         LogHitch(delay, operation, now);
-
-        Updated?.Invoke(this, EventArgs.Empty);
+        Notify();
     }
 
-    private PerformanceSample Publish(long now, double delay, PerformanceOperation? operation)
+    private void Notify()
     {
-        var sample = new PerformanceSample(now,
+        try
+        {
+            Updated?.Invoke(this, EventArgs.Empty);
+        }
+        catch (Exception exception)
+        {
+            logger.PerformanceListenerFailed(exception);
+        }
+    }
+
+    private PerformanceSample Sample(long now, double delay, PerformanceOperation? operation)
+    {
+        return new(now,
             delay,
             GC.GetTotalMemory(false),
             Environment.WorkingSet,
@@ -149,8 +165,12 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
             GC.CollectionCount(1) - _baseCollections[1],
             GC.CollectionCount(2) - _baseCollections[2],
             operation?.Name);
+    }
 
-        Volatile.Write(ref _snapshot, new(delay,
+    private void Publish(PerformanceSample sample, PerformanceOperation? operation)
+    {
+        Volatile.Write(ref _snapshot, new(DateTime.UtcNow,
+            sample.UiDelayMs,
             _delays.Peak(),
             _delays.Average(),
             _delays.Count,
@@ -162,8 +182,6 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
             sample.Gen2Collections,
             _startup.TotalSeconds,
             operation));
-
-        return sample;
     }
 
     private void LogHitch(double delay, PerformanceOperation? operation, long now)

@@ -6,7 +6,9 @@ public static class PerformanceFormat
     {
         var parts = new List<string>(3)
         {
-            $"{Math.Round(snapshot.UiDelayMs):N0} мс",
+            snapshot.UiPeakMs >= AppDefaults.PerformanceHitchMs
+                ? $"{Math.Round(snapshot.UiDelayMs):N0} мс · пик {Math.Round(snapshot.UiPeakMs):N0} мс"
+                : $"{Math.Round(snapshot.UiDelayMs):N0} мс",
             SizeFormatter.Format(snapshot.ManagedBytes),
         };
 
@@ -42,7 +44,7 @@ public static class PerformanceFormat
 
     public static string ChartWindow(PerformanceChartData data)
     {
-        return $"за {Duration(TimeSpan.FromSeconds(data.SpanSeconds))} · {data.Delay.Count:N0} замеров";
+        return $"за {Duration(TimeSpan.FromSeconds(data.SpanSeconds))} · {Plural.Format(data.Delay.Count, "замер", "замера", "замеров")}";
     }
 
     public static string Collections(int gen0, int gen1, int gen2)

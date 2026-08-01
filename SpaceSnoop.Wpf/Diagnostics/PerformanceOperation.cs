@@ -32,7 +32,9 @@ public sealed record PerformanceOperation(
 
         var seconds = (total.Value - done) / perSecond.Value;
 
-        return double.IsFinite(seconds) ? TimeSpan.FromSeconds(Math.Min(seconds, TimeSpan.MaxValue.TotalSeconds)) : null;
+        return double.IsFinite(seconds) && seconds <= AppDefaults.PerformanceEtaMaxSeconds
+            ? TimeSpan.FromSeconds(seconds)
+            : null;
     }
 
     private double? Rate(long amount)

@@ -1,6 +1,7 @@
 ﻿namespace SpaceSnoop.Wpf.Diagnostics;
 
 public sealed record PerformanceSnapshot(
+    DateTime CapturedAtUtc,
     double UiDelayMs,
     double UiPeakMs,
     double UiAverageMs,
@@ -14,5 +15,5 @@ public sealed record PerformanceSnapshot(
     double StartupSeconds,
     PerformanceOperation? Operation)
 {
-    public static PerformanceSnapshot Empty { get; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, null);
+    public static PerformanceSnapshot Empty { get; } = new(DateTime.MinValue, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, null);
 }

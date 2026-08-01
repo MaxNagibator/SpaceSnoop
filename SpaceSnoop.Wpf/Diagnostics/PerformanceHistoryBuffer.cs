@@ -3,7 +3,7 @@ using System.Diagnostics;
 
 namespace SpaceSnoop.Wpf.Diagnostics;
 
-public sealed class PerformanceHistoryBuffer(int capacity)
+internal sealed class PerformanceHistoryBuffer(int capacity)
 {
     private readonly PerformanceSample[] _samples = new PerformanceSample[Math.Max(1, capacity)];
 
@@ -35,52 +35,39 @@ public sealed class PerformanceHistoryBuffer(int capacity)
 
     public PerformanceHistory Capture(long now, DateTime capturedAtUtc, TimeSpan since, int maxPoints)
     {
-        if (_count == 0 || maxPoints <= 0)
+        var total = CountWithin(now, since);
+
+        if (total == 0 || maxPoints <= 0)
         {
             return PerformanceHistory.Empty with { CapturedAtUtc = capturedAtUtc };
         }
 
-        var builder = ImmutableArray.CreateBuilder<PerformancePoint>(Math.Min(_count, maxPoints));
-        var newest = default(PerformanceSample);
-        var oldest = default(PerformanceSample);
-        var omitted = 0;
+        var bucket = ((total - 1) / maxPoints) + 1;
+        var builder = ImmutableArray.CreateBuilder<PerformancePoint>(Math.Min(total, maxPoints));
+        var newest = At(0);
+        var oldest = newest;
+        var worst = newest;
+        var taken = 0;
 
-        for (var offset = 1; offset <= _count; offset++)
+        for (var offset = 0; offset < total; offset++)
         {
-            var sample = _samples[(_next - offset + _samples.Length) % _samples.Length];
-            var age = Stopwatch.GetElapsedTime(sample.Timestamp, now);
+            var sample = At(offset);
+            oldest = sample;
 
-            if (since > TimeSpan.Zero && age > since)
+            if (taken == 0 || sample.UiDelayMs > worst.UiDelayMs)
             {
-                break;
+                worst = sample;
             }
 
-            if (builder.Count == maxPoints)
+            taken++;
+
+            if (taken < bucket && offset < total - 1)
             {
-                omitted++;
                 continue;
             }
 
-            if (builder.Count == 0)
-            {
-                newest = sample;
-            }
-
-            oldest = sample;
-
-            builder.Add(new(age.TotalMilliseconds,
-                sample.UiDelayMs,
-                sample.ManagedBytes,
-                sample.WorkingSetBytes,
-                sample.Gen0Collections,
-                sample.Gen1Collections,
-                sample.Gen2Collections,
-                sample.Operation));
-        }
-
-        if (builder.Count == 0)
-        {
-            return PerformanceHistory.Empty with { CapturedAtUtc = capturedAtUtc };
+            builder.Add(Project(worst, now));
+            taken = 0;
         }
 
         builder.Reverse();
@@ -90,7 +77,42 @@ public sealed class PerformanceHistoryBuffer(int capacity)
             newest.Gen0Collections - oldest.Gen0Collections,
             newest.Gen1Collections - oldest.Gen1Collections,
             newest.Gen2Collections - oldest.Gen2Collections,
-            omitted,
+            total - builder.Count,
             builder.ToImmutable());
+    }
+
+    private int CountWithin(long now, TimeSpan since)
+    {
+        if (since <= TimeSpan.Zero)
+        {
+            return _count;
+        }
+
+        for (var offset = 0; offset < _count; offset++)
+        {
+            if (Stopwatch.GetElapsedTime(At(offset).Timestamp, now) > since)
+            {
+                return offset;
+            }
+        }
+
+        return _count;
+    }
+
+    private PerformanceSample At(int offset)
+    {
+        return _samples[(_next - 1 - offset + _samples.Length) % _samples.Length];
+    }
+
+    private static PerformancePoint Project(PerformanceSample sample, long now)
+    {
+        return new(Stopwatch.GetElapsedTime(sample.Timestamp, now).TotalMilliseconds,
+            sample.UiDelayMs,
+            sample.ManagedBytes,
+            sample.WorkingSetBytes,
+            sample.Gen0Collections,
+            sample.Gen1Collections,
+            sample.Gen2Collections,
+            sample.Operation);
     }
 }
