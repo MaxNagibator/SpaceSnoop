@@ -4,6 +4,7 @@
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Overview"
              xmlns:views="clr-namespace:SpaceSnoop.Wpf.Views.Overview"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
@@ -215,19 +216,14 @@
                 </Grid>
             </Border>
 
-            <Border Style="{StaticResource Card.Inset}"
-                    Margin="0,0,0,10"
-                    Visibility="{Binding HasRows, Converter={StaticResource InverseBoolToVisibility}}">
-                <StackPanel>
-                    <TextBlock Text="Профилей пока нет."
-                               Foreground="{DynamicResource Fg.Primary}" />
-                    <TextBlock
-                        Text="Создайте профили на странице «Расписание» – здесь их можно будет сравнить пакетно."
-                        Style="{StaticResource TextBlock.Subtle}"
-                        TextWrapping="Wrap"
-                        Margin="0,4,0,0" />
-                </StackPanel>
-            </Border>
+            <keepshell:EmptyState Icon="LayoutGrid"
+                                  IconSize="40"
+                                  Heading="Профилей пока нет"
+                                  Description="Профиль – это пара каталогов с направлением и расписанием. Создайте их на странице «Расписание», и здесь можно будет сравнить и синхронизировать все разом."
+                                  DescriptionMaxWidth="460"
+                                  Margin="0,60,0,10"
+                                  HorizontalAlignment="Center"
+                                  Visibility="{Binding HasRows, Converter={StaticResource InverseBoolToVisibility}}" />
 
             <Border Style="{StaticResource Card.Inset}"
                     Margin="0,0,0,10"
