@@ -17,6 +17,7 @@ public class GalleryOptionsTests
             Assert.That(options.Directory, Is.EqualTo(Default));
             Assert.That(options.Pages, Is.EqualTo(SectionKey.All));
             Assert.That(options.Dialogs, Is.EqualTo(GalleryDialogs.All));
+            Assert.That(options.Tips, Is.EqualTo(GalleryTips.All));
             Assert.That(options.Element, Is.Empty);
             Assert.That(options.Themes, Is.EqualTo(new[] { AppTheme.Light, AppTheme.Dark }));
             Assert.That(options.Width, Is.EqualTo(AppDefaults.GalleryWidthDefault));
@@ -48,6 +49,23 @@ public class GalleryOptionsTests
             Assert.That(picked.Dialogs, Is.EqualTo(new[] { GalleryDialogs.Diff, GalleryDialogs.Confirm }));
             Assert.That(off.Dialogs, Is.Empty);
             Assert.That(off.Unknown, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Подсказки_разбираются_отдельно_от_диалогов()
+    {
+        var picked = GalleryOptions.Parse(["--tips", "treemap-corner,treemap-corner"], Default);
+        var off = GalleryOptions.Parse(["--tips", GalleryOptions.NoneValue], Default);
+        var unknown = GalleryOptions.Parse(["--tips", "treemap-center,всплывашка"], Default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(picked.Tips, Is.EqualTo(new[] { GalleryTips.TreemapCorner }));
+            Assert.That(picked.Dialogs, Is.EqualTo(GalleryDialogs.All));
+            Assert.That(off.Tips, Is.Empty);
+            Assert.That(unknown.Tips, Is.EqualTo(new[] { GalleryTips.TreemapCenter }));
+            Assert.That(unknown.Unknown, Is.EqualTo(new[] { "всплывашка" }));
         });
     }
 

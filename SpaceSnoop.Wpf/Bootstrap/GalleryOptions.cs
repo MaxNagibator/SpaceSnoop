@@ -4,6 +4,7 @@ public sealed record GalleryOptions(
     string Directory,
     IReadOnlyList<string> Pages,
     IReadOnlyList<string> Dialogs,
+    IReadOnlyList<string> Tips,
     IReadOnlyList<AppTheme> Themes,
     int Width,
     int Height,
@@ -20,6 +21,7 @@ public sealed record GalleryOptions(
         var directory = defaultDirectory;
         var pages = AllPages;
         var dialogs = GalleryDialogs.All;
+        var tips = GalleryTips.All;
         IReadOnlyList<AppTheme> themes = [AppTheme.Light, AppTheme.Dark];
         var width = AppDefaults.GalleryWidthDefault;
         var height = AppDefaults.GalleryHeightDefault;
@@ -45,6 +47,12 @@ public sealed record GalleryOptions(
 
                 case "--dialogs":
                     dialogs = ParseDialogs(value, unknown);
+                    index++;
+                    positional = false;
+                    break;
+
+                case "--tips":
+                    tips = ParseTips(value, unknown);
                     index++;
                     positional = false;
                     break;
@@ -88,7 +96,7 @@ public sealed record GalleryOptions(
             }
         }
 
-        return new(directory, pages, dialogs, themes, width, height, scale, element, unknown);
+        return new(directory, pages, dialogs, tips, themes, width, height, scale, element, unknown);
     }
 
     private static double ParseScale(string value, double scale)
@@ -156,6 +164,36 @@ public sealed record GalleryOptions(
         }
 
         return dialogs.Count > 0 ? dialogs : GalleryDialogs.All;
+    }
+
+    private static IReadOnlyList<string> ParseTips(string value, List<string> unknown)
+    {
+        var requested = Split(value);
+
+        if (requested.Count == 1 && string.Equals(requested[0], NoneValue, StringComparison.OrdinalIgnoreCase))
+        {
+            return [];
+        }
+
+        var tips = new List<string>();
+
+        foreach (var tip in requested)
+        {
+            var match = GalleryTips.All.FirstOrDefault(known => string.Equals(known, tip, StringComparison.OrdinalIgnoreCase));
+
+            if (match is null)
+            {
+                unknown.Add(tip);
+                continue;
+            }
+
+            if (!tips.Contains(match, StringComparer.Ordinal))
+            {
+                tips.Add(match);
+            }
+        }
+
+        return tips.Count > 0 ? tips : GalleryTips.All;
     }
 
     private static IReadOnlyList<AppTheme> ParseThemes(string value, List<string> unknown)

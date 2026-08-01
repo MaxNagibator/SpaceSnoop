@@ -141,6 +141,28 @@ public sealed class TreemapView : FrameworkElement
 
     protected override int VisualChildrenCount => 1;
 
+    public ToolTip? ShowTooltipForAutomation(Point point)
+    {
+        var node = HitTest(point);
+
+        if (node is null)
+        {
+            return null;
+        }
+
+        _cursor = point;
+        _hover = node;
+        ShowTooltip(node);
+
+        return _toolTip.IsOpen ? _toolTip : null;
+    }
+
+    public void HideTooltipForAutomation()
+    {
+        _hover = null;
+        _toolTip.IsOpen = false;
+    }
+
     protected override void OnRender(DrawingContext context)
     {
         var startedAt = Stopwatch.GetTimestamp();

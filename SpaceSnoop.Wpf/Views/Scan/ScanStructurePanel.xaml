@@ -676,7 +676,8 @@
                         CornerRadius="{DynamicResource Radius.S}"
                         ClipToBounds="True">
                     <Grid>
-                        <controls:TreemapView ItemsSource="{Binding TreemapTiles}"
+                        <controls:TreemapView x:Name="Treemap"
+                                              ItemsSource="{Binding TreemapTiles}"
                                               Intensity="{Binding Intensity}"
                                               Performance="{Binding Performance}"
                                               SelectedItem="{Binding SelectedNode, Mode=TwoWay}"

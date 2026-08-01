@@ -50,6 +50,16 @@ public static class ViewCapture
 
     public static (int Width, int Height) Save(FrameworkElement element, string path, double scale = 1)
     {
+        return Save(element, null, default, path, scale);
+    }
+
+    public static (int Width, int Height) Save(
+        FrameworkElement element,
+        FrameworkElement? overlay,
+        Point overlayOffset,
+        string path,
+        double scale = 1)
+    {
         scale = Math.Clamp(scale, AppDefaults.ViewCaptureScaleMin, AppDefaults.ViewCaptureScaleMax);
         var size = new Size(element.ActualWidth, element.ActualHeight);
         var width = (int)Math.Ceiling(size.Width * scale);
@@ -65,6 +75,13 @@ public static class ViewCapture
         using (var context = visual.RenderOpen())
         {
             context.DrawRectangle(new VisualBrush(element), null, new(size));
+
+            if (overlay is { ActualWidth: > 0, ActualHeight: > 0 })
+            {
+                context.DrawRectangle(new VisualBrush(overlay),
+                    null,
+                    new(overlayOffset, new Size(overlay.ActualWidth, overlay.ActualHeight)));
+            }
         }
 
         var dpi = BaseDpi * scale;
@@ -80,6 +97,15 @@ public static class ViewCapture
         encoder.Save(stream);
 
         return (width, height);
+    }
+
+    public static Point OffsetBetween(Visual outer, Visual inner)
+    {
+        var dpi = VisualTreeHelper.GetDpi(outer);
+        var outerOrigin = outer.PointToScreen(new(0, 0));
+        var innerOrigin = inner.PointToScreen(new(0, 0));
+
+        return new((innerOrigin.X - outerOrigin.X) / dpi.DpiScaleX, (innerOrigin.Y - outerOrigin.Y) / dpi.DpiScaleY);
     }
 
     public static void DropObsolete(string directory, int keep, Action<Exception, string> onFailure)

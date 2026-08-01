@@ -27,7 +27,9 @@ public static class GalleryRun
     private const double OffScreen = -32000;
     private const string PageKind = "page";
     private const string DialogKind = "dialog";
+    private const string TipKind = "tip";
     private const string DialogFilePrefix = "dialog-";
+    private const string TipFilePrefix = "tip-";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -48,7 +50,7 @@ public static class GalleryRun
         var modals = shell.Modal;
 
         Directory.CreateDirectory(options.Directory);
-        logger.GalleryStarted(options.Pages.Count + options.Dialogs.Count, options.Themes.Count, options.Directory);
+        logger.GalleryStarted(options.Pages.Count + options.Dialogs.Count + options.Tips.Count, options.Themes.Count, options.Directory);
 
         window.WindowStartupLocation = WindowStartupLocation.Manual;
         window.Left = OffScreen;
@@ -95,6 +97,20 @@ public static class GalleryRun
                 {
                     skipped++;
                     logger.GalleryCaseFailed(exception.Unwrap(), $"{dialog}/{themeKey}");
+                }
+            }
+
+            foreach (var tip in options.Tips)
+            {
+                try
+                {
+                    shell.Toasts.Toasts.Clear();
+                    frames.Add(await CaptureTipAsync(window, shell, services, options, tip, themeKey).ConfigureAwait(true));
+                }
+                catch (Exception exception)
+                {
+                    skipped++;
+                    logger.GalleryCaseFailed(exception.Unwrap(), $"{tip}/{themeKey}");
                 }
             }
         }
@@ -176,6 +192,61 @@ public static class GalleryRun
             modals.RequestCancel();
             await WaitForModalAsync(modals, false).ConfigureAwait(true);
             GalleryDialogs.Cleanup(dialog, services);
+            await SettleAsync(window).ConfigureAwait(true);
+        }
+    }
+
+    private static async Task<GalleryFrame> CaptureTipAsync(
+        Window window,
+        ShellViewModel shell,
+        IServiceProvider services,
+        GalleryOptions options,
+        string tip,
+        string themeKey)
+    {
+        var section = GalleryTips.Section(tip);
+
+        if (!shell.TryNavigate(section))
+        {
+            throw new InvalidOperationException($"Страница «{section}» не открылась – подсказку «{tip}» негде показать.");
+        }
+
+        GalleryTips.Prepare(tip, services);
+        await SettleAsync(window).ConfigureAwait(true);
+
+        window.Left = 0;
+        window.Top = 0;
+        await SettleAsync(window).ConfigureAwait(true);
+
+        var host = GalleryTips.Host(window);
+
+        var tooltip = host.ShowTooltipForAutomation(GalleryTips.Point(tip, host))
+            ?? throw new InvalidOperationException($"Подсказка «{tip}» не открылась – под точкой нет плитки.");
+
+        try
+        {
+            await SettleAsync(window).ConfigureAwait(true);
+
+            var file = $"{TipFilePrefix}{ViewCapture.Slug(tip)}-{themeKey}{ViewCapture.FileExtension}";
+
+            var (width, height) = ViewCapture.Save(window,
+                tooltip,
+                ViewCapture.OffsetBetween(window, tooltip),
+                Path.Combine(options.Directory, file),
+                options.Scale);
+
+            if (width == 0 || height == 0)
+            {
+                throw new InvalidOperationException("Окно не отрисовано – нулевой размер кадра.");
+            }
+
+            return new(TipKind, tip, themeKey, file, width, height);
+        }
+        finally
+        {
+            host.HideTooltipForAutomation();
+            window.Left = OffScreen;
+            window.Top = OffScreen;
             await SettleAsync(window).ConfigureAwait(true);
         }
     }
