@@ -13,7 +13,11 @@ public sealed record PerformanceSnapshot(
     int Gen1Collections,
     int Gen2Collections,
     double StartupSeconds,
+    double RenderLastMs,
+    double RenderPeakMs,
+    double RenderAverageMs,
+    int RenderCount,
     PerformanceOperation? Operation)
 {
-    public static PerformanceSnapshot Empty { get; } = new(DateTime.MinValue, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, null);
+    public static PerformanceSnapshot Empty { get; } = new(DateTime.MinValue, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, null);
 }

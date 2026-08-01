@@ -34,6 +34,16 @@ public static class PerformanceReport
 
         text.AppendLine(CultureInfo.CurrentCulture, $"Старт приложения: {snapshot.StartupSeconds:N2} с");
 
+        if (snapshot.RenderCount == 0)
+        {
+            text.AppendLine("Отрисовка карты диска: кадров не было");
+        }
+        else
+        {
+            text.AppendLine(CultureInfo.CurrentCulture,
+                $"Отрисовка карты диска: {snapshot.RenderLastMs:N1} мс, пик {snapshot.RenderPeakMs:N1} мс, среднее {snapshot.RenderAverageMs:N1} мс за {Plural.Format(snapshot.RenderCount, "кадр", "кадра", "кадров")}");
+        }
+
         if (PerformanceFormat.Operation(snapshot.Operation) is { } operation)
         {
             text.AppendLine(CultureInfo.CurrentCulture, $"Операция: {operation}");

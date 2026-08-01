@@ -299,6 +299,26 @@ public class PerformanceTests
     }
 
     [Test]
+    public void Сводка_разводит_отсутствие_кадров_и_нулевую_стоимость_отрисовки()
+    {
+        var noFrames = PerformanceSnapshot.Empty with { CapturedAtUtc = DateTime.UtcNow, SampleCount = 20 };
+
+        var drawn = noFrames with
+        {
+            RenderLastMs = 4.28,
+            RenderPeakMs = 21.5,
+            RenderAverageMs = 7,
+            RenderCount = 31,
+        };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(PerformanceReport.Build(noFrames, "2.8.42"), Does.Contain("Отрисовка карты диска: кадров не было"));
+            Assert.That(PerformanceReport.Build(drawn, "2.8.42"), Does.Contain("4,3 мс, пик 21,5 мс, среднее 7,0 мс за 31 кадр"));
+        });
+    }
+
+    [Test]
     public void Сводка_сразу_после_сброса_не_выдаёт_ноль_за_измеренный_отклик()
     {
         var justStarted = PerformanceSnapshot.Empty with

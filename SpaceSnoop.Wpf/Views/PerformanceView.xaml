@@ -188,6 +188,35 @@
                                    Style="{StaticResource Performance.TileHint}" />
                     </StackPanel>
                 </Border>
+
+                <Border Style="{StaticResource Performance.Tile}">
+                    <StackPanel>
+                        <TextBlock Text="Отрисовка карты диска"
+                                   Style="{StaticResource Performance.TileCaption}" />
+
+                        <TextBlock Text="{Binding RenderText}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock"
+                                       BasedOn="{StaticResource Performance.TileValue}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsRenderSlow}"
+                                                     Value="True">
+                                            <Setter Property="Foreground"
+                                                    Value="{DynamicResource State.Warning}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <TextBlock Text="{Binding RenderHint}"
+                                   Style="{StaticResource Performance.TileHint}" />
+
+                        <TextBlock Text="построение кадра на UI-потоке, без растеризации"
+                                   Style="{StaticResource Performance.TileHint}"
+                                   Margin="0,2,0,0" />
+                    </StackPanel>
+                </Border>
             </WrapPanel>
 
             <Border Style="{StaticResource Card.Inset}"

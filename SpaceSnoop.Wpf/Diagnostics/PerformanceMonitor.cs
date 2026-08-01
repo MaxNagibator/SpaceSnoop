@@ -9,6 +9,8 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
 
     private readonly PerformanceSamples _delays = new(AppDefaults.PerformanceWindowSamples);
 
+    private readonly PerformanceSamples _renders = new(AppDefaults.PerformanceRenderSamples);
+
     private readonly PerformanceHistoryBuffer _history = new(AppDefaults.PerformanceHistorySamples);
 
     private readonly Lock _lock = new();
@@ -20,6 +22,8 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
     private long _lastTick;
 
     private long _lastHitchLog;
+
+    private int _renderCount;
 
     private PerformanceOperation? _operation;
 
@@ -80,6 +84,8 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
         {
             _delays.Clear();
             _history.Clear();
+            _renders.Clear();
+            _renderCount = 0;
 
             _lastTick = Stopwatch.GetTimestamp();
             _lastHitchLog = 0;
@@ -110,6 +116,20 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
     public void ReportOperation(PerformanceOperation? operation)
     {
         Volatile.Write(ref _operation, operation);
+    }
+
+    public void ReportRender(double milliseconds)
+    {
+        if (!_running || _disposed)
+        {
+            return;
+        }
+
+        lock (_lock)
+        {
+            _renders.Add(milliseconds);
+            _renderCount++;
+        }
     }
 
     public PerformanceHistory CaptureHistory(TimeSpan since, int maxPoints)
@@ -207,6 +227,10 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
             sample.Gen1Collections,
             sample.Gen2Collections,
             _startup.TotalSeconds,
+            _renders.Last,
+            _renders.Peak(),
+            _renders.Average(),
+            _renderCount,
             operation));
     }
 

@@ -3,6 +3,7 @@ using SpaceSnoop.Wpf.Converters;
 using System.Collections;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
@@ -23,8 +24,6 @@ public sealed class TreemapView : FrameworkElement
     private const double IconSize = 12;
     private const double IconGap = 5;
     private const double MarkerSize = 9;
-    private const double BeakTipOffset = 24;
-    private const double BeakGap = 4;
 
     public static readonly DependencyProperty ItemsSourceProperty =
         DependencyProperty.Register(nameof(ItemsSource),
@@ -47,6 +46,9 @@ public sealed class TreemapView : FrameworkElement
 
     public static readonly DependencyProperty DrillCommandProperty =
         DependencyProperty.Register(nameof(DrillCommand), typeof(ICommand), typeof(TreemapView));
+
+    public static readonly DependencyProperty PerformanceProperty =
+        DependencyProperty.Register(nameof(Performance), typeof(PerformanceMonitor), typeof(TreemapView));
 
     public static readonly DependencyProperty NodeContextMenuProperty =
         DependencyProperty.Register(nameof(NodeContextMenu), typeof(ContextMenu), typeof(TreemapView));
@@ -89,15 +91,6 @@ public sealed class TreemapView : FrameworkElement
         Unloaded += OnUnloaded;
     }
 
-    private enum TooltipSide
-    {
-        None = 0,
-        Below = 1,
-        Above = 2,
-        RightOf = 3,
-        LeftOf = 4,
-    }
-
     public IEnumerable? ItemsSource
     {
         get => ReadDependencyValue<IEnumerable>(ItemsSourceProperty);
@@ -122,6 +115,12 @@ public sealed class TreemapView : FrameworkElement
         set => SetValue(DrillCommandProperty, value);
     }
 
+    public PerformanceMonitor? Performance
+    {
+        get => ReadDependencyValue<PerformanceMonitor>(PerformanceProperty);
+        set => SetValue(PerformanceProperty, value);
+    }
+
     public ContextMenu? NodeContextMenu
     {
         get => (ContextMenu?)GetValue(NodeContextMenuProperty);
@@ -144,6 +143,7 @@ public sealed class TreemapView : FrameworkElement
 
     protected override void OnRender(DrawingContext context)
     {
+        var startedAt = Stopwatch.GetTimestamp();
         var width = ActualWidth;
         var height = ActualHeight;
 
@@ -177,6 +177,8 @@ public sealed class TreemapView : FrameworkElement
         }
 
         _tiles = tiles;
+
+        Performance?.ReportRender(Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
     }
 
     private void DrawTile(DrawingContext context, ScanNodeViewModel node, Rect tile, TileStyle style)
@@ -465,17 +467,6 @@ public sealed class TreemapView : FrameworkElement
         context.DrawGeometry(MarkerBrush, null, geometry);
     }
 
-    private static Point TopLeftFor(TooltipSide side, Point c, double w, double h, double t, double g)
-    {
-        return side switch
-        {
-            TooltipSide.Above => new(c.X - t, c.Y - g - h),
-            TooltipSide.RightOf => new(c.X + g, c.Y - t),
-            TooltipSide.LeftOf => new(c.X - g - w, c.Y - t),
-            _ => new(c.X - t, c.Y + g),
-        };
-    }
-
     private static void ApplyBeak(Path beak, TooltipSide side)
     {
         switch (side)
@@ -575,47 +566,25 @@ public sealed class TreemapView : FrameworkElement
 
     private CustomPopupPlacement[] PlaceTooltip(Size popupSize, Size targetSize, Point offset)
     {
-        var w = popupSize.Width;
-        var h = popupSize.Height;
-        var t = BeakTipOffset;
-        var g = BeakGap;
-        var c = _cursor;
-
-        var minX = 0.0;
-        var minY = 0.0;
-        var maxX = targetSize.Width;
-        var maxY = targetSize.Height;
+        var dpi = VisualTreeHelper.GetDpi(this);
+        var bounds = new Rect(0, 0, targetSize.Width / dpi.DpiScaleX, targetSize.Height / dpi.DpiScaleY);
 
         if (Window.GetWindow(this) is { } window)
         {
             var origin = TranslatePoint(new(0, 0), window);
-            minX = -origin.X;
-            minY = -origin.Y;
-            maxX = minX + window.ActualWidth;
-            maxY = minY + window.ActualHeight;
+            bounds = new(-origin.X, -origin.Y, window.ActualWidth, window.ActualHeight);
         }
 
-        var side = TooltipSide.Below;
-
-        foreach (var candidate in (ReadOnlySpan<TooltipSide>)[TooltipSide.Below, TooltipSide.Above, TooltipSide.RightOf, TooltipSide.LeftOf])
-        {
-            var p = TopLeftFor(candidate, c, w, h, t, g);
-
-            if (p.X >= minX && p.Y >= minY && p.X + w <= maxX && p.Y + h <= maxY)
-            {
-                side = candidate;
-                break;
-            }
-        }
+        var placement = TreemapTooltip.Place(_cursor, popupSize, bounds, dpi);
 
         _beak ??= _toolTip.Template?.FindName("Beak", _toolTip) as Path;
 
         if (_beak is not null)
         {
-            ApplyBeak(_beak, side);
+            ApplyBeak(_beak, placement.Side);
         }
 
-        return [new(TopLeftFor(side, c, w, h, t, g), PopupPrimaryAxis.None)];
+        return [new(placement.DeviceTopLeft, PopupPrimaryAxis.None)];
     }
 
     private void HookItems()

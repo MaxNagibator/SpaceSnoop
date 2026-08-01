@@ -95,6 +95,8 @@ public static class AppDefaults
     public const double PerformanceEtaMaxSeconds = 24 * 60 * 60;
     public const int PerformanceHitchMs = 500;
     public const int PerformanceHitchLogIntervalSeconds = 5;
+    public const int PerformanceRenderSamples = 60;
+    public const double PerformanceRenderSlowMs = 16;
     public const bool PerformanceChartExpandedDefault = false;
     public const int PerformanceChartRefreshMs = 1000;
     public const double PerformanceChartPanelHeight = 160;

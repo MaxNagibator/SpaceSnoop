@@ -80,6 +80,10 @@ public sealed class McpBridge(
             snapshot.Gen1Collections,
             snapshot.Gen2Collections,
             Math.Round(snapshot.StartupSeconds, 2),
+            Math.Round(snapshot.RenderLastMs, 1),
+            Math.Round(snapshot.RenderPeakMs, 1),
+            Math.Round(snapshot.RenderAverageMs, 1),
+            snapshot.RenderCount,
             DescribeOperation(snapshot.Operation),
             ReadHistory(historySeconds, historyPoints)));
     }

@@ -214,6 +214,8 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
     public ScanPreferences Preferences { get; }
 
+    public PerformanceMonitor Performance => _performance;
+
     public double Intensity
     {
         get => Preferences.Intensity;

@@ -678,6 +678,7 @@
                     <Grid>
                         <controls:TreemapView ItemsSource="{Binding TreemapTiles}"
                                               Intensity="{Binding Intensity}"
+                                              Performance="{Binding Performance}"
                                               SelectedItem="{Binding SelectedNode, Mode=TwoWay}"
                                               DrillCommand="{Binding DrillIntoCommand}"
                                               NodeContextMenu="{StaticResource ScanNodeMenu}"

@@ -34,6 +34,15 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
     private string _startupText = string.Empty;
 
     [ObservableProperty]
+    private string _renderText = string.Empty;
+
+    [ObservableProperty]
+    private string _renderHint = string.Empty;
+
+    [ObservableProperty]
+    private bool _isRenderSlow;
+
+    [ObservableProperty]
     private string _windowText = string.Empty;
 
     [ObservableProperty]
@@ -142,6 +151,14 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
 
         CollectionsText = $"{snapshot.Gen0Collections} / {snapshot.Gen1Collections} / {snapshot.Gen2Collections}";
         StartupText = $"{snapshot.StartupSeconds:N2} с";
+
+        RenderText = snapshot.RenderCount == 0 ? "нет кадров" : $"{snapshot.RenderLastMs:N1} мс";
+
+        RenderHint = snapshot.RenderCount == 0
+            ? "карту диска с начала сбора ни разу не рисовали"
+            : $"пик {snapshot.RenderPeakMs:N1} мс · среднее {snapshot.RenderAverageMs:N1} мс · {Plural.Format(snapshot.RenderCount, "кадр", "кадра", "кадров")}";
+
+        IsRenderSlow = snapshot.RenderPeakMs >= AppDefaults.PerformanceRenderSlowMs;
         WindowText = $"{Plural.Format(snapshot.SampleCount, "замер", "замера", "замеров")} за {snapshot.ObservedSpanSeconds:N1} с";
 
         OperationText = snapshot.Operation?.Name;

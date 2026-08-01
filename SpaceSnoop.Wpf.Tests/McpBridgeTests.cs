@@ -124,6 +124,20 @@ public class McpBridgeTests
     }
 
     [Test]
+    public void Стоимость_отрисовки_выходит_в_JSON_отдельными_полями()
+    {
+        var json = JsonDocument.Parse(McpBridge.Serialize(Performance(null))).RootElement;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(json.GetProperty("renderLastMs").GetDouble(), Is.EqualTo(4.3));
+            Assert.That(json.GetProperty("renderPeakMs").GetDouble(), Is.EqualTo(21.5));
+            Assert.That(json.GetProperty("renderAverageMs").GetDouble(), Is.EqualTo(7));
+            Assert.That(json.GetProperty("renderCount").GetInt32(), Is.EqualTo(31));
+        });
+    }
+
+    [Test]
     public void Накопительные_и_оконные_счётчики_GC_названы_по_разному()
     {
         var json = JsonDocument.Parse(McpBridge.Serialize(Performance(McpBridge.DescribeHistory(History(), 60, 240)))).RootElement;
@@ -303,6 +317,10 @@ public class McpBridgeTests
             1,
             0,
             1.25,
+            4.3,
+            21.5,
+            7,
+            31,
             null,
             history);
     }
