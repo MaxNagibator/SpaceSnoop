@@ -186,10 +186,6 @@ public partial class App : Application
         services.AddSingleton<ScheduleViewModel>();
         services.AddSingleton<DockerViewModel>();
         services.AddSingleton<ChatViewModel>();
-        // График живёт в двух местах сразу – врезкой на странице «Логи» и на странице
-        // «Производительность». Экземпляр у каждого свой (потому transient): активность им
-        // управляют разные хозяева, и общий экземпляр гасили бы друг другу при переходе между
-        // страницами.
         services.AddTransient<PerformanceChartViewModel>();
         services.AddSingleton<ILogsPanel>(static provider => provider.GetRequiredService<PerformanceChartViewModel>());
         services.AddSingleton<PerformanceViewModel>();

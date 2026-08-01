@@ -44,6 +44,31 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
             return;
         }
 
+        Rebase(markRunning: true);
+
+        _timer ??= CreateTimer();
+        _timer.Start();
+    }
+
+    public void Reset()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (!_running)
+        {
+            Start();
+            return;
+        }
+
+        Rebase(markRunning: false);
+        Notify();
+    }
+
+    private void Rebase(bool markRunning)
+    {
         for (var generation = 0; generation < _baseCollections.Length; generation++)
         {
             _baseCollections[generation] = GC.CollectionCount(generation);
@@ -58,13 +83,14 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
 
             _lastTick = Stopwatch.GetTimestamp();
             _lastHitchLog = 0;
-            _running = true;
+
+            if (markRunning)
+            {
+                _running = true;
+            }
 
             Publish(Sample(_lastTick, 0, operation), operation);
         }
-
-        _timer ??= CreateTimer();
-        _timer.Start();
     }
 
     public void Stop()

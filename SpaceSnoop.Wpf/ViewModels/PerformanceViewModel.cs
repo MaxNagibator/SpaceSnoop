@@ -77,10 +77,6 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
 
     ICommand IPageRefresh.RefreshCommand => RefreshCommand;
 
-    /// <summary>
-    /// Страница на экране или нет: замеры нужны, только пока их смотрят. Зовёт code-behind
-    /// по <c>Loaded</c>/<c>Unloaded</c>, как это делают остальные страницы приложения.
-    /// </summary>
     public void SetActive(bool active)
     {
         _active = active;
@@ -106,8 +102,7 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
     [RelayCommand]
     private void Reset()
     {
-        _monitor.Stop();
-        _monitor.Start();
+        _monitor.Reset();
         Apply(_monitor.Snapshot);
         Chart.Refresh();
         _notifier.Notify("Замеры производительности сброшены");

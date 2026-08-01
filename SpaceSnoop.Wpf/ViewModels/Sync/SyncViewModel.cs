@@ -887,7 +887,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         return ExecuteCompareAsync(cancellationToken);
     }
 
-    internal Task<SyncReport?> SyncFromAutomationAsync(CancellationToken cancellationToken)
+    internal Task<SyncRunResult?> SyncFromAutomationAsync(CancellationToken cancellationToken)
     {
         return ExecuteSyncAsync(false, cancellationToken);
     }
@@ -1847,7 +1847,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         return PerformanceFormat.Rate(finished) is { } rate ? $" Скорость: {rate}." : string.Empty;
     }
 
-    private async Task<SyncReport?> ExecuteSyncAsync(bool interactive, CancellationToken external = default)
+    private async Task<SyncRunResult?> ExecuteSyncAsync(bool interactive, CancellationToken external = default)
     {
         if (_result is null)
         {
@@ -1925,7 +1925,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             ShowSyncOutcome(report);
         }
 
-        return report;
+        return new(report, stopwatch.Elapsed, LastVerifyState);
     }
 
     private void ShowSyncOutcome(SyncReport report)

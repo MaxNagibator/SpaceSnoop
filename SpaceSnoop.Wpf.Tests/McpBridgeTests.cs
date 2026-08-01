@@ -141,12 +141,24 @@ public class McpBridgeTests
     [TestCase(SyncVerifyState.Completed, "Completed", "до конца")]
     public void Итог_синхронизации_различает_три_исхода_проверки(SyncVerifyState state, string expected, string hint)
     {
-        var json = JsonDocument.Parse(McpBridge.Serialize(SyncResult(state))).RootElement;
+        var json = JsonDocument.Parse(McpBridge.Serialize(SyncResult(state, 0))).RootElement;
 
         Assert.Multiple(() =>
         {
             Assert.That(json.GetProperty("verify").GetString(), Is.EqualTo(expected));
             Assert.That(json.GetProperty("verifyHint").GetString(), Does.Contain(hint));
+        });
+    }
+
+    [Test]
+    public void Пройденная_проверка_при_ошибках_не_обещает_сходимости()
+    {
+        var json = JsonDocument.Parse(McpBridge.Serialize(SyncResult(SyncVerifyState.Completed, 3))).RootElement;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(json.GetProperty("verifyHint").GetString(), Does.Contain("не проверялись"));
+            Assert.That(json.GetProperty("verifyHint").GetString(), Does.Not.Contain("каталоги сошлись"));
         });
     }
 
@@ -252,7 +264,7 @@ public class McpBridgeTests
         Assert.That(HeadlessSync.MapMode(SyncProfile.IndexOfMode(mode)), Is.EqualTo(mode));
     }
 
-    private static McpSyncResult SyncResult(SyncVerifyState state)
+    private static McpSyncResult SyncResult(SyncVerifyState state, int errorCount)
     {
         return new(3,
             1,
@@ -261,8 +273,8 @@ public class McpBridgeTests
             2048,
             "2 КБ",
             state,
-            McpBridge.DescribeVerifyState(state),
-            0,
+            McpBridge.DescribeVerifyState(state, errorCount),
+            errorCount,
             0,
             0,
             0,

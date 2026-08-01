@@ -11,15 +11,20 @@ public static class PerformanceReport
 
         text.AppendLine(CultureInfo.CurrentCulture, $"Производительность SpaceSnoop {version}");
 
-        text.AppendLine(snapshot.CapturedAtUtc == DateTime.MinValue
-            ? "Замеров ещё нет"
-            : $"Снято: {snapshot.CapturedAtUtc.ToLocalTime():yyyy-MM-dd HH:mm:ss}");
+        if (snapshot.SampleCount == 0)
+        {
+            text.AppendLine("Замеров ещё нет: сбор только запущен или сброшен, отклик мерить не по чему");
+        }
+        else
+        {
+            text.AppendLine(CultureInfo.CurrentCulture, $"Снято: {snapshot.CapturedAtUtc.ToLocalTime():yyyy-MM-dd HH:mm:ss}");
 
-        text.AppendLine(CultureInfo.CurrentCulture,
-            $"Отклик UI: {Math.Round(snapshot.UiDelayMs):N0} мс, пик {Math.Round(snapshot.UiPeakMs):N0} мс, среднее {Math.Round(snapshot.UiAverageMs):N0} мс");
+            text.AppendLine(CultureInfo.CurrentCulture,
+                $"Отклик UI: {Math.Round(snapshot.UiDelayMs):N0} мс, пик {Math.Round(snapshot.UiPeakMs):N0} мс, среднее {Math.Round(snapshot.UiAverageMs):N0} мс");
 
-        text.AppendLine(CultureInfo.CurrentCulture,
-            $"Окно: {Plural.Format(snapshot.SampleCount, "замер", "замера", "замеров")} за {snapshot.ObservedSpanSeconds:N1} с");
+            text.AppendLine(CultureInfo.CurrentCulture,
+                $"Окно: {Plural.Format(snapshot.SampleCount, "замер", "замера", "замеров")} за {snapshot.ObservedSpanSeconds:N1} с");
+        }
 
         text.AppendLine(CultureInfo.CurrentCulture,
             $"Память: {SizeFormatter.Format(snapshot.ManagedBytes)} управляемой, {SizeFormatter.Format(snapshot.WorkingSetBytes)} процесс");

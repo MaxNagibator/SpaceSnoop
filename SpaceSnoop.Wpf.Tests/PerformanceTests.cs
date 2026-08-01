@@ -2,12 +2,28 @@
 using SpaceSnoop.Core.Domain;
 using SpaceSnoop.Wpf.Diagnostics;
 using SpaceSnoop.Wpf.ViewModels.Sync;
+using System.Globalization;
 
 namespace SpaceSnoop.Wpf.Tests;
 
 [TestFixture]
 public class PerformanceTests
 {
+    private CultureInfo _culture = CultureInfo.CurrentCulture;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _culture = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = new("ru-RU");
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        CultureInfo.CurrentCulture = _culture;
+    }
+
     [Test]
     public void Пустой_буфер_не_даёт_ни_пика_ни_среднего()
     {
@@ -283,13 +299,22 @@ public class PerformanceTests
     }
 
     [Test]
-    public void Сводка_без_единого_замера_честно_это_говорит()
+    public void Сводка_сразу_после_сброса_не_выдаёт_ноль_за_измеренный_отклик()
     {
-        var text = PerformanceReport.Build(PerformanceSnapshot.Empty, "2.8.42");
+        var justStarted = PerformanceSnapshot.Empty with
+        {
+            CapturedAtUtc = DateTime.UtcNow,
+            ManagedBytes = 4096,
+            StartupSeconds = 1.25,
+        };
+
+        var text = PerformanceReport.Build(justStarted, "2.8.42");
 
         Assert.Multiple(() =>
         {
             Assert.That(text, Does.Contain("Замеров ещё нет"));
+            Assert.That(text, Does.Not.Contain("Отклик UI"));
+            Assert.That(text, Does.Contain(SizeFormatter.Format(4096)));
             Assert.That(text, Does.Not.Contain("Операция:"));
         });
     }

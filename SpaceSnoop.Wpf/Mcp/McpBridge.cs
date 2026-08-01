@@ -452,22 +452,24 @@ public sealed class McpBridge(
             return sync.SyncFromAutomationAsync(cancellationToken);
         });
 
-        var report = await run.ConfigureAwait(false);
+        var outcome = await run.ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (report is null)
+        if (outcome is null)
         {
             throw new McpException("Синхронизация не доведена до конца: операция отменена или сравнение сброшено. Часть файлов могла быть уже перенесена – сравните каталоги заново.");
         }
 
+        var report = outcome.Report;
+
         return Dispatch(() => Serialize(new McpSyncResult(report.CopiedCount,
             report.DeletedCount,
             report.SuccessCount,
-            Math.Round(sync.LastSyncElapsed.TotalSeconds, 2),
+            Math.Round(outcome.Elapsed.TotalSeconds, 2),
             report.CopiedBytes,
             SizeFormatter.Format(report.CopiedBytes),
-            sync.LastVerifyState,
-            DescribeVerifyState(sync.LastVerifyState),
+            outcome.Verify,
+            DescribeVerifyState(outcome.Verify, report.Errors.Count),
             report.Errors.Count,
             report.Mismatches.Count,
             Math.Max(0, report.Errors.Count - entryLimit),
@@ -478,10 +480,12 @@ public sealed class McpBridge(
             ReadSyncState())));
     }
 
-    internal static string DescribeVerifyState(SyncVerifyState state)
+    internal static string DescribeVerifyState(SyncVerifyState state, int errorCount)
     {
         return state switch
         {
+            SyncVerifyState.Completed when errorCount > 0 =>
+                "проверка прошла до конца, но идёт она только по применённым действиям: пути из errors не проверялись, там расхождение осталось",
             SyncVerifyState.Completed => "проверка прошла до конца: пустой mismatches означает, что каталоги сошлись",
             SyncVerifyState.Interrupted => "проверка прервана: часть путей не проверена, пустой mismatches ничего не доказывает",
             _ => "проверка выключена настройкой: сходимость не проверялась",
