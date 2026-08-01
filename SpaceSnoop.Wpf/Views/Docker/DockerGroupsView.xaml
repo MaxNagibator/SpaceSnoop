@@ -17,6 +17,20 @@
                     Value="{DynamicResource Fg.Primary}" />
         </Style>
 
+        <Style x:Key="Docker.DeleteButton"
+               TargetType="Button"
+               BasedOn="{StaticResource Button.Icon}">
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Muted}" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver"
+                         Value="True">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.Error}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <DataTemplate x:Key="Docker.ObjectRow"
                       DataType="{x:Type vm:DockerObjectViewModel}">
             <Border Padding="0,7"
@@ -56,7 +70,7 @@
                                VerticalAlignment="Center" />
                     <Grid Grid.Column="3"
                           Margin="10,0,0,0">
-                        <Button Style="{StaticResource Button.Icon}"
+                        <Button Style="{StaticResource Docker.DeleteButton}"
                                 Command="{Binding ArmDeleteCommand}"
                                 IsEnabled="{Binding DataContext.CanRun, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                 Visibility="{Binding ConfirmingDelete, Converter={StaticResource InverseBoolToVisibility}}"
@@ -66,8 +80,7 @@
                                                       Width="15"
                                                       Height="15"
                                                       HorizontalAlignment="Center"
-                                                      VerticalAlignment="Center"
-                                                      Foreground="{DynamicResource State.Error}" />
+                                                      VerticalAlignment="Center" />
                         </Button>
                         <StackPanel Orientation="Horizontal"
                                     Visibility="{Binding ConfirmingDelete, Converter={StaticResource BoolToVisibility}}">
@@ -114,6 +127,18 @@
                 TextWrapping="Wrap"
                 Margin="0,4,0,0" />
 
+            <StackPanel Margin="0,18,0,10"
+                        HorizontalAlignment="Center"
+                        Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">
+                <ProgressBar IsIndeterminate="True"
+                             Width="180"
+                             Height="3" />
+                <TextBlock Text="Опрашиваю Docker…"
+                           Style="{StaticResource TextBlock.Subtle}"
+                           HorizontalAlignment="Center"
+                           Margin="0,8,0,0" />
+            </StackPanel>
+
             <ItemsControl ItemsSource="{Binding Groups}"
                           Margin="0,8,0,0">
                 <ItemsControl.ItemTemplate>
@@ -131,7 +156,7 @@
                                                           Height="16"
                                                           VerticalAlignment="Center"
                                                           Margin="0,0,8,0"
-                                                          Foreground="{DynamicResource Accent.Primary}" />
+                                                          Foreground="{DynamicResource Fg.Secondary}" />
                                 <TextBlock Grid.Column="1"
                                            VerticalAlignment="Center"
                                            Style="{StaticResource Docker.SectionTitle}">
@@ -142,7 +167,7 @@
                                 <TextBlock Grid.Column="2"
                                            Text="{Binding TotalSize}"
                                            Style="{StaticResource TextBlock.Mono}"
-                                           Foreground="{DynamicResource Accent.Primary}"
+                                           Foreground="{DynamicResource Fg.Primary}"
                                            VerticalAlignment="Center" />
                             </Grid>
 

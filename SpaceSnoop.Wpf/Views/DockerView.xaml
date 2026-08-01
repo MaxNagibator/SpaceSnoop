@@ -14,11 +14,6 @@
                   HorizontalScrollBarVisibility="Disabled"
                   Padding="0,0,12,0">
         <StackPanel RequestBringIntoView="SuppressAutoScroll">
-            <ProgressBar IsIndeterminate="True"
-                         Height="3"
-                         Margin="0,0,0,8"
-                         Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
-
             <docker:DockerUnavailableView />
             <docker:DockerBucketsView />
             <docker:DockerGroupsView />

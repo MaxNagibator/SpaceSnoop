@@ -99,10 +99,7 @@ public sealed partial class DockerViewModel(
 
             if (snapshot.Available)
             {
-                foreach (var bucket in snapshot.Buckets)
-                {
-                    Buckets.Add(new(bucket));
-                }
+                FillBuckets(snapshot.Buckets);
 
                 await LoadObjectsAsync();
 
@@ -209,15 +206,21 @@ public sealed partial class DockerViewModel(
                 return;
             }
 
-            Buckets.Clear();
-            foreach (var bucket in snapshot.Buckets)
-            {
-                Buckets.Add(new(bucket));
-            }
+            FillBuckets(snapshot.Buckets);
         }
         catch (Exception ex)
         {
             logger.DockerUnavailable(ex.Message);
+        }
+    }
+
+    private void FillBuckets(IReadOnlyList<DockerUsage> buckets)
+    {
+        Buckets.Clear();
+
+        foreach (var bucket in DockerBucketViewModel.Build(buckets))
+        {
+            Buckets.Add(bucket);
         }
     }
 

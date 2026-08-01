@@ -58,4 +58,40 @@ public sealed class DockerBucketViewModelTests
     {
         Assert.That(DockerBucketViewModel.SizePart(reclaimable), Is.EqualTo(expected));
     }
+
+    [Test]
+    public void Полоса_меряется_самой_крупной_категорией()
+    {
+        var buckets = DockerBucketViewModel.Build(
+        [
+            new("Images", 4, 1, "2.987GB", "16.14MB (0%)"),
+            new("Build Cache", 393, 0, "20.06GB", "17.77GB"),
+        ]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(buckets[1].Fraction, Is.EqualTo(1).Within(0.001));
+            Assert.That(buckets[0].Fraction, Is.EqualTo(0.149).Within(0.001));
+            Assert.That(buckets[1].ReclaimFraction, Is.EqualTo(0.886).Within(0.001));
+        }
+    }
+
+    [Test]
+    public void Возвращаемое_никогда_не_длиннее_самой_полосы()
+    {
+        var buckets = DockerBucketViewModel.Build([new("Containers", 3, 0, "2.942MB", "2.942MB (100%)")]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(buckets[0].Fraction, Is.EqualTo(1).Within(0.001));
+            Assert.That(buckets[0].ReclaimFraction, Is.LessThanOrEqualTo(buckets[0].Fraction));
+            Assert.That(buckets[0].HasReclaim, Is.True);
+        }
+    }
+
+    [Test]
+    public void Пустой_снимок_не_ломает_доли()
+    {
+        Assert.That(DockerBucketViewModel.Build([]), Is.Empty);
+    }
 }

@@ -4,13 +4,13 @@ public sealed class DockerBucketViewModel
 {
     public DockerBucketViewModel(DockerUsage usage)
     {
-        var sizeBytes = DockerSize.ToBytes(usage.Size);
-        var reclaimBytes = DockerSize.ToBytes(SizePart(usage.Reclaimable));
+        SizeBytes = DockerSize.ToBytes(usage.Size);
+        ReclaimBytes = DockerSize.ToBytes(SizePart(usage.Reclaimable));
 
         Title = DockerText.Category(usage.Type);
         Count = usage.TotalCount;
-        SizeText = SizeFormatter.Format(sizeBytes);
-        ReclaimText = Reclaim(reclaimBytes, sizeBytes);
+        SizeText = SizeFormatter.Format(SizeBytes);
+        ReclaimText = Reclaim(ReclaimBytes, SizeBytes);
     }
 
     public string Title { get; }
@@ -20,6 +20,30 @@ public sealed class DockerBucketViewModel
     public string SizeText { get; }
 
     public string ReclaimText { get; }
+
+    public long SizeBytes { get; }
+
+    public long ReclaimBytes { get; }
+
+    public bool HasReclaim => ReclaimBytes > 0;
+
+    public double Fraction { get; private set; }
+
+    public double ReclaimFraction { get; private set; }
+
+    public static List<DockerBucketViewModel> Build(IEnumerable<DockerUsage> usages)
+    {
+        List<DockerBucketViewModel> items = [.. usages.Select(usage => new DockerBucketViewModel(usage))];
+        var largest = items.Count == 0 ? 0 : items.Max(item => item.SizeBytes);
+
+        foreach (var item in items)
+        {
+            item.Fraction = largest > 0 ? (double)item.SizeBytes / largest : 0;
+            item.ReclaimFraction = largest > 0 ? Math.Clamp((double)item.ReclaimBytes / largest, 0, item.Fraction) : 0;
+        }
+
+        return items;
+    }
 
     internal static string SizePart(string reclaimable)
     {

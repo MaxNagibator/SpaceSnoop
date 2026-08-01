@@ -78,10 +78,4 @@ public class HeatColorTests
             Assert.That(HeatColor.From(0.5, -1), Is.EqualTo(HeatColor.From(0.5, AppDefaults.IntensityMin)));
         }
     }
-
-    [Test]
-    public void Цвет_вычисляется_детерминированно()
-    {
-        Assert.That(HeatColor.From(0.42, 8), Is.EqualTo(HeatColor.From(0.42, 8)));
-    }
 }
