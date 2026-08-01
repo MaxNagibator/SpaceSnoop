@@ -87,6 +87,8 @@ public static class AppDefaults
     public const int PerformanceSampleIntervalMs = 500;
     public const int PerformanceWindowSamples = 20;
     public const int PerformanceHistorySamples = 600;
+    public const int PerformanceHistoryPointsMax = 240;
+    public const int PerformanceHistoryPointsDefault = 60;
     public const double PerformanceRateMinSeconds = 0.25;
     public const int PerformanceHitchMs = 500;
     public const int PerformanceHitchLogIntervalSeconds = 5;

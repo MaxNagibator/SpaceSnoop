@@ -26,10 +26,13 @@ public sealed class SpaceSnoopTools
     }
 
     [McpServerTool(Name = "get_performance")]
-    [Description("Как приложению живётся прямо сейчас: отклик интерфейса (задержка и пик за окно наблюдения), занятая память, число сборок мусора и скорость текущей операции. Отвечает мгновенно, ничего не считает и не меняет – с этого стоит начинать разговор «почему тормозит».")]
-    public static string GetPerformance(McpBridge bridge)
+    [Description("Как приложению живётся прямо сейчас: отклик интерфейса (задержка и пик за окно наблюдения), занятая память, число сборок мусора и скорость текущей операции. По запросу добавляет историю наблюдения – ряд замеров за последние минуты, по которому видно, когда именно была просадка. Отвечает мгновенно, ничего не считает и не меняет – с этого стоит начинать разговор «почему тормозит».")]
+    public static string GetPerformance(
+        McpBridge bridge,
+        [Description("За сколько секунд вернуть историю замеров: 0 – без истории. Хранятся последние 5 минут")] int historySeconds = 0,
+        [Description("Сколько точек истории вернуть максимум (берутся самые свежие, отброшенные считаются в omitted)")] int historyPoints = AppDefaults.PerformanceHistoryPointsDefault)
     {
-        return bridge.GetPerformance();
+        return bridge.GetPerformance(historySeconds, historyPoints);
     }
 
     [McpServerTool(Name = "list_drives")]

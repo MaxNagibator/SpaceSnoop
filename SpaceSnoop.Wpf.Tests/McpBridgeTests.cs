@@ -2,6 +2,7 @@
 using SpaceSnoop.Core.Domain;
 using SpaceSnoop.Core.Export;
 using SpaceSnoop.Wpf.Bootstrap;
+using SpaceSnoop.Wpf.Diagnostics;
 using SpaceSnoop.Wpf.Mcp;
 
 namespace SpaceSnoop.Wpf.Tests;
@@ -60,6 +61,29 @@ public class McpBridgeTests
     public void Дефолтная_глубина_скана_проходит_кламп_без_изменений()
     {
         Assert.That(McpBridge.ClampDepth(ScanExport.DefaultDepth), Is.EqualTo(ScanExport.DefaultDepth));
+    }
+
+    [TestCase(0, 1)]
+    [TestCase(-5, 1)]
+    [TestCase(60, 60)]
+    [TestCase(int.MaxValue, AppDefaults.PerformanceHistoryPointsMax)]
+    public void Число_точек_истории_зажимается_в_диапазон(int requested, int expected)
+    {
+        Assert.That(McpBridge.ClampHistoryPoints(requested), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void До_первого_замера_окно_наблюдения_не_обещает_секунд()
+    {
+        Assert.That(McpBridge.DescribeWindow(PerformanceSnapshot.Empty), Is.EqualTo("замеров ещё нет"));
+    }
+
+    [Test]
+    public void Окно_наблюдения_называет_охваченное_время_и_число_замеров()
+    {
+        var snapshot = PerformanceSnapshot.Empty with { SampleCount = 20, ObservedSpanSeconds = 13.5 };
+
+        Assert.That(McpBridge.DescribeWindow(snapshot), Does.StartWith("последние 13").And.EndWith("с (20 замеров)"));
     }
 
     [Test]

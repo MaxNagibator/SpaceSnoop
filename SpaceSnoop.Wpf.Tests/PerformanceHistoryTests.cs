@@ -83,7 +83,30 @@ public class PerformanceHistoryTests
 
         var history = buffer.Capture(now, DateTime.UnixEpoch, TimeSpan.Zero, 2);
 
-        Assert.That(history.Points.Select(static point => point.Operation), Is.EqualTo(new[] { "точка 2", "точка 1" }));
+        Assert.Multiple(() =>
+        {
+            Assert.That(history.Points.Select(static point => point.Operation), Is.EqualTo(new[] { "точка 2", "точка 1" }));
+            Assert.That(history.Omitted, Is.EqualTo(3));
+        });
+    }
+
+    [Test]
+    public void Предел_точек_не_считает_отброшенным_то_что_вне_окна()
+    {
+        var now = Stopwatch.GetTimestamp();
+        var buffer = new PerformanceHistoryBuffer(8);
+
+        buffer.Add(Sample(now, 30, "давняя"));
+        buffer.Add(Sample(now, 4, "недавняя"));
+        buffer.Add(Sample(now, 1, "свежая"));
+
+        var history = buffer.Capture(now, DateTime.UnixEpoch, TimeSpan.FromSeconds(10), 1);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(history.Points.Select(static point => point.Operation), Is.EqualTo(new[] { "свежая" }));
+            Assert.That(history.Omitted, Is.EqualTo(1));
+        });
     }
 
     [Test]

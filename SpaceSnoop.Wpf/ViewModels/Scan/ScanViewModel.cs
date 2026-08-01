@@ -242,6 +242,8 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
     internal DirectorySpace? CurrentRoot => Roots.Count > 0 ? Roots[0].Space as DirectorySpace : null;
 
+    internal TimeSpan LastScanElapsed { get; private set; }
+
     internal Func<ScanExportModel>? CaptureExportBuilder(int depth, int entryLimit)
     {
         if (CurrentRoot is not { } root)
@@ -287,6 +289,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         ResultSizeText = result.TotalSizeText;
         ResultFileCountText = result.TotalFileCount.ToString("N0");
         ResultDirCountText = result.TotalDirectoryCount.ToString("N0");
+        LastScanElapsed = elapsed;
         ResultElapsedText = FormatElapsed(elapsed);
         ResultRateText = PerformanceFormat.Rate(new("Сканирование", result.TotalFileCount, result.Size, elapsed)) ?? "–";
         HasResult = true;

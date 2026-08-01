@@ -892,6 +892,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         return ExecuteSyncAsync(false, cancellationToken);
     }
 
+    internal TimeSpan LastSyncElapsed { get; private set; }
+
     internal ComparisonExportModel? BuildExportModel(int entryLimit)
     {
         return CaptureExportBuilder(entryLimit)?.Invoke();
@@ -1869,6 +1871,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         {
             return null;
         }
+
+        LastSyncElapsed = stopwatch.Elapsed;
 
         _logger.SyncFinished(report.SuccessCount, report.Errors.Count, (long)stopwatch.Elapsed.TotalMilliseconds);
 

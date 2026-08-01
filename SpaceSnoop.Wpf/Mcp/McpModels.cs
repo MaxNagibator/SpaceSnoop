@@ -18,13 +18,17 @@ internal sealed record McpScanState(
     string Size,
     string Files,
     string Directories,
-    int MarkedForDeletion);
+    int MarkedForDeletion,
+    double ElapsedSeconds,
+    string Rate);
 
 internal sealed record McpScanNavigation(string Page, McpScanState Scan, string? Navigation);
 
 internal sealed record McpPerformance(
     bool Collecting,
     string Window,
+    int SampleCount,
+    double ObservedSpanSeconds,
     double UiDelayMs,
     double UiPeakMs,
     double UiAverageMs,
@@ -35,7 +39,28 @@ internal sealed record McpPerformance(
     int Gen0Collections,
     int Gen1Collections,
     int Gen2Collections,
-    McpPerformanceOperation? Operation);
+    McpPerformanceOperation? Operation,
+    McpPerformanceHistory? History);
+
+internal sealed record McpPerformanceHistory(
+    DateTime CapturedAtUtc,
+    double SpanSeconds,
+    int Points,
+    int Omitted,
+    int Gen0Collections,
+    int Gen1Collections,
+    int Gen2Collections,
+    IReadOnlyList<McpPerformancePoint> Timeline);
+
+internal sealed record McpPerformancePoint(
+    double AgeMs,
+    double UiDelayMs,
+    long ManagedBytes,
+    long WorkingSetBytes,
+    int Gen0Collections,
+    int Gen1Collections,
+    int Gen2Collections,
+    string? Operation);
 
 internal sealed record McpPerformanceOperation(
     string Name,
@@ -152,6 +177,11 @@ internal sealed record McpSyncResult(
     int Copied,
     int Deleted,
     int Succeeded,
+    double ElapsedSeconds,
+    long CopiedBytes,
+    string CopiedSize,
+    bool Verified,
     IReadOnlyList<SyncError> Errors,
     IReadOnlyList<SyncMismatch> Mismatches,
+    string Summary,
     McpSyncState Sync);

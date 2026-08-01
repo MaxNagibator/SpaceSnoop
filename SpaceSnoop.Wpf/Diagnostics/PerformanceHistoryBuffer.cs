@@ -43,8 +43,9 @@ public sealed class PerformanceHistoryBuffer(int capacity)
         var builder = ImmutableArray.CreateBuilder<PerformancePoint>(Math.Min(_count, maxPoints));
         var newest = default(PerformanceSample);
         var oldest = default(PerformanceSample);
+        var omitted = 0;
 
-        for (var offset = 1; offset <= _count && builder.Count < maxPoints; offset++)
+        for (var offset = 1; offset <= _count; offset++)
         {
             var sample = _samples[(_next - offset + _samples.Length) % _samples.Length];
             var age = Stopwatch.GetElapsedTime(sample.Timestamp, now);
@@ -52,6 +53,12 @@ public sealed class PerformanceHistoryBuffer(int capacity)
             if (since > TimeSpan.Zero && age > since)
             {
                 break;
+            }
+
+            if (builder.Count == maxPoints)
+            {
+                omitted++;
+                continue;
             }
 
             if (builder.Count == 0)
@@ -83,6 +90,7 @@ public sealed class PerformanceHistoryBuffer(int capacity)
             newest.Gen0Collections - oldest.Gen0Collections,
             newest.Gen1Collections - oldest.Gen1Collections,
             newest.Gen2Collections - oldest.Gen2Collections,
+            omitted,
             builder.ToImmutable());
     }
 }

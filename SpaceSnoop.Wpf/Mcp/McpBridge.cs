@@ -57,15 +57,16 @@ public sealed class McpBridge(
             ReadSyncState())));
     }
 
-    public string GetPerformance()
+    public string GetPerformance(int historySeconds, int historyPoints)
     {
-        logger.McpToolInvoked("get_performance", "-");
+        logger.McpToolInvoked("get_performance", historySeconds > 0 ? $"история за {historySeconds} с, точек до {historyPoints}" : "-");
 
         var snapshot = performance.Snapshot;
-        var windowSeconds = AppDefaults.PerformanceSampleIntervalMs * AppDefaults.PerformanceWindowSamples / 1000d;
 
         return Serialize(new McpPerformance(performance.IsRunning,
-            $"последние {windowSeconds:N0} с",
+            DescribeWindow(snapshot),
+            snapshot.SampleCount,
+            Math.Round(snapshot.ObservedSpanSeconds, 1),
             Math.Round(snapshot.UiDelayMs, 1),
             Math.Round(snapshot.UiPeakMs, 1),
             Math.Round(snapshot.UiAverageMs, 1),
@@ -76,7 +77,8 @@ public sealed class McpBridge(
             snapshot.Gen0Collections,
             snapshot.Gen1Collections,
             snapshot.Gen2Collections,
-            DescribeOperation(snapshot.Operation)));
+            DescribeOperation(snapshot.Operation),
+            ReadHistory(historySeconds, historyPoints)));
     }
 
     public string ListProfiles()
@@ -458,14 +460,31 @@ public sealed class McpBridge(
         return Dispatch(() => Serialize(new McpSyncResult(report.CopiedCount,
             report.DeletedCount,
             report.SuccessCount,
+            Math.Round(sync.LastSyncElapsed.TotalSeconds, 2),
+            report.CopiedBytes,
+            SizeFormatter.Format(report.CopiedBytes),
+            report.Verified,
             report.Errors,
             report.Mismatches,
+            sync.SummaryText,
             ReadSyncState())));
     }
 
     internal static int ClampEntryLimit(int entryLimit)
     {
         return Math.Clamp(entryLimit, AppDefaults.McpEntryLimitMin, AppDefaults.McpEntryLimitMax);
+    }
+
+    internal static int ClampHistoryPoints(int points)
+    {
+        return Math.Clamp(points, 1, AppDefaults.PerformanceHistoryPointsMax);
+    }
+
+    internal static string DescribeWindow(PerformanceSnapshot snapshot)
+    {
+        return snapshot.SampleCount == 0
+            ? "замеров ещё нет"
+            : $"последние {snapshot.ObservedSpanSeconds:N1} с ({snapshot.SampleCount:N0} замеров)";
     }
 
     internal static int ClampDepth(int depth)
@@ -528,6 +547,36 @@ public sealed class McpBridge(
             OverviewRunStatus.Overlap => "каталоги совпадают или вложены",
             _ => null,
         };
+    }
+
+    private McpPerformanceHistory? ReadHistory(int historySeconds, int historyPoints)
+    {
+        if (historySeconds <= 0)
+        {
+            return null;
+        }
+
+        var history = performance.CaptureHistory(TimeSpan.FromSeconds(historySeconds), ClampHistoryPoints(historyPoints));
+
+        var timeline = history.Points
+            .Select(static point => new McpPerformancePoint(Math.Round(point.AgeMs, 1),
+                Math.Round(point.UiDelayMs, 1),
+                point.ManagedBytes,
+                point.WorkingSetBytes,
+                point.Gen0Collections,
+                point.Gen1Collections,
+                point.Gen2Collections,
+                point.Operation))
+            .ToList();
+
+        return new(history.CapturedAtUtc,
+            Math.Round(history.SpanSeconds, 1),
+            timeline.Count,
+            history.Omitted,
+            history.Gen0Collections,
+            history.Gen1Collections,
+            history.Gen2Collections,
+            timeline);
     }
 
     private static McpPerformanceOperation? DescribeOperation(PerformanceOperation? operation)
@@ -994,7 +1043,9 @@ public sealed class McpBridge(
             scan.ResultSizeText,
             scan.ResultFileCountText,
             scan.ResultDirCountText,
-            scan.MarkedCount);
+            scan.MarkedCount,
+            Math.Round(scan.LastScanElapsed.TotalSeconds, 2),
+            scan.ResultRateText);
     }
 
     private McpSyncState ReadSyncState()
