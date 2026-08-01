@@ -245,7 +245,7 @@
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                                   Kind="{x:Static iconPacks:PackIconLucideKind.ArrowRight}"
-                                                  Foreground="{DynamicResource State.Success}" />
+                                                  Foreground="{DynamicResource Sync.LeftOnly}" />
                         <TextBlock Text="Копировать слева направо"
                                    VerticalAlignment="Center" />
                     </StackPanel>
@@ -299,7 +299,7 @@
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                                   Kind="{x:Static iconPacks:PackIconLucideKind.ArrowRight}"
-                                                  Foreground="{DynamicResource State.Success}" />
+                                                  Foreground="{DynamicResource Sync.LeftOnly}" />
                         <TextBlock Text="Всё содержимое: слева направо"
                                    VerticalAlignment="Center" />
                     </StackPanel>
@@ -561,7 +561,7 @@
                 <DataTrigger Binding="{Binding Action}"
                              Value="CopyToRight">
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Success}" />
+                            Value="{DynamicResource Sync.LeftOnly}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Action}"
                              Value="CopyToLeft">

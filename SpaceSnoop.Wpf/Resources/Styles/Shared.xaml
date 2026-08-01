@@ -80,6 +80,12 @@
     <Color x:Key="Heat.Color2">#BB6C52</Color>
     <Color x:Key="Heat.Color3">#A84625</Color>
 
+    <SolidColorBrush x:Key="Sync.LeftOnly"
+                     Color="{StaticResource Heat.Color3}" />
+
+    <SolidColorBrush x:Key="Sync.Modified"
+                     Color="{StaticResource Heat.Color1}" />
+
     <LinearGradientBrush x:Key="HeatSpectrum"
                          StartPoint="0,0"
                          EndPoint="1,0">
@@ -110,11 +116,11 @@
                          StartPoint="0,0"
                          EndPoint="0,1">
         <GradientStop Offset="0"
-                      Color="#6EBF8E" />
+                      Color="{StaticResource Heat.Color3}" />
         <GradientStop Offset="0.34"
                       Color="#93A6BA" />
         <GradientStop Offset="0.67"
-                      Color="#E0B055" />
+                      Color="{StaticResource Heat.Color1}" />
         <GradientStop Offset="1"
                       Color="#E07878" />
     </LinearGradientBrush>

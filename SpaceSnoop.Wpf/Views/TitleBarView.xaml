@@ -74,9 +74,9 @@
                 <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}"
                              Value="True">
                     <Setter Property="Background"
-                            Value="{DynamicResource Accent.Soft}" />
+                            Value="{DynamicResource Bg.SurfaceMute}" />
                     <Setter Property="Foreground"
-                            Value="{DynamicResource Accent.Primary}" />
+                            Value="{DynamicResource Fg.Primary}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>

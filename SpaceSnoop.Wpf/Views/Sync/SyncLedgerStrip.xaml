@@ -90,7 +90,7 @@
                 <DataTrigger Binding="{Binding NewerIsLeft}"
                              Value="True">
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Success}" />
+                            Value="{DynamicResource Sync.LeftOnly}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding NewerIsRight}"
                              Value="True">
@@ -109,7 +109,7 @@
                 <DataTrigger Binding="{Binding NewerIsLeft}"
                              Value="True">
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Success}" />
+                            Value="{DynamicResource Sync.LeftOnly}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding NewerIsRight}"
                              Value="True">
@@ -291,7 +291,7 @@
                              Height="8"
                              VerticalAlignment="Center"
                              Margin="0,0,7,0"
-                             Fill="{DynamicResource State.Success}" />
+                             Fill="{DynamicResource Sync.LeftOnly}" />
                     <TextBlock Text="Только слева"
                                Style="{StaticResource Caption}"
                                Margin="0,0,7,0" />
@@ -365,7 +365,7 @@
                              Height="8"
                              VerticalAlignment="Center"
                              Margin="0,0,7,0"
-                             Fill="{DynamicResource State.Warning}" />
+                             Fill="{DynamicResource Sync.Modified}" />
                     <TextBlock Text="Изменены"
                                Style="{StaticResource Caption}"
                                Margin="0,0,7,0" />
@@ -479,7 +479,7 @@
                         Background="{DynamicResource Bg.SurfaceMute}">
                     <StackPanel Orientation="Horizontal">
                         <Rectangle Style="{StaticResource CompositionSegment}"
-                                   Fill="{DynamicResource State.Success}">
+                                   Fill="{DynamicResource Sync.LeftOnly}">
                             <Rectangle.Width>
                                 <MultiBinding Converter="{StaticResource FractionToWidth}">
                                     <Binding Path="LeftOnlyFraction" />
@@ -499,7 +499,7 @@
                             </Rectangle.Width>
                         </Rectangle>
                         <Rectangle Style="{StaticResource CompositionSegment}"
-                                   Fill="{DynamicResource State.Warning}">
+                                   Fill="{DynamicResource Sync.Modified}">
                             <Rectangle.Width>
                                 <MultiBinding Converter="{StaticResource FractionToWidth}">
                                     <Binding Path="ModifiedFraction" />

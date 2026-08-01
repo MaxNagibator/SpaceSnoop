@@ -126,15 +126,15 @@
                     <Border DockPanel.Dock="Left"
                             Style="{StaticResource EndpointChip}"
                             Margin="0,0,8,0"
-                            Background="{DynamicResource State.SuccessSoft}"
-                            BorderBrush="{DynamicResource State.Success}"
+                            Background="{DynamicResource Accent.Soft}"
+                            BorderBrush="{DynamicResource Sync.LeftOnly}"
                             ToolTip="Левая сторона">
                         <TextBlock Text="Л"
                                    FontWeight="Bold"
                                    FontSize="{DynamicResource Font.Size.XS}"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
-                                   Foreground="{DynamicResource State.Success}" />
+                                   Foreground="{DynamicResource Sync.LeftOnly}" />
                     </Border>
                     <Button DockPanel.Dock="Right"
                             Style="{StaticResource Button.Secondary}"
@@ -369,7 +369,7 @@
                                     Command="{Binding ResolveAllToRightCommand}"
                                     Padding="9,2"
                                     MinHeight="26"
-                                    Foreground="{DynamicResource State.Success}"
+                                    Foreground="{DynamicResource Sync.LeftOnly}"
                                     ToolTip="Все спорные – слева направо"
                                     AutomationProperties.Name="Все спорные – слева направо">
                                 <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ArrowRight}"
