@@ -1,5 +1,7 @@
 ﻿using SpaceSnoop.Core;
+using SpaceSnoop.Core.Domain;
 using SpaceSnoop.Wpf.Diagnostics;
+using SpaceSnoop.Wpf.ViewModels.Sync;
 
 namespace SpaceSnoop.Wpf.Tests;
 
@@ -234,6 +236,44 @@ public class PerformanceTests
         var snapshot = PerformanceSnapshot.Empty with { UiDelayMs = 3, ManagedBytes = 2048, Operation = operation };
 
         Assert.That(PerformanceFormat.Summary(snapshot), Does.EndWith("Сканирование · 500 файл/с"));
+    }
+
+    [Test]
+    public void Итог_различает_проверено_и_проверка_прервана()
+    {
+        var report = new SyncReport();
+        report.AddApplied(SyncAction.CopyToRight, "a.txt", 1024);
+
+        var interrupted = SyncViewModel.DescribeVerify(true, report);
+        report.MarkVerified();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(interrupted, Does.Contain("проверка прервана"));
+            Assert.That(SyncViewModel.DescribeVerify(true, report), Is.EqualTo(", расхождений: 0"));
+            Assert.That(SyncViewModel.DescribeVerify(false, report), Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Итог_считает_скорость_по_применённым_и_скопированным()
+    {
+        var report = new SyncReport { CopiedCount = 9 };
+        report.Errors.Add(new("b.txt", SyncAction.CopyToRight, "нет доступа"));
+        report.AddApplied(SyncAction.CopyToRight, "a.txt", 2048);
+
+        var text = SyncViewModel.DescribeRate("Синхронизация", report, TimeSpan.FromSeconds(2));
+
+        Assert.That(text, Is.EqualTo($" Скорость: 5 файл/с · {SizeFormatter.Format(1024)}/с."));
+    }
+
+    [Test]
+    public void Итог_короткой_операции_обходится_без_скорости()
+    {
+        var report = new SyncReport { CopiedCount = 1 };
+        report.AddApplied(SyncAction.CopyToRight, "a.txt", 512);
+
+        Assert.That(SyncViewModel.DescribeRate("Синхронизация", report, TimeSpan.FromMilliseconds(80)), Is.Empty);
     }
 
     [TestCase(0, 0, "0:00")]

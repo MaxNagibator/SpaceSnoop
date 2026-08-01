@@ -39,6 +39,8 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
                 report.Mismatches.Add(new(item.RelativePath, item.Action, reason));
             }
         }
+
+        report.MarkVerified();
     }
 
     private static string? VerifyCopy(string source, string destination)
@@ -331,9 +333,15 @@ public sealed class SyncReport
     public int SuccessCount => CopiedCount + DeletedCount;
     public long CopiedBytes { get; private set; }
     public long DeletedBytes { get; private set; }
+    public bool Verified { get; private set; }
     public List<SyncApplied> Applied { get; } = [];
     public List<SyncError> Errors { get; } = [];
     public List<SyncMismatch> Mismatches { get; } = [];
+
+    public void MarkVerified()
+    {
+        Verified = true;
+    }
 
     public void AddApplied(SyncAction action, string relativePath, long bytes)
     {

@@ -96,6 +96,9 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     private string _resultElapsedText = "–";
 
     [ObservableProperty]
+    private string _resultRateText = "–";
+
+    [ObservableProperty]
     private string _scanCurrentPath = string.Empty;
 
     [ObservableProperty]
@@ -285,6 +288,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         ResultFileCountText = result.TotalFileCount.ToString("N0");
         ResultDirCountText = result.TotalDirectoryCount.ToString("N0");
         ResultElapsedText = FormatElapsed(elapsed);
+        ResultRateText = PerformanceFormat.Rate(new("Сканирование", result.TotalFileCount, result.Size, elapsed)) ?? "–";
         HasResult = true;
         RecountMarked();
 

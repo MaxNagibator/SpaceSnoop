@@ -1813,6 +1813,28 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             : null;
     }
 
+    internal static string DescribeVerify(bool requested, SyncReport report)
+    {
+        if (!requested)
+        {
+            return string.Empty;
+        }
+
+        return report.Verified
+            ? $", расхождений: {report.Mismatches.Count:N0}"
+            : $", проверка прервана (расхождений к тому моменту: {report.Mismatches.Count:N0})";
+    }
+
+    internal static string DescribeRate(string name, SyncReport report, TimeSpan elapsed)
+    {
+        var finished = new PerformanceOperation(name,
+            report.SuccessCount + report.Errors.Count,
+            report.CopiedBytes,
+            elapsed);
+
+        return PerformanceFormat.Rate(finished) is { } rate ? $" Скорость: {rate}." : string.Empty;
+    }
+
     private async Task<SyncReport?> ExecuteSyncAsync(bool interactive, CancellationToken external = default)
     {
         if (_result is null)
@@ -1863,9 +1885,10 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         RaiseProfileRun(null, report, (long)stopwatch.Elapsed.TotalMilliseconds);
         await ReadGitStateAsync();
 
-        var verifyText = verify ? $", расхождений: {report.Mismatches.Count:N0}" : string.Empty;
+        var verifyText = DescribeVerify(verify, report);
         var volumeText = report.CopiedBytes > 0 ? $" Перенесено: {SizeFormatter.Format(report.CopiedBytes)}." : string.Empty;
-        SummaryText = $"Готово за {stopwatch.Elapsed.TotalSeconds:F2} с.{volumeText} Успешно: {report.SuccessCount:N0}, ошибок: {report.Errors.Count:N0}{verifyText}";
+        var rateText = DescribeRate("Синхронизация", report, stopwatch.Elapsed);
+        SummaryText = $"Готово за {stopwatch.Elapsed.TotalSeconds:F2} с.{volumeText}{rateText} Успешно: {report.SuccessCount:N0}, ошибок: {report.Errors.Count:N0}{verifyText}";
         StatusCaption = SummaryText;
 
         var toastVolume = report.CopiedBytes > 0 ? $" · {SizeFormatter.Format(report.CopiedBytes)}" : string.Empty;

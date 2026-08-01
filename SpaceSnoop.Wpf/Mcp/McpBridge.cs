@@ -160,22 +160,24 @@ public sealed class McpBridge(
         // Те же параметры обхода, что и у человека на странице «Сканирование».
         var multithreaded = scanPreferences.UseMultithreading;
         var parallelism = scanPreferences.MaxParallelism;
-        var stopwatch = Stopwatch.StartNew();
 
-        var (tree, model) = await Task.Run(() =>
+        // Замер останавливается до сборки выгрузки: она обходит дерево ещё раз, и «время скана»
+        // в окне означало бы не то же, что «время скана» у агента.
+        var (tree, model, walk) = await Task.Run(() =>
                 {
                     var directory = new DirectoryInfo(path);
+                    var started = Stopwatch.GetTimestamp();
 
                     var root = multithreaded
                         ? calculator.CalculateMultithreaded(directory, parallelism, cancellationToken)
                         : calculator.Calculate(directory, cancellationToken);
 
-                    return (root, ScanExport.Build(root, directory.FullName, new(depth, multithreaded, parallelism), AppInfo.Version, entryLimit));
+                    var elapsed = Stopwatch.GetElapsedTime(started);
+
+                    return (root, ScanExport.Build(root, directory.FullName, new(depth, multithreaded, parallelism), AppInfo.Version, entryLimit), elapsed);
                 },
                 cancellationToken)
             .ConfigureAwait(false);
-
-        stopwatch.Stop();
 
         if (show)
         {
@@ -183,7 +185,7 @@ public sealed class McpBridge(
 
             Dispatch(() =>
             {
-                scan.ApplyScanResult(path, tree, stopwatch.Elapsed);
+                scan.ApplyScanResult(path, tree, walk);
                 scan.SelectPathForAutomation(tree.AbsolutePath);
                 DeferOrNavigate(SectionKey.Scan);
                 notifier.Notify($"Агент показал сканирование: {tree.AbsolutePath} · {tree.TotalSizeText}");

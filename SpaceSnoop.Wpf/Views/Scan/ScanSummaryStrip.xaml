@@ -69,38 +69,61 @@
                     Background="{StaticResource HeatSpectrumVertical}"
                     CornerRadius="10,0,0,10" />
 
-            <StackPanel Grid.Column="1"
-                        Orientation="Horizontal"
-                        VerticalAlignment="Center"
-                        Margin="14,7,0,7">
-                <TextBlock Text="Объём"
-                           Style="{StaticResource Caption}"
-                           Margin="0,0,7,0" />
-                <TextBlock Text="{Binding ResultSizeText}"
-                           Style="{StaticResource StatValue}"
-                           Foreground="{DynamicResource Accent.Primary}"
-                           Margin="0,0,20,0" />
+            <WrapPanel Grid.Column="1"
+                       VerticalAlignment="Center"
+                       Margin="14,3,0,3">
+                <WrapPanel.Resources>
+                    <Style x:Key="Metric"
+                           TargetType="StackPanel">
+                        <Setter Property="Orientation"
+                                Value="Horizontal" />
+                        <Setter Property="Margin"
+                                Value="0,4,20,0" />
+                    </Style>
+                </WrapPanel.Resources>
 
-                <TextBlock Text="Файлов"
-                           Style="{StaticResource Caption}"
-                           Margin="0,0,7,0" />
-                <TextBlock Text="{Binding ResultFileCountText}"
-                           Style="{StaticResource StatValue}"
-                           Margin="0,0,20,0" />
+                <StackPanel Style="{StaticResource Metric}">
+                    <TextBlock Text="Объём"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ResultSizeText}"
+                               Style="{StaticResource StatValue}"
+                               Foreground="{DynamicResource Accent.Primary}" />
+                </StackPanel>
 
-                <TextBlock Text="Каталогов"
-                           Style="{StaticResource Caption}"
-                           Margin="0,0,7,0" />
-                <TextBlock Text="{Binding ResultDirCountText}"
-                           Style="{StaticResource StatValue}"
-                           Margin="0,0,20,0" />
+                <StackPanel Style="{StaticResource Metric}">
+                    <TextBlock Text="Файлов"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ResultFileCountText}"
+                               Style="{StaticResource StatValue}" />
+                </StackPanel>
 
-                <TextBlock Text="Время"
-                           Style="{StaticResource Caption}"
-                           Margin="0,0,7,0" />
-                <TextBlock Text="{Binding ResultElapsedText}"
-                           Style="{StaticResource StatValue}" />
-            </StackPanel>
+                <StackPanel Style="{StaticResource Metric}">
+                    <TextBlock Text="Каталогов"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ResultDirCountText}"
+                               Style="{StaticResource StatValue}" />
+                </StackPanel>
+
+                <StackPanel Style="{StaticResource Metric}">
+                    <TextBlock Text="Время"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ResultElapsedText}"
+                               Style="{StaticResource StatValue}" />
+                </StackPanel>
+
+                <StackPanel Style="{StaticResource Metric}">
+                    <TextBlock Text="Скорость"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ResultRateText}"
+                               Style="{StaticResource StatValue}"
+                               ToolTip="Средняя скорость обхода за время сканирования" />
+                </StackPanel>
+            </WrapPanel>
 
             <StackPanel Grid.Column="2"
                         Orientation="Horizontal"

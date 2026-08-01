@@ -384,7 +384,72 @@ public class SyncEngineTests
 
         engine.Verify(report, _leftDir, _rightDir, CancellationToken.None);
 
-        Assert.That(report.Mismatches, Is.Empty);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.Mismatches, Is.Empty);
+            Assert.That(report.Verified, Is.True);
+        }
+    }
+
+    [Test]
+    public void Verify_NotRun_LeavesReportUnverified()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "hello world");
+
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("a.txt", "a.txt") { Status = ComparisonStatus.LeftOnly, Action = SyncAction.CopyToRight });
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var report = new SyncEngine(NullLogger<SyncEngine>.Instance).Execute(result, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.SuccessCount, Is.EqualTo(1));
+            Assert.That(report.Verified, Is.False);
+        }
+    }
+
+    [Test]
+    public void Verify_Cancelled_LeavesReportUnverifiedAndKeepsIt()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "data");
+
+        var report = new SyncReport();
+        report.AddApplied(SyncAction.CopyToRight, "a.txt", 4);
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        new SyncEngine(NullLogger<SyncEngine>.Instance).Verify(report, _leftDir, _rightDir, cts.Token);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.Verified, Is.False);
+            Assert.That(report.Mismatches, Is.Empty);
+            Assert.That(report.Applied, Has.Count.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public void Execute_FileErrorsAreNotFatal_AndDoNotVerifyReport()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "first");
+        File.WriteAllText(Path.Combine(_leftDir, "b.txt"), "second");
+
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("missing.txt", "missing.txt") { Status = ComparisonStatus.LeftOnly, Action = SyncAction.CopyToRight });
+        root.Files.Add(new("a.txt", "a.txt") { Status = ComparisonStatus.LeftOnly, Action = SyncAction.CopyToRight });
+        root.Files.Add(new("b.txt", "b.txt") { Status = ComparisonStatus.LeftOnly, Action = SyncAction.CopyToRight });
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var report = new SyncEngine(NullLogger<SyncEngine>.Instance).Execute(result, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.Errors, Has.Count.EqualTo(1));
+            Assert.That(report.SuccessCount, Is.EqualTo(2));
+            Assert.That(report.Verified, Is.False);
+        }
     }
 
     [Test]
