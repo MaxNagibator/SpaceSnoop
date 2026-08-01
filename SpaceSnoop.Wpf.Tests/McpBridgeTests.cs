@@ -4,6 +4,7 @@ using SpaceSnoop.Core.Export;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Diagnostics;
 using SpaceSnoop.Wpf.Mcp;
+using System.Text.Json;
 
 namespace SpaceSnoop.Wpf.Tests;
 
@@ -87,6 +88,51 @@ public class McpBridgeTests
     }
 
     [Test]
+    public void Снимок_без_истории_не_несёт_поля_history()
+    {
+        var json = JsonDocument.Parse(McpBridge.Serialize(Performance(null))).RootElement;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(json.TryGetProperty("history", out _), Is.False);
+            Assert.That(json.TryGetProperty("operation", out _), Is.False);
+            Assert.That(json.GetProperty("sampleCount").GetInt32(), Is.EqualTo(20));
+            Assert.That(json.GetProperty("startupSeconds").GetDouble(), Is.EqualTo(1.25));
+        });
+    }
+
+    [Test]
+    public void История_выходит_в_JSON_рядом_со_снимком()
+    {
+        var json = JsonDocument.Parse(McpBridge.Serialize(Performance(McpBridge.DescribeHistory(History())))).RootElement;
+        var history = json.GetProperty("history");
+        var timeline = history.GetProperty("timeline");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(history.GetProperty("points").GetInt32(), Is.EqualTo(2));
+            Assert.That(history.GetProperty("omitted").GetInt32(), Is.EqualTo(3));
+            Assert.That(history.GetProperty("gen0Collections").GetInt32(), Is.EqualTo(4));
+            Assert.That(timeline.GetArrayLength(), Is.EqualTo(2));
+            Assert.That(timeline[0].GetProperty("operation").GetString(), Is.EqualTo("Сканирование"));
+            Assert.That(timeline[1].TryGetProperty("operation", out _), Is.False);
+        });
+    }
+
+    [Test]
+    public void Возраст_и_задержка_точки_округляются_до_десятых()
+    {
+        var history = McpBridge.DescribeHistory(History());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(history.Timeline[0].AgeMs, Is.EqualTo(3000.6));
+            Assert.That(history.Timeline[0].UiDelayMs, Is.EqualTo(12.3));
+            Assert.That(history.SpanSeconds, Is.EqualTo(2.5));
+        });
+    }
+
+    [Test]
     public void Путь_скана_пропускается_для_существующего_каталога()
     {
         Assert.DoesNotThrow(() => McpBridge.ValidateScanPath(_left));
@@ -152,5 +198,40 @@ public class McpBridgeTests
     public void Индекс_режима_обратим_маппингу_профиля(SyncMode mode)
     {
         Assert.That(HeadlessSync.MapMode(SyncProfile.IndexOfMode(mode)), Is.EqualTo(mode));
+    }
+
+    private static McpPerformance Performance(McpPerformanceHistory? history)
+    {
+        return new(true,
+            "последние 10,0 с (20 замеров)",
+            20,
+            10,
+            3,
+            40,
+            5,
+            512,
+            "512 Б",
+            1024,
+            "1 КБ",
+            4,
+            1,
+            0,
+            1.25,
+            null,
+            history);
+    }
+
+    private static PerformanceHistory History()
+    {
+        return new(DateTime.UnixEpoch,
+            2.5049,
+            4,
+            1,
+            0,
+            3,
+            [
+                new(3000.56, 12.34, 100, 200, 1, 0, 0, "Сканирование"),
+                new(500.44, 0, 150, 250, 5, 1, 0, null),
+            ]);
     }
 }

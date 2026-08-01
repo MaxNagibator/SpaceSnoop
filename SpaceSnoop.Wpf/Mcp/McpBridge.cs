@@ -488,6 +488,29 @@ public sealed class McpBridge(
             : $"последние {snapshot.ObservedSpanSeconds:N1} с ({snapshot.SampleCount:N0} замеров)";
     }
 
+    internal static McpPerformanceHistory DescribeHistory(PerformanceHistory history)
+    {
+        var timeline = history.Points
+            .Select(static point => new McpPerformancePoint(Math.Round(point.AgeMs, 1),
+                Math.Round(point.UiDelayMs, 1),
+                point.ManagedBytes,
+                point.WorkingSetBytes,
+                point.Gen0Collections,
+                point.Gen1Collections,
+                point.Gen2Collections,
+                point.Operation))
+            .ToList();
+
+        return new(history.CapturedAtUtc,
+            Math.Round(history.SpanSeconds, 1),
+            timeline.Count,
+            history.Omitted,
+            history.Gen0Collections,
+            history.Gen1Collections,
+            history.Gen2Collections,
+            timeline);
+    }
+
     internal static int ClampDepth(int depth)
     {
         return Math.Clamp(depth, ScanExport.MinDepth, ScanExport.MaxDepth);
@@ -557,27 +580,7 @@ public sealed class McpBridge(
             return null;
         }
 
-        var history = performance.CaptureHistory(TimeSpan.FromSeconds(historySeconds), ClampHistoryPoints(historyPoints));
-
-        var timeline = history.Points
-            .Select(static point => new McpPerformancePoint(Math.Round(point.AgeMs, 1),
-                Math.Round(point.UiDelayMs, 1),
-                point.ManagedBytes,
-                point.WorkingSetBytes,
-                point.Gen0Collections,
-                point.Gen1Collections,
-                point.Gen2Collections,
-                point.Operation))
-            .ToList();
-
-        return new(history.CapturedAtUtc,
-            Math.Round(history.SpanSeconds, 1),
-            timeline.Count,
-            history.Omitted,
-            history.Gen0Collections,
-            history.Gen1Collections,
-            history.Gen2Collections,
-            timeline);
+        return DescribeHistory(performance.CaptureHistory(TimeSpan.FromSeconds(historySeconds), ClampHistoryPoints(historyPoints)));
     }
 
     private static McpPerformanceOperation? DescribeOperation(PerformanceOperation? operation)
@@ -646,7 +649,7 @@ public sealed class McpBridge(
         return ScanExport.ToJson(model);
     }
 
-    private static string Serialize<T>(T value)
+    internal static string Serialize<T>(T value)
     {
         return JsonSerializer.Serialize(value, JsonOptions);
     }
