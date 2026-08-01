@@ -28,6 +28,23 @@ public static class PerformanceFormat
         return $"Память {SizeFormatter.Format(managedBytes)} · процесс {SizeFormatter.Format(workingSetBytes)}";
     }
 
+    public static string ChartDelay(PerformanceChartData data)
+    {
+        return $"Отклик, пик {Math.Round(data.PeakDelayMs):N0} мс";
+    }
+
+    public static string ChartMemory(PerformanceChartData data)
+    {
+        return data.MemoryMaxBytes > data.MemoryMinBytes
+            ? $"Память {SizeFormatter.Format(data.MemoryMinBytes)} – {SizeFormatter.Format(data.MemoryMaxBytes)}"
+            : $"Память {SizeFormatter.Format(data.MemoryMaxBytes)}";
+    }
+
+    public static string ChartWindow(PerformanceChartData data)
+    {
+        return $"за {Duration(TimeSpan.FromSeconds(data.SpanSeconds))} · {data.Delay.Count:N0} замеров";
+    }
+
     public static string Collections(int gen0, int gen1, int gen2)
     {
         return $"Сборок мусора {gen0} / {gen1} / {gen2}";

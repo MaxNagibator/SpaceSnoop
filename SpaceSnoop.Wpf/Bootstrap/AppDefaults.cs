@@ -92,6 +92,8 @@ public static class AppDefaults
     public const double PerformanceRateMinSeconds = 0.25;
     public const int PerformanceHitchMs = 500;
     public const int PerformanceHitchLogIntervalSeconds = 5;
+    public const bool PerformanceChartExpandedDefault = false;
+    public const int PerformanceChartRefreshMs = 1000;
 
     public const string UpdateRepositoryDefault = AppInfo.RepoSlug;
     public const bool UpdateCheckOnStartupDefault = true;

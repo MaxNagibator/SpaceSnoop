@@ -186,6 +186,8 @@ public partial class App : Application
         services.AddSingleton<ScheduleViewModel>();
         services.AddSingleton<DockerViewModel>();
         services.AddSingleton<ChatViewModel>();
+        services.AddSingleton<PerformanceChartViewModel>();
+        services.AddSingleton<ILogsPanel>(static provider => provider.GetRequiredService<PerformanceChartViewModel>());
         services.AddSingleton<LogsViewModel>();
         services.AddSingleton<AboutViewModel>();
         services.AddSingleton<SettingsViewModel>();
