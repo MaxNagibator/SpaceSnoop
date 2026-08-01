@@ -466,7 +466,8 @@ public sealed class McpBridge(
             Math.Round(sync.LastSyncElapsed.TotalSeconds, 2),
             report.CopiedBytes,
             SizeFormatter.Format(report.CopiedBytes),
-            report.Verified,
+            sync.LastVerifyState,
+            DescribeVerifyState(sync.LastVerifyState),
             report.Errors.Count,
             report.Mismatches.Count,
             Math.Max(0, report.Errors.Count - entryLimit),
@@ -475,6 +476,16 @@ public sealed class McpBridge(
             [.. report.Mismatches.Take(entryLimit)],
             sync.SummaryText,
             ReadSyncState())));
+    }
+
+    internal static string DescribeVerifyState(SyncVerifyState state)
+    {
+        return state switch
+        {
+            SyncVerifyState.Completed => "проверка прошла до конца: пустой mismatches означает, что каталоги сошлись",
+            SyncVerifyState.Interrupted => "проверка прервана: часть путей не проверена, пустой mismatches ничего не доказывает",
+            _ => "проверка выключена настройкой: сходимость не проверялась",
+        };
     }
 
     internal static int ClampEntryLimit(int entryLimit)
@@ -578,7 +589,9 @@ public sealed class McpBridge(
             SectionKey.Docker => "Docker",
             SectionKey.Chat => "Чат",
             SectionKey.Logs => "Логи",
+            SectionKey.Performance => "Производительность",
             SectionKey.About => "О программе",
+            SectionKey.Settings => "Настройки",
             _ => "неизвестно",
         };
     }

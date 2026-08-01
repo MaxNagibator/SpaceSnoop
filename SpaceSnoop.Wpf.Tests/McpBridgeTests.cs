@@ -4,6 +4,7 @@ using SpaceSnoop.Core.Export;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Diagnostics;
 using SpaceSnoop.Wpf.Mcp;
+using SpaceSnoop.Wpf.ViewModels.Sync;
 using System.Text.Json;
 
 namespace SpaceSnoop.Wpf.Tests;
@@ -135,6 +136,20 @@ public class McpBridgeTests
         });
     }
 
+    [TestCase(SyncVerifyState.None, "None", "выключена")]
+    [TestCase(SyncVerifyState.Interrupted, "Interrupted", "прервана")]
+    [TestCase(SyncVerifyState.Completed, "Completed", "до конца")]
+    public void Итог_синхронизации_различает_три_исхода_проверки(SyncVerifyState state, string expected, string hint)
+    {
+        var json = JsonDocument.Parse(McpBridge.Serialize(SyncResult(state))).RootElement;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(json.GetProperty("verify").GetString(), Is.EqualTo(expected));
+            Assert.That(json.GetProperty("verifyHint").GetString(), Does.Contain(hint));
+        });
+    }
+
     [TestCase(0, 0)]
     [TestCase(-5, 0)]
     [TestCase(60, 60)]
@@ -235,6 +250,26 @@ public class McpBridgeTests
     public void Индекс_режима_обратим_маппингу_профиля(SyncMode mode)
     {
         Assert.That(HeadlessSync.MapMode(SyncProfile.IndexOfMode(mode)), Is.EqualTo(mode));
+    }
+
+    private static McpSyncResult SyncResult(SyncVerifyState state)
+    {
+        return new(3,
+            1,
+            4,
+            1.5,
+            2048,
+            "2 КБ",
+            state,
+            McpBridge.DescribeVerifyState(state),
+            0,
+            0,
+            0,
+            0,
+            [],
+            [],
+            "Готово",
+            new("C:\\left", "C:\\right", SyncMode.LeftToRight, SyncWinner.Newest, false, string.Empty, false, true, new Dictionary<string, int>()));
     }
 
     private static McpPerformance Performance(McpPerformanceHistory? history)

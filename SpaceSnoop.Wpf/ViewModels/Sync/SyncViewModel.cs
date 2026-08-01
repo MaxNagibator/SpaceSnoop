@@ -894,6 +894,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     internal TimeSpan LastSyncElapsed { get; private set; }
 
+    internal SyncVerifyState LastVerifyState { get; private set; }
+
     internal ComparisonExportModel? BuildExportModel(int entryLimit)
     {
         return CaptureExportBuilder(entryLimit)?.Invoke();
@@ -1815,16 +1817,24 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             : null;
     }
 
-    internal static string DescribeVerify(bool requested, SyncReport report)
+    internal static SyncVerifyState ResolveVerify(bool requested, SyncReport report)
     {
         if (!requested)
         {
-            return string.Empty;
+            return SyncVerifyState.None;
         }
 
-        return report.Verified
-            ? $", расхождений: {report.Mismatches.Count:N0}"
-            : $", проверка прервана (расхождений к тому моменту: {report.Mismatches.Count:N0})";
+        return report.Verified ? SyncVerifyState.Completed : SyncVerifyState.Interrupted;
+    }
+
+    internal static string DescribeVerify(bool requested, SyncReport report)
+    {
+        return ResolveVerify(requested, report) switch
+        {
+            SyncVerifyState.Completed => $", расхождений: {report.Mismatches.Count:N0}",
+            SyncVerifyState.Interrupted => $", проверка прервана (расхождений к тому моменту: {report.Mismatches.Count:N0})",
+            _ => string.Empty,
+        };
     }
 
     internal static string DescribeRate(string name, SyncReport report, TimeSpan elapsed)
@@ -1873,6 +1883,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
 
         LastSyncElapsed = stopwatch.Elapsed;
+        LastVerifyState = ResolveVerify(verify, report);
 
         _logger.SyncFinished(report.SuccessCount, report.Errors.Count, (long)stopwatch.Elapsed.TotalMilliseconds);
 
