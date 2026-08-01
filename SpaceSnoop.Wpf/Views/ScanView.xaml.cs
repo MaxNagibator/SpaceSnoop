@@ -99,13 +99,11 @@ public partial class ScanView : UserControl, IView<ScanViewModel>
         {
             InspectorColumn.SetCurrentValue(ColumnDefinition.MinWidthProperty, RailWidth);
             InspectorColumn.SetCurrentValue(ColumnDefinition.WidthProperty, new GridLength(RailWidth));
-            SplitterColumn.SetCurrentValue(ColumnDefinition.WidthProperty, new GridLength(0));
         }
         else
         {
             InspectorColumn.SetCurrentValue(ColumnDefinition.MinWidthProperty, MinPanelWidth);
             InspectorColumn.SetCurrentValue(ColumnDefinition.WidthProperty, new GridLength(_vm.Inspector.InspectorWidth));
-            SplitterColumn.SetCurrentValue(ColumnDefinition.WidthProperty, new GridLength(6));
         }
     }
 }

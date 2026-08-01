@@ -54,8 +54,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"
                                   MinWidth="340" />
-                <ColumnDefinition x:Name="SplitterColumn"
-                                  Width="6" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition x:Name="InspectorColumn"
                                   Width="380"
                                   MinWidth="280" />
@@ -65,13 +64,10 @@
 
             <GridSplitter Grid.Column="1"
                           x:Name="InspectorSplitter"
-                          Width="6"
-                          HorizontalAlignment="Stretch"
-                          VerticalAlignment="Stretch"
                           ResizeBehavior="PreviousAndNext"
                           ResizeDirection="Columns"
-                          Background="{DynamicResource Border.Subtle}"
                           ShowsPreview="False"
+                          AutomationProperties.Name="Ширина панели деталей"
                           DragCompleted="OnInspectorSplitterDragCompleted"
                           ToolTip="Перетащите, чтобы изменить ширину панели"
                           Visibility="{Binding Inspector.IsInspectorCollapsed, Converter={StaticResource InverseBoolToVisibility}}" />
