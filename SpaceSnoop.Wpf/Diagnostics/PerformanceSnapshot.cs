@@ -4,6 +4,8 @@ public sealed record PerformanceSnapshot(
     double UiDelayMs,
     double UiPeakMs,
     double UiAverageMs,
+    int SampleCount,
+    double ObservedSpanSeconds,
     long ManagedBytes,
     long WorkingSetBytes,
     int Gen0Collections,
@@ -11,5 +13,5 @@ public sealed record PerformanceSnapshot(
     int Gen2Collections,
     PerformanceOperation? Operation)
 {
-    public static PerformanceSnapshot Empty { get; } = new(0, 0, 0, 0, 0, 0, 0, 0, null);
+    public static PerformanceSnapshot Empty { get; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, null);
 }

@@ -86,6 +86,7 @@ public static class AppDefaults
     public const bool PerformanceHudDefault = false;
     public const int PerformanceSampleIntervalMs = 500;
     public const int PerformanceWindowSamples = 20;
+    public const int PerformanceHistorySamples = 600;
     public const double PerformanceRateMinSeconds = 0.25;
     public const int PerformanceHitchMs = 500;
     public const int PerformanceHitchLogIntervalSeconds = 5;

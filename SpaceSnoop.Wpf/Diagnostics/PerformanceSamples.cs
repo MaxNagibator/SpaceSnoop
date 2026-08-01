@@ -45,6 +45,11 @@ public sealed class PerformanceSamples(int capacity)
         return peak;
     }
 
+    public double SpanSeconds(double intervalMs)
+    {
+        return _count == 0 ? 0 : _count * (intervalMs + Average()) / 1000;
+    }
+
     public double Average()
     {
         if (_count == 0)

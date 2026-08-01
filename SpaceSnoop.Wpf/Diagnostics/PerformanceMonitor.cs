@@ -9,6 +9,10 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
 
     private readonly PerformanceSamples _delays = new(AppDefaults.PerformanceWindowSamples);
 
+    private readonly PerformanceHistoryBuffer _history = new(AppDefaults.PerformanceHistorySamples);
+
+    private readonly Lock _historyLock = new();
+
     private readonly int[] _baseCollections = new int[3];
 
     private DispatcherTimer? _timer;
@@ -42,11 +46,17 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
         }
 
         _delays.Clear();
+
+        lock (_historyLock)
+        {
+            _history.Clear();
+        }
+
         _lastTick = Stopwatch.GetTimestamp();
         _lastHitchLog = 0;
         _running = true;
 
-        Publish(0, Volatile.Read(ref _operation));
+        Publish(_lastTick, 0, Volatile.Read(ref _operation));
 
         _timer ??= CreateTimer();
         _timer.Start();
@@ -61,6 +71,17 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
     public void ReportOperation(PerformanceOperation? operation)
     {
         Volatile.Write(ref _operation, operation);
+    }
+
+    public PerformanceHistory CaptureHistory(TimeSpan since, int maxPoints)
+    {
+        var now = Stopwatch.GetTimestamp();
+        var capturedAtUtc = DateTime.UtcNow;
+
+        lock (_historyLock)
+        {
+            return _history.Capture(now, capturedAtUtc, since, maxPoints);
+        }
     }
 
     public void Dispose()
@@ -99,24 +120,42 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
         _delays.Add(delay);
 
         var operation = Volatile.Read(ref _operation);
+        var sample = Publish(now, delay, operation);
 
-        Publish(delay, operation);
+        lock (_historyLock)
+        {
+            _history.Add(sample);
+        }
+
         LogHitch(delay, operation, now);
 
         Updated?.Invoke(this, EventArgs.Empty);
     }
 
-    private void Publish(double delay, PerformanceOperation? operation)
+    private PerformanceSample Publish(long now, double delay, PerformanceOperation? operation)
     {
-        Volatile.Write(ref _snapshot, new(delay,
-            _delays.Peak(),
-            _delays.Average(),
+        var sample = new PerformanceSample(now,
+            delay,
             GC.GetTotalMemory(false),
             Environment.WorkingSet,
             GC.CollectionCount(0) - _baseCollections[0],
             GC.CollectionCount(1) - _baseCollections[1],
             GC.CollectionCount(2) - _baseCollections[2],
+            operation?.Name);
+
+        Volatile.Write(ref _snapshot, new(delay,
+            _delays.Peak(),
+            _delays.Average(),
+            _delays.Count,
+            _delays.SpanSeconds(SampleInterval.TotalMilliseconds),
+            sample.ManagedBytes,
+            sample.WorkingSetBytes,
+            sample.Gen0Collections,
+            sample.Gen1Collections,
+            sample.Gen2Collections,
             operation));
+
+        return sample;
     }
 
     private void LogHitch(double delay, PerformanceOperation? operation, long now)
