@@ -394,4 +394,7 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 2301, Level = LogLevel.Warning, Message = "Подписчик на замер производительности бросил исключение")]
     public static partial void PerformanceListenerFailed(this ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 2302, Level = LogLevel.Warning, Message = "Сводку производительности не удалось положить в буфер обмена")]
+    public static partial void PerformanceSummaryCopyFailed(this ILogger logger, Exception exception);
 }

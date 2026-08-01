@@ -26,6 +26,9 @@ public sealed partial class PerformanceChartViewModel : ObservableObject, ILogsP
     [ObservableProperty]
     private string? _operationsText;
 
+    [ObservableProperty]
+    private double _chartHeight = AppDefaults.PerformanceChartPanelHeight;
+
     public PerformanceChartViewModel(PerformanceMonitor monitor, ISettingsStore settings)
     {
         _monitor = monitor;
@@ -79,7 +82,7 @@ public sealed partial class PerformanceChartViewModel : ObservableObject, ILogsP
         Refresh();
     }
 
-    private void Refresh()
+    public void Refresh()
     {
         _monitor.Start();
 

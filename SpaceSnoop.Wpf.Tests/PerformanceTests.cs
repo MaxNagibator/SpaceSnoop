@@ -256,6 +256,62 @@ public class PerformanceTests
     }
 
     [Test]
+    public void Сводка_для_буфера_обмена_несёт_замеры_и_операцию()
+    {
+        var snapshot = PerformanceSnapshot.Empty with
+        {
+            CapturedAtUtc = new(2026, 8, 1, 10, 0, 0, DateTimeKind.Utc),
+            UiDelayMs = 12.4,
+            UiPeakMs = 640,
+            SampleCount = 20,
+            ObservedSpanSeconds = 10,
+            ManagedBytes = 1024,
+            StartupSeconds = 1.25,
+            Operation = new("Сканирование", 1000, 0, TimeSpan.FromSeconds(2)),
+        };
+
+        var text = PerformanceReport.Build(snapshot, "2.8.42");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(text, Does.Contain("2.8.42"));
+            Assert.That(text, Does.Contain("пик 640 мс"));
+            Assert.That(text, Does.Contain("20 замеров за 10,0 с"));
+            Assert.That(text, Does.Contain("Операция: Сканирование"));
+            Assert.That(text, Does.Not.Contain("Замеров ещё нет"));
+        });
+    }
+
+    [Test]
+    public void Сводка_без_единого_замера_честно_это_говорит()
+    {
+        var text = PerformanceReport.Build(PerformanceSnapshot.Empty, "2.8.42");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(text, Does.Contain("Замеров ещё нет"));
+            Assert.That(text, Does.Not.Contain("Операция:"));
+        });
+    }
+
+    [Test]
+    public void Признак_проверки_различает_выключено_прервано_и_пройдено()
+    {
+        var report = new SyncReport();
+        report.AddApplied(SyncAction.CopyToRight, "a.txt", 1024);
+
+        var interrupted = SyncViewModel.ResolveVerify(true, report);
+        report.MarkVerified();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(SyncViewModel.ResolveVerify(false, report), Is.EqualTo(SyncVerifyState.None));
+            Assert.That(interrupted, Is.EqualTo(SyncVerifyState.Interrupted));
+            Assert.That(SyncViewModel.ResolveVerify(true, report), Is.EqualTo(SyncVerifyState.Completed));
+        });
+    }
+
+    [Test]
     public void Итог_считает_скорость_по_применённым_и_скопированным()
     {
         var report = new SyncReport { CopiedCount = 9 };

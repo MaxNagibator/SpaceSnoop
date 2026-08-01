@@ -90,7 +90,7 @@
         </WrapPanel>
 
         <Border Grid.Row="1"
-                Height="120"
+                Height="{Binding ChartHeight}"
                 Background="{DynamicResource Bg.SurfaceAlt}"
                 BorderBrush="{DynamicResource Border.Subtle}"
                 BorderThickness="1"

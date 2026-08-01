@@ -35,6 +35,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         DockerViewModel docker,
         ChatViewModel chat,
         LogsViewModel logs,
+        PerformanceViewModel performance,
         AboutViewModel about,
         SettingsViewModel settingsPage,
         ModalHostViewModel modal,
@@ -59,6 +60,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         var scheduleItem = new NavigationItem("Расписание", PackIconLucideKind.CalendarClock, schedule);
         var dockerItem = new NavigationItem("Docker", PackIconLucideKind.Container, docker);
         var logsItem = new NavigationItem("Логи", PackIconLucideKind.ScrollText, logs);
+        var performanceItem = new NavigationItem("Производительность", PackIconLucideKind.Gauge, performance);
         var aboutItem = new NavigationItem("О программе", PackIconLucideKind.Info, about);
 
         _chatItem = new("Чат", PackIconLucideKind.MessageCircle, chat);
@@ -70,6 +72,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         Sections.Add(scheduleItem);
         Sections.Add(dockerItem);
         Sections.Add(logsItem);
+        Sections.Add(performanceItem);
         Sections.Add(aboutItem);
 
         _sectionByKey = new(StringComparer.OrdinalIgnoreCase)
@@ -81,6 +84,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
             [SectionKey.Docker] = dockerItem,
             [SectionKey.Chat] = _chatItem,
             [SectionKey.Logs] = logsItem,
+            [SectionKey.Performance] = performanceItem,
             [SectionKey.About] = aboutItem,
         };
 
