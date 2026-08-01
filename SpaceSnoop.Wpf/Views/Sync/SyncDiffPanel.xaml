@@ -96,21 +96,6 @@
                             Value="SemiBold" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Status}"
-                             Value="LeftOnly">
-                    <Setter Property="Foreground"
-                            Value="{DynamicResource State.Success}" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding Status}"
-                             Value="RightOnly">
-                    <Setter Property="Foreground"
-                            Value="{DynamicResource State.Info}" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding Status}"
-                             Value="Modified">
-                    <Setter Property="Foreground"
-                            Value="{DynamicResource State.Warning}" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding Status}"
                              Value="Conflict">
                     <Setter Property="Foreground"
                             Value="{DynamicResource State.Error}" />
@@ -773,7 +758,7 @@
                             CommandParameter="{x:Static vm:SyncSortField.Path}"
                             ToolTip="Сортировать по пути">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="ЛЕВАЯ"
+                            <TextBlock Text="Левая"
                                        Style="{StaticResource Caption}" />
                             <iconPacks:PackIconLucide Style="{StaticResource SortMark}"
                                                       Visibility="{Binding SortByPath, Converter={StaticResource BoolToVisibility}}" />
@@ -786,7 +771,7 @@
                             ToolTip="Сортировать по дате изменения"
                             Visibility="{Binding ShowModified, Converter={StaticResource BoolToVisibility}}">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="ДАТА"
+                            <TextBlock Text="Дата"
                                        Style="{StaticResource Caption}" />
                             <iconPacks:PackIconLucide Style="{StaticResource SortMark}"
                                                       Visibility="{Binding SortByModified, Converter={StaticResource BoolToVisibility}}" />
@@ -799,7 +784,7 @@
                             ToolTip="Сортировать по размеру"
                             Visibility="{Binding ShowSizes, Converter={StaticResource BoolToVisibility}}">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="РАЗМЕР"
+                            <TextBlock Text="Размер"
                                        Style="{StaticResource Caption}" />
                             <iconPacks:PackIconLucide Style="{StaticResource SortMark}"
                                                       Visibility="{Binding SortBySize, Converter={StaticResource BoolToVisibility}}" />
@@ -827,7 +812,7 @@
                             CommandParameter="{x:Static vm:SyncSortField.Path}"
                             ToolTip="Сортировать по пути">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="ПРАВАЯ"
+                            <TextBlock Text="Правая"
                                        Style="{StaticResource Caption}" />
                             <iconPacks:PackIconLucide Style="{StaticResource SortMark}"
                                                       Visibility="{Binding SortByPath, Converter={StaticResource BoolToVisibility}}" />
@@ -840,7 +825,7 @@
                             ToolTip="Сортировать по дате изменения"
                             Visibility="{Binding ShowModified, Converter={StaticResource BoolToVisibility}}">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="ДАТА"
+                            <TextBlock Text="Дата"
                                        Style="{StaticResource Caption}" />
                             <iconPacks:PackIconLucide Style="{StaticResource SortMark}"
                                                       Visibility="{Binding SortByModified, Converter={StaticResource BoolToVisibility}}" />
@@ -853,7 +838,7 @@
                             ToolTip="Сортировать по размеру"
                             Visibility="{Binding ShowSizes, Converter={StaticResource BoolToVisibility}}">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="РАЗМЕР"
+                            <TextBlock Text="Размер"
                                        Style="{StaticResource Caption}" />
                             <iconPacks:PackIconLucide Style="{StaticResource SortMark}"
                                                       Visibility="{Binding SortBySize, Converter={StaticResource BoolToVisibility}}" />
@@ -1100,7 +1085,6 @@
 
                     <TextBlock Grid.Column="0"
                                Text="{Binding SummaryText}"
-                               FontFamily="{DynamicResource Font.Mono}"
                                FontSize="{DynamicResource Font.Size.XS}"
                                Foreground="{DynamicResource Fg.Muted}"
                                VerticalAlignment="Center"

@@ -103,7 +103,7 @@
                                               Height="16" />
                 </Button>
 
-                <TextBlock Text="ДЕТАЛИ"
+                <TextBlock Text="Детали"
                            Style="{StaticResource Caption}"
                            Margin="0,12,0,0"
                            HorizontalAlignment="Center">
@@ -218,8 +218,8 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Grid.Column="0"
-                               Text="ДЕТАЛИ"
-                               Style="{StaticResource Caption}" />
+                               Text="Детали"
+                               Style="{StaticResource SectionTitle}" />
                     <Button Grid.Column="1"
                             Style="{StaticResource Button.Ghost}"
                             Command="{Binding ToggleInspectorCollapsedCommand}"
@@ -316,11 +316,10 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0"
-                                               Text="ОБЪЁМ"
+                                               Text="Объём"
                                                Style="{StaticResource Caption}" />
                                     <TextBlock Grid.Column="1"
                                                Text="{Binding TotalSizeText}"
-                                               FontFamily="{DynamicResource Font.Mono}"
                                                FontSize="{DynamicResource Font.Size.L}"
                                                FontWeight="SemiBold"
                                                Foreground="{DynamicResource Accent.Primary}" />
@@ -332,7 +331,7 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0"
-                                               Text="СВОИ ФАЙЛЫ"
+                                               Text="Свои файлы"
                                                Style="{StaticResource Caption}"
                                                ToolTip="Файлы непосредственно в каталоге, без подкаталогов" />
                                     <TextBlock Grid.Column="1"
@@ -357,7 +356,7 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0"
-                                               Text="ОТ ДИСКА"
+                                               Text="От диска"
                                                Style="{StaticResource Caption}" />
                                     <Border x:Name="DriveBarTrack"
                                             Grid.Column="2"
@@ -400,7 +399,7 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0"
-                                               Text="ОТ РОДИТЕЛЯ"
+                                               Text="От родителя"
                                                Style="{StaticResource Caption}" />
                                     <Border x:Name="ParentBarTrack"
                                             Grid.Column="2"
@@ -443,7 +442,7 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0"
-                                               Text="ОТ КОРНЯ"
+                                               Text="От корня"
                                                Style="{StaticResource Caption}" />
                                     <Border x:Name="RootBarTrack"
                                             Grid.Column="2"
@@ -498,7 +497,7 @@
                                                               Margin="0,0,7,0"
                                                               Foreground="{DynamicResource Fg.Muted}" />
                                     <StackPanel>
-                                        <TextBlock Text="ФАЙЛОВ"
+                                        <TextBlock Text="Файлов"
                                                    Style="{StaticResource Caption}" />
                                         <TextBlock Text="{Binding FileCountText}"
                                                    Style="{StaticResource Value}" />
@@ -513,7 +512,7 @@
                                                               Margin="0,0,7,0"
                                                               Foreground="{DynamicResource Fg.Muted}" />
                                     <StackPanel>
-                                        <TextBlock Text="КАТАЛОГОВ"
+                                        <TextBlock Text="Каталогов"
                                                    Style="{StaticResource Caption}" />
                                         <TextBlock Text="{Binding DirCountText}"
                                                    Style="{StaticResource Value}" />
@@ -532,7 +531,7 @@
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0"
-                                               Text="СОЗДАН"
+                                               Text="Создан"
                                                Style="{StaticResource Caption}" />
                                     <TextBlock Grid.Column="1"
                                                Text="{Binding CreationDateText}"
@@ -545,7 +544,7 @@
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0"
-                                               Text="ДОСТУП"
+                                               Text="Доступ"
                                                Style="{StaticResource Caption}"
                                                ToolTip="Время последнего доступа" />
                                     <TextBlock Grid.Column="1"
@@ -565,8 +564,8 @@
                                                           VerticalAlignment="Center"
                                                           Margin="0,0,7,0"
                                                           Foreground="{DynamicResource Accent.Primary}" />
-                                <TextBlock Text="КРУПНЕЙШЕЕ"
-                                           Style="{StaticResource Caption}" />
+                                <TextBlock Text="Крупнейшее"
+                                           Style="{StaticResource SectionTitle}" />
                             </StackPanel>
 
                             <ItemsControl ItemsSource="{Binding TopChildren}"
@@ -639,8 +638,8 @@
                         <Border BorderBrush="{DynamicResource Border.Subtle}"
                                 BorderThickness="0,1,0,0"
                                 Margin="0,14,0,8" />
-                        <TextBlock Text="ДЕЙСТВИЯ"
-                                   Style="{StaticResource Caption}"
+                        <TextBlock Text="Действия"
+                                   Style="{StaticResource SectionTitle}"
                                    Margin="0,0,0,4" />
 
                         <Button Style="{StaticResource InspectorAction}"

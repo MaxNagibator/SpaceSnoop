@@ -243,7 +243,7 @@
                        Margin="14,8,0,8">
                 <StackPanel Style="{StaticResource PlanVolume}"
                             ToolTip="{Binding PlanVolumeHint}">
-                    <TextBlock Text="ОБЪЁМ"
+                    <TextBlock Text="Объём"
                                Style="{StaticResource Caption}"
                                Margin="0,0,7,0" />
                     <StackPanel Style="{StaticResource PlanCopyPart}">
@@ -277,7 +277,7 @@
                                               VerticalAlignment="Center"
                                               Margin="0,0,7,0"
                                               Style="{StaticResource FreshIcon}" />
-                    <TextBlock Text="СВЕЖЕЕ"
+                    <TextBlock Text="Свежее"
                                Style="{StaticResource Caption}"
                                Margin="0,0,7,0" />
                     <TextBlock Text="{Binding NewerBadgeText}"
@@ -292,7 +292,7 @@
                              VerticalAlignment="Center"
                              Margin="0,0,7,0"
                              Fill="{DynamicResource State.Success}" />
-                    <TextBlock Text="ТОЛЬКО СЛЕВА"
+                    <TextBlock Text="Только слева"
                                Style="{StaticResource Caption}"
                                Margin="0,0,7,0" />
                     <TextBlock Text="{Binding LeftOnlyCount}"
@@ -329,7 +329,7 @@
                              VerticalAlignment="Center"
                              Margin="0,0,7,0"
                              Fill="{DynamicResource State.Info}" />
-                    <TextBlock Text="ТОЛЬКО СПРАВА"
+                    <TextBlock Text="Только справа"
                                Style="{StaticResource Caption}"
                                Margin="0,0,7,0" />
                     <TextBlock Text="{Binding RightOnlyCount}"
@@ -366,7 +366,7 @@
                              VerticalAlignment="Center"
                              Margin="0,0,7,0"
                              Fill="{DynamicResource State.Warning}" />
-                    <TextBlock Text="ИЗМЕНЕНЫ"
+                    <TextBlock Text="Изменены"
                                Style="{StaticResource Caption}"
                                Margin="0,0,7,0" />
                     <TextBlock Text="{Binding ModifiedCount}"
@@ -401,7 +401,7 @@
                              VerticalAlignment="Center"
                              Margin="0,0,7,0"
                              Fill="{DynamicResource State.Error}" />
-                    <TextBlock Text="КОНФЛИКТЫ"
+                    <TextBlock Text="Конфликты"
                                Style="{StaticResource Caption}"
                                Margin="0,0,7,0" />
                     <TextBlock Text="{Binding ConflictCount}">
@@ -427,7 +427,7 @@
                              VerticalAlignment="Center"
                              Margin="0,0,7,0"
                              Fill="{DynamicResource Border.Strong}" />
-                    <TextBlock Text="ОДИНАКОВЫХ"
+                    <TextBlock Text="Одинаковых"
                                Style="{StaticResource Caption}"
                                Margin="0,0,7,0" />
                     <TextBlock Text="{Binding IdenticalCount}"
@@ -465,8 +465,8 @@
                         Margin="20,0,14,0"
                         ToolTip="{Binding CompositionHint}"
                         Visibility="{Binding HasDifferences, Converter={StaticResource BoolToVisibility}}">
-                <TextBlock Text="РАЗЛИЧИЯ"
-                           Style="{StaticResource Caption}"
+                <TextBlock Text="Различия"
+                           Style="{StaticResource SectionTitle}"
                            Margin="0,0,7,0" />
                 <TextBlock Text="{Binding DifferingTotal}"
                            Style="{StaticResource TallyValue}"

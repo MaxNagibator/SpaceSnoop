@@ -151,7 +151,6 @@
                                            Text="{Binding SizeText}"
                                            VerticalAlignment="Center"
                                            Margin="14,0,2,0"
-                                           FontFamily="{DynamicResource Font.Mono}"
                                            FontSize="{DynamicResource Font.Size.Caption}"
                                            Foreground="{DynamicResource Fg.Muted}" />
                             </Grid>
@@ -182,7 +181,6 @@
                            AutomationProperties.LiveSetting="Polite"
                            Margin="12,0,0,0"
                            VerticalAlignment="Center"
-                           FontFamily="{DynamicResource Font.Mono}"
                            FontSize="{DynamicResource Font.Size.S}"
                            FontWeight="Medium"
                            Foreground="{DynamicResource Accent.Primary}" />
@@ -208,7 +206,7 @@
 
                 <StackPanel Grid.Column="1"
                             Orientation="Horizontal">
-                    <TextBlock Text="ОСВОБОЖДЕНО"
+                    <TextBlock Text="Освобождено"
                                VerticalAlignment="Center"
                                Margin="0,0,7,0"
                                FontFamily="{DynamicResource Font.Sans}"
@@ -217,7 +215,6 @@
                                Foreground="{DynamicResource Fg.Muted}" />
                     <TextBlock Text="{Binding FreedText}"
                                VerticalAlignment="Center"
-                               FontFamily="{DynamicResource Font.Mono}"
                                FontSize="{DynamicResource Font.Size.S}"
                                FontWeight="Medium"
                                Foreground="{DynamicResource Accent.Primary}" />

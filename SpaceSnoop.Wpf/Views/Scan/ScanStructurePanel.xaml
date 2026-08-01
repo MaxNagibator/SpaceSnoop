@@ -100,11 +100,10 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0"
-                                           Text="ОБЪЁМ"
+                                           Text="Объём"
                                            Style="{StaticResource Caption}" />
                                 <TextBlock Grid.Column="1"
                                            Text="{Binding SizeText}"
-                                           FontFamily="{DynamicResource Font.Mono}"
                                            FontSize="{DynamicResource Font.Size.M}"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource Accent.Primary}" />
@@ -116,11 +115,10 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0"
-                                           Text="СВОИ ФАЙЛЫ"
+                                           Text="Свои файлы"
                                            Style="{StaticResource Caption}" />
                                 <TextBlock Grid.Column="1"
                                            Text="{Binding OwnSizeText}"
-                                           FontFamily="{DynamicResource Font.Mono}"
                                            FontSize="{DynamicResource Font.Size.S}"
                                            FontWeight="Medium"
                                            Foreground="{DynamicResource Fg.Primary}" />
@@ -135,7 +133,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0"
-                                   Text="ОТ РОДИТЕЛЯ"
+                                   Text="От родителя"
                                    Style="{StaticResource Caption}" />
                         <Border x:Name="ShareTrack"
                                 Grid.Column="1"
@@ -161,7 +159,6 @@
                         </Border>
                         <TextBlock Grid.Column="2"
                                    Text="{Binding ShareText}"
-                                   FontFamily="{DynamicResource Font.Mono}"
                                    FontSize="{DynamicResource Font.Size.S}"
                                    FontWeight="Medium"
                                    MinWidth="40"
@@ -176,7 +173,7 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0"
-                                   Text="СОЗДАН"
+                                   Text="Создан"
                                    Style="{StaticResource Caption}" />
                         <TextBlock Grid.Column="1"
                                    Text="{Binding CreationDateText}"
@@ -190,7 +187,7 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0"
-                                   Text="ДОСТУП"
+                                   Text="Доступ"
                                    Style="{StaticResource Caption}" />
                         <TextBlock Grid.Column="1"
                                    Text="{Binding LastAccessText}"
@@ -375,8 +372,8 @@
                 <StackPanel Grid.Column="0"
                             Orientation="Horizontal"
                             VerticalAlignment="Center">
-                    <TextBlock Text="СТРУКТУРА КАТАЛОГА"
-                               Style="{StaticResource Caption}" />
+                    <TextBlock Text="Структура каталога"
+                               Style="{StaticResource SectionTitle}" />
                     <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
                                   IsChecked="{Binding ShowTreemap}"
                                   Margin="16,0,0,0"
@@ -408,7 +405,7 @@
                                               VerticalAlignment="Center"
                                               Margin="0,0,7,0"
                                               Foreground="{DynamicResource Fg.Muted}" />
-                    <TextBlock Text="СОРТИРОВКА"
+                    <TextBlock Text="Сортировка"
                                Style="{StaticResource Caption}"
                                Margin="0,0,9,0" />
                     <ComboBox ItemsSource="{Binding SortOptions}"
@@ -445,7 +442,7 @@
                 </StackPanel>
 
                 <TextBlock Grid.Column="2"
-                           Text="ФАЙЛЫ · ДОЛЯ · РАЗМЕР"
+                           Text="Файлы · доля · размер"
                            Style="{StaticResource Caption}"
                            Visibility="{Binding TreeVisible, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
             </Grid>

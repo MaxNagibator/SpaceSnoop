@@ -212,9 +212,9 @@ public sealed partial class OverviewRowViewModel : ObservableObject
 
     public string NewerBadgeText => _freshness.Verdict switch
     {
-        NewerSide.Left => "СЛЕВА",
-        NewerSide.Right => "СПРАВА",
-        NewerSide.Tie => "ПОРОВНУ",
+        NewerSide.Left => "Слева",
+        NewerSide.Right => "Справа",
+        NewerSide.Tie => "Поровну",
         _ => string.Empty,
     };
 

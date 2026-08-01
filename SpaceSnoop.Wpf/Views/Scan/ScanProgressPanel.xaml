@@ -44,7 +44,7 @@
                             </EventTrigger>
                         </Ellipse.Triggers>
                     </Ellipse>
-                    <TextBlock Text="СКАНИРОВАНИЕ"
+                    <TextBlock Text="Сканирование"
                                Style="{StaticResource Caption}"
                                Foreground="{DynamicResource Accent.Primary}" />
                 </StackPanel>
@@ -83,7 +83,6 @@
                            Margin="10,0,0,0"
                            TextAlignment="Right"
                            VerticalAlignment="Center"
-                           FontFamily="{DynamicResource Font.Mono}"
                            FontSize="{DynamicResource Font.Size.S}"
                            FontWeight="Medium"
                            Foreground="{DynamicResource Accent.Primary}"
@@ -93,21 +92,21 @@
             <StackPanel Orientation="Horizontal"
                         Margin="0,11,0,0"
                         VerticalAlignment="Center">
-                <TextBlock Text="КАТАЛОГОВ"
+                <TextBlock Text="Каталогов"
                            Style="{StaticResource Caption}"
                            Margin="0,0,7,0" />
                 <TextBlock Text="{Binding ScanDirCountText}"
                            Style="{StaticResource StatValue}"
                            Margin="0,0,18,0" />
 
-                <TextBlock Text="ФАЙЛОВ"
+                <TextBlock Text="Файлов"
                            Style="{StaticResource Caption}"
                            Margin="0,0,7,0" />
                 <TextBlock Text="{Binding ScanFileCountText}"
                            Style="{StaticResource StatValue}"
                            Margin="0,0,18,0" />
 
-                <TextBlock Text="ОБЪЁМ"
+                <TextBlock Text="Объём"
                            Style="{StaticResource Caption}"
                            Margin="0,0,7,0" />
                 <TextBlock Text="{Binding ScanBytesText}"
@@ -115,14 +114,14 @@
                            Foreground="{DynamicResource Accent.Primary}"
                            Margin="0,0,18,0" />
 
-                <TextBlock Text="СКОРОСТЬ"
+                <TextBlock Text="Скорость"
                            Style="{StaticResource Caption}"
                            Margin="0,0,7,0" />
                 <TextBlock Text="{Binding ScanThroughputText}"
                            Style="{StaticResource StatValue}"
                            Margin="0,0,18,0" />
 
-                <TextBlock Text="ВЕТКИ"
+                <TextBlock Text="Ветки"
                            Style="{StaticResource Caption}"
                            Margin="0,0,7,0"
                            Visibility="{Binding ScanHasBranches, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />

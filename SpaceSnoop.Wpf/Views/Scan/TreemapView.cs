@@ -163,7 +163,7 @@ public sealed class TreemapView : FrameworkElement
 
         var style = new TileStyle(ResourcePen("Fg.Primary", 1.5),
             ResourcePen("State.Error", 1.5),
-            TryFindResource("Font.Mono") as FontFamily,
+            TryFindResource("Font.Sans") as FontFamily,
             Intensity,
             FontScaleManager.Current);
 

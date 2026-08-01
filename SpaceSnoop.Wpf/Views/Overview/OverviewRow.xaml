@@ -149,7 +149,7 @@
                                               VerticalAlignment="Center"
                                               Margin="0,0,7,0"
                                               Style="{StaticResource FreshIcon}" />
-                    <TextBlock Text="СВЕЖЕЕ"
+                    <TextBlock Text="Свежее"
                                Style="{StaticResource TextBlock.Subtle}"
                                VerticalAlignment="Center"
                                Margin="0,0,7,0" />

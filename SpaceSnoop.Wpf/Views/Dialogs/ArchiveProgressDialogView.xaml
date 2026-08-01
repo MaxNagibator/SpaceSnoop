@@ -64,7 +64,6 @@
                                    Text="{Binding SourceSize}"
                                    VerticalAlignment="Center"
                                    Margin="12,0,0,0"
-                                   FontFamily="{DynamicResource Font.Mono}"
                                    FontSize="{DynamicResource Font.Size.S}"
                                    Foreground="{DynamicResource Fg.Muted}" />
                     </Grid>
@@ -127,7 +126,6 @@
                            AutomationProperties.LiveSetting="Polite"
                            Margin="12,0,0,0"
                            VerticalAlignment="Center"
-                           FontFamily="{DynamicResource Font.Mono}"
                            FontSize="{DynamicResource Font.Size.S}"
                            FontWeight="Medium"
                            Foreground="{DynamicResource Accent.Primary}" />

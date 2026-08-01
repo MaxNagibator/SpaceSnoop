@@ -73,7 +73,7 @@
                         Orientation="Horizontal"
                         VerticalAlignment="Center"
                         Margin="14,7,0,7">
-                <TextBlock Text="ОБЪЁМ"
+                <TextBlock Text="Объём"
                            Style="{StaticResource Caption}"
                            Margin="0,0,7,0" />
                 <TextBlock Text="{Binding ResultSizeText}"
@@ -81,21 +81,21 @@
                            Foreground="{DynamicResource Accent.Primary}"
                            Margin="0,0,20,0" />
 
-                <TextBlock Text="ФАЙЛОВ"
+                <TextBlock Text="Файлов"
                            Style="{StaticResource Caption}"
                            Margin="0,0,7,0" />
                 <TextBlock Text="{Binding ResultFileCountText}"
                            Style="{StaticResource StatValue}"
                            Margin="0,0,20,0" />
 
-                <TextBlock Text="КАТАЛОГОВ"
+                <TextBlock Text="Каталогов"
                            Style="{StaticResource Caption}"
                            Margin="0,0,7,0" />
                 <TextBlock Text="{Binding ResultDirCountText}"
                            Style="{StaticResource StatValue}"
                            Margin="0,0,20,0" />
 
-                <TextBlock Text="ВРЕМЯ"
+                <TextBlock Text="Время"
                            Style="{StaticResource Caption}"
                            Margin="0,0,7,0" />
                 <TextBlock Text="{Binding ResultElapsedText}"
@@ -112,7 +112,7 @@
                                           VerticalAlignment="Center"
                                           Margin="0,0,7,0"
                                           Foreground="{DynamicResource Accent.Primary}" />
-                <TextBlock Text="ПОДСВЕТКА"
+                <TextBlock Text="Подсветка"
                            Style="{StaticResource Caption}"
                            Margin="0,0,9,0" />
                 <Border Width="60"
@@ -130,7 +130,6 @@
                         Margin="9,0,9,0"
                         ToolTip="Чувствительность тепловой подсветки" />
                 <TextBlock Text="{Binding Intensity, StringFormat=0}"
-                           FontFamily="{DynamicResource Font.Mono}"
                            FontSize="{DynamicResource Font.Size.M}"
                            FontWeight="Medium"
                            Foreground="{DynamicResource Accent.Primary}"

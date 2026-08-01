@@ -276,9 +276,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public string NewerBadgeText => EffectiveNewerSide switch
     {
-        NewerSide.Left => "СЛЕВА",
-        NewerSide.Right => "СПРАВА",
-        NewerSide.Tie => "ПОРОВНУ",
+        NewerSide.Left => "Слева",
+        NewerSide.Right => "Справа",
+        NewerSide.Tie => "Поровну",
         _ => string.Empty,
     };
 

@@ -7,11 +7,27 @@
         <Setter Property="FontFamily"
                 Value="{DynamicResource Font.Sans}" />
         <Setter Property="FontSize"
-                Value="{DynamicResource Font.Size.XS}" />
+                Value="{DynamicResource Font.Size.S}" />
+        <Setter Property="FontWeight"
+                Value="Normal" />
+        <Setter Property="Foreground"
+                Value="{DynamicResource Fg.Muted}" />
+        <Setter Property="TextWrapping"
+                Value="NoWrap" />
+        <Setter Property="VerticalAlignment"
+                Value="Center" />
+    </Style>
+
+    <Style x:Key="SectionTitle"
+           TargetType="TextBlock">
+        <Setter Property="FontFamily"
+                Value="{DynamicResource Font.Sans}" />
+        <Setter Property="FontSize"
+                Value="{DynamicResource Font.Size.M}" />
         <Setter Property="FontWeight"
                 Value="SemiBold" />
         <Setter Property="Foreground"
-                Value="{DynamicResource Fg.Muted}" />
+                Value="{DynamicResource Fg.Primary}" />
         <Setter Property="TextWrapping"
                 Value="NoWrap" />
         <Setter Property="VerticalAlignment"
@@ -21,7 +37,7 @@
     <Style x:Key="StatValue"
            TargetType="TextBlock">
         <Setter Property="FontFamily"
-                Value="{DynamicResource Font.Mono}" />
+                Value="{DynamicResource Font.Sans}" />
         <Setter Property="FontSize"
                 Value="{DynamicResource Font.Size.M}" />
         <Setter Property="FontWeight"
