@@ -60,7 +60,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         var scheduleItem = new NavigationItem("Расписание", PackIconLucideKind.CalendarClock, schedule);
         var dockerItem = new NavigationItem("Docker", PackIconLucideKind.Container, docker);
         var logsItem = new NavigationItem("Логи", PackIconLucideKind.ScrollText, logs);
-        var performanceItem = new NavigationItem("Производительность", PackIconLucideKind.Gauge, performance);
+        var performanceItem = new NavigationItem("Диагностика", PackIconLucideKind.Gauge, performance);
         var aboutItem = new NavigationItem("О программе", PackIconLucideKind.Info, about);
 
         _chatItem = new("Чат", PackIconLucideKind.MessageCircle, chat);
