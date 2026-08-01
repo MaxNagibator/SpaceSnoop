@@ -8,6 +8,7 @@ global using SpaceSnoop.Core.Docker;
 global using SpaceSnoop.Core.Domain;
 global using SpaceSnoop.Wpf.Agent;
 global using SpaceSnoop.Wpf.Bootstrap;
+global using SpaceSnoop.Wpf.Diagnostics;
 global using SpaceSnoop.Wpf.Extensions;
 global using SpaceSnoop.Wpf.Mcp;
 global using SpaceSnoop.Wpf.ViewModels;

@@ -1,0 +1,66 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.PerformanceHudView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:PerformanceHudViewModel}"
+             d:DesignWidth="320"
+             Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+
+    <StackPanel Orientation="Horizontal"
+                VerticalAlignment="Center">
+        <StackPanel.ToolTip>
+            <StackPanel>
+                <TextBlock Text="{Binding DelayText}" />
+                <TextBlock Text="{Binding MemoryText}"
+                           Margin="0,4,0,0" />
+                <TextBlock Text="{Binding CollectionsText}"
+                           Margin="0,4,0,0" />
+                <TextBlock Text="{Binding OperationText}"
+                           Margin="0,4,0,0"
+                           Visibility="{Binding OperationText, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
+            </StackPanel>
+        </StackPanel.ToolTip>
+
+        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Activity}"
+                                  Width="11"
+                                  Height="11"
+                                  VerticalAlignment="Center"
+                                  Margin="0,0,6,0">
+            <iconPacks:PackIconLucide.Style>
+                <Style TargetType="iconPacks:PackIconLucide">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource Fg.Muted}" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsHitch}"
+                                     Value="True">
+                            <Setter Property="Foreground"
+                                    Value="{DynamicResource State.Warning}" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </iconPacks:PackIconLucide.Style>
+        </iconPacks:PackIconLucide>
+
+        <TextBlock Text="{Binding SummaryText}"
+                   VerticalAlignment="Center"
+                   MaxWidth="420"
+                   TextTrimming="CharacterEllipsis">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock"
+                       BasedOn="{StaticResource TextBlock.Subtle}">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsHitch}"
+                                     Value="True">
+                            <Setter Property="Foreground"
+                                    Value="{DynamicResource State.Warning}" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+    </StackPanel>
+</UserControl>

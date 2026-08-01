@@ -4,6 +4,7 @@ using KeepShell.Services.Modal;
 using Microsoft.Extensions.Logging.Abstractions;
 using SpaceSnoop.Core;
 using SpaceSnoop.Wpf.Bootstrap;
+using SpaceSnoop.Wpf.Diagnostics;
 using SpaceSnoop.Wpf.ViewModels.Sync;
 
 namespace SpaceSnoop.Wpf.Tests;
@@ -207,7 +208,8 @@ public class SyncQuickProfileTests
             NullLogger<SyncViewModel>.Instance,
             NullLogger<SyncEngine>.Instance,
             NullLogger<DirectoryComparer>.Instance,
-            notifier);
+            notifier,
+            new(NullLogger<PerformanceMonitor>.Instance));
     }
 
 }

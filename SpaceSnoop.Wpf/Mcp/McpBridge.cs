@@ -19,6 +19,7 @@ public sealed class McpBridge(
     DiskSpaceCalculator calculator,
     DockerService docker,
     ToastNotifier notifier,
+    PerformanceMonitor performance,
     ILogger<DirectoryComparer> comparerLogger,
     ILogger<McpBridge> logger)
 {
@@ -54,6 +55,28 @@ public sealed class McpBridge(
             SyncProfileStore.Load(settings).Count,
             ReadScanState(),
             ReadSyncState())));
+    }
+
+    public string GetPerformance()
+    {
+        logger.McpToolInvoked("get_performance", "-");
+
+        var snapshot = performance.Snapshot;
+        var windowSeconds = AppDefaults.PerformanceSampleIntervalMs * AppDefaults.PerformanceWindowSamples / 1000d;
+
+        return Serialize(new McpPerformance(performance.IsRunning,
+            $"последние {windowSeconds:N0} с",
+            Math.Round(snapshot.UiDelayMs, 1),
+            Math.Round(snapshot.UiPeakMs, 1),
+            Math.Round(snapshot.UiAverageMs, 1),
+            snapshot.ManagedBytes,
+            SizeFormatter.Format(snapshot.ManagedBytes),
+            snapshot.WorkingSetBytes,
+            SizeFormatter.Format(snapshot.WorkingSetBytes),
+            snapshot.Gen0Collections,
+            snapshot.Gen1Collections,
+            snapshot.Gen2Collections,
+            DescribeOperation(snapshot.Operation)));
     }
 
     public string ListProfiles()
@@ -503,6 +526,24 @@ public sealed class McpBridge(
             OverviewRunStatus.Overlap => "каталоги совпадают или вложены",
             _ => null,
         };
+    }
+
+    private static McpPerformanceOperation? DescribeOperation(PerformanceOperation? operation)
+    {
+        if (operation is null)
+        {
+            return null;
+        }
+
+        return new(operation.Name,
+            operation.Items,
+            operation.Bytes,
+            SizeFormatter.Format(operation.Bytes),
+            Math.Round(operation.Elapsed.TotalSeconds, 1),
+            operation.ItemsPerSecond is { } items ? Math.Round(items, 1) : null,
+            operation.BytesPerSecond is { } bytes ? Math.Round(bytes, 1) : null,
+            operation.Remaining() is { } remaining ? Math.Round(remaining.TotalSeconds, 1) : null,
+            PerformanceFormat.Operation(operation) ?? operation.Name);
     }
 
     private static McpDrive Describe(DriveInfo drive)

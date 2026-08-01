@@ -23,6 +23,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     private readonly ArchiveProgressDialogFactory _archiveDialogFactory;
     private readonly ILogger<ScanViewModel> _logger;
     private readonly ToastNotifier _notifier;
+    private readonly PerformanceMonitor _performance;
     private readonly DispatcherTimer _progressTimer;
 
     private readonly ScanSortState _sortState = new();
@@ -146,9 +147,11 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         DeleteProgressDialogFactory deleteDialogFactory,
         ArchiveProgressDialogFactory archiveDialogFactory,
         ILogger<ScanViewModel> logger,
-        ToastNotifier notifier)
+        ToastNotifier notifier,
+        PerformanceMonitor performance)
     {
         _calculator = calculator;
+        _performance = performance;
         _dialogs = dialogs;
         _settings = settings;
         _operations = operations;
@@ -940,6 +943,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         {
             _progressTimer.Stop();
             _scanStopwatch?.Stop();
+            _performance.ReportOperation(null);
             _progress = null;
             _progressFraction = null;
             _estimatedTotalBytes = null;
@@ -1009,6 +1013,12 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         _progressFraction = fraction;
         ScanHasDeterminateProgress = fraction.HasValue;
         ScanPercentText = fraction.HasValue ? $"{fraction.Value * 100:F0} %" : string.Empty;
+
+        _performance.ReportOperation(new("Сканирование",
+            snapshot.FilesScanned,
+            snapshot.BytesScanned,
+            elapsed,
+            TotalBytes: _estimatedTotalBytes));
 
         OnPropertyChanged(nameof(IsIndeterminate));
         OnPropertyChanged(nameof(ProgressValue));

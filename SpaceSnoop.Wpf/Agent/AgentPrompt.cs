@@ -13,6 +13,7 @@ public static class AgentPrompt
     private static readonly string[] SafeTools =
     [
         "get_app_state",
+        "get_performance",
         "list_profiles",
         "list_drives",
         "scan_directory",
@@ -70,6 +71,7 @@ public static class AgentPrompt
         return shortName switch
         {
             "get_app_state" => "состояние программы",
+            "get_performance" => "производительность приложения",
             "list_profiles" => "профили синхронизации",
             "list_drives" => "диски машины",
             "scan_directory" => "сканирование каталога",

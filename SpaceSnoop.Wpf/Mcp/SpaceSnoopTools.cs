@@ -25,6 +25,13 @@ public sealed class SpaceSnoopTools
         return bridge.ListProfiles();
     }
 
+    [McpServerTool(Name = "get_performance")]
+    [Description("Как приложению живётся прямо сейчас: отклик интерфейса (задержка и пик за окно наблюдения), занятая память, число сборок мусора и скорость текущей операции. Отвечает мгновенно, ничего не считает и не меняет – с этого стоит начинать разговор «почему тормозит».")]
+    public static string GetPerformance(McpBridge bridge)
+    {
+        return bridge.GetPerformance();
+    }
+
     [McpServerTool(Name = "list_drives")]
     [Description("Диски машины: буква, метка, файловая система, сколько всего, занято и свободно. Отвечает мгновенно – с этого дешевле начинать разговор о нехватке места, чем со сканирования.")]
     public static string ListDrives(McpBridge bridge)

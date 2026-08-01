@@ -41,10 +41,12 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         AgentPreferences agent,
         ShellPreferences preferences,
         AppUpdateViewModel appUpdate,
-        ToastHostViewModel toasts)
+        ToastHostViewModel toasts,
+        PerformanceHudViewModel hud)
         : base(modal)
     {
         Toasts = toasts;
+        Hud = hud;
         Theme = theme;
         Theme.PropertyChanged += OnThemePropertyChanged;
         Preferences = preferences;
@@ -110,6 +112,8 @@ public sealed partial class ShellViewModel : ShellViewModelBase
     }
 
     public ToastHostViewModel Toasts { get; }
+
+    public PerformanceHudViewModel Hud { get; }
 
     public ThemeViewModel Theme { get; }
 

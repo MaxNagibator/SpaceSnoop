@@ -11,6 +11,9 @@ public sealed partial class ShellPreferences : ShellPreferencesBase
     [ObservableProperty]
     private bool _warnIfNotAdministrator = AppDefaults.WarnIfNotAdminDefault;
 
+    [ObservableProperty]
+    private bool _showPerformanceHud = AppDefaults.PerformanceHudDefault;
+
     public ShellPreferences(ISettingsStore settings)
         : base(settings, new(SettingsKeys.ShowPageHeader, SettingsKeys.EnableToastNotifications, SettingsKeys.FontScale))
     {
@@ -18,6 +21,7 @@ public sealed partial class ShellPreferences : ShellPreferencesBase
         StartupPage = Settings.GetEnum(SettingsKeys.StartupPage, AppDefaults.StartupPageDefault);
         NavCollapsed = Settings.GetBool(SettingsKeys.NavCollapsed);
         WarnIfNotAdministrator = Settings.GetBool(SettingsKeys.WarnIfNotAdmin, AppDefaults.WarnIfNotAdminDefault);
+        ShowPerformanceHud = Settings.GetBool(SettingsKeys.PerformanceHud, AppDefaults.PerformanceHudDefault);
         SuppressPersist = false;
     }
 
@@ -43,5 +47,10 @@ public sealed partial class ShellPreferences : ShellPreferencesBase
     partial void OnWarnIfNotAdministratorChanged(bool value)
     {
         PersistBool(SettingsKeys.WarnIfNotAdmin, value);
+    }
+
+    partial void OnShowPerformanceHudChanged(bool value)
+    {
+        PersistBool(SettingsKeys.PerformanceHud, value);
     }
 }

@@ -388,4 +388,7 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 2204, Level = LogLevel.Warning, Message = "Галерея: кадр «{Case}» не снят")]
     public static partial void GalleryCaseFailed(this ILogger logger, Exception exception, string @case);
+
+    [LoggerMessage(EventId = 2300, Level = LogLevel.Warning, Message = "Интерфейс не отвечал {DelayMs} мс ({Operation})")]
+    public static partial void PerformanceHitch(this ILogger logger, long delayMs, string operation);
 }

@@ -21,6 +21,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private readonly ILogger<SyncEngine> _engineLogger;
     private readonly ILogger<DirectoryComparer> _comparerLogger;
     private readonly ToastNotifier _notifier;
+    private readonly PerformanceMonitor _performance;
     private readonly AgentPreferences _agent;
     private readonly GitService _git = new();
     private readonly HashSet<DirectoryComparison> _collapsed = [];
@@ -131,9 +132,10 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     [NotifyCanExecuteChangedFor(nameof(ResolveAllSkipCommand))]
     private bool _hasPending;
 
-    public SyncViewModel(ISettingsStore settings, IDialogService dialogs, OperationPreferences operations, AgentPreferences agent, ILogger<SyncViewModel> logger, ILogger<SyncEngine> engineLogger, ILogger<DirectoryComparer> comparerLogger, ToastNotifier notifier)
+    public SyncViewModel(ISettingsStore settings, IDialogService dialogs, OperationPreferences operations, AgentPreferences agent, ILogger<SyncViewModel> logger, ILogger<SyncEngine> engineLogger, ILogger<DirectoryComparer> comparerLogger, ToastNotifier notifier, PerformanceMonitor performance)
     {
         _settings = settings;
+        _performance = performance;
         _dialogs = dialogs;
         Operations = operations;
         _agent = agent;
@@ -2253,6 +2255,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         ProgressDetail = StatusCaption;
 
+        var stopwatch = Stopwatch.StartNew();
+
         var progress = new Progress<OperationProgress>(update =>
         {
             var tail = string.IsNullOrEmpty(update.Current) ? string.Empty : $" · {update.Current}";
@@ -2277,6 +2281,13 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
             StatusCaption = head;
             ProgressDetail = head + tail;
+
+            _performance.ReportOperation(new(operation,
+                update.Completed,
+                update.Bytes,
+                stopwatch.Elapsed,
+                determinate ? total : null,
+                totalBytes > 0 ? totalBytes : null));
         });
 
         try
@@ -2305,6 +2316,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             IsBusy = false;
             IsIndeterminate = true;
             ProgressValue = 0;
+            _performance.ReportOperation(null);
             _cts?.Dispose();
             _cts = null;
         }

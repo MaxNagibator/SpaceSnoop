@@ -22,6 +22,32 @@ internal sealed record McpScanState(
 
 internal sealed record McpScanNavigation(string Page, McpScanState Scan, string? Navigation);
 
+internal sealed record McpPerformance(
+    bool Collecting,
+    string Window,
+    double UiDelayMs,
+    double UiPeakMs,
+    double UiAverageMs,
+    long ManagedBytes,
+    string Managed,
+    long WorkingSetBytes,
+    string WorkingSet,
+    int Gen0Collections,
+    int Gen1Collections,
+    int Gen2Collections,
+    McpPerformanceOperation? Operation);
+
+internal sealed record McpPerformanceOperation(
+    string Name,
+    long Items,
+    long Bytes,
+    string Size,
+    double ElapsedSeconds,
+    double? ItemsPerSecond,
+    double? BytesPerSecond,
+    double? RemainingSeconds,
+    string Summary);
+
 internal sealed record McpArchivePlan(
     string Path,
     string Target,

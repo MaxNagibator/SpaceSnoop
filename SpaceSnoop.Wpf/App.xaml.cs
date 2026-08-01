@@ -83,6 +83,7 @@ public partial class App : Application
 
             _services.GetRequiredService<McpBridge>().Attach(_services.GetRequiredService<ShellViewModel>());
             _services.GetRequiredService<McpServerHost>().Apply();
+            _services.GetRequiredService<PerformanceMonitor>().Start();
 
             _ = Task.Run(() => ScheduleReconciler.Reconcile(settings, _logging.CreateLogger<ScheduleViewModel>()));
 
@@ -164,6 +165,9 @@ public partial class App : Application
         });
 
         services.AddSingleton<ErrorReportService>();
+
+        services.AddSingleton<PerformanceMonitor>();
+        services.AddSingleton<PerformanceHudViewModel>();
 
         services.AddSingleton<ScanInspectorViewModel>();
         services.AddSingleton<ScanNodeFactory>();

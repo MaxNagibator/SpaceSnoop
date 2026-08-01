@@ -70,7 +70,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     }
 
     public SettingsSectionList Sections { get; } = new(
-        new SettingsSection("appearance", "Внешний вид", PackIconLucideKind.Palette, "тема оформления светлая тёмная tarkov масштаб шрифта размер текста заголовок страницы уведомления тосты"),
+        new SettingsSection("appearance", "Внешний вид", PackIconLucideKind.Palette, "тема оформления светлая тёмная tarkov масштаб шрифта размер текста заголовок страницы уведомления тосты производительность отклик память диагностика"),
         new SettingsSection("startup", "Запуск", PackIconLucideKind.Power, "стартовая страница навигационный рейл свернуть права администратора предупреждение"),
         new SettingsSection("scan", "Сканирование", PackIconLucideKind.HardDrive, "многопоточный обход потоки параллелизм тепловая подсветка интенсивность проводник открытие файлов"),
         new SettingsSection("sync", "Синхронизация", PackIconLucideKind.FolderSync, "исключения glob паттерны автодополнение путей git репозиторий группировка служебных каталогов плоский вид"),
