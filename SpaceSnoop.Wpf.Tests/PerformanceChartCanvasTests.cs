@@ -1,5 +1,4 @@
-﻿using SpaceSnoop.Wpf.Bootstrap;
-using SpaceSnoop.Wpf.Diagnostics;
+﻿using SpaceSnoop.Wpf.Diagnostics;
 using SpaceSnoop.Wpf.Views.Diagnostics;
 using System.Windows;
 using System.Windows.Media;
@@ -23,58 +22,36 @@ public class PerformanceChartCanvasTests
     }
 
     [Test]
-    public void График_рисует_полосу_основание_порог_и_обе_линии()
+    public void В_тесной_полосе_график_не_рисуется()
     {
-        Assert.That(Render(Sample())?.Children, Has.Count.EqualTo(5));
+        Assert.That(Drawings(Render(Sample(), 400, 40)), Has.Exactly(1).Items);
     }
 
     [Test]
-    public void Без_кистей_холст_ничего_не_рисует()
+    public void Без_кистей_остаётся_только_поле_для_курсора()
     {
         var canvas = new PerformanceChartCanvas { Data = Sample() };
 
-        Assert.That(Render(canvas), Is.Null);
+        Assert.That(Drawings(Render(canvas)), Has.Exactly(1).Items);
     }
 
     [Test]
-    public void Порог_просадки_стоит_на_своей_доле_шкалы()
+    public void Обе_шкалы_и_ось_времени_подписаны()
     {
-        var line = (LineGeometry)((GeometryDrawing)Render(Sample())!.Children[2]).Geometry;
-        var expected = 2 + ((1 - (AppDefaults.PerformanceHitchMs / 900d)) * (120 - 4));
+        var labels = Drawings(Render(Sample())).OfType<GlyphRunDrawing>().Count();
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(line.StartPoint.Y, Is.EqualTo(expected).Within(0.001));
-            Assert.That(line.EndPoint.Y, Is.EqualTo(expected).Within(0.001));
-        });
+        Assert.That(labels, Is.GreaterThanOrEqualTo(8));
     }
 
     [Test]
-    public void Пунктир_достаётся_памяти_а_сплошная_отклику()
+    public void Порог_просадки_рисуется_пунктиром_поперёк_поля()
     {
-        var children = Render(Sample())!.Children;
-        var memory = ((GeometryDrawing)children[3]).Pen;
-        var delay = ((GeometryDrawing)children[4]).Pen;
+        var threshold = Lines(Render(Sample())).Single(static line => IsDashed(line, 2, 4));
 
         Assert.Multiple(() =>
         {
-            Assert.That(memory.DashStyle.Dashes, Is.Not.Empty);
-            Assert.That(memory.Thickness, Is.EqualTo(1));
-            Assert.That(delay.DashStyle.Dashes, Is.Empty);
-            Assert.That(delay.Thickness, Is.EqualTo(1.5));
-        });
-    }
-
-    [Test]
-    public void Полоса_операции_рисуется_слева_направо_по_своим_границам()
-    {
-        var band = (RectangleGeometry)((GeometryDrawing)Render(Sample())!.Children[0]).Geometry;
-        var data = Sample();
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(band.Rect.Left, Is.EqualTo(data.Bands[0].Start * 400).Within(0.001));
-            Assert.That(band.Rect.Right, Is.EqualTo(data.Bands[0].End * 400).Within(0.001));
+            Assert.That(threshold.Geometry.StartPoint.Y, Is.EqualTo(threshold.Geometry.EndPoint.Y));
+            Assert.That(threshold.Geometry.StartPoint.X, Is.LessThan(threshold.Geometry.EndPoint.X));
         });
     }
 
@@ -83,16 +60,128 @@ public class PerformanceChartCanvasTests
     {
         var quiet = PerformanceChartLayout.Build(new(DateTime.UnixEpoch, 1, 0, 0, 0, 0,
         [
-            new(1000, 0, 100, 0, 0, 0, 0, null),
-            new(500, 0, 200, 0, 0, 0, 0, null),
+            new(1000, 10, 100, 0, 0, 0, 0, null),
+            new(500, 20, 200, 0, 0, 0, 0, null),
         ]));
 
-        Assert.That(Render(quiet)?.Children, Has.Count.EqualTo(3));
+        Assert.That(Lines(Render(quiet)).Any(static line => IsDashed(line, 2, 4)), Is.False);
     }
 
-    private static DrawingGroup? Render(PerformanceChartData data, double width = 400, double height = 120)
+    [Test]
+    public void Каждая_серия_идёт_в_своём_поле_своей_кистью()
     {
-        var canvas = new PerformanceChartCanvas
+        var series = Drawings(Render(Sample()))
+            .OfType<GeometryDrawing>()
+            .Where(static drawing => drawing.Geometry is StreamGeometry)
+            .ToList();
+
+        var delay = series.Single(static drawing => ReferenceEquals(drawing.Pen.Brush, Brushes.OrangeRed));
+        var memory = series.Single(static drawing => ReferenceEquals(drawing.Pen.Brush, Brushes.SteelBlue));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(delay.Pen.Thickness, Is.GreaterThan(memory.Pen.Thickness));
+            Assert.That(delay.Geometry.Bounds.Bottom, Is.LessThan(memory.Geometry.Bounds.Top));
+        });
+    }
+
+    [Test]
+    public void Курсор_выбирает_ближайший_к_мыши_замер()
+    {
+        var canvas = Canvas(Sample());
+        Render(canvas);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(canvas.NearestIndex(new(canvas.ActualWidth - 4, canvas.ActualHeight / 2)), Is.EqualTo(3));
+            Assert.That(canvas.NearestIndex(new(0, canvas.ActualHeight / 2)), Is.EqualTo(-1));
+            Assert.That(canvas.NearestIndex(new(canvas.ActualWidth / 2, canvas.ActualHeight - 2)), Is.EqualTo(-1));
+        });
+    }
+
+    [Test]
+    public void Просадка_помечается_кружком_на_линии_отклика()
+    {
+        var markers = Drawings(Render(Sample()))
+            .OfType<GeometryDrawing>()
+            .Where(static drawing => drawing.Geometry is EllipseGeometry { RadiusX: 3.5 })
+            .ToList();
+
+        Assert.That(markers, Has.Exactly(1).Items);
+    }
+
+    [Test]
+    public void Полоса_операции_лежит_лентой_под_полями()
+    {
+        var drawing = Render(Sample())!;
+        var track = Drawings(drawing)
+            .OfType<GeometryDrawing>()
+            .Select(static item => item.Geometry)
+            .OfType<RectangleGeometry>()
+            .Single(static geometry => geometry.RadiusX > 0);
+
+        var grid = Lines(drawing).Max(static line => line.Geometry.StartPoint.Y);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(track.Rect.Height, Is.EqualTo(12));
+            Assert.That(track.Rect.Top, Is.GreaterThan(grid));
+        });
+    }
+
+    [Test]
+    public void Без_курсора_вертикали_на_графике_нет()
+    {
+        Assert.That(Lines(Render(Sample())).Any(static line => line.Geometry.StartPoint.X == line.Geometry.EndPoint.X), Is.False);
+    }
+
+    private static bool IsDashed((Pen Pen, LineGeometry Geometry) line, params double[] dashes)
+    {
+        return line.Pen.DashStyle.Dashes.SequenceEqual(dashes);
+    }
+
+    private static List<(Pen Pen, LineGeometry Geometry)> Lines(DrawingGroup? drawing)
+    {
+        return
+        [
+            .. Drawings(drawing)
+                .OfType<GeometryDrawing>()
+                .Where(static item => item is { Pen: not null, Geometry: LineGeometry })
+                .Select(static item => (item.Pen, (LineGeometry)item.Geometry)),
+        ];
+    }
+
+    private static IEnumerable<Drawing> Drawings(DrawingGroup? group)
+    {
+        if (group is null)
+        {
+            yield break;
+        }
+
+        foreach (var child in group.Children)
+        {
+            if (child is DrawingGroup nested)
+            {
+                foreach (var item in Drawings(nested))
+                {
+                    yield return item;
+                }
+
+                continue;
+            }
+
+            yield return child;
+        }
+    }
+
+    private static DrawingGroup? Render(PerformanceChartData data, double width = 400, double height = 200)
+    {
+        return Render(Canvas(data), width, height);
+    }
+
+    private static PerformanceChartCanvas Canvas(PerformanceChartData data)
+    {
+        return new()
         {
             Data = data,
             DelayBrush = Brushes.OrangeRed,
@@ -100,12 +189,13 @@ public class PerformanceChartCanvasTests
             BandBrush = Brushes.Bisque,
             ThresholdBrush = Brushes.Goldenrod,
             BaselineBrush = Brushes.Gainsboro,
+            LabelBrush = Brushes.Gray,
+            SurfaceBrush = Brushes.White,
+            TextBrush = Brushes.Black,
         };
-
-        return Render(canvas, width, height);
     }
 
-    private static DrawingGroup? Render(PerformanceChartCanvas canvas, double width = 400, double height = 120)
+    private static DrawingGroup? Render(PerformanceChartCanvas canvas, double width = 400, double height = 200)
     {
         canvas.Measure(new(width, height));
         canvas.Arrange(new Rect(0, 0, width, height));
@@ -118,10 +208,10 @@ public class PerformanceChartCanvasTests
     {
         return PerformanceChartLayout.Build(new(DateTime.UnixEpoch, 2, 0, 0, 0, 0,
         [
-            new(2000, 10, 100, 0, 0, 0, 0, null),
-            new(1500, 900, 180, 0, 0, 0, 0, "Сканирование"),
-            new(1000, 40, 260, 0, 0, 0, 0, "Сканирование"),
-            new(500, 5, 140, 0, 0, 0, 0, null),
+            new(2000, 10, 40 * 1024 * 1024, 0, 0, 0, 0, null),
+            new(1500, 900, 44 * 1024 * 1024, 0, 0, 0, 0, "Сканирование"),
+            new(1000, 40, 46 * 1024 * 1024, 0, 0, 0, 0, "Сканирование"),
+            new(500, 5, 42 * 1024 * 1024, 0, 0, 0, 0, null),
         ]));
     }
 }

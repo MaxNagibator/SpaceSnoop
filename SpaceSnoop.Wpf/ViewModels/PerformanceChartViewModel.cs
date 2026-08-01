@@ -15,7 +15,7 @@ public sealed partial class PerformanceChartViewModel : ObservableObject, ILogsP
     private PerformanceChartData _data = PerformanceChartData.Empty;
 
     [ObservableProperty]
-    private string _delayText = string.Empty;
+    private string _verdictText = string.Empty;
 
     [ObservableProperty]
     private string _memoryText = string.Empty;
@@ -46,13 +46,13 @@ public sealed partial class PerformanceChartViewModel : ObservableObject, ILogsP
 
     public string Title => "График производительности";
 
-    public string ThresholdText => $"порог {AppDefaults.PerformanceHitchMs} мс";
-
     public string ChartDescription =>
-        "Сплошная линия – задержка UI-потока: чем выше, тем дольше поток был занят, шкала идёт от нуля до пика окна. "
-        + $"Поперечный пунктир – порог просадки {AppDefaults.PerformanceHitchMs} мс, с которого просадка попадает в журнал; он виден, только когда пик до него дошёл. "
-        + "Частый пунктир – занятая управляемая память, растянутая от минимума окна к максимуму: он показывает форму роста, а не абсолютную величину. "
-        + "Заливка – промежутки, когда шла операция: сканирование, сравнение, синхронизация.";
+        "Верхнее поле – задержка UI-потока в миллисекундах: шкала идёт от нуля до круглого числа над пиком окна, "
+        + $"поперечный пунктир – порог просадки {AppDefaults.PerformanceHitchMs} мс, кружком помечен каждый замер выше порога. "
+        + "Нижнее поле – занятая управляемая память; её шкала подписана по краям делений, поэтому видно и величину, и размах. "
+        + "Ось внизу отсчитывает время назад от «сейчас», разрыв линии означает пропущенные замеры. "
+        + "Лента под осью – промежутки, когда шла операция: сканирование, сравнение, синхронизация. "
+        + "Наведение показывает значения выбранного замера.";
 
     public void SetActive(bool active)
     {
@@ -89,7 +89,7 @@ public sealed partial class PerformanceChartViewModel : ObservableObject, ILogsP
         var data = PerformanceChartLayout.Build(_monitor.CaptureHistory(TimeSpan.Zero, AppDefaults.PerformanceHistoryPointsMax));
 
         Data = data;
-        DelayText = PerformanceFormat.ChartDelay(data);
+        VerdictText = PerformanceFormat.ChartVerdict(data);
         MemoryText = PerformanceFormat.ChartMemory(data);
         WindowText = PerformanceFormat.ChartWindow(data);
         OperationsText = DescribeOperations(data);

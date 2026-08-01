@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
              xmlns:diagnostics="clr-namespace:SpaceSnoop.Wpf.Views.Diagnostics"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
@@ -16,78 +17,57 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <WrapPanel Grid.Row="0"
+        <DockPanel Grid.Row="0"
                    Margin="0,0,0,6"
                    Visibility="{Binding Data.HasData, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
-            <StackPanel Orientation="Horizontal"
-                        Margin="0,0,16,0">
-                <Line X1="0"
-                      Y1="0"
-                      X2="16"
-                      Y2="0"
-                      Stroke="{DynamicResource Accent.Primary}"
-                      StrokeThickness="1.5"
-                      VerticalAlignment="Center"
-                      Margin="0,0,6,0" />
-
-                <TextBlock Text="{Binding DelayText}"
-                           Style="{StaticResource TextBlock.Subtle}"
-                           VerticalAlignment="Center"
-                           TextTrimming="CharacterEllipsis" />
-            </StackPanel>
-
-            <StackPanel Orientation="Horizontal"
-                        Margin="0,0,16,0">
-                <Line X1="0"
-                      Y1="0"
-                      X2="16"
-                      Y2="0"
-                      Stroke="{DynamicResource State.Info}"
-                      StrokeThickness="1"
-                      StrokeDashArray="3 3"
-                      VerticalAlignment="Center"
-                      Margin="0,0,6,0" />
-
-                <TextBlock Text="{Binding MemoryText}"
-                           Style="{StaticResource TextBlock.Subtle}"
-                           VerticalAlignment="Center"
-                           TextTrimming="CharacterEllipsis" />
-            </StackPanel>
-
-            <StackPanel Orientation="Horizontal"
-                        Margin="0,0,16,0">
-                <Line X1="0"
-                      Y1="0"
-                      X2="16"
-                      Y2="0"
-                      Stroke="{DynamicResource State.Warning}"
-                      StrokeThickness="1"
-                      StrokeDashArray="2 4"
-                      VerticalAlignment="Center"
-                      Margin="0,0,6,0" />
-
-                <TextBlock Text="{Binding ThresholdText}"
-                           Style="{StaticResource TextBlock.Subtle}"
-                           VerticalAlignment="Center" />
-            </StackPanel>
-
-            <StackPanel Orientation="Horizontal"
-                        Margin="0,0,16,0">
-                <Rectangle Width="16"
-                           Height="10"
-                           Fill="{DynamicResource Accent.Soft}"
-                           VerticalAlignment="Center"
-                           Margin="0,0,6,0" />
-
-                <TextBlock Text="шла операция"
-                           Style="{StaticResource TextBlock.Subtle}"
-                           VerticalAlignment="Center" />
-            </StackPanel>
-
-            <TextBlock Text="{Binding WindowText}"
+            <TextBlock DockPanel.Dock="Right"
+                       Text="{Binding WindowText}"
                        Style="{StaticResource TextBlock.Subtle}"
-                       VerticalAlignment="Center" />
-        </WrapPanel>
+                       VerticalAlignment="Center"
+                       Margin="12,0,0,0" />
+
+            <StackPanel Orientation="Horizontal">
+                <iconPacks:PackIconLucide Width="14"
+                                          Height="14"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,6,0">
+                    <iconPacks:PackIconLucide.Style>
+                        <Style TargetType="iconPacks:PackIconLucide">
+                            <Setter Property="Kind"
+                                    Value="{x:Static iconPacks:PackIconLucideKind.Activity}" />
+                            <Setter Property="Foreground"
+                                    Value="{DynamicResource Fg.Muted}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Data.HasHitches}"
+                                             Value="True">
+                                    <Setter Property="Kind"
+                                            Value="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}" />
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource State.Warning}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </iconPacks:PackIconLucide.Style>
+                </iconPacks:PackIconLucide>
+
+                <TextBlock Text="{Binding VerdictText}"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock"
+                               BasedOn="{StaticResource TextBlock.Subtle}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Data.HasHitches}"
+                                             Value="True">
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource State.Warning}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </StackPanel>
+        </DockPanel>
 
         <Border Grid.Row="1"
                 Height="{Binding ChartHeight}"
@@ -99,19 +79,18 @@
                 Focusable="True"
                 AutomationProperties.Name="График производительности"
                 AutomationProperties.HelpText="{Binding ChartDescription}">
-            <Border.ToolTip>
-                <TextBlock Text="{Binding ChartDescription}"
-                           MaxWidth="420"
-                           TextWrapping="Wrap" />
-            </Border.ToolTip>
-
             <Grid>
                 <diagnostics:PerformanceChartCanvas Data="{Binding Data}"
+                                                    Margin="10,8"
                                                     DelayBrush="{DynamicResource Accent.Primary}"
                                                     MemoryBrush="{DynamicResource State.Info}"
                                                     BandBrush="{DynamicResource Accent.Soft}"
                                                     ThresholdBrush="{DynamicResource State.Warning}"
-                                                    BaselineBrush="{DynamicResource Border.Subtle}" />
+                                                    BaselineBrush="{DynamicResource Border.Subtle}"
+                                                    LabelBrush="{DynamicResource Fg.Muted}"
+                                                    SurfaceBrush="{DynamicResource Bg.Surface}"
+                                                    TextBrush="{DynamicResource Fg.Primary}"
+                                                    ToolTip="{Binding ChartDescription}" />
 
                 <TextBlock Text="Замеров пока нет – график появится через несколько секунд"
                            Style="{StaticResource TextBlock.Subtle}"
@@ -124,11 +103,17 @@
             </Grid>
         </Border>
 
-        <TextBlock Grid.Row="2"
-                   Text="{Binding OperationsText}"
-                   Style="{StaticResource TextBlock.Subtle}"
+        <DockPanel Grid.Row="2"
                    Margin="0,6,0,0"
-                   TextTrimming="CharacterEllipsis"
-                   Visibility="{Binding OperationsText, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
+                   Visibility="{Binding Data.HasData, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+            <TextBlock DockPanel.Dock="Right"
+                       Text="{Binding MemoryText}"
+                       Style="{StaticResource TextBlock.Subtle}"
+                       Margin="12,0,0,0" />
+
+            <TextBlock Text="{Binding OperationsText}"
+                       Style="{StaticResource TextBlock.Subtle}"
+                       TextTrimming="CharacterEllipsis" />
+        </DockPanel>
     </Grid>
 </UserControl>

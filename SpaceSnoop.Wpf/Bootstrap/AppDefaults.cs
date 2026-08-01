@@ -97,8 +97,9 @@ public static class AppDefaults
     public const int PerformanceHitchLogIntervalSeconds = 5;
     public const bool PerformanceChartExpandedDefault = false;
     public const int PerformanceChartRefreshMs = 1000;
-    public const double PerformanceChartPanelHeight = 120;
-    public const double PerformanceChartPageHeight = 260;
+    public const double PerformanceChartPanelHeight = 160;
+    public const double PerformanceChartPageHeight = 300;
+    public const int PerformanceChartDotLimit = 40;
 
     public const string UpdateRepositoryDefault = AppInfo.RepoSlug;
     public const bool UpdateCheckOnStartupDefault = true;

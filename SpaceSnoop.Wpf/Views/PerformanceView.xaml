@@ -210,7 +210,7 @@
             <Border Style="{StaticResource Card}"
                     Padding="14">
                 <StackPanel>
-                    <TextBlock Text="Последние минуты"
+                    <TextBlock Text="Окно наблюдения"
                                Style="{StaticResource TextBlock.Heading}"
                                Margin="0,0,0,10" />
 

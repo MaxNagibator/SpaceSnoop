@@ -30,9 +30,44 @@ public static class PerformanceFormat
         return $"Память {SizeFormatter.Format(managedBytes)} · процесс {SizeFormatter.Format(workingSetBytes)}";
     }
 
-    public static string ChartDelay(PerformanceChartData data)
+    public static string ChartVerdict(PerformanceChartData data)
     {
-        return $"Отклик, пик {Math.Round(data.PeakDelayMs):N0} мс";
+        if (!data.HasData)
+        {
+            return string.Empty;
+        }
+
+        var scale = $"пик {Math.Round(data.PeakDelayMs):N0} мс при пороге {AppDefaults.PerformanceHitchMs} мс";
+
+        if (!data.HasHitches)
+        {
+            return $"Просадок нет · {scale}";
+        }
+
+        var count = Plural.Format(data.Hitches.Count, "просадка", "просадки", "просадок");
+
+        return $"{count} · последняя {Ago(data.Hitches[^1].AgeMs)} · {scale}";
+    }
+
+    public static string Age(double seconds)
+    {
+        if (seconds < 1)
+        {
+            return "сейчас";
+        }
+
+        return seconds < 60
+            ? $"−{Math.Round(seconds):N0} с"
+            : $"−{Duration(TimeSpan.FromSeconds(seconds))}";
+    }
+
+    public static string Ago(double ageMs)
+    {
+        var seconds = ageMs / 1000;
+
+        return seconds < 60
+            ? $"{Math.Round(seconds):N0} с назад"
+            : $"{Duration(TimeSpan.FromSeconds(seconds))} назад";
     }
 
     public static string ChartMemory(PerformanceChartData data)
@@ -44,7 +79,7 @@ public static class PerformanceFormat
 
     public static string ChartWindow(PerformanceChartData data)
     {
-        return $"за {Duration(TimeSpan.FromSeconds(data.SpanSeconds))} · {Plural.Format(data.Delay.Count, "замер", "замера", "замеров")}";
+        return $"за {Duration(TimeSpan.FromSeconds(data.SpanSeconds))} · {Plural.Format(data.Points.Count, "замер", "замера", "замеров")}";
     }
 
     public static string Collections(int gen0, int gen1, int gen2)
