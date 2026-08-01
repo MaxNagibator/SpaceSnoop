@@ -130,10 +130,13 @@
                     <Run Text="{Binding DirectionArrow, Mode=OneWay}" />
                     <Run Text="{Binding Right, Mode=OneWay}" />
                 </TextBlock>
-                <TextBlock Text="{Binding StatusText}"
-                           Foreground="{DynamicResource Fg.Primary}"
+                <TextBlock Foreground="{DynamicResource Fg.Primary}"
                            TextTrimming="CharacterEllipsis"
-                           Margin="0,4,0,0" />
+                           Margin="0,4,0,0">
+                    <Run Text="{Binding StatusText, Mode=OneWay}" />
+                    <Run Text="{Binding WinnerText, Mode=OneWay}"
+                         Foreground="{DynamicResource Fg.Muted}" />
+                </TextBlock>
                 <TextBlock Text="{Binding BreakdownText}"
                            Style="{StaticResource TextBlock.Subtle}"
                            Margin="0,1,0,0"
@@ -163,22 +166,6 @@
                         Orientation="Horizontal"
                         VerticalAlignment="Center"
                         Margin="12,0,0,0">
-                <CheckBox IsChecked="{Binding IncludeInBatch}"
-                          Content="В пакете"
-                          VerticalAlignment="Center"
-                          Margin="0,0,12,0"
-                          ToolTip="{Binding BatchTooltip}" />
-                <ListBox Style="{StaticResource ListBox.SegmentedCompact}"
-                         ItemsSource="{Binding Modes}"
-                         SelectedIndex="{Binding SelectedModeIndex}"
-                         Margin="0,0,8,0"
-                         AutomationProperties.Name="Направление синхронизации" />
-                <ListBox Style="{StaticResource ListBox.SegmentedCompact}"
-                         ItemsSource="{Binding Winners}"
-                         SelectedIndex="{Binding SelectedWinnerIndex}"
-                         Margin="0,0,8,0"
-                         Visibility="{Binding WinnerApplicable, Converter={StaticResource BoolToVisibility}}"
-                         AutomationProperties.Name="Победитель в двустороннем режиме" />
                 <Button Style="{StaticResource Button.Ghost}"
                         Command="{Binding DataContext.SyncRowCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                         CommandParameter="{Binding}"
@@ -209,6 +196,62 @@
                         <TextBlock Text="Открыть" />
                     </StackPanel>
                 </Button>
+
+                <ToggleButton x:Name="RowMoreToggle"
+                              Style="{StaticResource ToggleButton.Toolbar}"
+                              MinWidth="0"
+                              Padding="9,0"
+                              Margin="8,0,0,0"
+                              VerticalAlignment="Center"
+                              ToolTip="Настройки профиля: участие в пакете, направление, победитель"
+                              AutomationProperties.Name="Настройки профиля">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Ellipsis}"
+                                              Width="15"
+                                              Height="15"
+                                              VerticalAlignment="Center" />
+                </ToggleButton>
+
+                <Popup PlacementTarget="{Binding ElementName=RowMoreToggle}"
+                       Placement="Bottom"
+                       IsOpen="{Binding IsChecked, ElementName=RowMoreToggle, Mode=TwoWay}"
+                       StaysOpen="False"
+                       AllowsTransparency="True"
+                       PopupAnimation="Fade"
+                       HorizontalOffset="-232"
+                       VerticalOffset="4">
+                    <Border Background="{DynamicResource Bg.Surface}"
+                            BorderBrush="{DynamicResource Border.Subtle}"
+                            BorderThickness="1"
+                            CornerRadius="{DynamicResource Radius.M}"
+                            Padding="12"
+                            MinWidth="280">
+                        <StackPanel>
+                            <CheckBox IsChecked="{Binding IncludeInBatch}"
+                                      Content="Участвует в пакетном прогоне"
+                                      ToolTip="{Binding BatchTooltip}" />
+
+                            <TextBlock Text="Направление"
+                                       Style="{StaticResource TextBlock.Subtle}"
+                                       Margin="0,12,0,4" />
+                            <ListBox Style="{StaticResource ListBox.Segmented}"
+                                     ItemsSource="{Binding Modes}"
+                                     SelectedIndex="{Binding SelectedModeIndex}"
+                                     HorizontalAlignment="Stretch"
+                                     AutomationProperties.Name="Направление синхронизации" />
+
+                            <StackPanel Visibility="{Binding WinnerApplicable, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Победитель"
+                                           Style="{StaticResource TextBlock.Subtle}"
+                                           Margin="0,12,0,4" />
+                                <ListBox Style="{StaticResource ListBox.Segmented}"
+                                         ItemsSource="{Binding Winners}"
+                                         SelectedIndex="{Binding SelectedWinnerIndex}"
+                                         HorizontalAlignment="Stretch"
+                                         AutomationProperties.Name="Победитель в двустороннем режиме" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Popup>
             </StackPanel>
         </Grid>
     </Border>

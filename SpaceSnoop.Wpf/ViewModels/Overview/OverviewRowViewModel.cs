@@ -165,6 +165,15 @@ public sealed partial class OverviewRowViewModel : ObservableObject
         _ => "Победитель: новее по дате. Клик – сменить.",
     };
 
+    public string WinnerText => !WinnerApplicable
+        ? string.Empty
+        : Profile.Winner switch
+        {
+            SyncWinner.Left => " · победитель слева",
+            SyncWinner.Right => " · победитель справа",
+            _ => " · побеждает свежее",
+        };
+
     public int DiffCount => LeftOnlyCount + RightOnlyCount + ModifiedCount + ConflictCount;
 
     public bool IsUnchanged =>
@@ -310,12 +319,14 @@ public sealed partial class OverviewRowViewModel : ObservableObject
         OnPropertyChanged(nameof(DirectionArrow));
         OnPropertyChanged(nameof(DirectionTooltip));
         OnPropertyChanged(nameof(WinnerApplicable));
+        OnPropertyChanged(nameof(WinnerText));
     }
 
     private void AdvanceWinnerChanged()
     {
         OnPropertyChanged(nameof(WinnerIconKind));
         OnPropertyChanged(nameof(WinnerTooltip));
+        OnPropertyChanged(nameof(WinnerText));
     }
 
     private static string FormatStamp(DateTime? value)

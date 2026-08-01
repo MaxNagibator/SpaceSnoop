@@ -304,32 +304,6 @@
                                                   Style="{StaticResource SyncDeleteMark}" />
                     </StackPanel>
                 </Button>
-                <ToggleButton Style="{StaticResource MirrorToggle}"
-                              IsChecked="{Binding Mirror}"
-                              IsEnabled="{Binding MirrorApplicable}"
-                              MinWidth="0"
-                              Padding="9,0"
-                              VerticalAlignment="Center"
-                              Margin="0,0,16,8"
-                              ToolTip="{Binding MirrorHint}"
-                              AutomationProperties.Name="{Binding MirrorHint}">
-                    <StackPanel Orientation="Horizontal">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FlipHorizontal2}"
-                                                  Width="14"
-                                                  Height="14"
-                                                  VerticalAlignment="Center"
-                                                  Margin="0,0,6,0" />
-                        <TextBlock Text="Зеркало"
-                                   VerticalAlignment="Center" />
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
-                                                  Width="13"
-                                                  Height="13"
-                                                  VerticalAlignment="Center"
-                                                  Margin="7,0,0,0"
-                                                  Foreground="{DynamicResource State.Error}"
-                                                  Visibility="{Binding MirrorDeletes, Converter={StaticResource BoolToVisibility}}" />
-                    </StackPanel>
-                </ToggleButton>
                 <Button Style="{StaticResource Button.Secondary}"
                         Command="{Binding HashCommand}"
                         MinWidth="0"
@@ -653,13 +627,40 @@
                                      ToolTip="{Binding WinnerHint}"
                                      AutomationProperties.Name="Победитель в двустороннем режиме" />
                         </StackPanel>
+                        <ToggleButton Style="{StaticResource MirrorToggle}"
+                                      IsChecked="{Binding Mirror}"
+                                      IsEnabled="{Binding MirrorApplicable}"
+                                      MinWidth="0"
+                                      Padding="9,0"
+                                      HorizontalAlignment="Stretch"
+                                      VerticalAlignment="Center"
+                                      Margin="0,12,0,0"
+                                      ToolTip="{Binding MirrorHint}"
+                                      AutomationProperties.Name="{Binding MirrorHint}">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FlipHorizontal2}"
+                                                          Width="14"
+                                                          Height="14"
+                                                          VerticalAlignment="Center"
+                                                          Margin="0,0,6,0" />
+                                <TextBlock Text="Зеркало"
+                                           VerticalAlignment="Center" />
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
+                                                          Width="13"
+                                                          Height="13"
+                                                          VerticalAlignment="Center"
+                                                          Margin="7,0,0,0"
+                                                          Foreground="{DynamicResource State.Error}"
+                                                          Visibility="{Binding MirrorDeletes, Converter={StaticResource BoolToVisibility}}" />
+                            </StackPanel>
+                        </ToggleButton>
                         <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
                                       IsChecked="{Binding Verify}"
                                       MinWidth="0"
                                       Padding="9,0"
                                       HorizontalAlignment="Stretch"
                                       VerticalAlignment="Center"
-                                      Margin="0,12,0,0"
+                                      Margin="0,8,0,0"
                                       ToolTip="После синхронизации сверять затронутые файлы (размер + дата) без полного пересравнения"
                                       AutomationProperties.Name="Проверять результат после синхронизации">
                             <StackPanel Orientation="Horizontal">

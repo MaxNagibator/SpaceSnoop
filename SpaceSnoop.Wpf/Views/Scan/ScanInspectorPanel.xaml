@@ -306,9 +306,7 @@
                             </TextBlock.ContextMenu>
                         </TextBlock>
 
-                        <Border Style="{StaticResource Card.Inset}"
-                                Padding="12,10"
-                                Margin="0,12,0,0">
+                        <Border Margin="0,14,0,0">
                             <StackPanel>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -341,9 +339,7 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Style="{StaticResource Card.Inset}"
-                                Padding="12,10"
-                                Margin="0,8,0,0"
+                        <Border Margin="0,12,0,0"
                                 Visibility="{Binding HasShares, Converter={StaticResource BoolToVisibility}}">
                             <StackPanel>
                                 <Grid Margin="0,2"
@@ -479,9 +475,7 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Style="{StaticResource Card.Inset}"
-                                Padding="12,10"
-                                Margin="0,8,0,0"
+                        <Border Margin="0,12,0,0"
                                 Visibility="{Binding IsDirectory, Converter={StaticResource BoolToVisibility}}">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -521,9 +515,7 @@
                             </Grid>
                         </Border>
 
-                        <Border Style="{StaticResource Card.Inset}"
-                                Padding="12,10"
-                                Margin="0,8,0,0">
+                        <Border Margin="0,12,0,0">
                             <StackPanel>
                                 <Grid Margin="0,2">
                                     <Grid.ColumnDefinitions>
@@ -555,8 +547,11 @@
                             </StackPanel>
                         </Border>
 
-                        <StackPanel Margin="0,14,0,0"
+                        <StackPanel Margin="0,16,0,0"
                                     Visibility="{Binding HasTopChildren, Converter={StaticResource BoolToVisibility}}">
+                            <Border BorderBrush="{DynamicResource Border.Subtle}"
+                                    BorderThickness="0,1,0,0"
+                                    Margin="0,0,0,12" />
                             <StackPanel Orientation="Horizontal">
                                 <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Flame}"
                                                           Width="13"

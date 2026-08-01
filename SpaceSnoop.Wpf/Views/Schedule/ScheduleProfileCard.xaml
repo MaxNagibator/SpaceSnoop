@@ -107,10 +107,7 @@
                               VerticalAlignment="Center" />
                 </Grid>
 
-                <Border Background="{DynamicResource Bg.SurfaceMute}"
-                        CornerRadius="{DynamicResource Radius.M}"
-                        Padding="10,6"
-                        Margin="0,8,0,0">
+                <Border Margin="0,8,0,0">
                     <TextBlock Text="{Binding Summary}"
                                TextWrapping="Wrap"
                                FontFamily="{DynamicResource Font.Mono}"
