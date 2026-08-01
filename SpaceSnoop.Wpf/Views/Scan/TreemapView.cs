@@ -161,11 +161,11 @@ public sealed class TreemapView : FrameworkElement
         var layout = TreemapLayout.Squarify(weights, Math.Max(0, width - Gap), Math.Max(0, height - Gap));
         var tiles = new (Rect, ScanNodeViewModel)[nodes.Count];
 
-        var selectionPen = ResourcePen("Fg.Primary", 1.5);
-        var deletedPen = ResourcePen("State.Error", 1.5);
-        var monoFont = TryFindResource("Font.Mono") as FontFamily;
-        var intensity = Intensity;
-        var scale = FontScaleManager.Current;
+        var style = new TileStyle(ResourcePen("Fg.Primary", 1.5),
+            ResourcePen("State.Error", 1.5),
+            TryFindResource("Font.Mono") as FontFamily,
+            Intensity,
+            FontScaleManager.Current);
 
         for (var i = 0; i < nodes.Count; i++)
         {
@@ -173,52 +173,55 @@ public sealed class TreemapView : FrameworkElement
             var bounds = new Rect(layout[i].X + inset, layout[i].Y + inset, layout[i].Width, layout[i].Height);
             tiles[i] = (bounds, node);
 
-            var tile = Deflate(bounds, inset);
-
-            if (tile.Width <= 0 || tile.Height <= 0)
-            {
-                continue;
-            }
-
-            var fill = new SolidColorBrush(HeatColor.From(node.Fraction, intensity));
-
-            if (node.IsMarkedDeleted)
-            {
-                fill.Opacity = 0.5;
-            }
-
-            fill.Freeze();
-
-            var pen = ReferenceEquals(node, SelectedItem) ? selectionPen
-                : node.IsMarkedDeleted ? deletedPen
-                : null;
-
-            var radius = node.IsDirectory ? CornerRadius : 0;
-
-            context.DrawRoundedRectangle(fill, null, tile, radius, radius);
-
-            if (node is { IsDirectory: true, IsMarkedDeleted: false })
-            {
-                context.DrawRoundedRectangle(CushionBrush, null, tile, radius, radius);
-            }
-
-            if (pen is not null)
-            {
-                context.DrawRoundedRectangle(null, pen, tile, radius, radius);
-            }
-
-            if (tile.Width >= LabelMinWidth && tile.Height >= LabelMinHeight * scale)
-            {
-                DrawLabel(context, node, tile, monoFont, scale);
-            }
-
-            if (node.IsDirectory)
-            {
-                DrawFolderMarker(context, tile);
-            }
+            DrawTile(context, node, Deflate(bounds, inset), style);
         }
 
         _tiles = tiles;
+    }
+
+    private void DrawTile(DrawingContext context, ScanNodeViewModel node, Rect tile, TileStyle style)
+    {
+        if (tile.Width <= 0 || tile.Height <= 0)
+        {
+            return;
+        }
+
+        var fill = new SolidColorBrush(HeatColor.From(node.Fraction, style.Intensity));
+
+        if (node.IsMarkedDeleted)
+        {
+            fill.Opacity = 0.5;
+        }
+
+        fill.Freeze();
+
+        var pen = ReferenceEquals(node, SelectedItem) ? style.Selection
+            : node.IsMarkedDeleted ? style.Deleted
+            : null;
+
+        var radius = node.IsDirectory ? CornerRadius : 0;
+
+        context.DrawRoundedRectangle(fill, null, tile, radius, radius);
+
+        if (node is { IsDirectory: true, IsMarkedDeleted: false })
+        {
+            context.DrawRoundedRectangle(CushionBrush, null, tile, radius, radius);
+        }
+
+        if (pen is not null)
+        {
+            context.DrawRoundedRectangle(null, pen, tile, radius, radius);
+        }
+
+        if (tile.Width >= LabelMinWidth && tile.Height >= LabelMinHeight * style.Scale)
+        {
+            DrawLabel(context, node, tile, style.Mono, style.Scale);
+        }
+
+        if (node.IsDirectory)
+        {
+            DrawFolderMarker(context, tile);
+        }
     }
 
     protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
@@ -741,4 +744,6 @@ public sealed class TreemapView : FrameworkElement
     {
         return TryFindResource(resourceKey) is Brush brush ? new(brush, thickness) : null;
     }
+
+    private readonly record struct TileStyle(Pen? Selection, Pen? Deleted, FontFamily? Mono, double Intensity, double Scale);
 }

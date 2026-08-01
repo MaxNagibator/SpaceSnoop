@@ -62,7 +62,7 @@ public sealed record ConfirmMetricLine(
             {
                 ("", var size) => size,
                 (var count, "") => count,
-                var (count, size) => $"{count} ({size})",
+                _ => $"{Count} ({Size})",
             };
 
             return Tone == ConfirmMetricTone.Sub ? $"    – {Caption}: {value}" : $"{Caption}: {value}";

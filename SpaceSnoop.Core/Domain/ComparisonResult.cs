@@ -116,7 +116,7 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
     {
         foreach (var file in dir.Files)
         {
-            tally.AddSubtreeDeleteBytes(action, file);
+            tally.AddSubtreeFileBytes(action, file);
         }
 
         foreach (var sub in dir.SubDirectories)
@@ -214,19 +214,29 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
     {
         return dir.Status switch
         {
-            ComparisonStatus.LeftOnly => mode switch
-            {
-                SyncMode.RightToLeft => mirror ? SyncAction.DeleteLeft : SyncAction.Skip,
-                SyncMode.Bidirectional => mirror && winner == SyncWinner.Right ? SyncAction.DeleteLeft : SyncAction.CopyToRight,
-                _ => SyncAction.CopyToRight,
-            },
-            ComparisonStatus.RightOnly => mode switch
-            {
-                SyncMode.LeftToRight => mirror ? SyncAction.DeleteRight : SyncAction.Skip,
-                SyncMode.Bidirectional => mirror && winner == SyncWinner.Left ? SyncAction.DeleteRight : SyncAction.CopyToLeft,
-                _ => SyncAction.CopyToLeft,
-            },
+            ComparisonStatus.LeftOnly => LeftOnlyDirAction(mode, mirror, winner),
+            ComparisonStatus.RightOnly => RightOnlyDirAction(mode, mirror, winner),
             _ => SyncAction.None,
+        };
+    }
+
+    private static SyncAction LeftOnlyDirAction(SyncMode mode, bool mirror, SyncWinner winner)
+    {
+        return mode switch
+        {
+            SyncMode.RightToLeft => mirror ? SyncAction.DeleteLeft : SyncAction.Skip,
+            SyncMode.Bidirectional => mirror && winner == SyncWinner.Right ? SyncAction.DeleteLeft : SyncAction.CopyToRight,
+            _ => SyncAction.CopyToRight,
+        };
+    }
+
+    private static SyncAction RightOnlyDirAction(SyncMode mode, bool mirror, SyncWinner winner)
+    {
+        return mode switch
+        {
+            SyncMode.LeftToRight => mirror ? SyncAction.DeleteRight : SyncAction.Skip,
+            SyncMode.Bidirectional => mirror && winner == SyncWinner.Left ? SyncAction.DeleteRight : SyncAction.CopyToLeft,
+            _ => SyncAction.CopyToLeft,
         };
     }
 
@@ -348,7 +358,7 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
             DeleteFileBytes += SideBytes(file.Action, file);
         }
 
-        public void AddSubtreeDeleteBytes(SyncAction action, FileComparison file)
+        public void AddSubtreeFileBytes(SyncAction action, FileComparison file)
         {
             DeleteDirBytes += SideBytes(action, file);
         }

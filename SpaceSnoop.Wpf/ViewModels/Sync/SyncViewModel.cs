@@ -1183,6 +1183,21 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         return $"{days:N0} {word} назад";
     }
 
+    private static string FormatAge(TimeSpan span)
+    {
+        if (span.TotalDays >= 1)
+        {
+            return $"{(int)span.TotalDays} дн.";
+        }
+
+        if (span.TotalHours >= 1)
+        {
+            return $"{(int)span.TotalHours} ч.";
+        }
+
+        return span.TotalMinutes >= 1 ? $"{(int)span.TotalMinutes} мин." : "<1 мин.";
+    }
+
     private static string FormatBranch(GitRepoState? git)
     {
         return git is null ? string.Empty : git.IsDetached ? "detached" : git.Branch;
@@ -1228,21 +1243,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
 
         return string.Join(" ", parts);
-    }
-
-    private static string FormatAge(TimeSpan span)
-    {
-        if (span.TotalDays >= 1)
-        {
-            return $"{(int)span.TotalDays} дн.";
-        }
-
-        if (span.TotalHours >= 1)
-        {
-            return $"{(int)span.TotalHours} ч.";
-        }
-
-        return span.TotalMinutes >= 1 ? $"{(int)span.TotalMinutes} мин." : "<1 мин.";
     }
 
     private static IEnumerable<T> FilterBySearch<T>(IEnumerable<T> items, string search, Func<T, string> path)
@@ -1722,33 +1722,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
                 return;
             }
 
-            var planned = CurrentPlan;
-            var deletes = planned.Deletes + planned.DirDeletes;
-            var offerHashes = planned.ModifiedCopies > 0 && !_hashesCompared;
-            var lines = BuildPlanLines(planned, null, BuildReceivers(planned), CurrentMode == SyncMode.Bidirectional);
-
-            if (offerHashes)
-            {
-                lines.Add(new ConfirmGapLine());
-                lines.Add(new ConfirmTextLine(
-                    "Изменённые отличаются размером или датой. «Сверить хеши» сравнит их содержимым.",
-                    ConfirmTextTone.Muted));
-            }
-
-            var choices = new List<ConfirmChoice> { new("Отмена", ConfirmChoiceKind.Dismissive) };
-
-            if (offerHashes)
-            {
-                choices.Add(hashes);
-            }
-
-            choices.Add(new("Синхронизировать", deletes > 0 ? ConfirmChoiceKind.Destructive : ConfirmChoiceKind.Primary));
-
-            var confirm = new ConfirmDialogViewModel($"Синхронизация {DirectionText()}", DirectionIconKind, lines, choices)
-            {
-                Summary = DescribePlanVolume(planned),
-                Warning = deletes > 0 ? DescribeDeletionRecency(current) : null,
-            };
+            var confirm = BuildSyncConfirmation(current, hashes);
 
             if (!await _dialogs.ShowAsync(confirm))
             {
@@ -1769,6 +1743,37 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
 
         await ExecuteSyncAsync(true, CancellationToken.None);
+    }
+
+    private ConfirmDialogViewModel BuildSyncConfirmation(ComparisonResult current, ConfirmChoice hashes)
+    {
+        var planned = CurrentPlan;
+        var deletes = planned.Deletes + planned.DirDeletes;
+        var offerHashes = planned.ModifiedCopies > 0 && !_hashesCompared;
+        var lines = BuildPlanLines(planned, null, BuildReceivers(planned), CurrentMode == SyncMode.Bidirectional);
+
+        if (offerHashes)
+        {
+            lines.Add(new ConfirmGapLine());
+            lines.Add(new ConfirmTextLine(
+                "Изменённые отличаются размером или датой. «Сверить хеши» сравнит их содержимым.",
+                ConfirmTextTone.Muted));
+        }
+
+        var choices = new List<ConfirmChoice> { new("Отмена", ConfirmChoiceKind.Dismissive) };
+
+        if (offerHashes)
+        {
+            choices.Add(hashes);
+        }
+
+        choices.Add(new("Синхронизировать", deletes > 0 ? ConfirmChoiceKind.Destructive : ConfirmChoiceKind.Primary));
+
+        return new($"Синхронизация {DirectionText()}", DirectionIconKind, lines, choices)
+        {
+            Summary = DescribePlanVolume(planned),
+            Warning = deletes > 0 ? DescribeDeletionRecency(current) : null,
+        };
     }
 
     internal static string DescribePlanVolume(PlannedActions planned)

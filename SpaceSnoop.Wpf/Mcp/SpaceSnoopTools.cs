@@ -7,6 +7,10 @@ namespace SpaceSnoop.Wpf.Mcp;
 [McpServerToolType]
 public sealed class SpaceSnoopTools
 {
+    private SpaceSnoopTools()
+    {
+    }
+
     [McpServerTool(Name = "get_app_state")]
     [Description("Текущее состояние запущенного SpaceSnoop: версия, права, открытая страница, параметры страницы «Синхронизация» и счётчики последнего сравнения.")]
     public static string GetAppState(McpBridge bridge)

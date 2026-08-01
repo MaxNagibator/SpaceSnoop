@@ -3,7 +3,7 @@ using System.Diagnostics;
 
 namespace SpaceSnoop.Services;
 
-public class WorkerService : IDisposable
+public sealed class WorkerService : IDisposable
 {
     private readonly BackgroundWorker _backgroundWorker;
     private readonly DiskSpaceCalculator _diskSpaceCalculator;
@@ -104,5 +104,5 @@ public class WorkerService : IDisposable
 
     public record Response(DirectorySpace? DirectorySpace, TimeSpan Elapsed, string? Error);
 
-    private record Request(string Disk, bool IsMultithread, CancellationToken CancellationToken);
+    private sealed record Request(string Disk, bool IsMultithread, CancellationToken CancellationToken);
 }

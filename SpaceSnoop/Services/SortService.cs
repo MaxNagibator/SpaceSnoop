@@ -1,6 +1,6 @@
 ﻿namespace SpaceSnoop.Services;
 
-public class SortService : IDisposable
+public sealed class SortService : IDisposable
 {
     private ComboBox? _sortModeComboBox;
     private CheckBox? _invertSortCheckBox;

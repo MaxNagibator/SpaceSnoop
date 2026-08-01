@@ -324,60 +324,7 @@ public sealed class McpBridge(
             throw new McpException($"За один вызов можно пометить не больше {AppDefaults.McpEntryLimitMax} путей.");
         }
 
-        return Dispatch(() =>
-        {
-            if (!scan.HasResult)
-            {
-                throw new McpException("На странице «Сканирование» результата ещё нет. Запустите open_scan с scan=true.");
-            }
-
-            if (scan.IsScanning)
-            {
-                logger.McpToolRejected("mark_for_deletion", "страница занята операцией");
-                throw new McpException("Страница «Сканирование» сейчас занята другой операцией.");
-            }
-
-            List<SpaceBase> targets = [];
-            List<string> missing = [];
-            List<string> rejected = [];
-
-            foreach (var path in paths.Select(static path => path.Trim()).Where(static path => path.Length > 0))
-            {
-                if (scan.FindForAutomation(path) is not { } space)
-                {
-                    missing.Add(path);
-                    continue;
-                }
-
-                if (mark && scan.IsScanRoot(space))
-                {
-                    rejected.Add(path);
-                    continue;
-                }
-
-                targets.Add(space);
-            }
-
-            var changed = scan.MarkForAutomation(targets, mark);
-
-            if (changed > 0)
-            {
-                logger.McpMutationRequested("mark_for_deletion", $"{(mark ? "помечено" : "снято")} {changed}, всего помечено {scan.MarkedCount}");
-
-                notifier.Notify(mark
-                        ? $"Агент пометил на удаление: {changed} · всего {SizeFormatter.Format(scan.MarkedBytes())}"
-                        : $"Агент снял пометку удаления: {changed}",
-                    StatusSeverity.Warning);
-            }
-
-            return Serialize(new McpMarkResult(changed,
-                missing,
-                rejected,
-                rejected.Count == 0 ? null : "Корень открытого сканирования пометить целиком нельзя – выберите подкаталоги.",
-                scan.MarkedCount,
-                SizeFormatter.Format(scan.MarkedBytes()),
-                ReadScanState()));
-        });
+        return Dispatch(() => MarkOnScanPage(paths, mark));
     }
 
     public async Task<string> GetDockerUsageAsync(bool includeObjects, int entryLimit, CancellationToken cancellationToken)
@@ -412,84 +359,7 @@ public sealed class McpBridge(
     {
         logger.McpToolInvoked("open_sync", $"«{left ?? "как есть"}» → «{right ?? "как есть"}», режим {mode?.ToString() ?? "как есть"}, сравнение {compare}");
 
-        var comparison = Dispatch(() =>
-        {
-            if (sync.IsBusy)
-            {
-                logger.McpToolRejected("open_sync", "страница занята операцией");
-                throw new McpException("Страница «Синхронизация» сейчас занята другой операцией.");
-            }
-
-            var targetLeft = string.IsNullOrWhiteSpace(left) ? sync.LeftPath.Trim() : left.Trim();
-            var targetRight = string.IsNullOrWhiteSpace(right) ? sync.RightPath.Trim() : right.Trim();
-            var targetMode = mode ?? sync.CurrentMode;
-
-            if (compare)
-            {
-                Validate(targetLeft, targetRight, targetMode);
-            }
-
-            if (!string.Equals(sync.LeftPath, targetLeft, StringComparison.Ordinal))
-            {
-                sync.LeftPath = targetLeft;
-            }
-
-            if (!string.Equals(sync.RightPath, targetRight, StringComparison.Ordinal))
-            {
-                sync.RightPath = targetRight;
-            }
-
-            sync.SelectedModeIndex = SyncProfile.IndexOfMode(targetMode);
-
-            List<string> ignored = [];
-
-            if (winner is { } side)
-            {
-                if (preferences.AllowMutations)
-                {
-                    sync.SelectedWinnerIndex = SyncProfile.IndexOfWinner(side);
-                }
-                else
-                {
-                    ignored.Add("winner");
-                }
-            }
-
-            if (mirror is { } enabled)
-            {
-                if (preferences.AllowMutations)
-                {
-                    sync.Mirror = enabled;
-                }
-                else
-                {
-                    ignored.Add("mirror");
-                }
-            }
-
-            if (ignored.Count > 0)
-            {
-                logger.McpToolRejected("open_sync", $"параметры {string.Join(", ", ignored)} требуют разрешённых изменяющих операций");
-            }
-
-            if (exclusions is not null)
-            {
-                sync.Exclusions = exclusions.Trim();
-            }
-
-            var deferred = DeferOrNavigate(SectionKey.Sync);
-
-            notifier.Notify(compare
-                ? $"Агент запустил сравнение: {targetLeft} → {targetRight}"
-                : deferred
-                    ? "Агент подготовил страницу «Синхронизация»"
-                    : "Агент открыл страницу «Синхронизация»");
-
-            return (
-                Run: compare ? sync.CompareFromAutomationAsync(cancellationToken) : null,
-                Deferred: deferred,
-                Ignored: ignored);
-        });
+        var comparison = Dispatch(() => PrepareSyncNavigation(left, right, mode, winner, mirror, exclusions, compare, cancellationToken));
 
         if (comparison.Run is not null)
         {
@@ -755,6 +625,162 @@ public sealed class McpBridge(
                 : "Агент открыл страницу «Сканирование»");
 
         return (start ? scan.ScanFromAutomationAsync(target, cancellationToken) : null, deferred);
+    }
+
+    private string MarkOnScanPage(IReadOnlyList<string> paths, bool mark)
+    {
+        if (!scan.HasResult)
+        {
+            throw new McpException("На странице «Сканирование» результата ещё нет. Запустите open_scan с scan=true.");
+        }
+
+        if (scan.IsScanning)
+        {
+            logger.McpToolRejected("mark_for_deletion", "страница занята операцией");
+            throw new McpException("Страница «Сканирование» сейчас занята другой операцией.");
+        }
+
+        var (targets, missing, rejected) = CollectMarkTargets(paths, mark);
+        var changed = scan.MarkForAutomation(targets, mark);
+
+        if (changed > 0)
+        {
+            logger.McpMutationRequested("mark_for_deletion", $"{(mark ? "помечено" : "снято")} {changed}, всего помечено {scan.MarkedCount}");
+
+            notifier.Notify(mark
+                    ? $"Агент пометил на удаление: {changed} · всего {SizeFormatter.Format(scan.MarkedBytes())}"
+                    : $"Агент снял пометку удаления: {changed}",
+                StatusSeverity.Warning);
+        }
+
+        return Serialize(new McpMarkResult(changed,
+            missing,
+            rejected,
+            rejected.Count == 0 ? null : "Корень открытого сканирования пометить целиком нельзя – выберите подкаталоги.",
+            scan.MarkedCount,
+            SizeFormatter.Format(scan.MarkedBytes()),
+            ReadScanState()));
+    }
+
+    private (List<SpaceBase> Targets, List<string> Missing, List<string> Rejected) CollectMarkTargets(IReadOnlyList<string> paths, bool mark)
+    {
+        List<SpaceBase> targets = [];
+        List<string> missing = [];
+        List<string> rejected = [];
+
+        foreach (var path in paths.Select(static path => path.Trim()).Where(static path => path.Length > 0))
+        {
+            if (scan.FindForAutomation(path) is not { } space)
+            {
+                missing.Add(path);
+            }
+            else if (mark && scan.IsScanRoot(space))
+            {
+                rejected.Add(path);
+            }
+            else
+            {
+                targets.Add(space);
+            }
+        }
+
+        return (targets, missing, rejected);
+    }
+
+    private (Task? Run, bool Deferred, IReadOnlyList<string> Ignored) PrepareSyncNavigation(
+        string? left,
+        string? right,
+        SyncMode? mode,
+        SyncWinner? winner,
+        bool? mirror,
+        string? exclusions,
+        bool compare,
+        CancellationToken cancellationToken)
+    {
+        if (sync.IsBusy)
+        {
+            logger.McpToolRejected("open_sync", "страница занята операцией");
+            throw new McpException("Страница «Синхронизация» сейчас занята другой операцией.");
+        }
+
+        var targetLeft = string.IsNullOrWhiteSpace(left) ? sync.LeftPath.Trim() : left.Trim();
+        var targetRight = string.IsNullOrWhiteSpace(right) ? sync.RightPath.Trim() : right.Trim();
+        var targetMode = mode ?? sync.CurrentMode;
+
+        if (compare)
+        {
+            Validate(targetLeft, targetRight, targetMode);
+        }
+
+        ApplySyncPaths(targetLeft, targetRight, targetMode, exclusions);
+        var ignored = ApplyGuardedSyncParameters(winner, mirror);
+
+        var deferred = DeferOrNavigate(SectionKey.Sync);
+
+        notifier.Notify(compare
+            ? $"Агент запустил сравнение: {targetLeft} → {targetRight}"
+            : deferred
+                ? "Агент подготовил страницу «Синхронизация»"
+                : "Агент открыл страницу «Синхронизация»");
+
+        return (compare ? sync.CompareFromAutomationAsync(cancellationToken) : null, deferred, ignored);
+    }
+
+    private void ApplySyncPaths(string left, string right, SyncMode mode, string? exclusions)
+    {
+        if (!string.Equals(sync.LeftPath, left, StringComparison.Ordinal))
+        {
+            sync.LeftPath = left;
+        }
+
+        if (!string.Equals(sync.RightPath, right, StringComparison.Ordinal))
+        {
+            sync.RightPath = right;
+        }
+
+        sync.SelectedModeIndex = SyncProfile.IndexOfMode(mode);
+
+        if (exclusions is not null)
+        {
+            sync.Exclusions = exclusions.Trim();
+        }
+    }
+
+    private IReadOnlyList<string> ApplyGuardedSyncParameters(SyncWinner? winner, bool? mirror)
+    {
+        List<string> ignored = [];
+        var allowed = preferences.AllowMutations;
+
+        if (winner is { } side)
+        {
+            if (allowed)
+            {
+                sync.SelectedWinnerIndex = SyncProfile.IndexOfWinner(side);
+            }
+            else
+            {
+                ignored.Add("winner");
+            }
+        }
+
+        if (mirror is { } enabled)
+        {
+            if (allowed)
+            {
+                sync.Mirror = enabled;
+            }
+            else
+            {
+                ignored.Add("mirror");
+            }
+        }
+
+        if (ignored.Count > 0)
+        {
+            logger.McpToolRejected("open_sync", $"параметры {string.Join(", ", ignored)} требуют разрешённых изменяющих операций");
+        }
+
+        return ignored;
     }
 
     private string BuildArchivePlan(string path, bool deleteOriginal)

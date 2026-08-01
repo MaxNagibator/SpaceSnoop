@@ -57,7 +57,7 @@ public partial class App : Application
 
             ViewLocator.InstallIntoApplication();
 
-            Log.Information(AppInfo.SessionStartMarker + "...");
+            Log.Information("{Marker}...", AppInfo.SessionStartMarker);
 
             if (TryRestartAsAdministrator(settings))
             {

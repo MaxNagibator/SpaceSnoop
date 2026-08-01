@@ -83,7 +83,10 @@ public sealed partial class DeleteProgressDialogViewModel : ObservableObject, ID
 
     public async Task StopAsync()
     {
-        _cts?.Cancel();
+        if (_cts is { } cts)
+        {
+            await cts.CancelAsync();
+        }
 
         if (StartCommand.ExecutionTask is not { } run)
         {

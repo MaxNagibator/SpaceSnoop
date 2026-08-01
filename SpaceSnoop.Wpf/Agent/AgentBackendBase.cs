@@ -49,6 +49,17 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
 
     public void Dispose()
     {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!disposing)
+        {
+            return;
+        }
+
         Process[] live;
 
         lock (_live)
@@ -61,8 +72,6 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
         {
             TryKill(process);
         }
-
-        GC.SuppressFinalize(this);
     }
 
     public AgentCliInfo? Detect()

@@ -7,12 +7,11 @@ on:
     branches:
       - master
 
-permissions:
-  contents: write
-
 jobs:
   prepare:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       version: ${{ steps.version.outputs.VERSION }}
       should_release: ${{ steps.decide.outputs.should_release }}
@@ -48,6 +47,8 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.should_release == 'true'
     runs-on: windows-2022
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -120,6 +121,8 @@ jobs:
     needs: [ prepare, build ]
     if: needs.prepare.outputs.should_release == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
@@ -137,7 +140,7 @@ jobs:
         shell: bash
         run: |
           cd dist
-          sha256sum *.exe *.zip > SHA256SUMS.txt
+          sha256sum -- *.exe *.zip > SHA256SUMS.txt
 
       - name: Render release body
         shell: bash
@@ -160,7 +163,7 @@ jobs:
           } > release-body.rendered.md
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           tag_name: v${{ needs.prepare.outputs.version }}
           name: SpaceSnoop v${{ needs.prepare.outputs.version }}

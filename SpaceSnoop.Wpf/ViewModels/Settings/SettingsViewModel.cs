@@ -173,7 +173,11 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         {
             if (value != AppStorage.UseAppData)
             {
-                ChangeStorageLocation(value);
+                _ = ChangeStorageLocationAsync(value)
+                    .ContinueWith(task => _logger.StorageLocationChangeFailed(task.Exception!, AppStorage.DirectoryFor(value)),
+                        CancellationToken.None,
+                        TaskContinuationOptions.OnlyOnFaulted,
+                        TaskScheduler.Default);
             }
 
             OnPropertyChanged();
@@ -318,7 +322,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         }
     }
 
-    private async void ChangeStorageLocation(bool useAppData)
+    private async Task ChangeStorageLocationAsync(bool useAppData)
     {
         var source = AppStorage.DataDirectory;
         var destination = AppStorage.DirectoryFor(useAppData);

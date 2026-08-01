@@ -578,11 +578,9 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         }
     }
 
-    private DriveItem AddDrive(string path)
+    private void AddDrive(string path)
     {
-        var item = new DriveItem(path);
-        Drives.Add(item);
-        return item;
+        Drives.Add(new(path));
     }
 
     private bool HasDrive(string path)
