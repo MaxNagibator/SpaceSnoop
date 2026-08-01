@@ -114,6 +114,12 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     private string _scanThroughputText = "–";
 
     [ObservableProperty]
+    private string _scanRemainingText = string.Empty;
+
+    [ObservableProperty]
+    private bool _scanHasRemaining;
+
+    [ObservableProperty]
     private string _scanTopLevelText = string.Empty;
 
     [ObservableProperty]
@@ -967,6 +973,8 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         ScanBytesText = SizeFormatter.Format(0);
         ScanElapsedText = FormatElapsed(TimeSpan.Zero);
         ScanThroughputText = "–";
+        ScanRemainingText = string.Empty;
+        ScanHasRemaining = false;
         ScanTopLevelText = string.Empty;
         ScanPercentText = string.Empty;
         ScanHasBranches = false;
@@ -992,15 +1000,6 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         ScanBytesText = SizeFormatter.Format(snapshot.BytesScanned);
         ScanElapsedText = FormatElapsed(elapsed);
 
-        var seconds = elapsed.TotalSeconds;
-
-        if (seconds > 0.25 && snapshot.FilesScanned > 0)
-        {
-            var filesPerSecond = snapshot.FilesScanned / seconds;
-            var bytesPerSecond = (long)(snapshot.BytesScanned / seconds);
-            ScanThroughputText = $"{filesPerSecond:N0} файл/с · {SizeFormatter.Format(bytesPerSecond)}/с";
-        }
-
         ScanHasBranches = snapshot.TopLevelTotal > 0;
         ScanTopLevelText = ScanHasBranches
             ? $"{snapshot.TopLevelCompleted:N0} / {snapshot.TopLevelTotal:N0}"
@@ -1014,11 +1013,18 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         ScanHasDeterminateProgress = fraction.HasValue;
         ScanPercentText = fraction.HasValue ? $"{fraction.Value * 100:F0} %" : string.Empty;
 
-        _performance.ReportOperation(new("Сканирование",
+        var operation = new PerformanceOperation("Сканирование",
             snapshot.FilesScanned,
             snapshot.BytesScanned,
             elapsed,
-            TotalBytes: _estimatedTotalBytes));
+            TotalBytes: _estimatedTotalBytes,
+            Basis: EtaBasis.Bytes);
+
+        ScanThroughputText = PerformanceFormat.Rate(operation) ?? "–";
+        ScanRemainingText = PerformanceFormat.Remaining(operation) ?? string.Empty;
+        ScanHasRemaining = ScanRemainingText.Length > 0;
+
+        _performance.ReportOperation(operation);
 
         OnPropertyChanged(nameof(IsIndeterminate));
         OnPropertyChanged(nameof(ProgressValue));

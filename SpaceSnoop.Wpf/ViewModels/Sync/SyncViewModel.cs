@@ -124,6 +124,15 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private string? _progressDetail;
 
     [ObservableProperty]
+    private string _progressRateText = string.Empty;
+
+    [ObservableProperty]
+    private string _progressRemainingText = string.Empty;
+
+    [ObservableProperty]
+    private bool _hasProgressRate;
+
+    [ObservableProperty]
     private string _summaryText = "Сравнение не выполнялось.";
 
     [ObservableProperty]
@@ -2235,6 +2244,11 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(external);
         var token = _cts.Token;
+
+        ProgressRateText = string.Empty;
+        ProgressRemainingText = string.Empty;
+        HasProgressRate = false;
+
         IsBusy = true;
 
         var operation = caption.TrimEnd(' ', ':');
@@ -2282,12 +2296,22 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             StatusCaption = head;
             ProgressDetail = head + tail;
 
-            _performance.ReportOperation(new(operation,
+            // TODO: остаток стоит на одном большом файле – SyncEngine докладывает прогресс только после
+            // копирования файла целиком; заменить на потоковое копирование вместо File.Copy, если
+            // синхронизация крупных файлов станет обычным сценарием.
+            var measured = new PerformanceOperation(operation,
                 update.Completed,
                 update.Bytes,
                 stopwatch.Elapsed,
                 determinate ? total : null,
-                totalBytes > 0 ? totalBytes : null));
+                totalBytes > 0 ? totalBytes : null,
+                totalBytes > 0 ? EtaBasis.Bytes : EtaBasis.Items);
+
+            ProgressRateText = PerformanceFormat.Rate(measured) ?? string.Empty;
+            ProgressRemainingText = PerformanceFormat.Remaining(measured) ?? string.Empty;
+            HasProgressRate = ProgressRateText.Length > 0 || ProgressRemainingText.Length > 0;
+
+            _performance.ReportOperation(measured);
         });
 
         try

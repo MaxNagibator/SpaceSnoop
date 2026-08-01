@@ -40,16 +40,11 @@ public static class PerformanceFormat
             return null;
         }
 
-        var parts = new List<string>(4) { operation.Name };
+        var parts = new List<string>(3) { operation.Name };
 
-        if (operation.ItemsPerSecond is { } items)
+        if (Rate(operation) is { } rate)
         {
-            parts.Add($"{items:N0} шт/с");
-        }
-
-        if (operation.BytesPerSecond is { } bytes)
-        {
-            parts.Add($"{SizeFormatter.Format((long)bytes)}/с");
+            parts.Add(rate);
         }
 
         if (operation.Remaining() is { } remaining)
@@ -58,6 +53,33 @@ public static class PerformanceFormat
         }
 
         return string.Join(" · ", parts);
+    }
+
+    public static string? Rate(PerformanceOperation? operation)
+    {
+        if (operation is null)
+        {
+            return null;
+        }
+
+        var parts = new List<string>(2);
+
+        if (operation.ItemsPerSecond is { } items)
+        {
+            parts.Add($"{items:N0} файл/с");
+        }
+
+        if (operation.BytesPerSecond is { } bytes)
+        {
+            parts.Add($"{SizeFormatter.Format((long)bytes)}/с");
+        }
+
+        return parts.Count > 0 ? string.Join(" · ", parts) : null;
+    }
+
+    public static string? Remaining(PerformanceOperation? operation)
+    {
+        return operation?.Remaining() is { } remaining ? $"≈ {Duration(remaining)}" : null;
     }
 
     public static string Duration(TimeSpan value)

@@ -89,46 +89,70 @@
                            Visibility="{Binding ScanHasDeterminateProgress, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
             </Grid>
 
-            <StackPanel Orientation="Horizontal"
-                        Margin="0,11,0,0"
-                        VerticalAlignment="Center">
-                <TextBlock Text="Каталогов"
-                           Style="{StaticResource Caption}"
-                           Margin="0,0,7,0" />
-                <TextBlock Text="{Binding ScanDirCountText}"
-                           Style="{StaticResource StatValue}"
-                           Margin="0,0,18,0" />
+            <WrapPanel Margin="0,7,0,0">
+                <WrapPanel.Resources>
+                    <Style x:Key="Metric"
+                           TargetType="StackPanel">
+                        <Setter Property="Orientation"
+                                Value="Horizontal" />
+                        <Setter Property="Margin"
+                                Value="0,4,18,0" />
+                    </Style>
+                </WrapPanel.Resources>
 
-                <TextBlock Text="Файлов"
-                           Style="{StaticResource Caption}"
-                           Margin="0,0,7,0" />
-                <TextBlock Text="{Binding ScanFileCountText}"
-                           Style="{StaticResource StatValue}"
-                           Margin="0,0,18,0" />
+                <StackPanel Style="{StaticResource Metric}">
+                    <TextBlock Text="Каталогов"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ScanDirCountText}"
+                               Style="{StaticResource StatValue}" />
+                </StackPanel>
 
-                <TextBlock Text="Объём"
-                           Style="{StaticResource Caption}"
-                           Margin="0,0,7,0" />
-                <TextBlock Text="{Binding ScanBytesText}"
-                           Style="{StaticResource StatValue}"
-                           Foreground="{DynamicResource Accent.Primary}"
-                           Margin="0,0,18,0" />
+                <StackPanel Style="{StaticResource Metric}">
+                    <TextBlock Text="Файлов"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ScanFileCountText}"
+                               Style="{StaticResource StatValue}" />
+                </StackPanel>
 
-                <TextBlock Text="Скорость"
-                           Style="{StaticResource Caption}"
-                           Margin="0,0,7,0" />
-                <TextBlock Text="{Binding ScanThroughputText}"
-                           Style="{StaticResource StatValue}"
-                           Margin="0,0,18,0" />
+                <StackPanel Style="{StaticResource Metric}">
+                    <TextBlock Text="Объём"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ScanBytesText}"
+                               Style="{StaticResource StatValue}"
+                               Foreground="{DynamicResource Accent.Primary}" />
+                </StackPanel>
 
-                <TextBlock Text="Ветки"
-                           Style="{StaticResource Caption}"
-                           Margin="0,0,7,0"
-                           Visibility="{Binding ScanHasBranches, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
-                <TextBlock Text="{Binding ScanTopLevelText}"
-                           Style="{StaticResource StatValue}"
-                           Visibility="{Binding ScanHasBranches, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
-            </StackPanel>
+                <StackPanel Style="{StaticResource Metric}">
+                    <TextBlock Text="Скорость"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ScanThroughputText}"
+                               Style="{StaticResource StatValue}" />
+                </StackPanel>
+
+                <StackPanel Style="{StaticResource Metric}"
+                            Visibility="{Binding ScanHasRemaining, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                    <TextBlock Text="Осталось"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ScanRemainingText}"
+                               Style="{StaticResource StatValue}"
+                               Foreground="{DynamicResource Accent.Primary}"
+                               ToolTip="Оценка по средней скорости от начала сканирования" />
+                </StackPanel>
+
+                <StackPanel Style="{StaticResource Metric}"
+                            Visibility="{Binding ScanHasBranches, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                    <TextBlock Text="Ветки"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ScanTopLevelText}"
+                               Style="{StaticResource StatValue}" />
+                </StackPanel>
+            </WrapPanel>
         </StackPanel>
     </Border>
 </UserControl>

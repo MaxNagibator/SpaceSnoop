@@ -59,6 +59,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
                 <iconPacks:PackIconLucide Grid.Column="0"
@@ -72,7 +73,36 @@
                            Text="{Binding ProgressDetail}"
                            Style="{StaticResource TextBlock.Subtle}"
                            VerticalAlignment="Center"
-                           TextTrimming="CharacterEllipsis" />
+                           TextTrimming="CharacterEllipsis"
+                           ToolTip="{Binding ProgressDetail}" />
+
+                <StackPanel Grid.Column="2"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="14,0,0,0"
+                            Visibility="{Binding HasProgressRate, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                    <TextBlock Text="{Binding ProgressRateText}"
+                               Style="{StaticResource StatValue}" />
+                    <TextBlock Text="{Binding ProgressRemainingText}"
+                               ToolTip="Оценка по средней скорости от начала операции">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock"
+                                   BasedOn="{StaticResource StatValue}">
+                                <Setter Property="Margin"
+                                        Value="12,0,0,0" />
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource Accent.Primary}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ProgressRemainingText}"
+                                                 Value="">
+                                        <Setter Property="Visibility"
+                                                Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
             </Grid>
 
             <Grid Grid.Row="1">

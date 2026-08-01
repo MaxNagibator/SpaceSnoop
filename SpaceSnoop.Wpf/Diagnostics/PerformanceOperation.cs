@@ -6,7 +6,8 @@ public sealed record PerformanceOperation(
     long Bytes,
     TimeSpan Elapsed,
     long? TotalItems = null,
-    long? TotalBytes = null)
+    long? TotalBytes = null,
+    EtaBasis Basis = EtaBasis.None)
 {
     public double? ItemsPerSecond => Rate(Items);
 
@@ -14,7 +15,12 @@ public sealed record PerformanceOperation(
 
     public TimeSpan? Remaining()
     {
-        return Estimate(TotalItems, Items, ItemsPerSecond) ?? Estimate(TotalBytes, Bytes, BytesPerSecond);
+        return Basis switch
+        {
+            EtaBasis.Items => Estimate(TotalItems, Items, ItemsPerSecond),
+            EtaBasis.Bytes => Estimate(TotalBytes, Bytes, BytesPerSecond),
+            _ => Estimate(TotalItems, Items, ItemsPerSecond) ?? Estimate(TotalBytes, Bytes, BytesPerSecond),
+        };
     }
 
     private static TimeSpan? Estimate(long? total, long done, double? perSecond)

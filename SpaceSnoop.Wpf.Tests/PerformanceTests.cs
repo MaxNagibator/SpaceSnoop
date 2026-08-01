@@ -106,6 +106,37 @@ public class PerformanceTests
     }
 
     [Test]
+    public void Основа_байтов_меряет_остаток_объёмом_а_не_штуками()
+    {
+        var operation = new PerformanceOperation("Синхронизация", 1000, 1_000_000, TimeSpan.FromSeconds(10),
+            TotalItems: 1001,
+            TotalBytes: 11_000_000,
+            Basis: EtaBasis.Bytes);
+
+        Assert.That(operation.Remaining(), Is.EqualTo(TimeSpan.FromSeconds(100)));
+    }
+
+    [Test]
+    public void Без_явной_основы_тысяча_мелких_файлов_прячет_один_огромный()
+    {
+        var operation = new PerformanceOperation("Синхронизация", 1000, 1_000_000, TimeSpan.FromSeconds(10),
+            TotalItems: 1001,
+            TotalBytes: 11_000_000);
+
+        Assert.That(operation.Remaining(), Is.EqualTo(TimeSpan.FromSeconds(0.01)));
+    }
+
+    [Test]
+    public void Основа_штук_не_падает_на_байты()
+    {
+        var operation = new PerformanceOperation("Сравнение", 100, 1_000_000, TimeSpan.FromSeconds(10),
+            TotalBytes: 11_000_000,
+            Basis: EtaBasis.Items);
+
+        Assert.That(operation.Remaining(), Is.Null);
+    }
+
+    [Test]
     public void Перебор_итога_не_даёт_отрицательного_остатка()
     {
         var operation = new PerformanceOperation("Синхронизация", 400, 0, TimeSpan.FromSeconds(10), TotalItems: 300);
@@ -124,7 +155,44 @@ public class PerformanceTests
     [Test]
     public void Отсутствие_операции_не_даёт_строки()
     {
-        Assert.That(PerformanceFormat.Operation(null), Is.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(PerformanceFormat.Operation(null), Is.Null);
+            Assert.That(PerformanceFormat.Rate(null), Is.Null);
+            Assert.That(PerformanceFormat.Remaining(null), Is.Null);
+        });
+    }
+
+    [Test]
+    public void Строка_скорости_идёт_без_имени_операции()
+    {
+        var operation = new PerformanceOperation("Синхронизация", 100, 2048, TimeSpan.FromSeconds(2));
+
+        Assert.That(PerformanceFormat.Rate(operation), Is.EqualTo($"50 файл/с · {SizeFormatter.Format(1024)}/с"));
+    }
+
+    [Test]
+    public void Слишком_короткий_замер_не_даёт_строки_скорости()
+    {
+        var operation = new PerformanceOperation("Сравнение", 5, 500, TimeSpan.FromMilliseconds(50));
+
+        Assert.That(PerformanceFormat.Rate(operation), Is.Null);
+    }
+
+    [Test]
+    public void Остаток_подаётся_приблизительным()
+    {
+        var operation = new PerformanceOperation("Синхронизация", 100, 0, TimeSpan.FromSeconds(10), TotalItems: 300);
+
+        Assert.That(PerformanceFormat.Remaining(operation), Is.EqualTo("≈ 0:20"));
+    }
+
+    [Test]
+    public void Неизвестный_остаток_не_даёт_строки()
+    {
+        var operation = new PerformanceOperation("Сканирование", 100, 2048, TimeSpan.FromSeconds(10));
+
+        Assert.That(PerformanceFormat.Remaining(operation), Is.Null);
     }
 
     [Test]
@@ -137,7 +205,7 @@ public class PerformanceTests
         Assert.Multiple(() =>
         {
             Assert.That(text, Does.StartWith("Синхронизация · "));
-            Assert.That(text, Does.Contain("шт/с"));
+            Assert.That(text, Does.Contain("файл/с"));
             Assert.That(text, Does.Contain("/с"));
             Assert.That(text, Does.Contain("осталось 0:20"));
         });
@@ -165,7 +233,7 @@ public class PerformanceTests
         var operation = new PerformanceOperation("Сканирование", 1000, 0, TimeSpan.FromSeconds(2));
         var snapshot = PerformanceSnapshot.Empty with { UiDelayMs = 3, ManagedBytes = 2048, Operation = operation };
 
-        Assert.That(PerformanceFormat.Summary(snapshot), Does.EndWith("Сканирование · 500 шт/с"));
+        Assert.That(PerformanceFormat.Summary(snapshot), Does.EndWith("Сканирование · 500 файл/с"));
     }
 
     [TestCase(0, 0, "0:00")]
