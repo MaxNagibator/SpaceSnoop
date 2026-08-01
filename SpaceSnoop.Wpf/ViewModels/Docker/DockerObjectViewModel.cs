@@ -11,7 +11,7 @@ public sealed partial class DockerObjectViewModel(DockerObject model) : Observab
 
     public string Name => model.Name;
 
-    public string Size => model.Size;
+    public string Size => SizeFormatter.Format(model.SizeBytes);
 
     public string Detail => model.Detail;
 

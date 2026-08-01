@@ -89,21 +89,21 @@
                                     <ColumnDefinition Width="140" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0"
-                                           Text="{Binding Type}"
+                                           Text="{Binding Title}"
                                            Foreground="{DynamicResource Fg.Primary}"
                                            VerticalAlignment="Center" />
                                 <TextBlock Grid.Column="1"
-                                           Text="{Binding TotalCount}"
+                                           Text="{Binding Count}"
                                            Style="{StaticResource TextBlock.Mono}"
                                            TextAlignment="Right"
                                            VerticalAlignment="Center" />
                                 <TextBlock Grid.Column="2"
-                                           Text="{Binding Size}"
+                                           Text="{Binding SizeText}"
                                            Style="{StaticResource TextBlock.Mono}"
                                            TextAlignment="Right"
                                            VerticalAlignment="Center" />
                                 <TextBlock Grid.Column="3"
-                                           Text="{Binding Reclaimable}"
+                                           Text="{Binding ReclaimText}"
                                            Style="{StaticResource TextBlock.Mono}"
                                            Foreground="{DynamicResource Accent.Primary}"
                                            TextAlignment="Right"

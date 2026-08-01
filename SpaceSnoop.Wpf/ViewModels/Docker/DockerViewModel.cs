@@ -34,7 +34,7 @@ public sealed partial class DockerViewModel(
     [ObservableProperty]
     private bool _pruneAllVolumes;
 
-    public ObservableCollection<DockerUsage> Buckets { get; } = [];
+    public ObservableCollection<DockerBucketViewModel> Buckets { get; } = [];
 
     public ObservableCollection<DockerGroupViewModel> Groups { get; } = [];
 
@@ -101,7 +101,7 @@ public sealed partial class DockerViewModel(
             {
                 foreach (var bucket in snapshot.Buckets)
                 {
-                    Buckets.Add(bucket);
+                    Buckets.Add(new(bucket));
                 }
 
                 await LoadObjectsAsync();
@@ -212,7 +212,7 @@ public sealed partial class DockerViewModel(
             Buckets.Clear();
             foreach (var bucket in snapshot.Buckets)
             {
-                Buckets.Add(bucket);
+                Buckets.Add(new(bucket));
             }
         }
         catch (Exception ex)

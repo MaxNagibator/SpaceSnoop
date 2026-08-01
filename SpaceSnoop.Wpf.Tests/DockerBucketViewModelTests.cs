@@ -1,0 +1,61 @@
+﻿using SpaceSnoop.Core.Docker;
+using SpaceSnoop.Wpf.ViewModels.Docker;
+using System.Globalization;
+
+namespace SpaceSnoop.Wpf.Tests;
+
+public sealed class DockerBucketViewModelTests
+{
+    private CultureInfo _culture = CultureInfo.CurrentCulture;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _culture = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = new("ru-RU");
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        CultureInfo.CurrentCulture = _culture;
+    }
+
+    [Test]
+    public void Категория_и_размеры_переводятся_в_формат_приложения()
+    {
+        var bucket = new DockerBucketViewModel(new("Images", 4, 1, "2.987GB", "16.14MB (0%)"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(bucket.Title, Is.EqualTo("Образы"));
+            Assert.That(bucket.Count, Is.EqualTo(4));
+            Assert.That(bucket.SizeText, Is.EqualTo("2,8 ГБ"));
+            Assert.That(bucket.ReclaimText, Is.EqualTo("15,4 МБ (0,5 %)"));
+        }
+    }
+
+    [Test]
+    public void Нечего_возвращать_показывается_нулём_без_доли()
+    {
+        var bucket = new DockerBucketViewModel(new("Local Volumes", 2, 2, "224.4MB", "0B (0%)"));
+
+        Assert.That(bucket.ReclaimText, Is.EqualTo("0 байт"));
+    }
+
+    [Test]
+    public void Возврат_всего_объёма_даёт_сто_процентов()
+    {
+        var bucket = new DockerBucketViewModel(new("Containers", 3, 0, "2.942MB", "2.942MB (100%)"));
+
+        Assert.That(bucket.ReclaimText, Is.EqualTo("2,8 МБ (100 %)"));
+    }
+
+    [TestCase("16.14MB (0%)", "16.14MB")]
+    [TestCase("17.77GB", "17.77GB")]
+    [TestCase("  0B (0%) ", "0B")]
+    public void Доля_в_скобках_отрезается_перед_разбором(string reclaimable, string expected)
+    {
+        Assert.That(DockerBucketViewModel.SizePart(reclaimable), Is.EqualTo(expected));
+    }
+}
