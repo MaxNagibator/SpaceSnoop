@@ -1,4 +1,5 @@
-﻿using SpaceSnoop.Wpf.Diagnostics;
+﻿using Microsoft.Extensions.Logging.Abstractions;
+using SpaceSnoop.Wpf.Diagnostics;
 using System.Diagnostics;
 
 namespace SpaceSnoop.Wpf.Tests;
@@ -193,6 +194,18 @@ public class PerformanceHistoryTests
         samples.Add(1000);
 
         Assert.That(samples.SpanSeconds(500), Is.EqualTo(2.5).Within(0.001));
+    }
+
+    [Test]
+    public void Время_старта_переживает_первую_публикацию_снимка()
+    {
+        using var monitor = new PerformanceMonitor(NullLogger<PerformanceMonitor>.Instance);
+
+        monitor.ReportStartup(TimeSpan.FromSeconds(1.25));
+        monitor.Start();
+        monitor.Stop();
+
+        Assert.That(monitor.Snapshot.StartupSeconds, Is.EqualTo(1.25));
     }
 
     private static PerformanceSample Sample(long now, double agoSeconds, string operation, int gen0 = 0)

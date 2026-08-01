@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using SpaceSnoop.Wpf.Views;
+using System.Diagnostics;
 using System.IO;
 
 namespace SpaceSnoop.Wpf;
@@ -13,6 +14,8 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        var startedAt = Stopwatch.GetTimestamp();
+
         base.OnStartup(e);
 
         _logging = KeepShellLogging.Bootstrap(new()
@@ -81,9 +84,12 @@ public partial class App : Application
                 ShutdownMode = ShutdownMode.OnMainWindowClose;
             }
 
+            var monitor = _services.GetRequiredService<PerformanceMonitor>();
+            monitor.ReportStartup(Stopwatch.GetElapsedTime(startedAt));
+
             _services.GetRequiredService<McpBridge>().Attach(_services.GetRequiredService<ShellViewModel>());
             _services.GetRequiredService<McpServerHost>().Apply();
-            _services.GetRequiredService<PerformanceMonitor>().Start();
+            monitor.Start();
 
             _ = Task.Run(() => ScheduleReconciler.Reconcile(settings, _logging.CreateLogger<ScheduleViewModel>()));
 

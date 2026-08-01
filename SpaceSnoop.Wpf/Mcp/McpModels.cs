@@ -39,6 +39,7 @@ internal sealed record McpPerformance(
     int Gen0Collections,
     int Gen1Collections,
     int Gen2Collections,
+    double StartupSeconds,
     McpPerformanceOperation? Operation,
     McpPerformanceHistory? History);
 

@@ -23,6 +23,8 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
 
     private PerformanceOperation? _operation;
 
+    private TimeSpan _startup;
+
     private PerformanceSnapshot _snapshot = PerformanceSnapshot.Empty;
 
     private volatile bool _running;
@@ -66,6 +68,11 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
     {
         _running = false;
         _timer?.Stop();
+    }
+
+    public void ReportStartup(TimeSpan elapsed)
+    {
+        _startup = elapsed;
     }
 
     public void ReportOperation(PerformanceOperation? operation)
@@ -153,6 +160,7 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
             sample.Gen0Collections,
             sample.Gen1Collections,
             sample.Gen2Collections,
+            _startup.TotalSeconds,
             operation));
 
         return sample;
