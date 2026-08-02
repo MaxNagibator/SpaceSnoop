@@ -2,12 +2,10 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Scan"
-             xmlns:bootstrap="clr-namespace:SpaceSnoop.Wpf.Bootstrap"
-             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
-             d:DataContext="{d:DesignInstance vm:ScanViewModel}"
+             d:DataContext="{d:DesignInstance vm:ScanSummaryViewModel}"
              d:DesignWidth="980">
     <UserControl.Resources>
         <Style x:Key="SummaryStrip"
@@ -62,7 +60,6 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="4" />
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
             <Border Grid.Column="0"
@@ -124,42 +121,6 @@
                                ToolTip="Средняя скорость обхода за время сканирования" />
                 </StackPanel>
             </WrapPanel>
-
-            <StackPanel Grid.Column="2"
-                        Orientation="Horizontal"
-                        VerticalAlignment="Center"
-                        Margin="20,0,14,0">
-                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Flame}"
-                                          Width="13"
-                                          Height="13"
-                                          VerticalAlignment="Center"
-                                          Margin="0,0,7,0"
-                                          Foreground="{DynamicResource Accent.Primary}" />
-                <TextBlock Text="Подсветка"
-                           Style="{StaticResource Caption}"
-                           Margin="0,0,9,0" />
-                <Border Width="60"
-                        Height="8"
-                        VerticalAlignment="Center"
-                        CornerRadius="{DynamicResource Radius.Pill}"
-                        Background="{StaticResource HeatSpectrum}" />
-                <Slider Width="116"
-                        Minimum="{x:Static bootstrap:AppDefaults.IntensityMin}"
-                        Maximum="{x:Static bootstrap:AppDefaults.IntensityMax}"
-                        Value="{Binding Intensity}"
-                        TickFrequency="1"
-                        IsSnapToTickEnabled="True"
-                        VerticalAlignment="Center"
-                        Margin="9,0,9,0"
-                        ToolTip="Чувствительность тепловой подсветки" />
-                <TextBlock Text="{Binding Intensity, StringFormat=0}"
-                           FontSize="{DynamicResource Font.Size.M}"
-                           FontWeight="Medium"
-                           Foreground="{DynamicResource Accent.Primary}"
-                           VerticalAlignment="Center"
-                           MinWidth="18"
-                           TextAlignment="Right" />
-            </StackPanel>
         </Grid>
     </Border>
 </UserControl>

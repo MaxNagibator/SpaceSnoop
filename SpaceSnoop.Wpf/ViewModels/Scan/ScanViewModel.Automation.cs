@@ -4,6 +4,16 @@ namespace SpaceSnoop.Wpf.ViewModels.Scan;
 
 public sealed partial class ScanViewModel : IScanAutomation
 {
+    string IScanAutomation.ResultPath => Summary.ResultPath;
+
+    string IScanAutomation.ResultSizeText => Summary.ResultSizeText;
+
+    string IScanAutomation.ResultFileCountText => Summary.ResultFileCountText;
+
+    string IScanAutomation.ResultDirCountText => Summary.ResultDirCountText;
+
+    string IScanAutomation.ResultRateText => Summary.ResultRateText;
+
     TimeSpan IScanAutomation.LastScanElapsed => LastScanElapsed;
 
     long IScanAutomation.MarkedBytes()

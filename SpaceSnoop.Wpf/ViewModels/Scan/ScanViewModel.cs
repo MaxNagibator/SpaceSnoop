@@ -58,24 +58,6 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     private bool _showTreemap = AppDefaults.ScanTreemapDefault;
 
     [ObservableProperty]
-    private string _resultPath = string.Empty;
-
-    [ObservableProperty]
-    private string _resultSizeText = "–";
-
-    [ObservableProperty]
-    private string _resultFileCountText = "–";
-
-    [ObservableProperty]
-    private string _resultDirCountText = "–";
-
-    [ObservableProperty]
-    private string _resultElapsedText = "–";
-
-    [ObservableProperty]
-    private string _resultRateText = "–";
-
-    [ObservableProperty]
     private ScanNodeViewModel? _selectedNode;
 
     [ObservableProperty]
@@ -119,6 +101,8 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         Progress = new(performance);
         Progress.PropertyChanged += OnProgressPropertyChanged;
 
+        Summary = new();
+
         Treemap = new(Roots);
         Treemap.DrilledInto += OnTreemapDrilledInto;
 
@@ -142,6 +126,8 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     public ObservableCollection<ScanNodeViewModel> Roots { get; } = [];
 
     public ScanProgressViewModel Progress { get; }
+
+    public ScanSummaryViewModel Summary { get; }
 
     public ScanTreemapViewModel Treemap { get; }
 
@@ -231,13 +217,8 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         Roots.Insert(0, node);
         Treemap.SetRoot(node);
 
-        ResultPath = result.AbsolutePath;
-        ResultSizeText = result.TotalSizeText;
-        ResultFileCountText = result.TotalFileCount.ToString("N0");
-        ResultDirCountText = result.TotalDirectoryCount.ToString("N0");
         LastScanElapsed = elapsed;
-        ResultElapsedText = ScanProgressViewModel.FormatElapsed(elapsed);
-        ResultRateText = PerformanceFormat.Rate(new("Сканирование", result.TotalFileCount, result.Size, elapsed)) ?? "–";
+        Summary.Apply(result, elapsed);
         HasResult = true;
         RecountMarked();
 
@@ -535,6 +516,12 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     partial void OnIsScanningChanged(bool value)
     {
         Progress.IsScanning = value;
+        Summary.IsScanning = value;
+    }
+
+    partial void OnHasResultChanged(bool value)
+    {
+        Summary.HasResult = value;
     }
 
     partial void OnSelectedDriveChanged(string value)
@@ -832,15 +819,13 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         }
 
         var resultRoot = Roots.FirstOrDefault(r =>
-            string.Equals(NormalizePath(r.AbsolutePath), NormalizePath(ResultPath), StringComparison.OrdinalIgnoreCase));
+            string.Equals(NormalizePath(r.AbsolutePath), NormalizePath(Summary.ResultPath), StringComparison.OrdinalIgnoreCase));
 
         if (resultRoot?.Space is DirectorySpace resultDir)
         {
-            ResultSizeText = resultDir.TotalSizeText;
-            ResultFileCountText = resultDir.TotalFileCount.ToString("N0");
-            ResultDirCountText = resultDir.TotalDirectoryCount.ToString("N0");
+            Summary.Refresh(resultDir);
         }
-        else if (rootsToRemove.Any(r => string.Equals(NormalizePath(r.AbsolutePath), NormalizePath(ResultPath), StringComparison.OrdinalIgnoreCase)))
+        else if (rootsToRemove.Any(r => string.Equals(NormalizePath(r.AbsolutePath), NormalizePath(Summary.ResultPath), StringComparison.OrdinalIgnoreCase)))
         {
             HasResult = false;
         }

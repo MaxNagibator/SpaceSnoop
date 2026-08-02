@@ -49,7 +49,8 @@
             </StackPanel>
         </Border>
 
-        <controls:ScanSummaryStrip Grid.Row="3" />
+        <controls:ScanSummaryStrip Grid.Row="3"
+                                   DataContext="{Binding Summary}" />
 
         <Grid Grid.Row="4">
             <Grid.ColumnDefinitions>

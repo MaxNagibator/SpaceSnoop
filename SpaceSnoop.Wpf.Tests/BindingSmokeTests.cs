@@ -2,11 +2,13 @@
 using Microsoft.Extensions.DependencyInjection;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.ViewModels;
+using SpaceSnoop.Wpf.ViewModels.Scan;
 using SpaceSnoop.Wpf.Views;
 using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Threading;
 
@@ -109,6 +111,40 @@ public class BindingSmokeTests
         Settle();
 
         Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
+    }
+
+    [Test]
+    public void Всплывающая_настройка_подсветки_не_теряет_биндинги()
+    {
+        Assert.That(_shell.TryNavigate(SectionKey.Scan), Is.True, "Страница «Сканирование» не открылась.");
+
+        Settle();
+
+        var toggle = ViewCapture.Find(_window, "HeatToggle") as ToggleButton;
+        Assert.That(toggle, Is.Not.Null, "В разметке сканирования нет кнопки подсветки HeatToggle.");
+
+        _sink.Clear();
+        toggle.IsChecked = true;
+        Settle();
+
+        var popup = toggle.FindName("HeatPopup") as Popup;
+        Assert.That(popup?.Child, Is.Not.Null, "Всплывающая панель подсветки не построила содержимое.");
+
+        var content = (FrameworkElement)popup.Child;
+        content.UpdateLayout();
+        Settle();
+
+        var slider = (Slider)toggle.FindName("HeatSlider");
+        var intensity = BindingOperations.GetBindingExpression(slider, RangeBase.ValueProperty);
+
+        toggle.IsChecked = false;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(content.DataContext, Is.InstanceOf<ScanViewModel>(), "Всплывающая панель не унаследовала контекст страницы.");
+            Assert.That(intensity?.Status, Is.EqualTo(BindingStatus.Active), "Ползунок подсветки не привязался к странице.");
+            Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
+        });
     }
 
     [Test]
