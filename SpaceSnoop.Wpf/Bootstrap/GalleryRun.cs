@@ -286,7 +286,7 @@ public static class GalleryRun
         var sync = services.GetRequiredService<SyncViewModel>();
         sync.Setup.LeftPath = fixture.Left;
         sync.Setup.RightPath = fixture.Right;
-        await sync.CompareFromAutomationAsync(CancellationToken.None).ConfigureAwait(true);
+        await sync.Operations.CompareFromAutomationAsync(CancellationToken.None).ConfigureAwait(true);
     }
 
     private static async Task SettleAsync(Window window)

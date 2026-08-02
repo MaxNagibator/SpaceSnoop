@@ -413,7 +413,7 @@ public sealed class McpBridge(
         {
             logger.McpToolInvoked("sync_current", $"план, записей до {entryLimit}");
 
-            var plan = Dispatch(() => sync.CapturePlanBuilder(entryLimit));
+            var plan = Dispatch(() => sync.Operations.CapturePlanBuilder(entryLimit));
 
             if (plan is null)
             {
@@ -443,7 +443,7 @@ public sealed class McpBridge(
                 throw new McpException("Страница «Синхронизация» сейчас занята другой операцией.");
             }
 
-            if (sync.HasPending)
+            if (sync.Operations.HasPending)
             {
                 throw new McpException("Есть неразрешённые спорные элементы – разрешите их в приложении.");
             }
@@ -451,7 +451,7 @@ public sealed class McpBridge(
             logger.McpMutationRequested("sync_current", $"«{sync.Setup.LeftPath}» → «{sync.Setup.RightPath}», режим {sync.Setup.CurrentMode}, зеркало {sync.Setup.Mirror}");
             notifier.Notify("Агент запустил синхронизацию", StatusSeverity.Warning);
 
-            return sync.SyncFromAutomationAsync(cancellationToken);
+            return sync.Operations.SyncFromAutomationAsync(cancellationToken);
         });
 
         var outcome = await run.ConfigureAwait(false);
@@ -862,7 +862,7 @@ public sealed class McpBridge(
                 ? "Агент подготовил страницу «Синхронизация»"
                 : "Агент открыл страницу «Синхронизация»");
 
-        return (compare ? sync.CompareFromAutomationAsync(cancellationToken) : null, deferred, ignored);
+        return (compare ? sync.Operations.CompareFromAutomationAsync(cancellationToken) : null, deferred, ignored);
     }
 
     private void ApplySyncPaths(string left, string right, SyncMode mode, string? exclusions)
@@ -1071,7 +1071,7 @@ public sealed class McpBridge(
 
     private Task<string> ExportCurrentAsync(int entryLimit, CancellationToken cancellationToken)
     {
-        var build = Dispatch(() => sync.CaptureExportBuilder(entryLimit));
+        var build = Dispatch(() => sync.Operations.CaptureExportBuilder(entryLimit));
 
         if (build is null)
         {

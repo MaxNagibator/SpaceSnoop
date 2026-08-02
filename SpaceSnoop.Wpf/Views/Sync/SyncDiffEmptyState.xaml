@@ -14,7 +14,7 @@
                           Description="Укажите два каталога – слева и справа – выберите направление и нажмите «Сравнить». Различия лягут в дерево с цветовой кодировкой статуса и направленными действиями синхронизации."
                           DescriptionMaxWidth="460"
                           ActionText="Сравнить"
-                          ActionCommand="{Binding CompareCommand}"
+                          ActionCommand="{Binding Operations.CompareCommand}"
                           VerticalAlignment="Center"
                           HorizontalAlignment="Center"
                           Visibility="{Binding Ledger.HasResult, Converter={StaticResource InverseBoolToVisibility}, FallbackValue=Visible}" />

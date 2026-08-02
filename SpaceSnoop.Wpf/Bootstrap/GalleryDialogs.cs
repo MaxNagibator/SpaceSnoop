@@ -32,7 +32,7 @@ public static class GalleryDialogs
         switch (key)
         {
             case Confirm:
-                Run(services.GetRequiredService<SyncViewModel>().SyncCommand, "«Синхронизировать» недоступна – сравнение не дало плана.");
+                Run(services.GetRequiredService<SyncViewModel>().Operations.SyncCommand, "«Синхронизировать» недоступна – сравнение не дало плана.");
                 break;
 
             case Diff:

@@ -13,7 +13,7 @@ public class SyncGitTests
     [TestCase("bin,.GIT,obj", ExpectedResult = "bin,.GIT,obj")]
     public string Git_исключение_добавляется_один_раз(string exclusions)
     {
-        return SyncViewModel.AddGitExclusion(exclusions);
+        return SyncOperationsViewModel.AddGitExclusion(exclusions);
     }
 
     [TestCase(".git", ExpectedResult = true)]

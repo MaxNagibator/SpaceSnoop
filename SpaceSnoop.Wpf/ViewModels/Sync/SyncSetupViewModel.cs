@@ -41,6 +41,9 @@ public sealed partial class SyncSetupViewModel : ObservableObject
     [ObservableProperty]
     private int _selectedWinnerIndex;
 
+    [ObservableProperty]
+    private bool _verify = AppDefaults.SyncVerifyDefault;
+
     public SyncSetupViewModel(
         ISettingsStore settings,
         IDialogService dialogs,
@@ -64,6 +67,8 @@ public sealed partial class SyncSetupViewModel : ObservableObject
     public event Action<SyncProfile>? ProfileSelected;
 
     public SyncQuickProfilesViewModel Profiles { get; }
+
+    public OperationPreferences Preferences => _operations;
 
     public IReadOnlyList<SegmentOption> Modes => SyncOptions.Modes;
 
@@ -242,6 +247,11 @@ public sealed partial class SyncSetupViewModel : ObservableObject
         ModeChanged?.Invoke();
     }
 
+    partial void OnVerifyChanged(bool value)
+    {
+        Persist(SettingsKeys.SyncVerify, value ? "true" : "false");
+    }
+
     partial void OnMirrorChanged(bool value)
     {
         Persist(SettingsKeys.SyncMirror, value ? "true" : "false");
@@ -285,6 +295,7 @@ public sealed partial class SyncSetupViewModel : ObservableObject
         SelectedModeIndex = Math.Clamp(_settings.GetInt(SettingsKeys.SyncMode), 0, ModeOrder.Length - 1);
         Mirror = _settings.GetBool(SettingsKeys.SyncMirror);
         SelectedWinnerIndex = Math.Clamp(_settings.GetInt(SettingsKeys.SyncWinner), 0, WinnerOrder.Length - 1);
+        Verify = _settings.GetBool(SettingsKeys.SyncVerify, AppDefaults.SyncVerifyDefault);
 
         _suppressPersist = false;
     }

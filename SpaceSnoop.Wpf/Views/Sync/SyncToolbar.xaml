@@ -151,7 +151,7 @@
                     </Button>
                     <Grid VerticalAlignment="Center">
                         <TextBox Text="{Binding Setup.LeftPath, UpdateSourceTrigger=PropertyChanged}"
-                                 behaviors:PathSuggest.Enabled="{Binding Operations.SyncPathSuggest}"
+                                 behaviors:PathSuggest.Enabled="{Binding Setup.Preferences.SyncPathSuggest}"
                                  Style="{StaticResource TextBox.Toolbar}"
                                  ToolTip="Каталог слева" />
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
@@ -242,7 +242,7 @@
                     </Button>
                     <Grid VerticalAlignment="Center">
                         <TextBox Text="{Binding Setup.RightPath, UpdateSourceTrigger=PropertyChanged}"
-                                 behaviors:PathSuggest.Enabled="{Binding Operations.SyncPathSuggest}"
+                                 behaviors:PathSuggest.Enabled="{Binding Setup.Preferences.SyncPathSuggest}"
                                  Style="{StaticResource TextBox.Toolbar}"
                                  ToolTip="Каталог справа" />
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
@@ -262,7 +262,7 @@
             <views:StretchWrapPanel Margin="0,12,0,0"
                                     ItemWidth="240">
                 <Button Style="{StaticResource Button.Secondary}"
-                        Command="{Binding CompareCommand}"
+                        Command="{Binding Operations.CompareCommand}"
                         VerticalAlignment="Center"
                         Margin="0,0,8,8"
                         ToolTip="{Binding Ledger.CompareCommandHint}"
@@ -282,7 +282,7 @@
                     </StackPanel>
                 </Button>
                 <Button Style="{StaticResource Button.Primary}"
-                        Command="{Binding SyncCommand}"
+                        Command="{Binding Operations.SyncCommand}"
                         VerticalAlignment="Center"
                         Margin="0,0,16,8"
                         ToolTip="{Binding Ledger.SyncCommandHint}"
@@ -305,7 +305,7 @@
                     </StackPanel>
                 </Button>
                 <Button Style="{StaticResource Button.Secondary}"
-                        Command="{Binding HashCommand}"
+                        Command="{Binding Operations.HashCommand}"
                         MinWidth="0"
                         Padding="9,0"
                         VerticalAlignment="Center"
@@ -366,7 +366,7 @@
                                                       Margin="2,0,8,0"
                                                       Foreground="{DynamicResource Fg.Muted}" />
                             <Button Style="{StaticResource Button.Ghost}"
-                                    Command="{Binding ResolveAllToRightCommand}"
+                                    Command="{Binding Operations.ResolveAllToRightCommand}"
                                     Padding="9,2"
                                     MinHeight="26"
                                     Foreground="{DynamicResource Sync.LeftOnly}"
@@ -377,7 +377,7 @@
                                                           Height="14" />
                             </Button>
                             <Button Style="{StaticResource Button.Ghost}"
-                                    Command="{Binding ResolveAllToLeftCommand}"
+                                    Command="{Binding Operations.ResolveAllToLeftCommand}"
                                     Padding="9,2"
                                     MinHeight="26"
                                     Foreground="{DynamicResource State.Info}"
@@ -388,7 +388,7 @@
                                                           Height="14" />
                             </Button>
                             <Button Style="{StaticResource Button.Ghost}"
-                                    Command="{Binding ResolveAllSkipCommand}"
+                                    Command="{Binding Operations.ResolveAllSkipCommand}"
                                     Padding="9,2"
                                     MinHeight="26"
                                     ToolTip="Пропустить все спорные"
@@ -651,11 +651,11 @@
                                                           VerticalAlignment="Center"
                                                           Margin="7,0,0,0"
                                                           Foreground="{DynamicResource State.Error}"
-                                                          Visibility="{Binding MirrorDeletes, Converter={StaticResource BoolToVisibility}}" />
+                                                          Visibility="{Binding Setup.MirrorDeletes, Converter={StaticResource BoolToVisibility}}" />
                             </StackPanel>
                         </ToggleButton>
                         <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
-                                      IsChecked="{Binding Verify}"
+                                      IsChecked="{Binding Setup.Verify}"
                                       MinWidth="0"
                                       Padding="9,0"
                                       HorizontalAlignment="Stretch"
@@ -682,7 +682,7 @@
                                   HorizontalAlignment="Stretch"
                                   ToolTip="Сколько последних коммитов показывать в раскрытой Git-полоске" />
                         <Button Style="{StaticResource Button.Secondary}"
-                                Command="{Binding ExportComparisonCommand}"
+                                Command="{Binding Operations.ExportComparisonCommand}"
                                 MinWidth="0"
                                 Padding="9,0"
                                 HorizontalAlignment="Stretch"
