@@ -1,0 +1,21 @@
+<UserControl x:Class="SpaceSnoop.Wpf.Views.Sync.SyncDiffEmptyState"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Sync"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:SyncViewModel}">
+
+    <keepshell:EmptyState Icon="GitCompareArrows"
+                          IconSize="40"
+                          Heading="Сравнение ещё не выполнялось"
+                          Description="Укажите два каталога – слева и справа – выберите направление и нажмите «Сравнить». Различия лягут в дерево с цветовой кодировкой статуса и направленными действиями синхронизации."
+                          DescriptionMaxWidth="460"
+                          ActionText="Сравнить"
+                          ActionCommand="{Binding CompareCommand}"
+                          VerticalAlignment="Center"
+                          HorizontalAlignment="Center"
+                          Visibility="{Binding HasResult, Converter={StaticResource InverseBoolToVisibility}, FallbackValue=Visible}" />
+</UserControl>

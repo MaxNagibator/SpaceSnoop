@@ -1,0 +1,256 @@
+<UserControl x:Class="SpaceSnoop.Wpf.Views.Sync.SyncDiffHeaderBar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Sync"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:SyncViewModel}"
+             d:DesignWidth="1040">
+
+    <UserControl.Resources>
+        <Style x:Key="SortHeader"
+               TargetType="Button"
+               BasedOn="{StaticResource Button.Ghost}">
+            <Setter Property="Command"
+                    Value="{Binding SortByColumnCommand}" />
+            <Setter Property="Padding"
+                    Value="2,0" />
+            <Setter Property="MinWidth"
+                    Value="0" />
+            <Setter Property="MinHeight"
+                    Value="16" />
+            <Setter Property="HorizontalAlignment"
+                    Value="Left" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+        </Style>
+
+        <Style x:Key="SortMark"
+               TargetType="iconPacks:PackIconLucide">
+            <Setter Property="Kind"
+                    Value="{Binding SortDirectionIconKind}" />
+            <Setter Property="Width"
+                    Value="10" />
+            <Setter Property="Height"
+                    Value="10" />
+            <Setter Property="Margin"
+                    Value="4,0,0,0" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Accent.Primary}" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0"
+              Margin="6,4,18,8"
+              Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center"
+                        Margin="8,0,0,0">
+                <Button Style="{StaticResource Button.Secondary}"
+                        Command="{Binding ExpandAllCommand}"
+                        MinWidth="0"
+                        Padding="9,0"
+                        Margin="0,0,8,0"
+                        ToolTip="Развернуть все каталоги в дереве"
+                        AutomationProperties.Name="Развернуть все каталоги"
+                        Visibility="{Binding FlatView, Converter={StaticResource InverseBoolToVisibility}}">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ChevronsUpDown}"
+                                              Width="14"
+                                              Height="14" />
+                </Button>
+                <Button Style="{StaticResource Button.Secondary}"
+                        Command="{Binding CollapseAllCommand}"
+                        MinWidth="0"
+                        Padding="9,0"
+                        ToolTip="Свернуть все каталоги в дереве"
+                        AutomationProperties.Name="Свернуть все каталоги"
+                        Visibility="{Binding FlatView, Converter={StaticResource InverseBoolToVisibility}}">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ChevronsDownUp}"
+                                              Width="14"
+                                              Height="14" />
+                </Button>
+            </StackPanel>
+
+            <Grid Grid.Column="0"
+                  Width="240"
+                  HorizontalAlignment="Left">
+                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource TextBox.IconField}"
+                         Tag="{x:Static iconPacks:PackIconLucideKind.Search}"
+                         ToolTip="Фильтр по пути – в дереве оставляет только совпавшие ветки" />
+                <TextBlock Text="Фильтр по пути"
+                           Margin="36,0,8,0"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource Fg.Muted}"
+                           IsHitTestVisible="False"
+                           Visibility="{Binding SearchTextEmpty, Converter={StaticResource BoolToVisibility}}" />
+            </Grid>
+
+            <ComboBox Grid.Column="2"
+                      SelectedValuePath="Tag"
+                      SelectedValue="{Binding RowSort}"
+                      Style="{StaticResource ComboBox.Toolbar}"
+                      MinWidth="150"
+                      Margin="8,0,0,0"
+                      VerticalAlignment="Center"
+                      ToolTip="Сортировка списка">
+                <ComboBoxItem Content="По пути"
+                              Tag="{x:Static vm:SyncSortField.Path}" />
+                <ComboBoxItem Content="По размеру"
+                              Tag="{x:Static vm:SyncSortField.Size}" />
+                <ComboBoxItem Content="По дате"
+                              Tag="{x:Static vm:SyncSortField.Modified}" />
+                <ComboBoxItem Content="По статусу"
+                              Tag="{x:Static vm:SyncSortField.Status}" />
+            </ComboBox>
+
+            <ToggleButton Grid.Column="3"
+                          Style="{StaticResource ToggleButton.Toolbar}"
+                          IsChecked="{Binding RowSortDescending}"
+                          MinWidth="0"
+                          Padding="9,0"
+                          Margin="8,0,0,0"
+                          VerticalAlignment="Center"
+                          ToolTip="Сортировать по убыванию"
+                          AutomationProperties.Name="Сортировать по убыванию">
+                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ArrowDownUp}"
+                                          Width="14"
+                                          Height="14" />
+            </ToggleButton>
+        </Grid>
+
+        <Grid Grid.Row="1"
+              Margin="14,6,18,8"
+              Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="60" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Grid Grid.Column="0"
+                  Margin="0,0,8,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Button Style="{StaticResource SortHeader}"
+                        CommandParameter="{x:Static vm:SyncSortField.Path}"
+                        ToolTip="Сортировать по пути">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Левая"
+                                   Style="{StaticResource Caption}" />
+                        <iconPacks:PackIconLucide Style="{StaticResource SortMark}"
+                                                  Visibility="{Binding SortByPath, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="1"
+                        Style="{StaticResource SortHeader}"
+                        CommandParameter="{x:Static vm:SyncSortField.Modified}"
+                        Margin="0,0,18,0"
+                        ToolTip="Сортировать по дате изменения"
+                        Visibility="{Binding ShowModified, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Дата"
+                                   Style="{StaticResource Caption}" />
+                        <iconPacks:PackIconLucide Style="{StaticResource SortMark}"
+                                                  Visibility="{Binding SortByModified, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="2"
+                        Style="{StaticResource SortHeader}"
+                        CommandParameter="{x:Static vm:SyncSortField.Size}"
+                        HorizontalAlignment="Right"
+                        ToolTip="Сортировать по размеру"
+                        Visibility="{Binding ShowSizes, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Размер"
+                                   Style="{StaticResource Caption}" />
+                        <iconPacks:PackIconLucide Style="{StaticResource SortMark}"
+                                                  Visibility="{Binding SortBySize, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+
+            <iconPacks:PackIconLucide Grid.Column="1"
+                                      Kind="{x:Static iconPacks:PackIconLucideKind.MousePointerClick}"
+                                      Width="14"
+                                      Height="14"
+                                      HorizontalAlignment="Center"
+                                      Foreground="{DynamicResource Fg.Muted}"
+                                      ToolTip="Кружок по центру строки задаёт действие синхронизации – клик циклически переключает копирование / пропуск / удаление."
+                                      AutomationProperties.Name="Действие синхронизации" />
+
+            <Grid Grid.Column="2"
+                  Margin="8,0,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Button Style="{StaticResource SortHeader}"
+                        CommandParameter="{x:Static vm:SyncSortField.Path}"
+                        ToolTip="Сортировать по пути">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Правая"
+                                   Style="{StaticResource Caption}" />
+                        <iconPacks:PackIconLucide Style="{StaticResource SortMark}"
+                                                  Visibility="{Binding SortByPath, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="1"
+                        Style="{StaticResource SortHeader}"
+                        CommandParameter="{x:Static vm:SyncSortField.Modified}"
+                        Margin="0,0,18,0"
+                        ToolTip="Сортировать по дате изменения"
+                        Visibility="{Binding ShowModified, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Дата"
+                                   Style="{StaticResource Caption}" />
+                        <iconPacks:PackIconLucide Style="{StaticResource SortMark}"
+                                                  Visibility="{Binding SortByModified, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="2"
+                        Style="{StaticResource SortHeader}"
+                        CommandParameter="{x:Static vm:SyncSortField.Size}"
+                        HorizontalAlignment="Right"
+                        ToolTip="Сортировать по размеру"
+                        Visibility="{Binding ShowSizes, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Размер"
+                                   Style="{StaticResource Caption}" />
+                        <iconPacks:PackIconLucide Style="{StaticResource SortMark}"
+                                                  Visibility="{Binding SortBySize, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Grid>
+
+        <Border Grid.Row="1"
+                VerticalAlignment="Bottom"
+                Height="1"
+                Background="{DynamicResource Border.Subtle}"
+                Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+    </Grid>
+</UserControl>

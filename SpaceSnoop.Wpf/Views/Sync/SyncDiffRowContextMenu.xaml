@@ -1,0 +1,188 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:agent="clr-namespace:SpaceSnoop.Wpf.Agent"
+                    xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks">
+
+    <ContextMenu x:Key="SyncNodeMenu">
+        <ContextMenu.Resources>
+            <Style x:Key="MenuGlyph"
+                   TargetType="iconPacks:PackIconLucide">
+                <Setter Property="Width"
+                        Value="14" />
+                <Setter Property="Height"
+                        Value="14" />
+                <Setter Property="VerticalAlignment"
+                        Value="Center" />
+                <Setter Property="Margin"
+                        Value="0,0,9,0" />
+            </Style>
+        </ContextMenu.Resources>
+
+        <MenuItem
+            Command="{Binding PlacementTarget.DataContext.CompareContentCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            Visibility="{Binding PlacementTarget.DataContext.CanCompareContent, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+            <MenuItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.GitCompareArrows}"
+                                              Foreground="{DynamicResource State.Info}" />
+                    <TextBlock Text="{Binding PlacementTarget.DataContext.CompareContentHeader, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </MenuItem.Header>
+        </MenuItem>
+        <MenuItem
+            Command="{Binding PlacementTarget.DataContext.AskAgentCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            ToolTip="Открыть чат с готовым вопросом об этой строке сравнения"
+            Visibility="{Binding PlacementTarget.DataContext.CanAskAgent, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+            <MenuItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.MessageCircle}"
+                                              Foreground="{DynamicResource State.Info}" />
+                    <TextBlock Text="{x:Static agent:AgentPersona.AskHeader}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </MenuItem.Header>
+        </MenuItem>
+
+        <Separator />
+
+        <MenuItem
+            Command="{Binding PlacementTarget.DataContext.CopyToRightCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            Visibility="{Binding PlacementTarget.DataContext.CanCopyRight, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+            <MenuItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.ArrowRight}"
+                                              Foreground="{DynamicResource Sync.LeftOnly}" />
+                    <TextBlock Text="Копировать слева направо"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </MenuItem.Header>
+        </MenuItem>
+        <MenuItem
+            Command="{Binding PlacementTarget.DataContext.CopyToLeftCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            Visibility="{Binding PlacementTarget.DataContext.CanCopyLeft, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+            <MenuItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.ArrowLeft}"
+                                              Foreground="{DynamicResource State.Info}" />
+                    <TextBlock Text="Копировать справа налево"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </MenuItem.Header>
+        </MenuItem>
+        <MenuItem
+            Command="{Binding PlacementTarget.DataContext.SkipCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            Visibility="{Binding PlacementTarget.DataContext.CanCycle, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+            <MenuItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.Ban}"
+                                              Foreground="{DynamicResource Fg.Muted}" />
+                    <TextBlock Text="Пропустить (не трогать)"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </MenuItem.Header>
+        </MenuItem>
+        <MenuItem
+            Command="{Binding PlacementTarget.DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            Visibility="{Binding PlacementTarget.DataContext.CanDeleteFile, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+            <MenuItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                              Foreground="{DynamicResource State.Error}" />
+                    <TextBlock
+                        Text="{Binding PlacementTarget.DataContext.FileDeleteHeader, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                        VerticalAlignment="Center" />
+                </StackPanel>
+            </MenuItem.Header>
+        </MenuItem>
+
+        <MenuItem
+            Command="{Binding PlacementTarget.DataContext.DirCopyToRightCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            Visibility="{Binding PlacementTarget.DataContext.IsDirectory, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+            <MenuItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.ArrowRight}"
+                                              Foreground="{DynamicResource Sync.LeftOnly}" />
+                    <TextBlock Text="Всё содержимое: слева направо"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </MenuItem.Header>
+        </MenuItem>
+        <MenuItem
+            Command="{Binding PlacementTarget.DataContext.DirCopyToLeftCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            Visibility="{Binding PlacementTarget.DataContext.IsDirectory, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+            <MenuItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.ArrowLeft}"
+                                              Foreground="{DynamicResource State.Info}" />
+                    <TextBlock Text="Всё содержимое: справа налево"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </MenuItem.Header>
+        </MenuItem>
+        <MenuItem
+            Command="{Binding PlacementTarget.DataContext.DirSkipCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            Visibility="{Binding PlacementTarget.DataContext.IsDirectory, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+            <MenuItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.Ban}"
+                                              Foreground="{DynamicResource Fg.Muted}" />
+                    <TextBlock Text="Всё содержимое: пропустить"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </MenuItem.Header>
+        </MenuItem>
+        <MenuItem
+            Command="{Binding PlacementTarget.DataContext.DirDeleteCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            Visibility="{Binding PlacementTarget.DataContext.CanDirDelete, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+            <MenuItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                              Foreground="{DynamicResource State.Error}" />
+                    <TextBlock
+                        Text="{Binding PlacementTarget.DataContext.DirDeleteHeader, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                        VerticalAlignment="Center" />
+                </StackPanel>
+            </MenuItem.Header>
+        </MenuItem>
+
+        <Separator
+            Visibility="{Binding PlacementTarget.DataContext.TreeExpansionActionsVisible, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}" />
+        <MenuItem
+            Command="{Binding PlacementTarget.DataContext.ExpandSubtreeCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            Visibility="{Binding PlacementTarget.DataContext.TreeExpansionActionsVisible, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+            <MenuItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.ChevronsUpDown}"
+                                              Foreground="{DynamicResource Fg.Muted}" />
+                    <TextBlock Text="Развернуть эту ветку"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </MenuItem.Header>
+        </MenuItem>
+        <MenuItem
+            Command="{Binding PlacementTarget.DataContext.CollapseSubtreeCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            Visibility="{Binding PlacementTarget.DataContext.TreeExpansionActionsVisible, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+            <MenuItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.ChevronsDownUp}"
+                                              Foreground="{DynamicResource Fg.Muted}" />
+                    <TextBlock Text="Свернуть эту ветку"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </MenuItem.Header>
+        </MenuItem>
+    </ContextMenu>
+</ResourceDictionary>
