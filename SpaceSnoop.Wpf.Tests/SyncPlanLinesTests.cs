@@ -21,7 +21,7 @@ public class SyncPlanLinesTests
             DeleteDirBytes = 4 * Megabyte,
         };
 
-        var lines = SyncViewModel.BuildPlanLines(planned, null, []);
+        var lines = SyncLedgerViewModel.BuildPlanLines(planned, null, []);
 
         using (Assert.EnterMultipleScope())
         {
@@ -39,7 +39,7 @@ public class SyncPlanLinesTests
     {
         var planned = new PlannedActions(0, 0, 2, 0, 1) { DeleteFileBytes = Megabyte, DeleteDirBytes = 4 * Megabyte };
 
-        var lines = SyncViewModel.BuildPlanLines(planned, null, []);
+        var lines = SyncLedgerViewModel.BuildPlanLines(planned, null, []);
 
         Assert.That(Text(lines), Does.Contain("эти файлы в число 2 не входят"));
     }
@@ -49,7 +49,7 @@ public class SyncPlanLinesTests
     {
         var planned = new PlannedActions(0, 0, 0, 0, 1) { DeleteDirBytes = 4 * Megabyte };
 
-        var lines = SyncViewModel.BuildPlanLines(planned, null, []);
+        var lines = SyncLedgerViewModel.BuildPlanLines(planned, null, []);
 
         using (Assert.EnterMultipleScope())
         {
@@ -64,7 +64,7 @@ public class SyncPlanLinesTests
         var planned = new PlannedActions(1, 0, 0, 0, 0) { NewCopyBytes = 10 * Megabyte, CopyToRightBytes = 10 * Megabyte };
         var receivers = new PlanReceiver[] { new("D:\\Backup", 10 * Megabyte, 4 * Megabyte) };
 
-        var lines = SyncViewModel.BuildPlanLines(planned, null, receivers);
+        var lines = SyncLedgerViewModel.BuildPlanLines(planned, null, receivers);
 
         using (Assert.EnterMultipleScope())
         {
@@ -79,7 +79,7 @@ public class SyncPlanLinesTests
         var planned = new PlannedActions(1, 0, 0, 0, 0) { NewCopyBytes = 10 * Megabyte, CopyToRightBytes = 10 * Megabyte };
         var receivers = new PlanReceiver[] { new("D:\\Backup", 10 * Megabyte, 40 * Megabyte) };
 
-        var lines = SyncViewModel.BuildPlanLines(planned, null, receivers);
+        var lines = SyncLedgerViewModel.BuildPlanLines(planned, null, receivers);
 
         using (Assert.EnterMultipleScope())
         {
@@ -96,7 +96,7 @@ public class SyncPlanLinesTests
         var planned = new PlannedActions(1, 0, 0, 0, 0) { NewCopyBytes = Megabyte, CopyToRightBytes = Megabyte };
         var receivers = new PlanReceiver[] { new("\\\\server\\share", Megabyte, null) };
 
-        var lines = SyncViewModel.BuildPlanLines(planned, null, receivers);
+        var lines = SyncLedgerViewModel.BuildPlanLines(planned, null, receivers);
 
         Assert.That(lines, Has.Some.EqualTo(new ConfirmMetricLine("Свободно", string.Empty, "неизвестно")));
     }
@@ -107,7 +107,7 @@ public class SyncPlanLinesTests
         var planned = new PlannedActions(1, 0, 0, 0, 0) { NewCopyBytes = Megabyte, CopyToRightBytes = Megabyte };
         var receivers = new PlanReceiver[] { new("D:\\Backup", Megabyte, 40 * Megabyte) };
 
-        var lines = SyncViewModel.BuildPlanLines(planned, null, receivers, bothWays: true);
+        var lines = SyncLedgerViewModel.BuildPlanLines(planned, null, receivers, bothWays: true);
 
         Assert.That(Text(lines), Does.Contain("Во встречном направлении копирования нет."));
     }
@@ -115,7 +115,7 @@ public class SyncPlanLinesTests
     [Test]
     public void Пустой_план_не_говорит_ни_о_месте_ни_о_корзине()
     {
-        var lines = SyncViewModel.BuildPlanLines(PlannedActions.Empty, "слева направо", [new("D:\\Backup", Megabyte, 0)]);
+        var lines = SyncLedgerViewModel.BuildPlanLines(PlannedActions.Empty, "слева направо", [new("D:\\Backup", Megabyte, 0)]);
 
         using (Assert.EnterMultipleScope())
         {

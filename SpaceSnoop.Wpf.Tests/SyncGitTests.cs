@@ -76,11 +76,11 @@ public class SyncGitTests
     {
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(SyncViewModel.CombineNewer(NewerSide.Left, false, 1), Is.EqualTo(NewerSide.Right));
-            Assert.That(SyncViewModel.CombineNewer(NewerSide.Right, false, -1), Is.EqualTo(NewerSide.Left));
-            Assert.That(SyncViewModel.CombineNewer(NewerSide.Left, true, 0), Is.EqualTo(NewerSide.Tie));
-            Assert.That(SyncViewModel.CombineNewer(NewerSide.Left, false, 0), Is.EqualTo(NewerSide.Left));
-            Assert.That(SyncViewModel.CombineNewer(NewerSide.None, false, 0), Is.EqualTo(NewerSide.None));
+            Assert.That(SyncLedgerViewModel.CombineNewer(NewerSide.Left, false, 1), Is.EqualTo(NewerSide.Right));
+            Assert.That(SyncLedgerViewModel.CombineNewer(NewerSide.Right, false, -1), Is.EqualTo(NewerSide.Left));
+            Assert.That(SyncLedgerViewModel.CombineNewer(NewerSide.Left, true, 0), Is.EqualTo(NewerSide.Tie));
+            Assert.That(SyncLedgerViewModel.CombineNewer(NewerSide.Left, false, 0), Is.EqualTo(NewerSide.Left));
+            Assert.That(SyncLedgerViewModel.CombineNewer(NewerSide.None, false, 0), Is.EqualTo(NewerSide.None));
         }
     }
 

@@ -35,11 +35,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private bool _gitPromptDeclined;
     private bool _hashesCompared;
     private bool _gitGroupExpanded;
-    private Dictionary<ComparisonStatus, int> _stats = NewZeroStats();
-    private Dictionary<ComparisonStatus, int> _dirStats = NewZeroStats();
-    private FreshnessSummary _freshness;
-    private PlannedActions _plan = PlannedActions.Empty;
-    private int _total;
 
     [ObservableProperty]
     private string _leftPath = string.Empty;
@@ -119,7 +114,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         Session.PropertyChanged += OnSessionPropertyChanged;
 
         Git = new(settings, logger);
-        Git.StateChanged += NotifyNewerBadgeChanged;
+
+        Ledger = new(Git, () => new(DirectionIconKind, DirectionText(), CurrentMode == SyncMode.Bidirectional));
+        Ledger.PropertyChanged += OnLedgerPropertyChanged;
 
         Profiles = new(settings, dialogs, BuildCurrentProfile, ApplyProfile, () => !IsBusy, message => Session.StatusCaption = message);
         LoadSettings();
@@ -135,6 +132,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public SyncSessionViewModel Session { get; }
 
+    public SyncLedgerViewModel Ledger { get; }
+
     public bool ChatEnabled => _agent.Enabled;
 
     public OperationPreferences Operations { get; }
@@ -146,62 +145,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     public IReadOnlyList<SegmentOption> Modes => SyncOptions.Modes;
 
     public IReadOnlyList<SegmentOption> Winners => SyncOptions.Winners;
-
-    public bool HasResult => _result is not null;
-
-    public bool SyncIsPrimary => HasActionableChanges();
-
-    public int IdenticalCount => _stats[ComparisonStatus.Identical];
-
-    public int LeftOnlyCount => _stats[ComparisonStatus.LeftOnly];
-
-    public int RightOnlyCount => _stats[ComparisonStatus.RightOnly];
-
-    public int ModifiedCount => _stats[ComparisonStatus.Modified];
-
-    public int ConflictCount => _stats[ComparisonStatus.Conflict];
-
-    public int IdenticalDirCount => _dirStats[ComparisonStatus.Identical];
-
-    public int LeftOnlyDirCount => _dirStats[ComparisonStatus.LeftOnly];
-
-    public int RightOnlyDirCount => _dirStats[ComparisonStatus.RightOnly];
-
-    public int ModifiedDirCount => _dirStats[ComparisonStatus.Modified];
-
-    public int DifferingTotal => LeftOnlyCount + RightOnlyCount + ModifiedCount + ConflictCount;
-
-    public bool HasDifferences => DifferingTotal > 0;
-
-    public double LeftOnlyFraction => Fraction(ComparisonStatus.LeftOnly);
-
-    public double RightOnlyFraction => Fraction(ComparisonStatus.RightOnly);
-
-    public double ModifiedFraction => Fraction(ComparisonStatus.Modified);
-
-    public double ConflictFraction => Fraction(ComparisonStatus.Conflict);
-
-    public bool SyncIsDestructive => _plan.Deletes + _plan.DirDeletes > 0;
-
-    public string CompareCommandHint => HasResult
-        ? "Пересчитать различия заново. Файлы не трогает."
-        : "Сравнить каталоги и показать различия. Файлы не трогает.";
-
-    public string SyncCommandHint => BuildSyncCommandHint();
-
-    public bool HasPlanVolume => _plan.CopyBytes > 0 || _plan.DeleteBytes > 0;
-
-    public bool HasPlanCopy => _plan.CopyBytes > 0;
-
-    public bool HasPlanTrash => _plan.DeleteBytes > 0;
-
-    public string PlanCopyText => SizeFormatter.Format(_plan.CopyBytes);
-
-    public string PlanTrashText => SizeFormatter.Format(_plan.DeleteBytes);
-
-    public string PlanVolumeHint => ConfirmDialogViewModel.AsText(BuildPlanLines(_plan, null, BuildReceivers(_plan)));
-
-    public bool HasConflicts => ConflictCount > 0;
 
     public PackIconLucideKind DirectionIconKind => CurrentMode switch
     {
@@ -241,32 +184,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public bool MirrorDeletes => Mirror && MirrorApplicable;
 
-    public bool ShowNewerBadge => _result is not null && EffectiveNewerSide != NewerSide.None;
-
-    public PackIconLucideKind NewerBadgeIconKind => EffectiveNewerSide switch
-    {
-        NewerSide.Left => PackIconLucideKind.ArrowLeft,
-        NewerSide.Right => PackIconLucideKind.ArrowRight,
-        _ => PackIconLucideKind.ArrowRightLeft,
-    };
-
-    public bool NewerIsLeft => EffectiveNewerSide == NewerSide.Left;
-
-    public bool NewerIsRight => EffectiveNewerSide == NewerSide.Right;
-
-    public string NewerBadgeText => EffectiveNewerSide switch
-    {
-        NewerSide.Left => "Слева",
-        NewerSide.Right => "Справа",
-        NewerSide.Tie => "Поровну",
-        _ => string.Empty,
-    };
-
-    public string NewerBadgeTooltip => GitDecidesNewer
-        ? $"Свежее по коммитам git: слева {SyncGitViewModel.FormatStamp(Git.LeftState?.CommittedAt?.LocalDateTime)}, справа {SyncGitViewModel.FormatStamp(Git.RightState?.CommittedAt?.LocalDateTime)}."
-        : $"Свежее по новейшему изменённому файлу: слева {SyncGitViewModel.FormatStamp(_freshness.LeftChangedMax)}, справа {SyncGitViewModel.FormatStamp(_freshness.RightChangedMax)}.{Environment.NewLine}"
-          + $"Изменённых новее: слева {_freshness.LeftNewer:N0}, справа {_freshness.RightNewer:N0}.";
-
     public bool ExclusionsEmpty => string.IsNullOrWhiteSpace(Exclusions);
 
     public bool SearchTextEmpty => string.IsNullOrWhiteSpace(SearchText);
@@ -280,11 +197,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     public PackIconLucideKind SortDirectionIconKind => RowSortDescending
         ? PackIconLucideKind.ArrowDown
         : PackIconLucideKind.ArrowUp;
-
-    public string CompositionHint =>
-        $"Состав различий ({DifferingTotal:N0} файлов): только слева {LeftOnlyCount:N0}, только справа {RightOnlyCount:N0}, изменены {ModifiedCount:N0}, конфликты {ConflictCount:N0}.{Environment.NewLine}"
-        + $"Каталоги: только слева {LeftOnlyDirCount:N0}, только справа {RightOnlyDirCount:N0}, изменены {ModifiedDirCount:N0}, одинаковые {IdenticalDirCount:N0}.{Environment.NewLine}"
-        + $"Одинаковых файлов {IdenticalCount:N0} – в полосу не входят.";
 
     public bool ShowApplied
     {
@@ -307,12 +219,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     public double ProgressMax => Session.ProgressMax;
 
     public ICommand CancelCommand => Session.CancelCommand;
-
-    private NewerSide EffectiveNewerSide => CombineNewer(_freshness.Verdict, Git.GitInSync, Git.GitNewerSign);
-
-    private bool GitDecidesNewer => Git.GitInSync || Git.GitNewerSign != 0;
-
-    private PlannedActions CurrentPlan => _result?.CountPlannedActions() ?? PlannedActions.Empty;
 
     public void NotifyActionsChanged()
     {
@@ -467,126 +373,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
                 : $"{exclusions.TrimEnd()},.git";
     }
 
-    internal static NewerSide CombineNewer(NewerSide freshness, bool gitInSync, int gitNewerSign)
-    {
-        if (gitInSync)
-        {
-            return NewerSide.Tie;
-        }
-
-        return gitNewerSign switch
-        {
-            < 0 => NewerSide.Left,
-            > 0 => NewerSide.Right,
-            _ => freshness,
-        };
-    }
-
-    internal static (Dictionary<ComparisonStatus, int> Files, Dictionary<ComparisonStatus, int> Dirs) CountRemaining(
-        DirectoryComparison root,
-        IReadOnlyDictionary<object, SyncOutcome> outcomes)
-    {
-        var files = NewZeroStats();
-        var dirs = NewZeroStats();
-        WalkRemaining(root, outcomes, files, dirs);
-        return (files, dirs);
-    }
-
-    internal static List<ConfirmLine> BuildPlanLines(
-        PlannedActions planned,
-        string? direction,
-        IReadOnlyList<PlanReceiver> receivers,
-        bool bothWays = false)
-    {
-        var lines = new List<ConfirmLine>();
-
-        if (direction is not null)
-        {
-            lines.Add(new ConfirmTextLine($"Направление: {direction}."));
-            lines.Add(new ConfirmGapLine());
-        }
-
-        if (planned.Total == 0)
-        {
-            lines.Add(new ConfirmTextLine("Изменений нет."));
-            return lines;
-        }
-
-        if (planned.Copies > 0)
-        {
-            lines.Add(new ConfirmMetricLine(
-                "Скопировать файлов",
-                $"{planned.Copies:N0}",
-                SizeFormatter.Format(planned.CopyBytes)));
-
-            if (planned.ModifiedCopies > 0)
-            {
-                lines.Add(new ConfirmMetricLine(
-                    "новых",
-                    $"{planned.NewCopies:N0}",
-                    SizeFormatter.Format(planned.NewCopyBytes),
-                    ConfirmMetricTone.Sub));
-
-                lines.Add(new ConfirmMetricLine(
-                    "изменённых",
-                    $"{planned.ModifiedCopies:N0}",
-                    SizeFormatter.Format(planned.ModifiedCopyBytes),
-                    ConfirmMetricTone.Sub));
-            }
-        }
-
-        if (planned.DirCopies > 0)
-        {
-            lines.Add(new ConfirmMetricLine("Создать каталогов", $"{planned.DirCopies:N0}", string.Empty));
-        }
-
-        if (planned.Deletes > 0)
-        {
-            lines.Add(new ConfirmMetricLine(
-                "Удалить файлов в корзину",
-                $"{planned.Deletes:N0}",
-                SizeFormatter.Format(planned.DeleteFileBytes),
-                ConfirmMetricTone.Danger));
-        }
-
-        if (planned.DirDeletes > 0)
-        {
-            lines.Add(new ConfirmMetricLine(
-                "Удалить каталогов целиком",
-                $"{planned.DirDeletes:N0}",
-                SizeFormatter.Format(planned.DeleteDirBytes),
-                ConfirmMetricTone.Danger));
-
-            var whole = planned.DirDeletes == 1
-                ? "Каталог уходит в корзину со всем содержимым"
-                : "Каталоги уходят в корзину со всем содержимым";
-
-            lines.Add(new ConfirmTextLine(
-                planned.Deletes > 0
-                    ? $"{whole} – эти файлы в число {planned.Deletes:N0} не входят."
-                    : $"{whole}.",
-                ConfirmTextTone.Muted));
-        }
-
-        var space = DescribeReceivers(receivers, bothWays);
-
-        if (space.Count > 0)
-        {
-            lines.Add(new ConfirmGapLine());
-            lines.AddRange(space);
-        }
-
-        if (planned.DeleteBytes > 0)
-        {
-            lines.Add(new ConfirmGapLine());
-            lines.Add(new ConfirmTextLine(
-                "Удалённое уходит в корзину – место освободится после её очистки.",
-                ConfirmTextTone.Muted));
-        }
-
-        return lines;
-    }
-
     internal Task CompareFromAutomationAsync(CancellationToken cancellationToken)
     {
         return ExecuteCompareAsync(cancellationToken);
@@ -656,60 +442,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
     }
 
-    private static void WalkRemaining(
-        DirectoryComparison dir,
-        IReadOnlyDictionary<object, SyncOutcome> outcomes,
-        Dictionary<ComparisonStatus, int> files,
-        Dictionary<ComparisonStatus, int> dirs)
-    {
-        foreach (var file in dir.Files)
-        {
-            CountRemainingFile(file, outcomes, files);
-        }
-
-        foreach (var sub in dir.SubDirectories)
-        {
-            CountRemainingDirectory(sub, outcomes, dirs);
-            WalkRemaining(sub, outcomes, files, dirs);
-        }
-    }
-
-    private static void CountRemainingFile(
-        FileComparison file,
-        IReadOnlyDictionary<object, SyncOutcome> outcomes,
-        Dictionary<ComparisonStatus, int> files)
-    {
-        if (outcomes.GetValueOrDefault(file) == SyncOutcome.Applied)
-        {
-            if (file.Action is not (SyncAction.DeleteLeft or SyncAction.DeleteRight))
-            {
-                files[ComparisonStatus.Identical]++;
-            }
-
-            return;
-        }
-
-        files[file.Status]++;
-    }
-
-    private static void CountRemainingDirectory(
-        DirectoryComparison dir,
-        IReadOnlyDictionary<object, SyncOutcome> outcomes,
-        Dictionary<ComparisonStatus, int> dirs)
-    {
-        if (outcomes.GetValueOrDefault(dir) == SyncOutcome.Applied)
-        {
-            if (dir.Action is not (SyncAction.DeleteLeft or SyncAction.DeleteRight))
-            {
-                dirs[ComparisonStatus.Identical]++;
-            }
-
-            return;
-        }
-
-        dirs[dir.Status]++;
-    }
-
     private static void ApplyActionRecursive(DirectoryComparison dir, SyncAction action)
     {
         if (dir.Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly)
@@ -748,18 +480,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
                 SyncAction.Skip => SyncAction.Skip,
                 _ => dir.Action,
             };
-    }
-
-    private static Dictionary<ComparisonStatus, int> NewZeroStats()
-    {
-        var stats = new Dictionary<ComparisonStatus, int>();
-
-        foreach (var status in Enum.GetValues<ComparisonStatus>())
-        {
-            stats[status] = 0;
-        }
-
-        return stats;
     }
 
     private static FileDiffResult BuildContentDiff(string leftPath, string rightPath)
@@ -834,77 +554,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
 
         return count;
-    }
-
-    private static List<ConfirmLine> DescribeReceivers(IReadOnlyList<PlanReceiver> receivers, bool bothWays)
-    {
-        var lines = new List<ConfirmLine>();
-
-        foreach (var receiver in receivers)
-        {
-            if (receiver.Required <= 0)
-            {
-                continue;
-            }
-
-            if (lines.Count > 0)
-            {
-                lines.Add(new ConfirmGapLine());
-            }
-
-            lines.Add(new ConfirmTextLine($"Приёмник {receiver.Path}", ConfirmTextTone.Muted));
-            lines.Add(new ConfirmMetricLine("Потребуется", string.Empty, $"≈{SizeFormatter.Format(receiver.Required)}"));
-
-            if (receiver.Free is not { } free)
-            {
-                lines.Add(new ConfirmMetricLine("Свободно", string.Empty, "неизвестно"));
-                continue;
-            }
-
-            var enough = free >= receiver.Required;
-
-            lines.Add(new ConfirmMetricLine(
-                "Свободно",
-                string.Empty,
-                SizeFormatter.Format(free),
-                enough ? ConfirmMetricTone.None : ConfirmMetricTone.Danger));
-
-            if (!enough)
-            {
-                lines.Add(new ConfirmTextLine(
-                    $"Не хватает ≈{SizeFormatter.Format(receiver.Required - free)}.",
-                    ConfirmTextTone.Danger));
-            }
-        }
-
-        if (bothWays && lines.Count > 0 && receivers.Count(static receiver => receiver.Required > 0) == 1)
-        {
-            lines.Add(new ConfirmTextLine("Во встречном направлении копирования нет.", ConfirmTextTone.Muted));
-        }
-
-        return lines;
-    }
-
-    private static long? TryGetFreeSpace(string path)
-    {
-        // TODO: свободное место на UNC-приёмнике не читается – DriveInfo знает только локальные корни; перейти на GetDiskFreeSpaceEx, когда появятся жалобы на сетевые папки
-        try
-        {
-            var root = Path.GetPathRoot(Path.GetFullPath(path));
-
-            if (string.IsNullOrEmpty(root))
-            {
-                return null;
-            }
-
-            var drive = new DriveInfo(root);
-
-            return drive.IsReady ? drive.AvailableFreeSpace : null;
-        }
-        catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException or NotSupportedException)
-        {
-            return null;
-        }
     }
 
     private void AdoptComparison(ComparisonResult comparison)
@@ -1048,7 +697,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         SummaryText = $"Сравнение завершено за {stopwatch.Elapsed.TotalSeconds:F2} с";
         Session.StatusCaption = SummaryText;
 
-        _logger.CompareFinished(_total, (long)stopwatch.Elapsed.TotalMilliseconds);
+        _logger.CompareFinished(Ledger.Total, (long)stopwatch.Elapsed.TotalMilliseconds);
         RaiseProfileRun(_result, null, (long)stopwatch.Elapsed.TotalMilliseconds);
 
         await ReadGitStateAsync();
@@ -1135,7 +784,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             var done = 0;
             HashModifiedFiles(result.Root, result.LeftPath, result.RightPath, progress, ref done, token);
             return SyncRowsProjector.BuildDirSizeCache(result.Root);
-        }, ModifiedCount, CancellationToken.None);
+        }, Ledger.ModifiedCount, CancellationToken.None);
 
         stopwatch.Stop();
 
@@ -1157,7 +806,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     private bool CanSync()
     {
-        return !IsBusy && _result is not null && !HasPending && HasActionableChanges();
+        return !IsBusy && _result is not null && !HasPending && Ledger.HasActionableChanges();
     }
 
     [RelayCommand(CanExecute = nameof(CanSync))]
@@ -1183,7 +832,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
                 return;
             }
 
-            var confirm = BuildSyncConfirmation(current, hashes);
+            var confirm = Ledger.BuildSyncConfirmation(current, hashes);
 
             if (!await _dialogs.ShowAsync(confirm))
             {
@@ -1197,90 +846,13 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
             await HashCommand.ExecuteAsync(null);
 
-            if (!HasActionableChanges() || _result is not { } hashed || hashed.HasPendingResolution())
+            if (!Ledger.HasActionableChanges() || _result is not { } hashed || hashed.HasPendingResolution())
             {
                 return;
             }
         }
 
         await ExecuteSyncAsync(true, CancellationToken.None);
-    }
-
-    private ConfirmDialogViewModel BuildSyncConfirmation(ComparisonResult current, ConfirmChoice hashes)
-    {
-        var planned = CurrentPlan;
-        var deletes = planned.Deletes + planned.DirDeletes;
-        var offerHashes = planned.ModifiedCopies > 0 && !_hashesCompared;
-        var lines = BuildPlanLines(planned, null, BuildReceivers(planned), CurrentMode == SyncMode.Bidirectional);
-
-        if (offerHashes)
-        {
-            lines.Add(new ConfirmGapLine());
-            lines.Add(new ConfirmTextLine(
-                "Изменённые отличаются размером или датой. «Сверить хеши» сравнит их содержимым.",
-                ConfirmTextTone.Muted));
-        }
-
-        var choices = new List<ConfirmChoice> { new("Отмена", ConfirmChoiceKind.Dismissive) };
-
-        if (offerHashes)
-        {
-            choices.Add(hashes);
-        }
-
-        choices.Add(new("Синхронизировать", deletes > 0 ? ConfirmChoiceKind.Destructive : ConfirmChoiceKind.Primary));
-
-        return new($"Синхронизация {DirectionText()}", DirectionIconKind, lines, choices)
-        {
-            Summary = DescribePlanVolume(planned),
-            Warning = deletes > 0 ? DescribeDeletionRecency(current) : null,
-        };
-    }
-
-    internal static string DescribePlanVolume(PlannedActions planned)
-    {
-        var parts = new List<string>();
-
-        if (planned.CopyBytes > 0)
-        {
-            parts.Add($"копирование ≈{SizeFormatter.Format(planned.CopyBytes)}");
-        }
-
-        if (planned.DeleteBytes > 0)
-        {
-            parts.Add($"в корзину ≈{SizeFormatter.Format(planned.DeleteBytes)}");
-        }
-
-        return parts.Count > 0 ? string.Join(" · ", parts) : $"действий: {planned.Total:N0}";
-    }
-
-    private static string? DescribeDeletionRecency(ComparisonResult result)
-    {
-        var (_, newest) = SyncFreshness.DeletionRecency(result.Root);
-
-        return newest is { } when
-            ? $"Новейшее из удаляемого изменено {SyncGitViewModel.FormatStamp(when)} ({SyncGitViewModel.FormatAge(when)}) – убедитесь, что зеркалите не более свежую папку."
-            : null;
-    }
-
-    internal static SyncVerifyState ResolveVerify(bool requested, SyncReport report)
-    {
-        if (!requested)
-        {
-            return SyncVerifyState.None;
-        }
-
-        return report.Verified ? SyncVerifyState.Completed : SyncVerifyState.Interrupted;
-    }
-
-    internal static string DescribeVerify(bool requested, SyncReport report)
-    {
-        return ResolveVerify(requested, report) switch
-        {
-            SyncVerifyState.Completed => $", расхождений: {report.Mismatches.Count:N0}",
-            SyncVerifyState.Interrupted => $", проверка прервана (расхождений к тому моменту: {report.Mismatches.Count:N0})",
-            _ => string.Empty,
-        };
     }
 
     private async Task<SyncRunResult?> ExecuteSyncAsync(bool interactive, CancellationToken external = default)
@@ -1291,7 +863,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
 
         var result = _result;
-        var planned = CurrentPlan;
+        var planned = Ledger.CurrentPlan;
         var stopwatch = Stopwatch.StartNew();
 
         _logger.SyncStarted(CurrentMode);
@@ -1314,7 +886,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
 
         LastSyncElapsed = stopwatch.Elapsed;
-        LastVerifyState = ResolveVerify(verify, report);
+        LastVerifyState = SyncLedgerViewModel.ResolveVerify(verify, report);
 
         _logger.SyncFinished(report.SuccessCount, report.Errors.Count, (long)stopwatch.Elapsed.TotalMilliseconds);
 
@@ -1327,11 +899,11 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _lastReport = report;
         _outcomes = SyncOutcomes.Build(result, report.Errors, report.Mismatches);
         RebuildRows();
-        RefreshLedgerAfterSync();
+        Ledger.RefreshAfterSync(_outcomes);
         RaiseProfileRun(null, report, (long)stopwatch.Elapsed.TotalMilliseconds);
         await ReadGitStateAsync();
 
-        var verifyText = DescribeVerify(verify, report);
+        var verifyText = SyncLedgerViewModel.DescribeVerify(verify, report);
         var volumeText = report.CopiedBytes > 0 ? $" Перенесено: {SizeFormatter.Format(report.CopiedBytes)}." : string.Empty;
         var rateText = SyncSessionViewModel.DescribeRate("Синхронизация", report, stopwatch.Elapsed);
         SummaryText = $"Готово за {stopwatch.Elapsed.TotalSeconds:F2} с.{volumeText}{rateText} Успешно: {report.SuccessCount:N0}, ошибок: {report.Errors.Count:N0}{verifyText}";
@@ -1544,6 +1116,18 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
     }
 
+    private void OnLedgerPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(SyncLedgerViewModel.SyncIsPrimary))
+        {
+            return;
+        }
+
+        SyncCommand.NotifyCanExecuteChanged();
+        HashCommand.NotifyCanExecuteChanged();
+        ExportComparisonCommand.NotifyCanExecuteChanged();
+    }
+
     private void ReapplyMode()
     {
         if (_result is null)
@@ -1749,78 +1333,16 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     private void UpdateSummary()
     {
-        if (_result is null)
-        {
-            SummaryText = "Сравнение не выполнялось.";
-            _stats = NewZeroStats();
-            _dirStats = NewZeroStats();
-            _freshness = default;
-            _plan = PlannedActions.Empty;
-            _total = 0;
-            NotifyLedgerChanged();
-            HasPending = false;
-            SyncCommand.NotifyCanExecuteChanged();
-            HashCommand.NotifyCanExecuteChanged();
-            ExportComparisonCommand.NotifyCanExecuteChanged();
-            OnPropertyChanged(nameof(SyncIsPrimary));
-            return;
-        }
+        HasPending = _result?.HasPendingResolution() ?? false;
+        Ledger.Update(_result, _hashesCompared);
 
-        var stats = _result.GetStatistics();
-
-        SummaryText =
-            $"Одинаковых: {stats[ComparisonStatus.Identical]}, "
-            + $"только слева: {stats[ComparisonStatus.LeftOnly]}, "
-            + $"только справа: {stats[ComparisonStatus.RightOnly]}, "
-            + $"изменённых: {stats[ComparisonStatus.Modified]}, "
-            + $"конфликтов: {stats[ComparisonStatus.Conflict]}";
-
-        _stats = stats;
-        _dirStats = _result.GetDirectoryStatistics();
-        _freshness = SyncFreshness.Compute(_result.Root);
-        _plan = _result.CountPlannedActions();
-        _total = stats.Values.Sum();
-        NotifyLedgerChanged();
-
-        HasPending = _result.HasPendingResolution();
-        SyncCommand.NotifyCanExecuteChanged();
-        HashCommand.NotifyCanExecuteChanged();
-        ExportComparisonCommand.NotifyCanExecuteChanged();
-        OnPropertyChanged(nameof(SyncIsPrimary));
-    }
-
-    private void RefreshLedgerAfterSync()
-    {
-        if (_result is null)
-        {
-            return;
-        }
-
-        var (files, dirs) = CountRemaining(_result.Root, _outcomes);
-        _stats = files;
-        _dirStats = dirs;
-        _total = files.Values.Sum();
-        _freshness = default;
-        _plan = PlannedActions.Empty;
-        NotifyLedgerChanged();
-    }
-
-    private string BuildSyncCommandHint()
-    {
-        if (_result is null)
-        {
-            return "Сначала выполните сравнение.";
-        }
-
-        var lines = BuildPlanLines(_plan, DirectionText(), BuildReceivers(_plan), CurrentMode == SyncMode.Bidirectional);
-
-        if (SyncIsDestructive)
-        {
-            lines.Add(new ConfirmGapLine());
-            lines.Add(new ConfirmTextLine("Удаление идёт в корзину, копирование перезаписывает файлы на приёмнике."));
-        }
-
-        return ConfirmDialogViewModel.AsText(lines);
+        SummaryText = _result is null
+            ? "Сравнение не выполнялось."
+            : $"Одинаковых: {Ledger.IdenticalCount}, "
+              + $"только слева: {Ledger.LeftOnlyCount}, "
+              + $"только справа: {Ledger.RightOnlyCount}, "
+              + $"изменённых: {Ledger.ModifiedCount}, "
+              + $"конфликтов: {Ledger.ConflictCount}";
     }
 
     private string DirectionText()
@@ -1831,35 +1353,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             SyncMode.Bidirectional => "в обе стороны",
             _ => "слева направо",
         };
-    }
-
-    private List<PlanReceiver> BuildReceivers(PlannedActions planned)
-    {
-        if (_result is null)
-        {
-            return [];
-        }
-
-        var receivers = new List<PlanReceiver>();
-
-        if (planned.RequiredLeftBytes > 0)
-        {
-            receivers.Add(new(_result.LeftPath, planned.RequiredLeftBytes, TryGetFreeSpace(_result.LeftPath)));
-        }
-
-        if (planned.RequiredRightBytes > 0)
-        {
-            receivers.Add(new(_result.RightPath, planned.RequiredRightBytes, TryGetFreeSpace(_result.RightPath)));
-        }
-
-        return receivers;
-    }
-
-    private double Fraction(ComparisonStatus status)
-    {
-        var differing = DifferingTotal;
-
-        return differing > 0 ? (double)_stats[status] / differing : 0;
     }
 
     [RelayCommand]
@@ -1881,53 +1374,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         OnPropertyChanged(nameof(SortBySize));
         OnPropertyChanged(nameof(SortByModified));
         OnPropertyChanged(nameof(SortDirectionIconKind));
-    }
-
-    private void NotifyLedgerChanged()
-    {
-        OnPropertyChanged(nameof(HasResult));
-        OnPropertyChanged(nameof(IdenticalCount));
-        OnPropertyChanged(nameof(LeftOnlyCount));
-        OnPropertyChanged(nameof(RightOnlyCount));
-        OnPropertyChanged(nameof(ModifiedCount));
-        OnPropertyChanged(nameof(ConflictCount));
-        OnPropertyChanged(nameof(IdenticalDirCount));
-        OnPropertyChanged(nameof(LeftOnlyDirCount));
-        OnPropertyChanged(nameof(RightOnlyDirCount));
-        OnPropertyChanged(nameof(ModifiedDirCount));
-        OnPropertyChanged(nameof(DifferingTotal));
-        OnPropertyChanged(nameof(HasDifferences));
-        OnPropertyChanged(nameof(LeftOnlyFraction));
-        OnPropertyChanged(nameof(RightOnlyFraction));
-        OnPropertyChanged(nameof(ModifiedFraction));
-        OnPropertyChanged(nameof(ConflictFraction));
-        OnPropertyChanged(nameof(HasConflicts));
-        OnPropertyChanged(nameof(CompositionHint));
-        OnPropertyChanged(nameof(SyncIsDestructive));
-        OnPropertyChanged(nameof(CompareCommandHint));
-        OnPropertyChanged(nameof(SyncCommandHint));
-        OnPropertyChanged(nameof(HasPlanVolume));
-        OnPropertyChanged(nameof(HasPlanCopy));
-        OnPropertyChanged(nameof(HasPlanTrash));
-        OnPropertyChanged(nameof(PlanCopyText));
-        OnPropertyChanged(nameof(PlanTrashText));
-        OnPropertyChanged(nameof(PlanVolumeHint));
-        NotifyNewerBadgeChanged();
-    }
-
-    private void NotifyNewerBadgeChanged()
-    {
-        OnPropertyChanged(nameof(ShowNewerBadge));
-        OnPropertyChanged(nameof(NewerBadgeIconKind));
-        OnPropertyChanged(nameof(NewerBadgeText));
-        OnPropertyChanged(nameof(NewerBadgeTooltip));
-        OnPropertyChanged(nameof(NewerIsLeft));
-        OnPropertyChanged(nameof(NewerIsRight));
-    }
-
-    private bool HasActionableChanges()
-    {
-        return _result is not null && _result.CountPlannedActions().Total > 0;
     }
 
     private SyncProfile BuildCurrentProfile(string id, string name, SyncProfile? existing = null)

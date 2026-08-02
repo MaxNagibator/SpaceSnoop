@@ -222,9 +222,9 @@ public sealed class McpBridge(
                 parts.Add($"помечено на удаление {scan.MarkedCount}");
             }
 
-            if (sync.HasResult)
+            if (sync.Ledger.HasResult)
             {
-                parts.Add($"открыто сравнение {sync.LeftPath} → {sync.RightPath}, различий {sync.LeftOnlyCount + sync.RightOnlyCount + sync.ModifiedCount + sync.ConflictCount}");
+                parts.Add($"открыто сравнение {sync.LeftPath} → {sync.RightPath}, различий {sync.Ledger.LeftOnlyCount + sync.Ledger.RightOnlyCount + sync.Ledger.ModifiedCount + sync.Ledger.ConflictCount}");
             }
 
             return $"[Состояние окна SpaceSnoop: {string.Join("; ", parts)}. Это служебная справка, отвечать на неё не надо.]";
@@ -433,7 +433,7 @@ public sealed class McpBridge(
 
         var run = Dispatch(() =>
         {
-            if (!sync.HasResult)
+            if (!sync.Ledger.HasResult)
             {
                 throw new McpException("Сначала выполните сравнение: open_sync с compare=true.");
             }
@@ -1104,14 +1104,14 @@ public sealed class McpBridge(
             sync.Mirror,
             sync.Exclusions,
             sync.IsBusy,
-            sync.HasResult,
+            sync.Ledger.HasResult,
             new Dictionary<string, int>
             {
-                ["Identical"] = sync.IdenticalCount,
-                ["LeftOnly"] = sync.LeftOnlyCount,
-                ["RightOnly"] = sync.RightOnlyCount,
-                ["Modified"] = sync.ModifiedCount,
-                ["Conflict"] = sync.ConflictCount,
+                ["Identical"] = sync.Ledger.IdenticalCount,
+                ["LeftOnly"] = sync.Ledger.LeftOnlyCount,
+                ["RightOnly"] = sync.Ledger.RightOnlyCount,
+                ["Modified"] = sync.Ledger.ModifiedCount,
+                ["Conflict"] = sync.Ledger.ConflictCount,
             });
     }
 }

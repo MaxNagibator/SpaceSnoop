@@ -260,14 +260,14 @@ public class PerformanceTests
         var report = new SyncReport();
         report.AddApplied(SyncAction.CopyToRight, "a.txt", 1024);
 
-        var interrupted = SyncViewModel.DescribeVerify(true, report);
+        var interrupted = SyncLedgerViewModel.DescribeVerify(true, report);
         report.MarkVerified();
 
         Assert.Multiple(() =>
         {
             Assert.That(interrupted, Does.Contain("проверка прервана"));
-            Assert.That(SyncViewModel.DescribeVerify(true, report), Is.EqualTo(", расхождений: 0"));
-            Assert.That(SyncViewModel.DescribeVerify(false, report), Is.Empty);
+            Assert.That(SyncLedgerViewModel.DescribeVerify(true, report), Is.EqualTo(", расхождений: 0"));
+            Assert.That(SyncLedgerViewModel.DescribeVerify(false, report), Is.Empty);
         });
     }
 
@@ -345,14 +345,14 @@ public class PerformanceTests
         var report = new SyncReport();
         report.AddApplied(SyncAction.CopyToRight, "a.txt", 1024);
 
-        var interrupted = SyncViewModel.ResolveVerify(true, report);
+        var interrupted = SyncLedgerViewModel.ResolveVerify(true, report);
         report.MarkVerified();
 
         Assert.Multiple(() =>
         {
-            Assert.That(SyncViewModel.ResolveVerify(false, report), Is.EqualTo(SyncVerifyState.None));
+            Assert.That(SyncLedgerViewModel.ResolveVerify(false, report), Is.EqualTo(SyncVerifyState.None));
             Assert.That(interrupted, Is.EqualTo(SyncVerifyState.Interrupted));
-            Assert.That(SyncViewModel.ResolveVerify(true, report), Is.EqualTo(SyncVerifyState.Completed));
+            Assert.That(SyncLedgerViewModel.ResolveVerify(true, report), Is.EqualTo(SyncVerifyState.Completed));
         });
     }
 

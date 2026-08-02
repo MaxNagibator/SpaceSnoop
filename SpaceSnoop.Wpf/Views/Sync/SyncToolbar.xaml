@@ -75,7 +75,7 @@
             <Setter Property="Visibility"
                     Value="Collapsed" />
             <Style.Triggers>
-                <DataTrigger Binding="{Binding SyncIsDestructive}"
+                <DataTrigger Binding="{Binding Ledger.SyncIsDestructive}"
                              Value="True">
                     <Setter Property="Visibility"
                             Value="Visible" />
@@ -86,7 +86,7 @@
         <Style x:Key="CompareLabel"
                TargetType="TextBlock">
             <Style.Triggers>
-                <DataTrigger Binding="{Binding SyncIsPrimary}"
+                <DataTrigger Binding="{Binding Ledger.SyncIsPrimary}"
                              Value="True">
                     <DataTrigger.EnterActions>
                         <BeginStoryboard Storyboard="{StaticResource LabelHide}" />
@@ -101,7 +101,7 @@
         <Style x:Key="SyncLabel"
                TargetType="TextBlock">
             <Style.Triggers>
-                <DataTrigger Binding="{Binding SyncIsPrimary}"
+                <DataTrigger Binding="{Binding Ledger.SyncIsPrimary}"
                              Value="True">
                     <DataTrigger.EnterActions>
                         <BeginStoryboard Storyboard="{StaticResource LabelShow}" />
@@ -265,7 +265,7 @@
                         Command="{Binding CompareCommand}"
                         VerticalAlignment="Center"
                         Margin="0,0,8,8"
-                        ToolTip="{Binding CompareCommandHint}"
+                        ToolTip="{Binding Ledger.CompareCommandHint}"
                         AutomationProperties.Name="Сравнить каталоги">
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.GitCompare}"
@@ -285,7 +285,7 @@
                         Command="{Binding SyncCommand}"
                         VerticalAlignment="Center"
                         Margin="0,0,16,8"
-                        ToolTip="{Binding SyncCommandHint}"
+                        ToolTip="{Binding Ledger.SyncCommandHint}"
                         AutomationProperties.Name="Синхронизировать каталоги">
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Kind="{Binding DirectionIconKind}"

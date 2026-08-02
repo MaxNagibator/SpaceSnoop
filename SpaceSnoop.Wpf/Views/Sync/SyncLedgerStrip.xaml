@@ -7,7 +7,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
-             d:DataContext="{d:DesignInstance vm:SyncViewModel}"
+             d:DataContext="{d:DesignInstance vm:SyncLedgerViewModel}"
              d:DesignWidth="1040">
 
     <UserControl.Resources>
@@ -224,7 +224,8 @@
         </Style>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource LedgerStrip}"
+    <Border DataContext="{Binding Ledger}"
+            Style="{StaticResource LedgerStrip}"
             Margin="0,0,0,10">
         <Grid>
             <Grid.ColumnDefinitions>

@@ -249,7 +249,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         }
         else
         {
-            lines.AddRange(SyncViewModel.BuildPlanLines(planned, null, []));
+            lines.AddRange(SyncLedgerViewModel.BuildPlanLines(planned, null, []));
         }
 
         if (!await ConfirmSyncAsync("Синхронизация профиля", lines, planned))
@@ -319,7 +319,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         }
         else
         {
-            lines.AddRange(SyncViewModel.BuildPlanLines(planned, null, []));
+            lines.AddRange(SyncLedgerViewModel.BuildPlanLines(planned, null, []));
         }
 
         if (!await ConfirmSyncAsync("Синхронизация всех профилей", lines, planned))
@@ -558,7 +558,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
                 new("Синхронизировать", destructive ? ConfirmChoiceKind.Destructive : ConfirmChoiceKind.Primary),
             ])
         {
-            Summary = planned is null ? null : SyncViewModel.DescribePlanVolume(planned),
+            Summary = planned is null ? null : SyncLedgerViewModel.DescribePlanVolume(planned),
         };
 
         return await _dialogs.ShowAsync(confirm);
