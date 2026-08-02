@@ -183,7 +183,9 @@ public partial class App : Application
         services.AddSingleton<ArchiveProgressDialogFactory>();
 
         services.AddSingleton<ScanViewModel>();
+        services.AddSingleton<IScanAutomation>(static provider => provider.GetRequiredService<ScanViewModel>());
         services.AddSingleton<SyncViewModel>();
+        services.AddSingleton<ISyncAutomation>(static provider => provider.GetRequiredService<SyncViewModel>());
         services.AddSingleton<OverviewViewModel>();
         services.AddSingleton<ScheduleViewModel>();
         services.AddSingleton<DockerViewModel>();

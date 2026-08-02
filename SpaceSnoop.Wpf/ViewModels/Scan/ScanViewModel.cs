@@ -263,7 +263,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         return _archiveDialogFactory.CreateRequest(dir, deleteOriginal, interactive: false);
     }
 
-    internal async Task<ArchiveProgressDialogViewModel> ArchiveFromAutomationAsync(
+    internal async Task<ArchiveOutcome> ArchiveFromAutomationAsync(
         DirectorySpace dir,
         ArchiveRequest request,
         CancellationToken cancellationToken)
@@ -277,7 +277,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
         ApplyArchiveResult(dir, dialog);
 
-        return dialog;
+        return new(dialog.CreatedArchivePath, dialog.OriginalDeleted, dialog.StatusText);
     }
 
     internal int MarkForAutomation(IReadOnlyList<SpaceBase> targets, bool mark)

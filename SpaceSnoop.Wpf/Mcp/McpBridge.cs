@@ -12,8 +12,8 @@ namespace SpaceSnoop.Wpf.Mcp;
 
 public sealed class McpBridge(
     ISettingsStore settings,
-    SyncViewModel sync,
-    ScanViewModel scan,
+    ISyncAutomation sync,
+    IScanAutomation scan,
     McpPreferences preferences,
     ScanPreferences scanPreferences,
     DiskSpaceCalculator calculator,
@@ -192,6 +192,12 @@ public sealed class McpBridge(
 
             Dispatch(() =>
             {
+                if (scan.IsScanning)
+                {
+                    logger.McpToolRejected("scan_directory", "страница занялась операцией, пока шёл обход");
+                    throw new McpException("Страница «Сканирование» занялась другой операцией, пока шёл обход – результат не показан. Повторите с show=false, чтобы получить данные без окна.");
+                }
+
                 scan.ApplyScanResult(path, tree, walk);
                 scan.SelectPathForAutomation(tree.AbsolutePath);
                 DeferOrNavigate(SectionKey.Scan);
@@ -222,9 +228,9 @@ public sealed class McpBridge(
                 parts.Add($"помечено на удаление {scan.MarkedCount}");
             }
 
-            if (sync.Ledger.HasResult)
+            if (sync.HasComparison)
             {
-                parts.Add($"открыто сравнение {sync.Setup.LeftPath} → {sync.Setup.RightPath}, различий {sync.Ledger.LeftOnlyCount + sync.Ledger.RightOnlyCount + sync.Ledger.ModifiedCount + sync.Ledger.ConflictCount}");
+                parts.Add($"открыто сравнение {sync.LeftPath} → {sync.RightPath}, различий {sync.LeftOnlyCount + sync.RightOnlyCount + sync.ModifiedCount + sync.ConflictCount}");
             }
 
             return $"[Состояние окна SpaceSnoop: {string.Join("; ", parts)}. Это служебная справка, отвечать на неё не надо.]";
@@ -318,20 +324,20 @@ public sealed class McpBridge(
 
         var (prepared, run) = Dispatch(() => PrepareArchiveRun(path, deleteOriginal, cancellationToken));
 
-        var dialog = await run.ConfigureAwait(false);
+        var outcome = await run.ConfigureAwait(false);
 
         return Dispatch(() =>
         {
-            if (dialog.CreatedArchivePath is null)
+            if (outcome.ArchivePath is null)
             {
-                throw new McpException($"Архив не создан: {dialog.StatusText}");
+                throw new McpException($"Архив не создан: {outcome.StatusText}");
             }
 
             return Serialize(new McpArchiveResult(prepared.SourcePath,
-                dialog.CreatedArchivePath,
+                outcome.ArchivePath,
                 prepared.Files.Count,
-                dialog.OriginalDeleted,
-                dialog.StatusText,
+                outcome.OriginalDeleted,
+                outcome.StatusText,
                 ReadScanState()));
         });
     }
@@ -413,7 +419,7 @@ public sealed class McpBridge(
         {
             logger.McpToolInvoked("sync_current", $"план, записей до {entryLimit}");
 
-            var plan = Dispatch(() => sync.Operations.CapturePlanBuilder(entryLimit));
+            var plan = Dispatch(() => sync.CapturePlanBuilder(entryLimit));
 
             if (plan is null)
             {
@@ -433,7 +439,7 @@ public sealed class McpBridge(
 
         var run = Dispatch(() =>
         {
-            if (!sync.Ledger.HasResult)
+            if (!sync.HasComparison)
             {
                 throw new McpException("Сначала выполните сравнение: open_sync с compare=true.");
             }
@@ -443,15 +449,15 @@ public sealed class McpBridge(
                 throw new McpException("Страница «Синхронизация» сейчас занята другой операцией.");
             }
 
-            if (sync.Operations.HasPending)
+            if (sync.HasPendingConflicts)
             {
                 throw new McpException("Есть неразрешённые спорные элементы – разрешите их в приложении.");
             }
 
-            logger.McpMutationRequested("sync_current", $"«{sync.Setup.LeftPath}» → «{sync.Setup.RightPath}», режим {sync.Setup.CurrentMode}, зеркало {sync.Setup.Mirror}");
+            logger.McpMutationRequested("sync_current", $"«{sync.LeftPath}» → «{sync.RightPath}», режим {sync.Mode}, зеркало {sync.Mirror}");
             notifier.Notify("Агент запустил синхронизацию", StatusSeverity.Warning);
 
-            return sync.Operations.SyncFromAutomationAsync(cancellationToken);
+            return sync.SyncFromAutomationAsync(cancellationToken);
         });
 
         var outcome = await run.ConfigureAwait(false);
@@ -844,9 +850,9 @@ public sealed class McpBridge(
             throw new McpException("Страница «Синхронизация» сейчас занята другой операцией.");
         }
 
-        var targetLeft = string.IsNullOrWhiteSpace(left) ? sync.Setup.LeftPath.Trim() : left.Trim();
-        var targetRight = string.IsNullOrWhiteSpace(right) ? sync.Setup.RightPath.Trim() : right.Trim();
-        var targetMode = mode ?? sync.Setup.CurrentMode;
+        var targetLeft = string.IsNullOrWhiteSpace(left) ? sync.LeftPath.Trim() : left.Trim();
+        var targetRight = string.IsNullOrWhiteSpace(right) ? sync.RightPath.Trim() : right.Trim();
+        var targetMode = mode ?? sync.Mode;
 
         if (compare)
         {
@@ -865,26 +871,26 @@ public sealed class McpBridge(
             _ => "Агент открыл страницу «Синхронизация»",
         });
 
-        return (compare ? sync.Operations.CompareFromAutomationAsync(cancellationToken) : null, deferred, ignored);
+        return (compare ? sync.CompareFromAutomationAsync(cancellationToken) : null, deferred, ignored);
     }
 
     private void ApplySyncPaths(string left, string right, SyncMode mode, string? exclusions)
     {
-        if (!string.Equals(sync.Setup.LeftPath, left, StringComparison.Ordinal))
+        if (!string.Equals(sync.LeftPath, left, StringComparison.Ordinal))
         {
-            sync.Setup.LeftPath = left;
+            sync.LeftPath = left;
         }
 
-        if (!string.Equals(sync.Setup.RightPath, right, StringComparison.Ordinal))
+        if (!string.Equals(sync.RightPath, right, StringComparison.Ordinal))
         {
-            sync.Setup.RightPath = right;
+            sync.RightPath = right;
         }
 
-        sync.Setup.SelectedModeIndex = SyncProfile.IndexOfMode(mode);
+        sync.Mode = mode;
 
         if (exclusions is not null)
         {
-            sync.Setup.Exclusions = exclusions.Trim();
+            sync.Exclusions = exclusions.Trim();
         }
     }
 
@@ -897,7 +903,7 @@ public sealed class McpBridge(
         {
             if (allowed)
             {
-                sync.Setup.SelectedWinnerIndex = SyncProfile.IndexOfWinner(side);
+                sync.Winner = side;
             }
             else
             {
@@ -909,7 +915,7 @@ public sealed class McpBridge(
         {
             if (allowed)
             {
-                sync.Setup.Mirror = enabled;
+                sync.Mirror = enabled;
             }
             else
             {
@@ -937,7 +943,7 @@ public sealed class McpBridge(
             request.DeleteOriginal));
     }
 
-    private (ArchiveRequest Request, Task<ArchiveProgressDialogViewModel> Run) PrepareArchiveRun(string path, bool deleteOriginal, CancellationToken cancellationToken)
+    private (ArchiveRequest Request, Task<ArchiveOutcome> Run) PrepareArchiveRun(string path, bool deleteOriginal, CancellationToken cancellationToken)
     {
         if (scan.IsScanning)
         {
@@ -1074,7 +1080,7 @@ public sealed class McpBridge(
 
     private Task<string> ExportCurrentAsync(int entryLimit, CancellationToken cancellationToken)
     {
-        var build = Dispatch(() => sync.Operations.CaptureExportBuilder(entryLimit));
+        var build = Dispatch(() => sync.CaptureExportBuilder(entryLimit));
 
         if (build is null)
         {
@@ -1100,21 +1106,21 @@ public sealed class McpBridge(
 
     private McpSyncState ReadSyncState()
     {
-        return new(sync.Setup.LeftPath,
-            sync.Setup.RightPath,
-            sync.Setup.CurrentMode,
-            sync.Setup.CurrentWinner,
-            sync.Setup.Mirror,
-            sync.Setup.Exclusions,
+        return new(sync.LeftPath,
+            sync.RightPath,
+            sync.Mode,
+            sync.Winner,
+            sync.Mirror,
+            sync.Exclusions,
             sync.IsBusy,
-            sync.Ledger.HasResult,
+            sync.HasComparison,
             new Dictionary<string, int>
             {
-                ["Identical"] = sync.Ledger.IdenticalCount,
-                ["LeftOnly"] = sync.Ledger.LeftOnlyCount,
-                ["RightOnly"] = sync.Ledger.RightOnlyCount,
-                ["Modified"] = sync.Ledger.ModifiedCount,
-                ["Conflict"] = sync.Ledger.ConflictCount,
+                ["Identical"] = sync.IdenticalCount,
+                ["LeftOnly"] = sync.LeftOnlyCount,
+                ["RightOnly"] = sync.RightOnlyCount,
+                ["Modified"] = sync.ModifiedCount,
+                ["Conflict"] = sync.ConflictCount,
             });
     }
 }

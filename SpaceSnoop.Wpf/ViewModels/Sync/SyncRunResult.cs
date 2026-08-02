@@ -2,4 +2,4 @@
 
 namespace SpaceSnoop.Wpf.ViewModels.Sync;
 
-internal sealed record SyncRunResult(SyncReport Report, TimeSpan Elapsed, SyncVerifyState Verify);
+public sealed record SyncRunResult(SyncReport Report, TimeSpan Elapsed, SyncVerifyState Verify);
