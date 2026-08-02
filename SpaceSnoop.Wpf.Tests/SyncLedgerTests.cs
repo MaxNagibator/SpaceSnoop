@@ -24,7 +24,7 @@ public class SyncLedgerTests
         var result = new ComparisonResult(@"C:\left", @"C:\right", root);
         var outcomes = SyncOutcomes.Build(result, [], [new("drift.txt", SyncAction.CopyToRight, "содержимое расходится")]);
 
-        var (files, dirs) = SyncLedgerViewModel.CountRemaining(root, outcomes);
+        var (files, dirs) = SyncPlanNarrative.CountRemaining(root, outcomes);
 
         using (Assert.EnterMultipleScope())
         {

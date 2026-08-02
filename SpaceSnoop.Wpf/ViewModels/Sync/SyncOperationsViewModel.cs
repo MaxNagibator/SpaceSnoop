@@ -1,6 +1,4 @@
 ﻿using KeepShell.Services;
-using SpaceSnoop.Core.Export;
-using SpaceSnoop.Wpf.Diff;
 using System.Diagnostics;
 using System.IO;
 
@@ -8,15 +6,12 @@ namespace SpaceSnoop.Wpf.ViewModels.Sync;
 
 public sealed partial class SyncOperationsViewModel : ObservableObject
 {
-    private const long MaxDiffBytes = 5 * 1024 * 1024;
-
     private readonly ISettingsStore _settings;
     private readonly IDialogService _dialogs;
     private readonly ILogger _logger;
     private readonly CompareDirectoriesUseCase _compare;
     private readonly ExecuteSyncUseCase _sync;
     private readonly ToastNotifier _notifier;
-    private readonly IFilePicker _filePicker;
     private readonly SyncSetupViewModel _setup;
     private readonly SyncSessionViewModel _session;
     private readonly SyncGitViewModel _git;
@@ -28,7 +23,6 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
 
     private Dictionary<object, SyncOutcome> _outcomes = [];
     private Dictionary<DirectoryComparison, (long Left, long Right)>? _dirSizeCache;
-    private bool _gitPromptDeclined;
     private bool _hashesCompared;
 
     [ObservableProperty]
@@ -44,7 +38,6 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
         CompareDirectoriesUseCase compare,
         ExecuteSyncUseCase sync,
         ToastNotifier notifier,
-        IFilePicker filePicker,
         SyncSetupViewModel setup,
         SyncSessionViewModel session,
         SyncGitViewModel git,
@@ -57,7 +50,6 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
         _compare = compare;
         _sync = sync;
         _notifier = notifier;
-        _filePicker = filePicker;
         _setup = setup;
         _session = session;
         _git = git;
@@ -71,6 +63,8 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
 
     internal ComparisonResult? Result => _result;
 
+    internal SyncReport? LastReport => _lastReport;
+
     internal Dictionary<object, SyncOutcome> Outcomes => _outcomes;
 
     internal Dictionary<DirectoryComparison, (long Left, long Right)>? DirSizeCache => _dirSizeCache;
@@ -81,31 +75,17 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
 
     internal SyncVerifyState LastVerifyState { get; private set; }
 
-    internal static string AddGitExclusion(string exclusions)
-    {
-        var parts = exclusions.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-        if (parts.Any(static part => string.Equals(part, ".git", StringComparison.OrdinalIgnoreCase)))
-        {
-            return exclusions;
-        }
-
-        return string.IsNullOrWhiteSpace(exclusions) ? ".git" : $"{exclusions.TrimEnd()},.git";
-    }
-
     public void NotifyBusyChanged()
     {
         CompareCommand.NotifyCanExecuteChanged();
         HashCommand.NotifyCanExecuteChanged();
         SyncCommand.NotifyCanExecuteChanged();
-        ExportComparisonCommand.NotifyCanExecuteChanged();
     }
 
     public void NotifyPlanChanged()
     {
         SyncCommand.NotifyCanExecuteChanged();
         HashCommand.NotifyCanExecuteChanged();
-        ExportComparisonCommand.NotifyCanExecuteChanged();
     }
 
     public void ReapplyMode()
@@ -171,49 +151,6 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
         return ExecuteSyncAsync(false, cancellationToken);
     }
 
-    internal ComparisonExportModel? BuildExportModel(int entryLimit)
-    {
-        return CaptureExportBuilder(entryLimit)?.Invoke();
-    }
-
-    internal Func<SyncPlanExportModel>? CapturePlanBuilder(int entryLimit)
-    {
-        if (_result is null)
-        {
-            return null;
-        }
-
-        var result = _result;
-        var options = new ComparisonExportOptions(_setup.CurrentMode, _setup.CurrentWinner, _setup.Mirror, _setup.Exclusions.Trim());
-
-        return () => SyncPlanExport.Build(result, options, AppInfo.Version, entryLimit);
-    }
-
-    internal Func<ComparisonExportModel>? CaptureExportBuilder(int entryLimit)
-    {
-        if (_result is null)
-        {
-            return null;
-        }
-
-        var result = _result;
-        var options = new ComparisonExportOptions(_setup.CurrentMode, _setup.CurrentWinner, _setup.Mirror, _setup.Exclusions.Trim());
-
-        var git = _git.LeftState is null && _git.RightState is null
-            ? null
-            : new ComparisonExportGit(_git.LeftState, _git.RightState, _git.GitVerdictText);
-
-        var lastSync = _lastReport is null
-            ? null
-            : new ComparisonExportSync(_lastReport.CopiedCount, _lastReport.DeletedCount, _lastReport.Errors, _lastReport.Mismatches);
-
-        return () => ComparisonExport.Build(result, options, AppInfo.Version, entryLimit) with
-        {
-            Git = git,
-            LastSync = lastSync,
-        };
-    }
-
     internal async Task CompareContentAsync(FileComparison file)
     {
         if (_result is null)
@@ -228,7 +165,7 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
 
         try
         {
-            built = await Task.Run(() => BuildContentDiff(leftPath, rightPath), CancellationToken.None);
+            built = await Task.Run(() => SyncContentDiff.Build(leftPath, rightPath), CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -241,127 +178,6 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
 
         var dialog = new FileDiffDialogViewModel(_settings, file, leftPath, rightPath, built.Lines, built.Added, built.Removed, built.Unavailable);
         await _dialogs.ShowAsync(dialog);
-    }
-
-    private static FileDiffResult BuildContentDiff(string leftPath, string rightPath)
-    {
-        var leftInfo = new FileInfo(leftPath);
-        var rightInfo = new FileInfo(rightPath);
-
-        if (!leftInfo.Exists && !rightInfo.Exists)
-        {
-            throw new InvalidOperationException($"Файл не найден ни с одной стороны: {leftPath}");
-        }
-
-        if (DiffUnavailable(leftInfo, out var reason) || DiffUnavailable(rightInfo, out reason))
-        {
-            return FileDiffResult.Unreadable(reason);
-        }
-
-        var lines = TextDiff.Compute(ReadLines(leftInfo), ReadLines(rightInfo));
-        var added = lines.Count(static l => l.Kind == DiffLineKind.Added);
-        var removed = lines.Count(static l => l.Kind == DiffLineKind.Removed);
-        return new(lines, added, removed, null);
-
-        static string[] ReadLines(FileInfo info)
-        {
-            return info.Exists ? File.ReadAllLines(info.FullName) : [];
-        }
-    }
-
-    // TODO: бинарь определяем по NUL-байту; кодировку доверяем File.ReadAllLines (BOM → UTF-8)
-    private static bool DiffUnavailable(FileInfo info, out string reason)
-    {
-        if (!info.Exists)
-        {
-            reason = string.Empty;
-            return false;
-        }
-
-        if (info.Length > MaxDiffBytes)
-        {
-            reason = "Файл велик для построчного сравнения (> 5 МБ) – показано только сводное различие.";
-            return true;
-        }
-
-        if (Array.IndexOf(File.ReadAllBytes(info.FullName), (byte)0) >= 0)
-        {
-            reason = "Файл выглядит двоичным – построчное сравнение недоступно, показано сводное различие.";
-            return true;
-        }
-
-        reason = string.Empty;
-        return false;
-    }
-
-    private static int CountGitDirectories(DirectoryComparison dir)
-    {
-        var count = 0;
-
-        foreach (var sub in dir.SubDirectories)
-        {
-            if (string.Equals(sub.Name, ".git", StringComparison.OrdinalIgnoreCase))
-            {
-                count++;
-                continue;
-            }
-
-            count += CountGitDirectories(sub);
-        }
-
-        return count;
-    }
-
-    private void HashModifiedFiles(DirectoryComparison dir, string leftBase, string rightBase, IProgress<OperationProgress> progress, ref int done, CancellationToken token)
-    {
-        foreach (var file in dir.Files.Where(static f => f.Status == ComparisonStatus.Modified))
-        {
-            token.ThrowIfCancellationRequested();
-
-            var leftPath = Path.Combine(leftBase, file.RelativePath);
-            var rightPath = Path.Combine(rightBase, file.RelativePath);
-
-            try
-            {
-                file.LeftHash = FileHasher.ComputeHash(leftPath, token);
-                file.RightHash = FileHasher.ComputeHash(rightPath, token);
-
-                if (file.LeftHash == file.RightHash)
-                {
-                    file.Status = ComparisonStatus.Identical;
-                    file.Action = SyncAction.Skip;
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logger.HashFileFailed(ex, leftPath);
-            }
-
-            progress.Report(new(++done, file.RelativePath));
-        }
-
-        foreach (var sub in dir.SubDirectories)
-        {
-            HashModifiedFiles(sub, leftBase, rightBase, progress, ref done, token);
-        }
-    }
-
-    private void WriteSyncLog(SyncReport report, bool interactive = true)
-    {
-        var origin = interactive ? string.Empty : " (запуск агентом через MCP)";
-
-        try
-        {
-            SyncLog.Append($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Синхронизация{origin}: {report.SuccessCount} успешно, {report.Errors.Count} ошибок", report);
-        }
-        catch (Exception ex)
-        {
-            _logger.SyncLogWriteFailed(ex);
-        }
     }
 
     private bool CanRun()
@@ -428,57 +244,12 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
         RaiseProfileRun(_result, null, (long)stopwatch.Elapsed.TotalMilliseconds);
 
         await ReadGitStateAsync();
-        await OfferToSkipGitAsync();
-    }
 
-    private async Task OfferToSkipGitAsync()
-    {
-        if (_result is null || _gitPromptDeclined)
+        if (_result is not null && await _git.OfferToSkipAsync(_result, _setup.Exclusions) is { } exclusions)
         {
-            return;
+            _setup.Exclusions = exclusions;
+            await CompareAsync();
         }
-
-        var gitFolders = CountGitDirectories(_result.Root);
-
-        if (gitFolders == 0)
-        {
-            return;
-        }
-
-        var choice = _settings.GetEnum(SettingsKeys.SyncGitFolders, GitFolderPromptChoice.Ask);
-
-        if (choice == GitFolderPromptChoice.Keep)
-        {
-            return;
-        }
-
-        if (choice == GitFolderPromptChoice.Ask)
-        {
-            var prompt = new GitFolderPromptViewModel(gitFolders);
-            var skip = await _dialogs.ShowAsync(prompt);
-
-            if (prompt.Choice != GitFolderPromptChoice.Ask)
-            {
-                _settings.SetEnum(SettingsKeys.SyncGitFolders, prompt.Choice);
-            }
-
-            if (!skip)
-            {
-                _gitPromptDeclined = true;
-                return;
-            }
-        }
-
-        var updatedExclusions = AddGitExclusion(_setup.Exclusions);
-
-        if (string.Equals(updatedExclusions, _setup.Exclusions, StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        _logger.SyncGitFoldersSkipped(gitFolders);
-        _setup.Exclusions = updatedExclusions;
-        await CompareAsync();
     }
 
     private Task ReadGitStateAsync()
@@ -509,7 +280,7 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
         var sizes = await _session.RunAsync("Вычисление хешей:", (token, progress) =>
         {
             var done = 0;
-            HashModifiedFiles(result.Root, result.LeftPath, result.RightPath, progress, ref done, token);
+            SyncHasher.HashModified(result.Root, result.LeftPath, result.RightPath, progress, ref done, token, _logger);
             return SyncRowsProjector.BuildDirSizeCache(result.Root);
         }, _ledger.ModifiedCount, CancellationToken.None);
 
@@ -611,7 +382,7 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
         }
 
         LastSyncElapsed = stopwatch.Elapsed;
-        LastVerifyState = SyncLedgerViewModel.ResolveVerify(verify, report);
+        LastVerifyState = SyncPlanNarrative.ResolveVerify(verify, report);
 
         _logger.SyncFinished(report.SuccessCount, report.Errors.Count, (long)stopwatch.Elapsed.TotalMilliseconds);
 
@@ -620,70 +391,29 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
             _logger.SyncVerified(report.Applied.Count, report.Mismatches.Count);
         }
 
-        WriteSyncLog(report, interactive);
+        var origin = interactive ? string.Empty : " (запуск агентом через MCP)";
+        SyncLog.AppendSafe($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Синхронизация{origin}: {report.SuccessCount} успешно, {report.Errors.Count} ошибок", report, _logger);
+
         _lastReport = report;
         _outcomes = SyncOutcomes.Build(result, report.Errors, report.Mismatches);
         RaiseComparisonChanged(SyncComparisonChange.Applied);
         RaiseProfileRun(null, report, (long)stopwatch.Elapsed.TotalMilliseconds);
         await ReadGitStateAsync();
 
-        var verifyText = SyncLedgerViewModel.DescribeVerify(verify, report);
+        var verifyText = SyncPlanNarrative.DescribeVerify(verify, report);
         var volumeText = report.CopiedBytes > 0 ? $" Перенесено: {SizeFormatter.Format(report.CopiedBytes)}." : string.Empty;
         var rateText = SyncSessionViewModel.DescribeRate("Синхронизация", report, stopwatch.Elapsed);
         Report($"Готово за {stopwatch.Elapsed.TotalSeconds:F2} с.{volumeText}{rateText} Успешно: {report.SuccessCount:N0}, ошибок: {report.Errors.Count:N0}{verifyText}");
 
-        var toastVolume = report.CopiedBytes > 0 ? $" · {SizeFormatter.Format(report.CopiedBytes)}" : string.Empty;
+        var (toastMessage, toastSeverity) = SyncOutcomeNarrative.DescribeToast(report);
+        _notifier.Notify(toastMessage, toastSeverity);
 
-        var syncToastMessage = report switch
+        if (interactive && SyncOutcomeNarrative.DescribeProblems(report) is { } problem)
         {
-            { Errors.Count: > 0 } => $"Синхронизация: применено {report.SuccessCount:N0}, ошибок: {report.Errors.Count:N0}",
-            { Mismatches.Count: > 0 } => $"Синхронизация: применено {report.SuccessCount:N0} · расхождений: {report.Mismatches.Count:N0}",
-            _ => $"Синхронизация завершена: применено {report.SuccessCount:N0}{toastVolume}",
-        };
-
-        var syncToastSeverity = report switch
-        {
-            { Errors.Count: > 0 } => StatusSeverity.Error,
-            { Mismatches.Count: > 0 } => StatusSeverity.Warning,
-            _ => StatusSeverity.Success,
-        };
-
-        _notifier.Notify(syncToastMessage, syncToastSeverity);
-
-        if (interactive)
-        {
-            ShowSyncOutcome(report);
+            _dialogs.Warning(problem.Title, problem.Message);
         }
 
         return new(report, stopwatch.Elapsed, LastVerifyState);
-    }
-
-    private void ShowSyncOutcome(SyncReport report)
-    {
-        if (report.Errors.Count > 0)
-        {
-            const int MaxShown = 20;
-            var list = string.Join(Environment.NewLine, report.Errors.Take(MaxShown).Select(e => $"  {e.RelativePath}: {e.Message}"));
-
-            if (report.Errors.Count > MaxShown)
-            {
-                list += $"{Environment.NewLine}  …и ещё {report.Errors.Count - MaxShown}";
-            }
-
-            _dialogs.Warning("Ошибки", $"Ошибки при синхронизации:{Environment.NewLine}{list}");
-        }
-        else if (report.Mismatches.Count > 0)
-        {
-            const int MaxShown = 20;
-            var list = string.Join(Environment.NewLine, report.Mismatches.Take(MaxShown).Select(m => $"  {m.RelativePath}: {m.Reason}"));
-
-            if (report.Mismatches.Count > MaxShown)
-            {
-                list += $"{Environment.NewLine}  …и ещё {report.Mismatches.Count - MaxShown}";
-            }
-
-            _dialogs.Warning("Расхождения после синхронизации", $"После применения проверка нашла расхождения:{Environment.NewLine}{list}");
-        }
     }
 
     [RelayCommand(CanExecute = nameof(HasPending))]
@@ -716,57 +446,6 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
         _session.StatusCaption = $"Разрешено элементов: {count}.";
     }
 
-    private bool CanExport()
-    {
-        return !_session.IsBusy && _result is not null;
-    }
-
-    [RelayCommand(CanExecute = nameof(CanExport))]
-    private void ExportComparison()
-    {
-        if (_result is null)
-        {
-            return;
-        }
-
-        var path = _filePicker.SaveFile(new FileSaveRequest("Экспорт сравнения", "JSON (*.json)|*.json")
-        {
-            DefaultExtension = ".json",
-            FileName = BuildExportFileName(),
-        });
-
-        if (path is null)
-        {
-            return;
-        }
-
-        try
-        {
-            var model = BuildExportModel(ComparisonExport.DefaultEntryLimit)!;
-
-            File.WriteAllText(path, ComparisonExport.ToJson(model));
-            _logger.ComparisonExported(path, model.Entries.Count, model.OmittedEntries);
-
-            var omitted = model.OmittedEntries > 0 ? $", пропущено {model.OmittedEntries:N0}" : string.Empty;
-            _session.StatusCaption = $"Сравнение выгружено: {Path.GetFileName(path)}";
-            _notifier.Notify($"Сравнение выгружено: записей {model.Entries.Count:N0}{omitted}", StatusSeverity.Success);
-        }
-        catch (Exception ex)
-        {
-            _logger.ComparisonExportFailed(ex, path);
-            _dialogs.Error("Экспорт сравнения", ex.Message);
-        }
-    }
-
-    private string BuildExportFileName()
-    {
-        var trimmed = _setup.LeftPath.Trim().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var raw = Path.GetFileName(trimmed);
-        var name = string.Join("_", raw.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
-
-        return $"sync-compare-{(name.Length == 0 ? "root" : name)}-{DateTime.Now:yyyyMMdd-HHmmss}.json";
-    }
-
     private void RaiseProfileRun(ComparisonResult? comparison, SyncReport? report, long elapsedMs)
     {
         if (_setup.ActiveProfileId is { } id)
@@ -787,12 +466,4 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
     }
 
     private sealed record ComparePreparation(ComparisonResult Result, Dictionary<DirectoryComparison, (long Left, long Right)> Sizes);
-
-    private sealed record FileDiffResult(IReadOnlyList<DiffLine> Lines, int Added, int Removed, string? Unavailable)
-    {
-        public static FileDiffResult Unreadable(string reason)
-        {
-            return new([], 0, 0, reason);
-        }
-    }
 }

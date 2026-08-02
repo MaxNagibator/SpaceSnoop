@@ -56,12 +56,12 @@ public sealed partial class SyncViewModel : ISyncAutomation
 
     Func<ComparisonExportModel>? ISyncAutomation.CaptureExportBuilder(int entryLimit)
     {
-        return Operations.CaptureExportBuilder(entryLimit);
+        return Export.CaptureExportBuilder(entryLimit);
     }
 
     Func<SyncPlanExportModel>? ISyncAutomation.CapturePlanBuilder(int entryLimit)
     {
-        return Operations.CapturePlanBuilder(entryLimit);
+        return Export.CapturePlanBuilder(entryLimit);
     }
 
     Task ISyncAutomation.CompareFromAutomationAsync(CancellationToken cancellationToken)

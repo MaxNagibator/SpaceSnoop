@@ -249,7 +249,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         }
         else
         {
-            lines.AddRange(SyncLedgerViewModel.BuildPlanLines(planned, null, []));
+            lines.AddRange(SyncPlanNarrative.BuildPlanLines(planned, null, []));
         }
 
         if (!await ConfirmSyncAsync("Синхронизация профиля", lines, planned))
@@ -319,7 +319,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         }
         else
         {
-            lines.AddRange(SyncLedgerViewModel.BuildPlanLines(planned, null, []));
+            lines.AddRange(SyncPlanNarrative.BuildPlanLines(planned, null, []));
         }
 
         if (!await ConfirmSyncAsync("Синхронизация всех профилей", lines, planned))
@@ -482,7 +482,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
             row.ApplySyncReport(report);
             row.ElapsedMs = (long)stopwatch.Elapsed.TotalMilliseconds;
             row.Error = null;
-            WriteSyncLog(profile.Name, report);
+            SyncLog.AppendSafe($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Обзор [{profile.Name}]: {report.SuccessCount} успешно, {report.Errors.Count} ошибок", report, _logger);
         }
         catch (OperationCanceledException) when (!token.IsCancellationRequested)
         {
@@ -558,7 +558,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
                 new("Синхронизировать", destructive ? ConfirmChoiceKind.Destructive : ConfirmChoiceKind.Primary),
             ])
         {
-            Summary = planned is null ? null : SyncLedgerViewModel.DescribePlanVolume(planned),
+            Summary = planned is null ? null : SyncPlanNarrative.DescribePlanVolume(planned),
         };
 
         return await _dialogs.ShowAsync(confirm);
@@ -579,18 +579,6 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         };
 
         _notifier.Notify(caption, severity);
-    }
-
-    private void WriteSyncLog(string name, SyncReport report)
-    {
-        try
-        {
-            SyncLog.Append($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Обзор [{name}]: {report.SuccessCount} успешно, {report.Errors.Count} ошибок", report);
-        }
-        catch (Exception exception)
-        {
-            _logger.SyncLogWriteFailed(exception);
-        }
     }
 
     private bool CanCompareAll()

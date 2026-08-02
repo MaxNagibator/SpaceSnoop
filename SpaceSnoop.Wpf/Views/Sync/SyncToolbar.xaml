@@ -682,7 +682,7 @@
                                   HorizontalAlignment="Stretch"
                                   ToolTip="Сколько последних коммитов показывать в раскрытой Git-полоске" />
                         <Button Style="{StaticResource Button.Secondary}"
-                                Command="{Binding Operations.ExportComparisonCommand}"
+                                Command="{Binding Export.ExportComparisonCommand}"
                                 MinWidth="0"
                                 Padding="9,0"
                                 HorizontalAlignment="Stretch"

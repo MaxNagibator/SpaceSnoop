@@ -13,7 +13,7 @@ public class SyncGitTests
     [TestCase("bin,.GIT,obj", ExpectedResult = "bin,.GIT,obj")]
     public string Git_исключение_добавляется_один_раз(string exclusions)
     {
-        return SyncOperationsViewModel.AddGitExclusion(exclusions);
+        return SyncGitViewModel.AddGitExclusion(exclusions);
     }
 
     [TestCase(".git", ExpectedResult = true)]
@@ -76,11 +76,11 @@ public class SyncGitTests
     {
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(SyncLedgerViewModel.CombineNewer(NewerSide.Left, false, 1), Is.EqualTo(NewerSide.Right));
-            Assert.That(SyncLedgerViewModel.CombineNewer(NewerSide.Right, false, -1), Is.EqualTo(NewerSide.Left));
-            Assert.That(SyncLedgerViewModel.CombineNewer(NewerSide.Left, true, 0), Is.EqualTo(NewerSide.Tie));
-            Assert.That(SyncLedgerViewModel.CombineNewer(NewerSide.Left, false, 0), Is.EqualTo(NewerSide.Left));
-            Assert.That(SyncLedgerViewModel.CombineNewer(NewerSide.None, false, 0), Is.EqualTo(NewerSide.None));
+            Assert.That(SyncPlanNarrative.CombineNewer(NewerSide.Left, false, 1), Is.EqualTo(NewerSide.Right));
+            Assert.That(SyncPlanNarrative.CombineNewer(NewerSide.Right, false, -1), Is.EqualTo(NewerSide.Left));
+            Assert.That(SyncPlanNarrative.CombineNewer(NewerSide.Left, true, 0), Is.EqualTo(NewerSide.Tie));
+            Assert.That(SyncPlanNarrative.CombineNewer(NewerSide.Left, false, 0), Is.EqualTo(NewerSide.Left));
+            Assert.That(SyncPlanNarrative.CombineNewer(NewerSide.None, false, 0), Is.EqualTo(NewerSide.None));
         }
     }
 

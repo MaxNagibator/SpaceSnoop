@@ -1,4 +1,5 @@
-﻿using MahApps.Metro.IconPacks;
+﻿using KeepShell.Services;
+using MahApps.Metro.IconPacks;
 using SpaceSnoop.Core.Git;
 
 namespace SpaceSnoop.Wpf.ViewModels.Sync;
@@ -6,6 +7,7 @@ namespace SpaceSnoop.Wpf.ViewModels.Sync;
 public sealed partial class SyncGitViewModel : ObservableObject
 {
     private readonly ISettingsStore _settings;
+    private readonly IDialogService _dialogs;
     private readonly ILogger _logger;
     private readonly GitService _git = new();
 
@@ -14,13 +16,15 @@ public sealed partial class SyncGitViewModel : ObservableObject
     private string? _leftPath;
     private string? _rightPath;
     private bool _gitHistoryLoaded;
+    private bool _gitPromptDeclined;
 
     [ObservableProperty]
     private int _gitHistoryCount;
 
-    public SyncGitViewModel(ISettingsStore settings, ILogger logger)
+    public SyncGitViewModel(ISettingsStore settings, IDialogService dialogs, ILogger logger)
     {
         _settings = settings;
+        _dialogs = dialogs;
         _logger = logger;
         _gitHistoryCount = settings.GetInt(SettingsKeys.SyncGitHistoryCount, AppDefaults.GitHistoryCountDefault);
     }
@@ -248,6 +252,86 @@ public sealed partial class SyncGitViewModel : ObservableObject
         GitHistoryExpanded = false;
         ResetHistory();
         NotifyChanged();
+    }
+
+    internal async Task<string?> OfferToSkipAsync(ComparisonResult result, string exclusions)
+    {
+        if (_gitPromptDeclined)
+        {
+            return null;
+        }
+
+        var gitFolders = CountGitDirectories(result.Root);
+
+        if (gitFolders == 0)
+        {
+            return null;
+        }
+
+        var choice = _settings.GetEnum(SettingsKeys.SyncGitFolders, GitFolderPromptChoice.Ask);
+
+        if (choice == GitFolderPromptChoice.Keep)
+        {
+            return null;
+        }
+
+        if (choice == GitFolderPromptChoice.Ask)
+        {
+            var prompt = new GitFolderPromptViewModel(gitFolders);
+            var skip = await _dialogs.ShowAsync(prompt);
+
+            if (prompt.Choice != GitFolderPromptChoice.Ask)
+            {
+                _settings.SetEnum(SettingsKeys.SyncGitFolders, prompt.Choice);
+            }
+
+            if (!skip)
+            {
+                _gitPromptDeclined = true;
+                return null;
+            }
+        }
+
+        var updated = AddGitExclusion(exclusions);
+
+        if (string.Equals(updated, exclusions, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        _logger.SyncGitFoldersSkipped(gitFolders);
+
+        return updated;
+    }
+
+    internal static string AddGitExclusion(string exclusions)
+    {
+        var parts = exclusions.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (parts.Any(static part => string.Equals(part, ".git", StringComparison.OrdinalIgnoreCase)))
+        {
+            return exclusions;
+        }
+
+        return string.IsNullOrWhiteSpace(exclusions) ? ".git" : $"{exclusions.TrimEnd()},.git";
+    }
+
+    private static int CountGitDirectories(DirectoryComparison dir)
+    {
+        var count = 0;
+
+        foreach (var sub in dir.SubDirectories)
+        {
+            if (string.Equals(sub.Name, ".git", StringComparison.OrdinalIgnoreCase))
+            {
+                count++;
+                continue;
+            }
+
+            count += CountGitDirectories(sub);
+        }
+
+        return count;
     }
 
     private static string FormatAge(TimeSpan span)

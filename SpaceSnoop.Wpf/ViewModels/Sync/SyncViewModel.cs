@@ -28,7 +28,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         Session = new(dialogs, logger, notifier, performance, summary => SummaryText = summary);
         Session.PropertyChanged += OnSessionPropertyChanged;
 
-        Git = new(settings, logger);
+        Git = new(settings, dialogs, logger);
 
         Setup = new(settings, dialogs, operations, filePicker, () => !IsBusy, message => Session.StatusCaption = message);
         Setup.ProfileSelected += ApplyProfile;
@@ -36,12 +36,14 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         Ledger = new(Git, () => new(Setup.DirectionIconKind, Setup.DirectionText(), Setup.CurrentMode == SyncMode.Bidirectional));
         Ledger.PropertyChanged += OnLedgerPropertyChanged;
 
-        Operations = new(settings, dialogs, logger, compare, sync, notifier, filePicker, Setup, Session, Git, Ledger, summary => SummaryText = summary);
+        Operations = new(settings, dialogs, logger, compare, sync, notifier, Setup, Session, Git, Ledger, summary => SummaryText = summary);
         Operations.ComparisonChanged += OnComparisonChanged;
         Operations.ProfileRunCompleted += RaiseProfileRun;
 
         Setup.PathChanged += Operations.DiscardComparisonIfPathChanged;
         Setup.ModeChanged += Operations.ReapplyMode;
+
+        Export = new(dialogs, logger, notifier, filePicker, Setup, Session, Git, () => Operations.Result, () => Operations.LastReport);
 
         Rows = new(settings, operations, agent, Operations.CompareContentAsync, AskAgentAbout);
         Rows.ActionsChanged += UpdateSummary;
@@ -60,6 +62,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     public SyncSetupViewModel Setup { get; }
 
     public SyncOperationsViewModel Operations { get; }
+
+    public SyncExportViewModel Export { get; }
 
     public SyncRowsViewModel Rows { get; }
 
@@ -165,6 +169,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
                 OnPropertyChanged(nameof(IsBusy));
                 Setup.NotifyBusyChanged();
                 Operations.NotifyBusyChanged();
+                Export.ExportComparisonCommand.NotifyCanExecuteChanged();
                 break;
 
             case nameof(StatusCaption):
@@ -181,6 +186,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         if (e.PropertyName == nameof(SyncLedgerViewModel.SyncIsPrimary))
         {
             Operations.NotifyPlanChanged();
+            Export.ExportComparisonCommand.NotifyCanExecuteChanged();
         }
     }
 

@@ -1,6 +1,7 @@
 ﻿using Serilog;
 using System.IO;
 using System.Text;
+using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 namespace SpaceSnoop.Wpf.Bootstrap;
 
@@ -13,6 +14,18 @@ public static class SyncLog
     public static void Append(string header, SyncReport report)
     {
         Append(FilePath, header, report);
+    }
+
+    internal static void AppendSafe(string header, SyncReport report, ILogger logger)
+    {
+        try
+        {
+            Append(header, report);
+        }
+        catch (Exception exception)
+        {
+            logger.SyncLogWriteFailed(exception);
+        }
     }
 
     internal static void Append(string filePath, string header, SyncReport report)
