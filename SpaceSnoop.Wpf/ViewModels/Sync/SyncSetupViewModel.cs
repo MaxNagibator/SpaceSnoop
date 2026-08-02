@@ -96,7 +96,7 @@ public sealed partial class SyncSetupViewModel : ObservableObject
 
     public bool ShowConflictResolvers => IsBidirectional && WinnerIsNewest;
 
-    public string WinnerHint => "Победитель решает изменённые и спорные файлы; при зеркале — что удалять на проигравшей стороне.";
+    public string WinnerHint => "Победитель решает изменённые и спорные файлы; при зеркале – что удалять на проигравшей стороне.";
 
     public string MirrorHint => CurrentMode switch
     {

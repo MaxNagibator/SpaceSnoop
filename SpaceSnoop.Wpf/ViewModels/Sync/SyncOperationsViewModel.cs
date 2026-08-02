@@ -391,7 +391,7 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
 
         if (SyncProfile.PathsOverlap(left, right))
         {
-            _dialogs.Warning("Сравнение", "Каталоги совпадают или вложены друг в друга — синхронизация невозможна.");
+            _dialogs.Warning("Сравнение", "Каталоги совпадают или вложены друг в друга – синхронизация невозможна.");
             return;
         }
 

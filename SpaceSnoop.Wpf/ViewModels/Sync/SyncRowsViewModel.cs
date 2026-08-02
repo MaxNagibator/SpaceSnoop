@@ -357,7 +357,7 @@ public sealed partial class SyncRowsViewModel : ObservableObject, ISyncRowHost
 
         ShowIdentical = _settings.GetBool(SettingsKeys.SyncShowIdentical);
         ShowSizes = _settings.GetBool(SettingsKeys.SyncShowSizes, AppDefaults.SyncShowSizesDefault);
-        ShowModified = _settings.GetBool(SettingsKeys.SyncShowModified);
+        ShowModified = _settings.GetBool(SettingsKeys.SyncShowModified, AppDefaults.SyncShowModifiedDefault);
         BlankAbsent = _settings.GetBool(SettingsKeys.SyncBlankAbsent);
         HideApplied = _settings.GetBool(SettingsKeys.SyncHideApplied);
         FlatView = _settings.GetBool(SettingsKeys.SyncFlatView);

@@ -241,6 +241,8 @@ public sealed partial class SyncGitViewModel : ObservableObject
 
     internal void Clear()
     {
+        _leftPath = null;
+        _rightPath = null;
         _leftGit = null;
         _rightGit = null;
         GitHistoryExpanded = false;
