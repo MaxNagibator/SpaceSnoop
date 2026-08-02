@@ -89,7 +89,7 @@ public sealed partial class DockerViewModel(
         StatusText = "Опрашиваю Docker…";
         try
         {
-            var snapshot = await docker.GetSnapshotAsync();
+            var snapshot = await docker.GetSnapshotAsync(CancellationToken.None);
 
             Buckets.Clear();
             IsAvailable = snapshot.Available;
@@ -129,7 +129,7 @@ public sealed partial class DockerViewModel(
 
     private async Task LoadObjectsAsync()
     {
-        var inventory = await docker.GetInventoryAsync();
+        var inventory = await docker.GetInventoryAsync(CancellationToken.None);
 
         var groups = inventory
             .GroupBy(o => o.Kind)
@@ -167,7 +167,7 @@ public sealed partial class DockerViewModel(
         StatusText = $"Удаляю {kind} «{target.Name}»…";
         try
         {
-            await docker.RemoveAsync(target);
+            await docker.RemoveAsync(target, CancellationToken.None);
             logger.DockerObjectRemoved(target.Kind.ToString(), target.Name);
         }
         catch (Exception ex)
@@ -200,7 +200,7 @@ public sealed partial class DockerViewModel(
     {
         try
         {
-            var snapshot = await docker.GetSnapshotAsync();
+            var snapshot = await docker.GetSnapshotAsync(CancellationToken.None);
             if (!snapshot.Available)
             {
                 return;
@@ -510,7 +510,7 @@ public sealed partial class DockerViewModel(
         try
         {
             logger.DockerCleanupStarted(target.ToString());
-            var result = await docker.PruneAsync(target, allUnused);
+            var result = await docker.PruneAsync(target, allUnused, CancellationToken.None);
             logger.DockerCleanupFinished(target.ToString(), Summarize(result));
             dialogs.Info(title, string.IsNullOrWhiteSpace(result) ? "Готово. Освобождать было нечего." : result);
         }

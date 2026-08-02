@@ -65,8 +65,8 @@ public sealed class SystemDockerProcessRunner : IDockerProcessRunner
                 return new(-1, string.Empty, string.Empty, "Процесс не запустился.");
             }
 
-            outputTask = process.StandardOutput.ReadToEndAsync();
-            errorTask = process.StandardError.ReadToEndAsync();
+            outputTask = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
+            errorTask = process.StandardError.ReadToEndAsync(CancellationToken.None);
 
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancel);
             if (options.Timeout != System.Threading.Timeout.InfiniteTimeSpan)
