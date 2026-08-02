@@ -53,7 +53,7 @@ public class SyncGitTests
         var left = new DateTimeOffset(2026, 6, 29, 12, 0, 0, TimeSpan.Zero);
         var right = new DateTimeOffset(2026, 6, 26, 12, 0, 0, TimeSpan.Zero);
 
-        Assert.That(SyncViewModel.DescribeNewer(left, right), Is.EqualTo("слева новее на 3 дн."));
+        Assert.That(SyncGitViewModel.DescribeNewer(left, right), Is.EqualTo("слева новее на 3 дн."));
     }
 
     [Test]
@@ -62,13 +62,13 @@ public class SyncGitTests
         var left = new DateTimeOffset(2026, 6, 29, 10, 0, 0, TimeSpan.Zero);
         var right = new DateTimeOffset(2026, 6, 29, 12, 30, 0, TimeSpan.Zero);
 
-        Assert.That(SyncViewModel.DescribeNewer(left, right), Is.EqualTo("справа новее на 2 ч."));
+        Assert.That(SyncGitViewModel.DescribeNewer(left, right), Is.EqualTo("справа новее на 2 ч."));
     }
 
     [TestCaseSource(nameof(NoNewerCases))]
     public void Направление_пустое_когда_не_определить(DateTimeOffset? left, DateTimeOffset? right)
     {
-        Assert.That(SyncViewModel.DescribeNewer(left, right), Is.Empty);
+        Assert.That(SyncGitViewModel.DescribeNewer(left, right), Is.Empty);
     }
 
     [Test]

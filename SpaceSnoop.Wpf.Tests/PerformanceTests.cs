@@ -363,7 +363,7 @@ public class PerformanceTests
         report.Errors.Add(new("b.txt", SyncAction.CopyToRight, "нет доступа"));
         report.AddApplied(SyncAction.CopyToRight, "a.txt", 2048);
 
-        var text = SyncViewModel.DescribeRate("Синхронизация", report, TimeSpan.FromSeconds(2));
+        var text = SyncSessionViewModel.DescribeRate("Синхронизация", report, TimeSpan.FromSeconds(2));
 
         Assert.That(text, Is.EqualTo($" Скорость: 5 файл/с · {SizeFormatter.Format(1024)}/с."));
     }
@@ -374,7 +374,7 @@ public class PerformanceTests
         var report = new SyncReport { CopiedCount = 1 };
         report.AddApplied(SyncAction.CopyToRight, "a.txt", 512);
 
-        Assert.That(SyncViewModel.DescribeRate("Синхронизация", report, TimeSpan.FromMilliseconds(80)), Is.Empty);
+        Assert.That(SyncSessionViewModel.DescribeRate("Синхронизация", report, TimeSpan.FromMilliseconds(80)), Is.Empty);
     }
 
     [TestCase(0, 0, "0:00")]

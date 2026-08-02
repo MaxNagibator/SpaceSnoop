@@ -6,7 +6,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
-             d:DataContext="{d:DesignInstance vm:SyncViewModel}"
+             d:DataContext="{d:DesignInstance vm:SyncGitViewModel}"
              d:DesignWidth="1040">
 
     <UserControl.Resources>
@@ -144,7 +144,8 @@
         </DataTemplate>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource GitStrip}"
+    <Border DataContext="{Binding Git}"
+            Style="{StaticResource GitStrip}"
             ToolTip="{Binding GitTooltip}">
         <StackPanel VerticalAlignment="Center">
             <Border Background="Transparent"

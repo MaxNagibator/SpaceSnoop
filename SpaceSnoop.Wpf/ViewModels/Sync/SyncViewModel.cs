@@ -2,8 +2,8 @@
 using MahApps.Metro.IconPacks;
 using Microsoft.Win32;
 using SpaceSnoop.Core.Export;
-using SpaceSnoop.Core.Git;
 using SpaceSnoop.Wpf.Diff;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Windows.Input;
@@ -21,29 +21,20 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private readonly CompareDirectoriesUseCase _compare;
     private readonly ExecuteSyncUseCase _sync;
     private readonly ToastNotifier _notifier;
-    private readonly PerformanceMonitor _performance;
     private readonly AgentPreferences _agent;
-    private readonly GitService _git = new();
     private readonly HashSet<DirectoryComparison> _collapsed = [];
     private readonly HashSet<string> _collapsedSubGroups = new(StringComparer.OrdinalIgnoreCase);
 
     private ComparisonResult? _result;
     private SyncReport? _lastReport;
-    private GitRepoState? _leftGit;
-    private GitRepoState? _rightGit;
-    private bool _gitHistoryLoaded;
 
     private Dictionary<object, SyncOutcome> _outcomes = [];
     private Dictionary<DirectoryComparison, (long Left, long Right)>? _dirSizeCache;
-    private CancellationTokenSource? _cts;
     private string? _activeProfileId;
     private bool _suppressPersist;
     private bool _gitPromptDeclined;
     private bool _hashesCompared;
     private bool _gitGroupExpanded;
-    private bool _isIndeterminate = true;
-    private double _progressValue;
-    private double _progressMax = 1;
     private Dictionary<ComparisonStatus, int> _stats = NewZeroStats();
     private Dictionary<ComparisonStatus, int> _dirStats = NewZeroStats();
     private FreshnessSummary _freshness;
@@ -90,9 +81,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private bool _verify = AppDefaults.SyncVerifyDefault;
 
     [ObservableProperty]
-    private int _gitHistoryCount = AppDefaults.GitHistoryCountDefault;
-
-    [ObservableProperty]
     private bool _hideApplied;
 
     [ObservableProperty]
@@ -108,30 +96,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private string _searchText = string.Empty;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(CompareCommand))]
-    [NotifyCanExecuteChangedFor(nameof(HashCommand))]
-    [NotifyCanExecuteChangedFor(nameof(SyncCommand))]
-    [NotifyCanExecuteChangedFor(nameof(BrowseLeftCommand))]
-    [NotifyCanExecuteChangedFor(nameof(BrowseRightCommand))]
-    [NotifyCanExecuteChangedFor(nameof(ExportComparisonCommand))]
-    private bool _isBusy;
-
-    [ObservableProperty]
-    private string? _statusCaption;
-
-    [ObservableProperty]
-    private string? _progressDetail;
-
-    [ObservableProperty]
-    private string _progressRateText = string.Empty;
-
-    [ObservableProperty]
-    private string _progressRemainingText = string.Empty;
-
-    [ObservableProperty]
-    private bool _hasProgressRate;
-
-    [ObservableProperty]
     private string _summaryText = "Сравнение не выполнялось.";
 
     [ObservableProperty]
@@ -143,7 +107,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     public SyncViewModel(ISettingsStore settings, IDialogService dialogs, OperationPreferences operations, AgentPreferences agent, ILogger<SyncViewModel> logger, CompareDirectoriesUseCase compare, ExecuteSyncUseCase sync, ToastNotifier notifier, PerformanceMonitor performance)
     {
         _settings = settings;
-        _performance = performance;
         _dialogs = dialogs;
         Operations = operations;
         _agent = agent;
@@ -151,7 +114,14 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _compare = compare;
         _sync = sync;
         _notifier = notifier;
-        Profiles = new(settings, dialogs, BuildCurrentProfile, ApplyProfile, () => !IsBusy, message => StatusCaption = message);
+
+        Session = new(dialogs, logger, notifier, performance, summary => SummaryText = summary);
+        Session.PropertyChanged += OnSessionPropertyChanged;
+
+        Git = new(settings, logger);
+        Git.StateChanged += NotifyNewerBadgeChanged;
+
+        Profiles = new(settings, dialogs, BuildCurrentProfile, ApplyProfile, () => !IsBusy, message => Session.StatusCaption = message);
         LoadSettings();
         Profiles.Load();
         _settings.Changed += OnSettingsChanged;
@@ -161,7 +131,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public event Action<SyncProfileRun>? ProfileRunCompleted;
 
-    public static int[] GitHistoryCounts { get; } = [4, 8, 16, 32];
+    public SyncGitViewModel Git { get; }
+
+    public SyncSessionViewModel Session { get; }
 
     public bool ChatEnabled => _agent.Enabled;
 
@@ -291,121 +263,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     };
 
     public string NewerBadgeTooltip => GitDecidesNewer
-        ? $"Свежее по коммитам git: слева {FormatStamp(_leftGit?.CommittedAt?.LocalDateTime)}, справа {FormatStamp(_rightGit?.CommittedAt?.LocalDateTime)}."
-        : $"Свежее по новейшему изменённому файлу: слева {FormatStamp(_freshness.LeftChangedMax)}, справа {FormatStamp(_freshness.RightChangedMax)}.{Environment.NewLine}"
+        ? $"Свежее по коммитам git: слева {SyncGitViewModel.FormatStamp(Git.LeftState?.CommittedAt?.LocalDateTime)}, справа {SyncGitViewModel.FormatStamp(Git.RightState?.CommittedAt?.LocalDateTime)}."
+        : $"Свежее по новейшему изменённому файлу: слева {SyncGitViewModel.FormatStamp(_freshness.LeftChangedMax)}, справа {SyncGitViewModel.FormatStamp(_freshness.RightChangedMax)}.{Environment.NewLine}"
           + $"Изменённых новее: слева {_freshness.LeftNewer:N0}, справа {_freshness.RightNewer:N0}.";
-
-    public bool HasGit => _leftGit is not null || _rightGit is not null;
-
-    public bool LeftIsRepo => _leftGit is not null;
-
-    public bool RightIsRepo => _rightGit is not null;
-
-    public string LeftGitBranch => FormatBranch(_leftGit);
-
-    public string RightGitBranch => FormatBranch(_rightGit);
-
-    public string LeftGitHead => FormatHead(_leftGit);
-
-    public string RightGitHead => FormatHead(_rightGit);
-
-    public string LeftGitDirty => FormatDirty(_leftGit);
-
-    public string RightGitDirty => FormatDirty(_rightGit);
-
-    public bool LeftGitIsDirty => _leftGit?.IsDirty == true;
-
-    public bool RightGitIsDirty => _rightGit?.IsDirty == true;
-
-    public string LeftGitUpstream => FormatUpstream(_leftGit);
-
-    public string RightGitUpstream => FormatUpstream(_rightGit);
-
-    public bool GitInSync =>
-        _leftGit is not null
-        && _rightGit is not null
-        && _leftGit.HasCommits
-        && _rightGit.HasCommits
-        && string.Equals(_leftGit.Oid, _rightGit.Oid, StringComparison.OrdinalIgnoreCase)
-        && !_leftGit.IsDirty
-        && !_rightGit.IsDirty;
-
-    public PackIconLucideKind GitVerdictIconKind
-    {
-        get
-        {
-            if (GitInSync)
-            {
-                return PackIconLucideKind.Check;
-            }
-
-            return GitNewerSign switch
-            {
-                < 0 => PackIconLucideKind.ArrowLeft,
-                > 0 => PackIconLucideKind.ArrowRight,
-                _ => PackIconLucideKind.GitCompareArrows,
-            };
-        }
-    }
-
-    public bool GitShowsNewer => GitNewerSign != 0;
-
-    public string GitVerdictText
-    {
-        get
-        {
-            if (_leftGit is null || _rightGit is null)
-            {
-                return "одна сторона не репозиторий";
-            }
-
-            if (!_leftGit.HasCommits || !_rightGit.HasCommits)
-            {
-                return "нет коммитов";
-            }
-
-            if (!string.Equals(_leftGit.Oid, _rightGit.Oid, StringComparison.OrdinalIgnoreCase))
-            {
-                var newer = DescribeNewer(_leftGit.CommittedAt, _rightGit.CommittedAt);
-
-                return newer.Length == 0 ? "разные коммиты" : $"разные коммиты, {newer}";
-            }
-
-            return _leftGit.IsDirty || _rightGit.IsDirty ? "тот же коммит, есть изменения" : "синхронны";
-        }
-    }
-
-    public IReadOnlyList<GitCommit> LeftGitLog { get; private set; } = [];
-
-    public IReadOnlyList<GitCommit> RightGitLog { get; private set; } = [];
-
-    public bool GitHistoryExpanded { get; private set; }
-
-    public PackIconLucideKind GitHistoryIconKind => GitHistoryExpanded ? PackIconLucideKind.ChevronUp : PackIconLucideKind.ChevronDown;
-
-    public bool LeftGitLogEmpty => _gitHistoryLoaded && LeftGitLog.Count == 0;
-
-    public bool RightGitLogEmpty => _gitHistoryLoaded && RightGitLog.Count == 0;
-
-    public string LeftGitLogEmptyText => _leftGit is null ? "не репозиторий" : "нет коммитов";
-
-    public string RightGitLogEmptyText => _rightGit is null ? "не репозиторий" : "нет коммитов";
-
-    public string? GitTooltip
-    {
-        get
-        {
-            if (_leftGit is not { HasCommits: true } left
-                || _rightGit is not { HasCommits: true } right
-                || string.Equals(left.Oid, right.Oid, StringComparison.OrdinalIgnoreCase))
-            {
-                return null;
-            }
-
-            return $"Коммит слева: {FormatStamp(left.CommittedAt?.LocalDateTime)}, справа: {FormatStamp(right.CommittedAt?.LocalDateTime)}.{Environment.NewLine}"
-                   + "«Новее» – по дате коммита, не по истории веток.";
-        }
-    }
 
     public bool ExclusionsEmpty => string.IsNullOrWhiteSpace(Exclusions);
 
@@ -436,47 +296,21 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public string PageDescription => "Сравнение и синхронизация двух каталогов.";
 
-    public bool IsIndeterminate
-    {
-        get => _isIndeterminate;
-        private set => SetProperty(ref _isIndeterminate, value);
-    }
+    public bool IsBusy => Session.IsBusy;
 
-    public double ProgressValue
-    {
-        get => _progressValue;
-        private set => SetProperty(ref _progressValue, value);
-    }
+    public string? StatusCaption => Session.StatusCaption;
 
-    public double ProgressMax
-    {
-        get => _progressMax;
-        private set => SetProperty(ref _progressMax, value);
-    }
+    public bool IsIndeterminate => Session.IsIndeterminate;
 
-    public ICommand CancelCommand => CancelOperationCommand;
+    public double ProgressValue => Session.ProgressValue;
 
-    private NewerSide EffectiveNewerSide => CombineNewer(_freshness.Verdict, GitInSync, GitNewerSign);
+    public double ProgressMax => Session.ProgressMax;
 
-    private bool GitDecidesNewer => GitInSync || GitNewerSign != 0;
+    public ICommand CancelCommand => Session.CancelCommand;
 
-    private int GitNewerSign
-    {
-        get
-        {
-            if (_leftGit is not { HasCommits: true } left
-                || _rightGit is not { HasCommits: true } right
-                || string.Equals(left.Oid, right.Oid, StringComparison.OrdinalIgnoreCase)
-                || left.CommittedAt is not { } l
-                || right.CommittedAt is not { } r
-                || l == r)
-            {
-                return 0;
-            }
+    private NewerSide EffectiveNewerSide => CombineNewer(_freshness.Verdict, Git.GitInSync, Git.GitNewerSign);
 
-            return l > r ? -1 : 1;
-        }
-    }
+    private bool GitDecidesNewer => Git.GitInSync || Git.GitNewerSign != 0;
 
     private PlannedActions CurrentPlan => _result?.CountPlannedActions() ?? PlannedActions.Empty;
 
@@ -614,12 +448,12 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         if (comparison is null)
         {
-            StatusCaption = $"Профиль применён: {profile.Name}.";
+            Session.StatusCaption = $"Профиль применён: {profile.Name}.";
             return;
         }
 
         AdoptComparison(comparison);
-        StatusCaption = $"Профиль применён: {profile.Name}. Результат сравнения перенесён.";
+        Session.StatusCaption = $"Профиль применён: {profile.Name}. Результат сравнения перенесён.";
     }
 
     internal static string AddGitExclusion(string exclusions)
@@ -631,19 +465,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             : string.IsNullOrWhiteSpace(exclusions)
                 ? ".git"
                 : $"{exclusions.TrimEnd()},.git";
-    }
-
-    // TODO: «новее» по дате коммита, не по предкам; ancestry-вердикт требует общего хранилища объектов (cross-repo merge-base)
-    internal static string DescribeNewer(DateTimeOffset? left, DateTimeOffset? right)
-    {
-        if (left is not { } l || right is not { } r || l == r)
-        {
-            return string.Empty;
-        }
-
-        var side = l > r ? "слева новее" : "справа новее";
-
-        return $"{side} на {FormatAge((l - r).Duration())}";
     }
 
     internal static NewerSide CombineNewer(NewerSide freshness, bool gitInSync, int gitNewerSign)
@@ -808,9 +629,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         var result = _result;
         var options = new ComparisonExportOptions(CurrentMode, CurrentWinner, Mirror, Exclusions.Trim());
 
-        var git = _leftGit is null && _rightGit is null
+        var git = Git.LeftState is null && Git.RightState is null
             ? null
-            : new ComparisonExportGit(_leftGit, _rightGit, GitVerdictText);
+            : new ComparisonExportGit(Git.LeftState, Git.RightState, Git.GitVerdictText);
 
         var lastSync = _lastReport is null
             ? null
@@ -1015,99 +836,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         return count;
     }
 
-    private static string FormatStamp(DateTime? value)
-    {
-        return value is { } stamp ? stamp.ToString("yyyy-MM-dd HH:mm") : "–";
-    }
-
-    private static string FormatAge(DateTime value)
-    {
-        var days = (int)(DateTime.Now.Date - value.Date).TotalDays;
-
-        if (days <= 0)
-        {
-            return "сегодня";
-        }
-
-        if (days == 1)
-        {
-            return "вчера";
-        }
-
-        var word = (days % 100) is >= 11 and <= 14
-            ? "дней"
-            : (days % 10) switch
-            {
-                1 => "день",
-                2 or 3 or 4 => "дня",
-                _ => "дней",
-            };
-
-        return $"{days:N0} {word} назад";
-    }
-
-    private static string FormatAge(TimeSpan span)
-    {
-        if (span.TotalDays >= 1)
-        {
-            return $"{(int)span.TotalDays} дн.";
-        }
-
-        if (span.TotalHours >= 1)
-        {
-            return $"{(int)span.TotalHours} ч.";
-        }
-
-        return span.TotalMinutes >= 1 ? $"{(int)span.TotalMinutes} мин." : "<1 мин.";
-    }
-
-    private static string FormatBranch(GitRepoState? git)
-    {
-        return git is null ? string.Empty : git.IsDetached ? "detached" : git.Branch;
-    }
-
-    private static string FormatHead(GitRepoState? git)
-    {
-        if (git is null)
-        {
-            return string.Empty;
-        }
-
-        if (!git.HasCommits)
-        {
-            return "нет коммитов";
-        }
-
-        return string.IsNullOrEmpty(git.Subject) ? git.ShortHash : $"{git.ShortHash} · {git.Subject}";
-    }
-
-    private static string FormatDirty(GitRepoState? git)
-    {
-        return git is null ? string.Empty : git.IsDirty ? $"{git.DirtyCount} изм." : "чисто";
-    }
-
-    private static string FormatUpstream(GitRepoState? git)
-    {
-        if (git is null || !git.HasUpstream)
-        {
-            return string.Empty;
-        }
-
-        var parts = new List<string>(2);
-
-        if (git.Ahead > 0)
-        {
-            parts.Add($"↑{git.Ahead}");
-        }
-
-        if (git.Behind > 0)
-        {
-            parts.Add($"↓{git.Behind}");
-        }
-
-        return string.Join(" ", parts);
-    }
-
     private static List<ConfirmLine> DescribeReceivers(IReadOnlyList<PlanReceiver> receivers, bool bothWays)
     {
         var lines = new List<ConfirmLine>();
@@ -1176,19 +904,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException or NotSupportedException)
         {
             return null;
-        }
-    }
-
-    [RelayCommand]
-    private async Task ToggleGitHistoryAsync()
-    {
-        GitHistoryExpanded = !GitHistoryExpanded;
-        OnPropertyChanged(nameof(GitHistoryExpanded));
-        OnPropertyChanged(nameof(GitHistoryIconKind));
-
-        if (GitHistoryExpanded && !_gitHistoryLoaded)
-        {
-            await LoadGitHistoryAsync();
         }
     }
 
@@ -1310,7 +1025,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         var request = new CompareDirectoriesRequest(left, right, Exclusions, CurrentMode, CurrentWinner, Mirror);
 
-        var prepared = await RunAsync("Сравнение каталогов:", (token, progress) =>
+        var prepared = await Session.RunAsync("Сравнение каталогов:", (token, progress) =>
         {
             var compared = _compare.Execute(request, token, progress);
             return new ComparePreparation(compared, SyncRowsProjector.BuildDirSizeCache(compared.Root));
@@ -1331,7 +1046,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         RebuildRows();
         UpdateSummary();
         SummaryText = $"Сравнение завершено за {stopwatch.Elapsed.TotalSeconds:F2} с";
-        StatusCaption = SummaryText;
+        Session.StatusCaption = SummaryText;
 
         _logger.CompareFinished(_total, (long)stopwatch.Elapsed.TotalMilliseconds);
         RaiseProfileRun(_result, null, (long)stopwatch.Elapsed.TotalMilliseconds);
@@ -1390,116 +1105,11 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         await CompareAsync();
     }
 
-    private async Task ReadGitStateAsync()
+    private Task ReadGitStateAsync()
     {
-        if (_result is null)
-        {
-            return;
-        }
-
-        var left = _result.LeftPath;
-        var right = _result.RightPath;
-
-        try
-        {
-            (_leftGit, _rightGit) = await Task.Run(
-                async () => (await _git.ReadAsync(left, CancellationToken.None), await _git.ReadAsync(right, CancellationToken.None)),
-                CancellationToken.None);
-        }
-        catch (Exception ex)
-        {
-            _logger.GitStateFailed(ex.Unwrap());
-            ClearGit();
-            return;
-        }
-
-        if (_leftGit is not null || _rightGit is not null)
-        {
-            _logger.GitStateRead(FormatBranch(_leftGit), FormatBranch(_rightGit));
-        }
-
-        ResetGitHistory();
-        NotifyGitChanged();
-
-        if (GitHistoryExpanded)
-        {
-            await LoadGitHistoryAsync();
-        }
-    }
-
-    private async Task LoadGitHistoryAsync()
-    {
-        if (_result is null)
-        {
-            return;
-        }
-
-        var left = _result.LeftPath;
-        var right = _result.RightPath;
-        var count = GitHistoryCount;
-
-        try
-        {
-            (LeftGitLog, RightGitLog) = await Task.Run(
-                async () => (await _git.ReadHistoryAsync(left, count, CancellationToken.None), await _git.ReadHistoryAsync(right, count, CancellationToken.None)),
-                CancellationToken.None);
-        }
-        catch (Exception ex)
-        {
-            _logger.GitStateFailed(ex.Unwrap());
-            LeftGitLog = [];
-            RightGitLog = [];
-        }
-
-        _gitHistoryLoaded = true;
-        NotifyGitChanged();
-    }
-
-    private void ResetGitHistory()
-    {
-        LeftGitLog = [];
-        RightGitLog = [];
-        _gitHistoryLoaded = false;
-    }
-
-    private void ClearGit()
-    {
-        _leftGit = null;
-        _rightGit = null;
-        GitHistoryExpanded = false;
-        ResetGitHistory();
-        NotifyGitChanged();
-    }
-
-    private void NotifyGitChanged()
-    {
-        OnPropertyChanged(nameof(HasGit));
-        OnPropertyChanged(nameof(LeftIsRepo));
-        OnPropertyChanged(nameof(RightIsRepo));
-        OnPropertyChanged(nameof(LeftGitBranch));
-        OnPropertyChanged(nameof(RightGitBranch));
-        OnPropertyChanged(nameof(LeftGitHead));
-        OnPropertyChanged(nameof(RightGitHead));
-        OnPropertyChanged(nameof(LeftGitDirty));
-        OnPropertyChanged(nameof(RightGitDirty));
-        OnPropertyChanged(nameof(LeftGitIsDirty));
-        OnPropertyChanged(nameof(RightGitIsDirty));
-        OnPropertyChanged(nameof(LeftGitUpstream));
-        OnPropertyChanged(nameof(RightGitUpstream));
-        OnPropertyChanged(nameof(GitInSync));
-        OnPropertyChanged(nameof(GitShowsNewer));
-        OnPropertyChanged(nameof(GitVerdictIconKind));
-        OnPropertyChanged(nameof(GitVerdictText));
-        OnPropertyChanged(nameof(GitTooltip));
-        OnPropertyChanged(nameof(LeftGitLog));
-        OnPropertyChanged(nameof(RightGitLog));
-        OnPropertyChanged(nameof(GitHistoryExpanded));
-        OnPropertyChanged(nameof(GitHistoryIconKind));
-        OnPropertyChanged(nameof(LeftGitLogEmpty));
-        OnPropertyChanged(nameof(RightGitLogEmpty));
-        OnPropertyChanged(nameof(LeftGitLogEmptyText));
-        OnPropertyChanged(nameof(RightGitLogEmptyText));
-        NotifyNewerBadgeChanged();
+        return _result is null
+            ? Task.CompletedTask
+            : Git.ReadAsync(_result.LeftPath, _result.RightPath, CancellationToken.None);
     }
 
     private bool CanHash()
@@ -1520,7 +1130,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         _logger.HashStarted();
 
-        var sizes = await RunAsync("Вычисление хешей:", (token, progress) =>
+        var sizes = await Session.RunAsync("Вычисление хешей:", (token, progress) =>
         {
             var done = 0;
             HashModifiedFiles(result.Root, result.LeftPath, result.RightPath, progress, ref done, token);
@@ -1540,7 +1150,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         RebuildRows();
         UpdateSummary();
         SummaryText = $"Хеши вычислены за {stopwatch.Elapsed.TotalSeconds:F2} с";
-        StatusCaption = SummaryText;
+        Session.StatusCaption = SummaryText;
 
         _logger.HashFinished((long)stopwatch.Elapsed.TotalMilliseconds);
     }
@@ -1649,7 +1259,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         var (_, newest) = SyncFreshness.DeletionRecency(result.Root);
 
         return newest is { } when
-            ? $"Новейшее из удаляемого изменено {FormatStamp(when)} ({FormatAge(when)}) – убедитесь, что зеркалите не более свежую папку."
+            ? $"Новейшее из удаляемого изменено {SyncGitViewModel.FormatStamp(when)} ({SyncGitViewModel.FormatAge(when)}) – убедитесь, что зеркалите не более свежую папку."
             : null;
     }
 
@@ -1673,16 +1283,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         };
     }
 
-    internal static string DescribeRate(string name, SyncReport report, TimeSpan elapsed)
-    {
-        var finished = new PerformanceOperation(name,
-            report.SuccessCount + report.Errors.Count,
-            report.CopiedBytes,
-            elapsed);
-
-        return PerformanceFormat.Rate(finished) is { } rate ? $" Скорость: {rate}." : string.Empty;
-    }
-
     private async Task<SyncRunResult?> ExecuteSyncAsync(bool interactive, CancellationToken external = default)
     {
         if (_result is null)
@@ -1700,7 +1300,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         var request = new ExecuteSyncRequest(result, SyncConflictPolicy.None, SyncDeleteUi.Interactive, verify);
 
-        var report = await RunAsync("Синхронизация:",
+        var report = await Session.RunAsync("Синхронизация:",
             (token, progress) => _sync.Execute(request, token, progress),
             planned.Total,
             external,
@@ -1733,9 +1333,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         var verifyText = DescribeVerify(verify, report);
         var volumeText = report.CopiedBytes > 0 ? $" Перенесено: {SizeFormatter.Format(report.CopiedBytes)}." : string.Empty;
-        var rateText = DescribeRate("Синхронизация", report, stopwatch.Elapsed);
+        var rateText = SyncSessionViewModel.DescribeRate("Синхронизация", report, stopwatch.Elapsed);
         SummaryText = $"Готово за {stopwatch.Elapsed.TotalSeconds:F2} с.{volumeText}{rateText} Успешно: {report.SuccessCount:N0}, ошибок: {report.Errors.Count:N0}{verifyText}";
-        StatusCaption = SummaryText;
+        Session.StatusCaption = SummaryText;
 
         var toastVolume = report.CopiedBytes > 0 ? $" · {SizeFormatter.Format(report.CopiedBytes)}" : string.Empty;
 
@@ -1815,7 +1415,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         var count = _result.ResolveAllConflicts(action);
         RebuildRows();
         UpdateSummary();
-        StatusCaption = $"Разрешено элементов: {count}.";
+        Session.StatusCaption = $"Разрешено элементов: {count}.";
     }
 
     private bool CanExport()
@@ -1853,7 +1453,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             _logger.ComparisonExported(dialog.FileName, model.Entries.Count, model.OmittedEntries);
 
             var omitted = model.OmittedEntries > 0 ? $", пропущено {model.OmittedEntries:N0}" : string.Empty;
-            StatusCaption = $"Сравнение выгружено: {Path.GetFileName(dialog.FileName)}";
+            Session.StatusCaption = $"Сравнение выгружено: {Path.GetFileName(dialog.FileName)}";
             _notifier.Notify($"Сравнение выгружено: записей {model.Entries.Count:N0}{omitted}", StatusSeverity.Success);
         }
         catch (Exception ex)
@@ -1870,12 +1470,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         var name = string.Join("_", raw.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
 
         return $"sync-compare-{(name.Length == 0 ? "root" : name)}-{DateTime.Now:yyyyMMdd-HHmmss}.json";
-    }
-
-    [RelayCommand]
-    private void CancelOperation()
-    {
-        _cts?.Cancel();
     }
 
     [RelayCommand]
@@ -1926,9 +1520,28 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         ReapplyMode();
     }
 
-    partial void OnIsBusyChanged(bool value)
+    private void OnSessionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        Profiles.NotifyCanSaveChanged();
+        switch (e.PropertyName)
+        {
+            case nameof(IsBusy):
+                OnPropertyChanged(nameof(IsBusy));
+                Profiles.NotifyCanSaveChanged();
+                CompareCommand.NotifyCanExecuteChanged();
+                HashCommand.NotifyCanExecuteChanged();
+                SyncCommand.NotifyCanExecuteChanged();
+                BrowseLeftCommand.NotifyCanExecuteChanged();
+                BrowseRightCommand.NotifyCanExecuteChanged();
+                ExportComparisonCommand.NotifyCanExecuteChanged();
+                break;
+
+            case nameof(StatusCaption):
+            case nameof(IsIndeterminate):
+            case nameof(ProgressValue):
+            case nameof(ProgressMax):
+                OnPropertyChanged(e.PropertyName);
+                break;
+        }
     }
 
     private void ReapplyMode()
@@ -1976,18 +1589,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     partial void OnVerifyChanged(bool value)
     {
         Persist(SettingsKeys.SyncVerify, value ? "true" : "false");
-    }
-
-    partial void OnGitHistoryCountChanged(int value)
-    {
-        Persist(SettingsKeys.SyncGitHistoryCount, value.ToString());
-
-        _gitHistoryLoaded = false;
-
-        if (GitHistoryExpanded && HasGit)
-        {
-            _ = LoadGitHistoryAsync();
-        }
     }
 
     partial void OnHideAppliedChanged(bool value)
@@ -2103,118 +1704,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
     }
 
-    private async Task<T?> RunAsync<T>(
-        string caption,
-        Func<CancellationToken, IProgress<OperationProgress>, T> work,
-        int total = 0,
-        CancellationToken external = default,
-        long totalBytes = 0)
-        where T : class
-    {
-        _cts = CancellationTokenSource.CreateLinkedTokenSource(external);
-        var token = _cts.Token;
-
-        ProgressRateText = string.Empty;
-        ProgressRemainingText = string.Empty;
-        HasProgressRate = false;
-
-        IsBusy = true;
-
-        var operation = caption.TrimEnd(' ', ':');
-        var determinate = total > 0;
-
-        if (determinate)
-        {
-            ProgressMax = total;
-            ProgressValue = 0;
-            IsIndeterminate = false;
-            StatusCaption = $"{caption} 0 / {total} (0 %)";
-        }
-        else
-        {
-            IsIndeterminate = true;
-            StatusCaption = caption;
-        }
-
-        ProgressDetail = StatusCaption;
-
-        var stopwatch = Stopwatch.StartNew();
-
-        var progress = new Progress<OperationProgress>(update =>
-        {
-            var tail = string.IsNullOrEmpty(update.Current) ? string.Empty : $" · {update.Current}";
-
-            string head;
-
-            if (determinate)
-            {
-                ProgressValue = update.Completed;
-                var percent = update.Completed * 100 / total;
-                head = $"{caption} {update.Completed} / {total} ({percent} %)";
-            }
-            else
-            {
-                head = $"{caption} {update.Completed}";
-            }
-
-            if (totalBytes > 0)
-            {
-                head += $" · {SizeFormatter.Format(update.Bytes)} из {SizeFormatter.Format(totalBytes)}";
-            }
-
-            StatusCaption = head;
-            ProgressDetail = head + tail;
-
-            // TODO: остаток стоит на одном большом файле – SyncEngine докладывает прогресс только после
-            // копирования файла целиком; заменить на потоковое копирование вместо File.Copy, если
-            // синхронизация крупных файлов станет обычным сценарием.
-            var measured = new PerformanceOperation(operation,
-                update.Completed,
-                update.Bytes,
-                stopwatch.Elapsed,
-                determinate ? total : null,
-                totalBytes > 0 ? totalBytes : null,
-                totalBytes > 0 ? EtaBasis.Bytes : EtaBasis.Items);
-
-            ProgressRateText = PerformanceFormat.Rate(measured) ?? string.Empty;
-            ProgressRemainingText = PerformanceFormat.Remaining(measured) ?? string.Empty;
-            HasProgressRate = ProgressRateText.Length > 0 || ProgressRemainingText.Length > 0;
-
-            _performance.ReportOperation(measured);
-        });
-
-        try
-        {
-            return await Task.Run(() => work(token, progress), token);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.SyncOperationCancelled(operation);
-            SummaryText = "Операция отменена.";
-            StatusCaption = SummaryText;
-            return null;
-        }
-        catch (Exception exception)
-        {
-            var cause = exception.Unwrap();
-            _logger.SyncOperationFailed(cause, operation);
-            _notifier.Notify($"Ошибка: {operation}", StatusSeverity.Error);
-            _dialogs.Error("Ошибка", cause.Message);
-            SummaryText = $"Ошибка: {cause.Message}";
-            StatusCaption = SummaryText;
-            return null;
-        }
-        finally
-        {
-            IsBusy = false;
-            IsIndeterminate = true;
-            ProgressValue = 0;
-            _performance.ReportOperation(null);
-            _cts?.Dispose();
-            _cts = null;
-        }
-    }
-
     private void ClearComparison()
     {
         _result = null;
@@ -2224,7 +1713,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _hashesCompared = false;
         _collapsed.Clear();
         Rows.ReplaceAll([]);
-        ClearGit();
+        Git.Clear();
         UpdateSummary();
     }
 
@@ -2475,7 +1964,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         ShowModified = _settings.GetBool(SettingsKeys.SyncShowModified);
         BlankAbsent = _settings.GetBool(SettingsKeys.SyncBlankAbsent);
         Verify = _settings.GetBool(SettingsKeys.SyncVerify, AppDefaults.SyncVerifyDefault);
-        GitHistoryCount = _settings.GetInt(SettingsKeys.SyncGitHistoryCount, AppDefaults.GitHistoryCountDefault);
         HideApplied = _settings.GetBool(SettingsKeys.SyncHideApplied);
         FlatView = _settings.GetBool(SettingsKeys.SyncFlatView);
         RowSort = _settings.GetEnum(SettingsKeys.SyncFlatSort, AppDefaults.SyncFlatSortDefault);
