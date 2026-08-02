@@ -103,7 +103,7 @@ public static class GalleryDialogs
         var root = Root(scan);
 
         root.MarkContentsDeletedCommand.Execute(null);
-        Run(scan.DeleteMarkedCommand, "«Удалить помеченное» недоступна – пометки не встали.");
+        Run(scan.Marks.DeleteMarkedCommand, "«Удалить помеченное» недоступна – пометки не встали.");
     }
 
     private static void OpenArchive(IServiceProvider services)

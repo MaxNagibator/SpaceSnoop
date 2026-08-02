@@ -26,7 +26,7 @@
                                           VerticalAlignment="Center"
                                           Margin="2,0,10,0"
                                           Foreground="{DynamicResource Fg.Secondary}" />
-                <ComboBox ItemsSource="{Binding Drives}"
+                <ComboBox ItemsSource="{Binding Drives.Items}"
                           SelectedValue="{Binding SelectedDrive}"
                           SelectedValuePath="Path"
                           Style="{StaticResource ComboBox.Toolbar}"
@@ -86,7 +86,7 @@
                         Orientation="Horizontal"
                         VerticalAlignment="Center">
                 <Button Style="{StaticResource Button.Destructive}"
-                        Command="{Binding DeleteMarkedCommand}"
+                        Command="{Binding Marks.DeleteMarkedCommand}"
                         ToolTip="Переместить помеченные элементы в корзину (пометка – ПКМ по узлу)">
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
@@ -103,8 +103,8 @@
                                 VerticalAlignment="Center"
                                 CornerRadius="{DynamicResource Radius.Pill}"
                                 Background="#40FFFFFF"
-                                Visibility="{Binding HasMarked, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
-                            <TextBlock Text="{Binding MarkedCount}"
+                                Visibility="{Binding Marks.HasMarked, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                            <TextBlock Text="{Binding Marks.MarkedCount}"
                                        VerticalAlignment="Center"
                                        HorizontalAlignment="Center"
                                        FontWeight="SemiBold"
