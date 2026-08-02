@@ -134,12 +134,12 @@
                                 Orientation="Horizontal"
                                 VerticalAlignment="Center">
                         <Button Style="{StaticResource Button.Ghost}"
-                                Command="{Binding SkipCurrentCommand}"
+                                Command="{Binding Batch.SkipCurrentCommand}"
                                 MinHeight="{DynamicResource Control.Height.Default}"
                                 Padding="14,6"
                                 Margin="0,0,8,0"
                                 ToolTip="Пропустить текущий профиль и перейти к следующему"
-                                Visibility="{Binding IsBatchRunning, Converter={StaticResource BoolToVisibility}}">
+                                Visibility="{Binding Batch.IsBatchRunning, Converter={StaticResource BoolToVisibility}}">
                             <StackPanel Orientation="Horizontal">
                                 <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.SkipForward}"
                                                           Width="14"
@@ -173,7 +173,7 @@
                             </StackPanel>
                         </Button>
                         <Button Style="{StaticResource Button.Secondary}"
-                                Command="{Binding CompareAllCommand}"
+                                Command="{Binding Batch.CompareAllCommand}"
                                 MinHeight="{DynamicResource Control.Height.Default}"
                                 Padding="14,6"
                                 Margin="0,0,8,0">
@@ -188,7 +188,7 @@
                             </StackPanel>
                         </Button>
                         <Button Style="{StaticResource Button.Primary}"
-                                Command="{Binding SyncAllCommand}"
+                                Command="{Binding Batch.SyncAllCommand}"
                                 MinHeight="{DynamicResource Control.Height.Default}"
                                 Padding="14,6"
                                 ToolTip="Синхронизировать все профили (удаления – в корзину)">
@@ -223,12 +223,12 @@
                                   DescriptionMaxWidth="460"
                                   Margin="0,60,0,10"
                                   HorizontalAlignment="Center"
-                                  Visibility="{Binding HasRows, Converter={StaticResource InverseBoolToVisibility}}" />
+                                  Visibility="{Binding Rows.HasRows, Converter={StaticResource InverseBoolToVisibility}}" />
 
             <Border Style="{StaticResource Card.Inset}"
                     Margin="0,0,0,10"
                     Padding="14,10"
-                    Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}">
+                    Visibility="{Binding Rows.HasRows, Converter={StaticResource BoolToVisibility}}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="2*" />
@@ -239,7 +239,7 @@
 
                     <Grid Grid.Column="0"
                           HorizontalAlignment="Stretch">
-                        <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                        <TextBox Text="{Binding Rows.SearchText, UpdateSourceTrigger=PropertyChanged}"
                                  Style="{StaticResource TextBox.IconField}"
                                  Tag="{x:Static iconPacks:PackIconLucideKind.Search}"
                                  ToolTip="Фильтр профилей по имени или пути" />
@@ -248,12 +248,12 @@
                                    VerticalAlignment="Center"
                                    Foreground="{DynamicResource Fg.Muted}"
                                    IsHitTestVisible="False"
-                                   Visibility="{Binding SearchTextEmpty, Converter={StaticResource BoolToVisibility}}" />
+                                   Visibility="{Binding Rows.SearchTextEmpty, Converter={StaticResource BoolToVisibility}}" />
                     </Grid>
 
                     <ComboBox Grid.Column="1"
                               SelectedValuePath="Tag"
-                              SelectedValue="{Binding SortField}"
+                              SelectedValue="{Binding Rows.SortField}"
                               Style="{StaticResource ComboBox.Toolbar}"
                               MinWidth="160"
                               Margin="8,0,0,0"
@@ -274,7 +274,7 @@
 
                     <ToggleButton Grid.Column="2"
                                   Style="{StaticResource ToggleButton.Toolbar}"
-                                  IsChecked="{Binding SortDescending}"
+                                  IsChecked="{Binding Rows.SortDescending}"
                                   MinWidth="0"
                                   Padding="9,0"
                                   Margin="8,0,0,0"
@@ -288,7 +288,7 @@
 
                     <ToggleButton Grid.Column="3"
                                   Style="{StaticResource ToggleButton.Toolbar}"
-                                  IsChecked="{Binding GroupUnchanged}"
+                                  IsChecked="{Binding Rows.GroupUnchanged}"
                                   MinWidth="0"
                                   Padding="9,0"
                                   Margin="8,0,0,0"
@@ -311,10 +311,10 @@
             <TextBlock Text="Ничего не найдено."
                        Style="{StaticResource TextBlock.Subtle}"
                        Margin="2,2,0,8"
-                       Visibility="{Binding NoMatches, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+                       Visibility="{Binding Rows.NoMatches, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
 
-            <ItemsControl ItemsSource="{Binding RowsView}"
-                          Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}">
+            <ItemsControl ItemsSource="{Binding Rows.RowsView}"
+                          Visibility="{Binding Rows.HasRows, Converter={StaticResource BoolToVisibility}}">
                 <ItemsControl.GroupStyle>
                     <GroupStyle>
                         <GroupStyle.ContainerStyle>
