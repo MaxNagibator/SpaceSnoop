@@ -39,15 +39,11 @@ internal sealed class HeadlessSync
                 return 1;
             }
 
-            var filter = new ExclusionFilter(options.Exclusions);
-            var comparer = new DirectoryComparer(filter, NullLogger<DirectoryComparer>.Instance);
-            var result = comparer.Compare(options.Left, options.Right, CancellationToken.None);
+            var compare = new CompareDirectoriesUseCase(NullLogger<DirectoryComparer>.Instance);
+            var result = compare.Execute(new(options.Left, options.Right, options.Exclusions, options.Mode, options.Winner, options.Mirror), CancellationToken.None);
 
-            result.ApplyMode(options.Mode, options.Mirror, options.Winner);
-            result.ResolveAllConflicts(SyncAction.Skip);
-
-            var engine = new SyncEngine(NullLogger<SyncEngine>.Instance, false);
-            var report = engine.Execute(result, CancellationToken.None);
+            var sync = new ExecuteSyncUseCase(NullLogger<SyncEngine>.Instance);
+            var report = sync.Execute(new(result, SyncConflictPolicy.SkipUnresolved, SyncDeleteUi.Silent), CancellationToken.None);
 
             stopwatch.Stop();
             WriteLog(options.Name, report, logger);

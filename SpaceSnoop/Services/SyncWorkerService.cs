@@ -22,14 +22,14 @@ public sealed class SyncWorkerService : IDisposable
 
     public bool IsBusy => _backgroundWorker.IsBusy;
 
-    public void StartCompare(string leftPath, string rightPath, ExclusionFilter filter, CancellationToken cancellationToken)
+    public void StartCompare(CompareDirectoriesRequest compareRequest, CancellationToken cancellationToken)
     {
         if (_backgroundWorker.IsBusy)
         {
             return;
         }
 
-        var request = new CompareRequest(leftPath, rightPath, filter, cancellationToken);
+        var request = new CompareRequest(compareRequest, cancellationToken);
         _backgroundWorker.RunWorkerAsync(request);
     }
 
@@ -69,13 +69,13 @@ public sealed class SyncWorkerService : IDisposable
 
         switch (args.Argument)
         {
-            case CompareRequest(var leftPath, var rightPath, var filter, var token):
+            case CompareRequest(var compareRequest, var token):
                 stopwatch = Stopwatch.StartNew();
 
                 try
                 {
-                    var comparer = new DirectoryComparer(filter, NullLogger<DirectoryComparer>.Instance);
-                    var result = comparer.Compare(leftPath, rightPath, token);
+                    var compare = new CompareDirectoriesUseCase(NullLogger<DirectoryComparer>.Instance);
+                    var result = compare.Execute(compareRequest, token);
                     stopwatch.Stop();
                     args.Result = new CompareResponse(result, stopwatch.Elapsed, null);
                 }
@@ -119,8 +119,8 @@ public sealed class SyncWorkerService : IDisposable
 
                 try
                 {
-                    var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
-                    var report = engine.Execute(comparisonResult, token);
+                    var sync = new ExecuteSyncUseCase(NullLogger<SyncEngine>.Instance);
+                    var report = sync.Execute(new(comparisonResult), token);
                     stopwatch.Stop();
                     args.Result = new SyncResponse(report, stopwatch.Elapsed, null);
                 }
@@ -217,7 +217,7 @@ public sealed class SyncWorkerService : IDisposable
 
     public sealed record HashResponse(ComparisonResult? Result, TimeSpan Elapsed, string? Error);
 
-    private sealed record CompareRequest(string LeftPath, string RightPath, ExclusionFilter Filter, CancellationToken CancellationToken);
+    private sealed record CompareRequest(CompareDirectoriesRequest Request, CancellationToken CancellationToken);
 
     private sealed record SyncRequest(ComparisonResult ComparisonResult, CancellationToken CancellationToken);
 

@@ -18,8 +18,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private readonly ISettingsStore _settings;
     private readonly IDialogService _dialogs;
     private readonly ILogger<SyncViewModel> _logger;
-    private readonly ILogger<SyncEngine> _engineLogger;
-    private readonly ILogger<DirectoryComparer> _comparerLogger;
+    private readonly CompareDirectoriesUseCase _compare;
+    private readonly ExecuteSyncUseCase _sync;
     private readonly ToastNotifier _notifier;
     private readonly PerformanceMonitor _performance;
     private readonly AgentPreferences _agent;
@@ -141,7 +141,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     [NotifyCanExecuteChangedFor(nameof(ResolveAllSkipCommand))]
     private bool _hasPending;
 
-    public SyncViewModel(ISettingsStore settings, IDialogService dialogs, OperationPreferences operations, AgentPreferences agent, ILogger<SyncViewModel> logger, ILogger<SyncEngine> engineLogger, ILogger<DirectoryComparer> comparerLogger, ToastNotifier notifier, PerformanceMonitor performance)
+    public SyncViewModel(ISettingsStore settings, IDialogService dialogs, OperationPreferences operations, AgentPreferences agent, ILogger<SyncViewModel> logger, CompareDirectoriesUseCase compare, ExecuteSyncUseCase sync, ToastNotifier notifier, PerformanceMonitor performance)
     {
         _settings = settings;
         _performance = performance;
@@ -149,8 +149,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         Operations = operations;
         _agent = agent;
         _logger = logger;
-        _engineLogger = engineLogger;
-        _comparerLogger = comparerLogger;
+        _compare = compare;
+        _sync = sync;
         _notifier = notifier;
         Profiles = new(settings, dialogs, BuildCurrentProfile, ApplyProfile, () => !IsBusy, message => StatusCaption = message);
         LoadSettings();
@@ -1463,20 +1463,15 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             return;
         }
 
-        var filter = new ExclusionFilter(Exclusions);
         var stopwatch = Stopwatch.StartNew();
 
         _logger.CompareStarted(left, right);
 
-        var mode = CurrentMode;
-        var mirror = Mirror;
-        var winner = CurrentWinner;
+        var request = new CompareDirectoriesRequest(left, right, Exclusions, CurrentMode, CurrentWinner, Mirror);
 
         var prepared = await RunAsync("Сравнение каталогов:", (token, progress) =>
         {
-            var comparer = new DirectoryComparer(filter, _comparerLogger);
-            var compared = comparer.Compare(left, right, token, progress);
-            compared.ApplyMode(mode, mirror, winner);
+            var compared = _compare.Execute(request, token, progress);
             return new ComparePreparation(compared, BuildDirSizeCache(compared.Root));
         }, external: external);
 
@@ -1862,18 +1857,13 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         var verify = Verify;
 
-        var report = await RunAsync("Синхронизация:", (token, progress) =>
-        {
-            var engine = new SyncEngine(_engineLogger);
-            var executed = engine.Execute(result, token, progress);
+        var request = new ExecuteSyncRequest(result, SyncConflictPolicy.None, SyncDeleteUi.Interactive, verify);
 
-            if (verify)
-            {
-                engine.Verify(executed, result.LeftPath, result.RightPath, token);
-            }
-
-            return executed;
-        }, planned.Total, external, planned.CopyBytes);
+        var report = await RunAsync("Синхронизация:",
+            (token, progress) => _sync.Execute(request, token, progress),
+            planned.Total,
+            external,
+            planned.CopyBytes);
 
         stopwatch.Stop();
 

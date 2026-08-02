@@ -20,7 +20,7 @@ public sealed class McpBridge(
     DockerService docker,
     ToastNotifier notifier,
     PerformanceMonitor performance,
-    ILogger<DirectoryComparer> comparerLogger,
+    CompareDirectoriesUseCase compare,
     ILogger<McpBridge> logger)
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -132,9 +132,7 @@ public sealed class McpBridge(
 
         var model = await Task.Run(() =>
                 {
-                    var comparer = new DirectoryComparer(new(patterns), comparerLogger);
-                    var result = comparer.Compare(left, right, cancellationToken);
-                    result.ApplyMode(mode, mirror, winner);
+                    var result = compare.Execute(new(left, right, patterns, mode, winner, mirror), cancellationToken);
 
                     return ComparisonExport.Build(result, new(mode, winner, mirror, patterns), AppInfo.Version, entryLimit);
                 },

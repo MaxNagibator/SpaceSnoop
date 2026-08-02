@@ -153,6 +153,8 @@ public partial class App : Application
         services.AddSingleton<DiskSpaceCalculator>();
         services.AddSingleton<DockerService>();
         services.AddSingleton<ArchiveService>();
+        services.AddSingleton<CompareDirectoriesUseCase>();
+        services.AddSingleton<ExecuteSyncUseCase>();
 
         services.AddKeepShell();
         services.AddKeepShellToasts();
@@ -212,7 +214,11 @@ public partial class App : Application
         services.AddSingleton<McpBridge>();
         services.AddSingleton<McpServerHost>();
 
-        return services.BuildServiceProvider();
+        return services.BuildServiceProvider(new ServiceProviderOptions
+        {
+            ValidateOnBuild = true,
+            ValidateScopes = true,
+        });
     }
 
     private void RunGallery(IEnumerable<string> args)

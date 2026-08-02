@@ -206,8 +206,8 @@ public class SyncQuickProfileTests
             new(settings),
             new(settings),
             NullLogger<SyncViewModel>.Instance,
-            NullLogger<SyncEngine>.Instance,
-            NullLogger<DirectoryComparer>.Instance,
+            new(NullLogger<DirectoryComparer>.Instance),
+            new(NullLogger<SyncEngine>.Instance),
             notifier,
             new(NullLogger<PerformanceMonitor>.Instance));
     }

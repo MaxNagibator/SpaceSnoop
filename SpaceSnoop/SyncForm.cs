@@ -77,9 +77,8 @@ public partial class SyncForm : Form
         _progressBar.Style = ProgressBarStyle.Marquee;
         _statusLabel.Text = "Сравнение...";
 
-        var filter = new ExclusionFilter(_exclusionTextBox.Text);
         ResetCancellationTokenSource();
-        _workerService.StartCompare(leftPath, rightPath, filter, _cancellationTokenSource!.Token);
+        _workerService.StartCompare(new(leftPath, rightPath, _exclusionTextBox.Text, CurrentMode(), SyncWinner.Newest, false), _cancellationTokenSource!.Token);
     }
 
     private void OnCompareCompleted(object? sender, SyncWorkerService.CompareResponse? response)
@@ -330,6 +329,17 @@ public partial class SyncForm : Form
         _cancellationTokenSource = new();
     }
 
+    private SyncMode CurrentMode()
+    {
+        return _syncModeComboBox.SelectedIndex switch
+        {
+            0 => SyncMode.LeftToRight,
+            1 => SyncMode.RightToLeft,
+            2 => SyncMode.Bidirectional,
+            _ => SyncMode.LeftToRight,
+        };
+    }
+
     private void ApplyCurrentMode()
     {
         if (_comparisonResult == null)
@@ -337,15 +347,7 @@ public partial class SyncForm : Form
             return;
         }
 
-        var mode = _syncModeComboBox.SelectedIndex switch
-        {
-            0 => SyncMode.LeftToRight,
-            1 => SyncMode.RightToLeft,
-            2 => SyncMode.Bidirectional,
-            _ => SyncMode.LeftToRight,
-        };
-
-        _comparisonResult.ApplyMode(mode);
+        _comparisonResult.ApplyMode(CurrentMode());
     }
 
     private void UpdateSummary()

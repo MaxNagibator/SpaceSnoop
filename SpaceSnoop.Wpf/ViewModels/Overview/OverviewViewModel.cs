@@ -15,8 +15,8 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
     private readonly IDialogService _dialogs;
     private readonly ToastNotifier _notifier;
     private readonly ILogger<OverviewViewModel> _logger;
-    private readonly ILogger<DirectoryComparer> _comparerLogger;
-    private readonly ILogger<SyncEngine> _engineLogger;
+    private readonly CompareDirectoriesUseCase _compare;
+    private readonly ExecuteSyncUseCase _sync;
 
     private CancellationTokenSource? _cts;
     private CancellationTokenSource? _rowCts;
@@ -54,14 +54,14 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
     [ObservableProperty]
     private double _progressMax;
 
-    public OverviewViewModel(ISettingsStore settings, IDialogService dialogs, ToastNotifier notifier, ILogger<OverviewViewModel> logger, ILogger<DirectoryComparer> comparerLogger, ILogger<SyncEngine> engineLogger)
+    public OverviewViewModel(ISettingsStore settings, IDialogService dialogs, ToastNotifier notifier, ILogger<OverviewViewModel> logger, CompareDirectoriesUseCase compare, ExecuteSyncUseCase sync)
     {
         _settings = settings;
         _dialogs = dialogs;
         _notifier = notifier;
         _logger = logger;
-        _comparerLogger = comparerLogger;
-        _engineLogger = engineLogger;
+        _compare = compare;
+        _sync = sync;
 
         RowsView = CollectionViewSource.GetDefaultView(Rows);
         RowsView.Filter = FilterRow;
@@ -169,9 +169,8 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
 
                 try
                 {
-                    var filter = new ExclusionFilter(row.Profile.Exclusions);
-                    var result = await Task.Run(() => new DirectoryComparer(filter, _comparerLogger).Compare(row.Profile.Left.Trim(), row.Profile.Right.Trim(), rowCts.Token),
-                        rowCts.Token);
+                    var request = BuildCompareRequest(row.Profile);
+                    var result = await Task.Run(() => _compare.Execute(request, rowCts.Token), rowCts.Token);
 
                     rowStopwatch.Stop();
                     row.ApplyStatistics(result.GetStatistics(), result.GetDirectoryStatistics());
@@ -470,13 +469,12 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
 
         try
         {
+            var request = BuildCompareRequest(profile);
+
             var report = await Task.Run(() =>
                 {
-                    var filter = new ExclusionFilter(profile.Exclusions);
-                    var result = new DirectoryComparer(filter, _comparerLogger).Compare(left, right, rowCts.Token);
-                    result.ApplyMode(mode, mirror, winner);
-                    result.ResolveAllConflicts(SyncAction.Skip);
-                    return new SyncEngine(_engineLogger, false).Execute(result, rowCts.Token);
+                    var result = _compare.Execute(request, rowCts.Token);
+                    return _sync.Execute(new(result, SyncConflictPolicy.SkipUnresolved, SyncDeleteUi.Silent), rowCts.Token);
                 },
                 rowCts.Token);
 
@@ -505,6 +503,11 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
             _rowCts = null;
             rowCts.Dispose();
         }
+    }
+
+    private static CompareDirectoriesRequest BuildCompareRequest(SyncProfile profile)
+    {
+        return new(profile.Left, profile.Right, profile.Exclusions, HeadlessSync.MapMode(profile.Mode), profile.Winner, profile.Mirror);
     }
 
     private void MarkSkipped(OverviewRowViewModel row, string? note = null)
