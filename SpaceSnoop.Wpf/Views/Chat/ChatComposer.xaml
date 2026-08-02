@@ -12,7 +12,7 @@
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/Views/Chat/ChatResources.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/SpaceSnoop.Wpf;component/Views/Chat/ChatResources.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </UserControl.Resources>

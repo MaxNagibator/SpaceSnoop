@@ -1,5 +1,6 @@
 ﻿using MahApps.Metro.IconPacks;
 using System.ComponentModel;
+using System.Windows.Input;
 
 namespace SpaceSnoop.Wpf.ViewModels;
 
@@ -133,6 +134,8 @@ public sealed partial class ShellViewModel : ShellViewModelBase
 
     public string? CurrentSectionKey => _sectionByKey.FirstOrDefault(p => p.Value == Selected).Key;
 
+    public ICommand? PageRefreshCommand => CurrentPageRefresh?.RefreshCommand;
+
     public bool TryNavigate(string sectionKey)
     {
         if (!_sectionByKey.TryGetValue(sectionKey, out var item))
@@ -147,6 +150,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
     protected override void OnSelectionChanged(NavigationItem? value)
     {
         StatusText = value?.Title ?? "Готов";
+        OnPropertyChanged(nameof(PageRefreshCommand));
 
         if (value is not null && Sections.Contains(value))
         {

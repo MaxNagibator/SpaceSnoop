@@ -13,7 +13,7 @@
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/Views/Settings/SettingsResources.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/SpaceSnoop.Wpf;component/Views/Settings/SettingsResources.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <Style x:Key="Mcp.Notice"

@@ -277,7 +277,7 @@ public static class GalleryRun
         return modals.HasActive == active;
     }
 
-    private static async Task ArrangeAsync(IServiceProvider services, GalleryFixture fixture)
+    internal static async Task ArrangeAsync(IServiceProvider services, GalleryFixture fixture)
     {
         var scan = services.GetRequiredService<ScanViewModel>();
         await scan.ScanFromAutomationAsync(fixture.Left, CancellationToken.None).ConfigureAwait(true);

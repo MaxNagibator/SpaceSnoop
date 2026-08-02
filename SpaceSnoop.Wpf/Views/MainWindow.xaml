@@ -11,7 +11,7 @@
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance vm:ShellViewModel}"
         Title="SpaceSnoop"
-        Icon="pack://application:,,,/icon.ico"
+        Icon="pack://application:,,,/SpaceSnoop.Wpf;component/icon.ico"
         Height="720"
         Width="1100"
         MinHeight="520"
@@ -34,7 +34,7 @@
 
     <Window.InputBindings>
         <KeyBinding Key="F5"
-                    Command="{Binding CurrentPageRefresh.RefreshCommand}" />
+                    Command="{Binding PageRefreshCommand}" />
         <KeyBinding Key="Escape"
                     Command="{Binding CurrentPageStatus.CancelCommand}" />
     </Window.InputBindings>

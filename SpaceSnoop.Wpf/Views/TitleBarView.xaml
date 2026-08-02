@@ -95,7 +95,7 @@
             <StackPanel Grid.Column="0"
                         Orientation="Horizontal"
                         Margin="14,0">
-                <Image Source="pack://application:,,,/icon.ico"
+                <Image Source="pack://application:,,,/SpaceSnoop.Wpf;component/icon.ico"
                        Width="18"
                        Height="18"
                        VerticalAlignment="Center"
@@ -200,7 +200,7 @@
                 </Border>
 
                 <Button Style="{StaticResource Theme.SegmentButton}"
-                        Command="{Binding CurrentPageRefresh.RefreshCommand}"
+                        Command="{Binding PageRefreshCommand}"
                         Width="36"
                         VerticalAlignment="Center"
                         Margin="0,0,8,0"

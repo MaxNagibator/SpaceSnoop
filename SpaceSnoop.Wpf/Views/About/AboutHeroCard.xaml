@@ -25,7 +25,7 @@
                         BorderBrush="{DynamicResource Border.Subtle}"
                         BorderThickness="1"
                         VerticalAlignment="Top">
-                    <Image Source="pack://application:,,,/icon.ico"
+                    <Image Source="pack://application:,,,/SpaceSnoop.Wpf;component/icon.ico"
                            Width="36"
                            Height="36"
                            RenderOptions.BitmapScalingMode="HighQuality" />

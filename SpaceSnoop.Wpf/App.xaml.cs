@@ -143,7 +143,7 @@ public partial class App : Application
         return result == MessageBoxResult.Yes && AdminElevation.TryRestartAsAdmin();
     }
 
-    private static ServiceProvider ConfigureServices(ISettingsStore settings, KeepShellLogging logging)
+    internal static ServiceProvider ConfigureServices(ISettingsStore settings, KeepShellLogging logging)
     {
         var services = new ServiceCollection();
 

@@ -14,8 +14,8 @@
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/Views/Sync/SyncDiffRowContextMenu.xaml" />
-                <ResourceDictionary Source="/Views/Sync/SyncDiffRowTemplate.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/SpaceSnoop.Wpf;component/Views/Sync/SyncDiffRowContextMenu.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/SpaceSnoop.Wpf;component/Views/Sync/SyncDiffRowTemplate.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <Style x:Key="ToggleButton.Filter"

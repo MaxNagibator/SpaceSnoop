@@ -14,7 +14,7 @@
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/Views/About/AboutResources.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/SpaceSnoop.Wpf;component/Views/About/AboutResources.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </UserControl.Resources>
