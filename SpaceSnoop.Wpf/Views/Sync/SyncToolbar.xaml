@@ -32,7 +32,7 @@
                TargetType="ToggleButton"
                BasedOn="{StaticResource ToggleButton.Toolbar}">
             <Style.Triggers>
-                <DataTrigger Binding="{Binding MirrorDeletes}"
+                <DataTrigger Binding="{Binding Setup.MirrorDeletes}"
                              Value="True">
                     <Setter Property="Background"
                             Value="{DynamicResource State.ErrorSoft}" />
@@ -138,7 +138,7 @@
                     </Border>
                     <Button DockPanel.Dock="Right"
                             Style="{StaticResource Button.Secondary}"
-                            Command="{Binding BrowseLeftCommand}"
+                            Command="{Binding Setup.BrowseLeftCommand}"
                             Padding="9,0"
                             MinWidth="0"
                             Margin="6,0,0,0"
@@ -150,7 +150,7 @@
                                                   Height="15" />
                     </Button>
                     <Grid VerticalAlignment="Center">
-                        <TextBox Text="{Binding LeftPath, UpdateSourceTrigger=PropertyChanged}"
+                        <TextBox Text="{Binding Setup.LeftPath, UpdateSourceTrigger=PropertyChanged}"
                                  behaviors:PathSuggest.Enabled="{Binding Operations.SyncPathSuggest}"
                                  Style="{StaticResource TextBox.Toolbar}"
                                  ToolTip="Каталог слева" />
@@ -163,7 +163,7 @@
                                                   IsHitTestVisible="False"
                                                   Foreground="{DynamicResource State.Error}"
                                                   ToolTip="Каталог не найден"
-                                                  Visibility="{Binding LeftPathInvalid, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+                                                  Visibility="{Binding Setup.LeftPathInvalid, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
                     </Grid>
                 </DockPanel>
 
@@ -172,12 +172,12 @@
                         HorizontalAlignment="Center"
                         Cursor="Hand"
                         Margin="0,0,12,8"
-                        Command="{Binding CycleModeCommand}"
-                        ToolTip="{Binding DirectionHint}"
-                        AutomationProperties.Name="{Binding DirectionHint}">
+                        Command="{Binding Setup.CycleModeCommand}"
+                        ToolTip="{Binding Setup.DirectionHint}"
+                        AutomationProperties.Name="{Binding Setup.DirectionHint}">
                     <Button.InputBindings>
                         <MouseBinding MouseAction="RightClick"
-                                      Command="{Binding SwapPathsCommand}" />
+                                      Command="{Binding Setup.SwapPathsCommand}" />
                     </Button.InputBindings>
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
@@ -189,7 +189,7 @@
                                     Background="{DynamicResource Accent.Soft}"
                                     BorderBrush="{DynamicResource Accent.Primary}">
                                 <iconPacks:PackIconLucide x:Name="Arrow"
-                                                          Kind="{Binding DirectionIconKind}"
+                                                          Kind="{Binding Setup.DirectionIconKind}"
                                                           Width="13"
                                                           Height="13"
                                                           HorizontalAlignment="Center"
@@ -229,7 +229,7 @@
                     </Border>
                     <Button DockPanel.Dock="Left"
                             Style="{StaticResource Button.Secondary}"
-                            Command="{Binding BrowseRightCommand}"
+                            Command="{Binding Setup.BrowseRightCommand}"
                             Padding="9,0"
                             MinWidth="0"
                             Margin="0,0,6,0"
@@ -241,7 +241,7 @@
                                                   Height="15" />
                     </Button>
                     <Grid VerticalAlignment="Center">
-                        <TextBox Text="{Binding RightPath, UpdateSourceTrigger=PropertyChanged}"
+                        <TextBox Text="{Binding Setup.RightPath, UpdateSourceTrigger=PropertyChanged}"
                                  behaviors:PathSuggest.Enabled="{Binding Operations.SyncPathSuggest}"
                                  Style="{StaticResource TextBox.Toolbar}"
                                  ToolTip="Каталог справа" />
@@ -254,7 +254,7 @@
                                                   IsHitTestVisible="False"
                                                   Foreground="{DynamicResource State.Error}"
                                                   ToolTip="Каталог не найден"
-                                                  Visibility="{Binding RightPathInvalid, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+                                                  Visibility="{Binding Setup.RightPathInvalid, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
                     </Grid>
                 </DockPanel>
             </views:StretchWrapPanel>
@@ -288,7 +288,7 @@
                         ToolTip="{Binding Ledger.SyncCommandHint}"
                         AutomationProperties.Name="Синхронизировать каталоги">
                     <StackPanel Orientation="Horizontal">
-                        <iconPacks:PackIconLucide Kind="{Binding DirectionIconKind}"
+                        <iconPacks:PackIconLucide Kind="{Binding Setup.DirectionIconKind}"
                                                   Width="15"
                                                   Height="15"
                                                   VerticalAlignment="Center" />
@@ -355,7 +355,7 @@
                             BorderBrush="{DynamicResource Border.Subtle}"
                             VerticalAlignment="Center"
                             Margin="0,0,16,0"
-                            Visibility="{Binding ShowConflictResolvers, Converter={StaticResource BoolToVisibility}}"
+                            Visibility="{Binding Setup.ShowConflictResolvers, Converter={StaticResource BoolToVisibility}}"
                             ToolTip="Разрешить все спорные элементы разом">
                         <StackPanel Orientation="Horizontal"
                                     VerticalAlignment="Center">
@@ -410,7 +410,7 @@
 
                         <Button Grid.Column="0"
                                 Style="{StaticResource Button.Ghost}"
-                                Command="{Binding Profiles.SaveProfileCommand}"
+                                Command="{Binding Setup.Profiles.SaveProfileCommand}"
                                 Width="32"
                                 MinHeight="{DynamicResource Control.Height.Default}"
                                 Padding="0"
@@ -423,9 +423,9 @@
                                                       Height="14" />
                         </Button>
 
-                        <ComboBox ItemsSource="{Binding Profiles.Items}"
+                        <ComboBox ItemsSource="{Binding Setup.Profiles.Items}"
                                   Grid.Column="1"
-                                  SelectedItem="{Binding Profiles.SelectedProfile}"
+                                  SelectedItem="{Binding Setup.Profiles.SelectedProfile}"
                                   Style="{StaticResource ComboBox.Toolbar}"
                                   VerticalAlignment="Center"
                                   ToolTip="Профиль синхронизации">
@@ -611,32 +611,32 @@
                         <TextBlock Text="Направление"
                                    Style="{StaticResource TextBlock.Subtle}"
                                    Margin="0,0,0,4" />
-                        <ListBox ItemsSource="{Binding Modes}"
-                                 SelectedIndex="{Binding SelectedModeIndex}"
+                        <ListBox ItemsSource="{Binding Setup.Modes}"
+                                 SelectedIndex="{Binding Setup.SelectedModeIndex}"
                                  Style="{StaticResource ListBox.Segmented}"
                                  HorizontalAlignment="Stretch"
                                  AutomationProperties.Name="Направление синхронизации" />
-                        <StackPanel Visibility="{Binding IsBidirectional, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel Visibility="{Binding Setup.IsBidirectional, Converter={StaticResource BoolToVisibility}}">
                             <TextBlock Text="Победитель"
                                        Style="{StaticResource TextBlock.Subtle}"
                                        Margin="0,12,0,4" />
-                            <ListBox ItemsSource="{Binding Winners}"
-                                     SelectedIndex="{Binding SelectedWinnerIndex}"
+                            <ListBox ItemsSource="{Binding Setup.Winners}"
+                                     SelectedIndex="{Binding Setup.SelectedWinnerIndex}"
                                      Style="{StaticResource ListBox.Segmented}"
                                      HorizontalAlignment="Stretch"
-                                     ToolTip="{Binding WinnerHint}"
+                                     ToolTip="{Binding Setup.WinnerHint}"
                                      AutomationProperties.Name="Победитель в двустороннем режиме" />
                         </StackPanel>
                         <ToggleButton Style="{StaticResource MirrorToggle}"
-                                      IsChecked="{Binding Mirror}"
-                                      IsEnabled="{Binding MirrorApplicable}"
+                                      IsChecked="{Binding Setup.Mirror}"
+                                      IsEnabled="{Binding Setup.MirrorApplicable}"
                                       MinWidth="0"
                                       Padding="9,0"
                                       HorizontalAlignment="Stretch"
                                       VerticalAlignment="Center"
                                       Margin="0,12,0,0"
-                                      ToolTip="{Binding MirrorHint}"
-                                      AutomationProperties.Name="{Binding MirrorHint}">
+                                      ToolTip="{Binding Setup.MirrorHint}"
+                                      AutomationProperties.Name="{Binding Setup.MirrorHint}">
                             <StackPanel Orientation="Horizontal">
                                 <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FlipHorizontal2}"
                                                           Width="14"
@@ -703,7 +703,7 @@
                                    Style="{StaticResource TextBlock.Subtle}"
                                    Margin="0,12,0,4" />
                         <Grid HorizontalAlignment="Stretch">
-                            <TextBox Text="{Binding Exclusions, UpdateSourceTrigger=PropertyChanged}"
+                            <TextBox Text="{Binding Setup.Exclusions, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource TextBox.IconField}"
                                      Tag="{x:Static iconPacks:PackIconLucideKind.Funnel}"
                                      ToolTip="Исключения: глоб-шаблоны через запятую, напр. bin,obj,*.tmp" />
@@ -712,7 +712,7 @@
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource Fg.Muted}"
                                        IsHitTestVisible="False"
-                                       Visibility="{Binding ExclusionsEmpty, Converter={StaticResource BoolToVisibility}}" />
+                                       Visibility="{Binding Setup.ExclusionsEmpty, Converter={StaticResource BoolToVisibility}}" />
                         </Grid>
                     </StackPanel>
                 </Border>

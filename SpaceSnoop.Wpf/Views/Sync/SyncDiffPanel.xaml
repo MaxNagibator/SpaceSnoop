@@ -66,7 +66,7 @@
             <sync:SyncDiffHeaderBar Grid.Row="0" />
 
             <ListBox Grid.Row="1"
-                     ItemsSource="{Binding Rows}"
+                     ItemsSource="{Binding Rows.Rows}"
                      Background="Transparent"
                      BorderThickness="0"
                      Margin="0,4,0,0"
@@ -105,7 +105,7 @@
                                VerticalAlignment="Center"
                                Margin="12,0,0,-4">
                         <ToggleButton Style="{StaticResource ToggleButton.Filter}"
-                                      IsChecked="{Binding FlatView}"
+                                      IsChecked="{Binding Rows.FlatView}"
                                       ToolTip="Плоский список различающихся файлов вместо дерева каталогов"
                                       AutomationProperties.Name="Плоский список файлов вместо дерева">
                             <StackPanel Orientation="Horizontal">
@@ -122,7 +122,7 @@
                         <Border Style="{StaticResource FilterDivider}" />
 
                         <ToggleButton Style="{StaticResource ToggleButton.Filter}"
-                                      IsChecked="{Binding ShowIdentical}"
+                                      IsChecked="{Binding Rows.ShowIdentical}"
                                       ToolTip="Показывать одинаковые файлы"
                                       AutomationProperties.Name="Показывать одинаковые файлы">
                             <StackPanel Orientation="Horizontal">
@@ -136,7 +136,7 @@
                             </StackPanel>
                         </ToggleButton>
                         <ToggleButton Style="{StaticResource ToggleButton.Filter}"
-                                      IsChecked="{Binding ShowApplied}"
+                                      IsChecked="{Binding Rows.ShowApplied}"
                                       ToolTip="Показывать строки, успешно применённые при последней синхронизации"
                                       AutomationProperties.Name="Показывать успешно применённые строки">
                             <StackPanel Orientation="Horizontal">
@@ -153,7 +153,7 @@
                         <Border Style="{StaticResource FilterDivider}" />
 
                         <ToggleButton Style="{StaticResource ToggleButton.Filter}"
-                                      IsChecked="{Binding ShowSizes}"
+                                      IsChecked="{Binding Rows.ShowSizes}"
                                       ToolTip="Показывать размеры файлов"
                                       AutomationProperties.Name="Показывать размеры файлов">
                             <StackPanel Orientation="Horizontal">
@@ -167,7 +167,7 @@
                             </StackPanel>
                         </ToggleButton>
                         <ToggleButton Style="{StaticResource ToggleButton.Filter}"
-                                      IsChecked="{Binding ShowModified}"
+                                      IsChecked="{Binding Rows.ShowModified}"
                                       ToolTip="Показывать время последнего изменения файла"
                                       AutomationProperties.Name="Показывать время последнего изменения файла">
                             <StackPanel Orientation="Horizontal">
@@ -181,7 +181,7 @@
                             </StackPanel>
                         </ToggleButton>
                         <ToggleButton Style="{StaticResource ToggleButton.Filter}"
-                                      IsChecked="{Binding BlankAbsent}"
+                                      IsChecked="{Binding Rows.BlankAbsent}"
                                       Margin="0,0,0,4"
                                       ToolTip="Отсутствующую сторону показывать пустой, а не зачёркнутым именем"
                                       AutomationProperties.Name="Отсутствующую сторону показывать пустой">

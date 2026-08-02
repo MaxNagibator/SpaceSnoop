@@ -471,12 +471,12 @@
                                Style="{StaticResource SideModifiedLeft}"
                                Margin="8,0,0,0"
                                ToolTip="Последнее изменение"
-                               Visibility="{Binding DataContext.ShowModified, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}" />
+                               Visibility="{Binding DataContext.Rows.ShowModified, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}" />
                     <TextBlock Grid.Column="5"
                                Text="{Binding LeftSizeText}"
                                Style="{StaticResource SideSize}"
                                Margin="8,0,6,0"
-                               Visibility="{Binding DataContext.ShowSizes, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}" />
+                               Visibility="{Binding DataContext.Rows.ShowSizes, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}" />
                 </Grid>
 
                 <Button Grid.Column="1"
@@ -547,12 +547,12 @@
                                Style="{StaticResource SideModifiedRight}"
                                Margin="8,0,0,0"
                                ToolTip="Последнее изменение"
-                               Visibility="{Binding DataContext.ShowModified, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}" />
+                               Visibility="{Binding DataContext.Rows.ShowModified, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}" />
                     <TextBlock Grid.Column="5"
                                Text="{Binding RightSizeText}"
                                Style="{StaticResource SideSize}"
                                Margin="8,0,6,0"
-                               Visibility="{Binding DataContext.ShowSizes, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}" />
+                               Visibility="{Binding DataContext.Rows.ShowSizes, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}" />
                 </Grid>
             </Grid>
         </Grid>

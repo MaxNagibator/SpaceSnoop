@@ -224,7 +224,7 @@ public sealed class McpBridge(
 
             if (sync.Ledger.HasResult)
             {
-                parts.Add($"открыто сравнение {sync.LeftPath} → {sync.RightPath}, различий {sync.Ledger.LeftOnlyCount + sync.Ledger.RightOnlyCount + sync.Ledger.ModifiedCount + sync.Ledger.ConflictCount}");
+                parts.Add($"открыто сравнение {sync.Setup.LeftPath} → {sync.Setup.RightPath}, различий {sync.Ledger.LeftOnlyCount + sync.Ledger.RightOnlyCount + sync.Ledger.ModifiedCount + sync.Ledger.ConflictCount}");
             }
 
             return $"[Состояние окна SpaceSnoop: {string.Join("; ", parts)}. Это служебная справка, отвечать на неё не надо.]";
@@ -448,7 +448,7 @@ public sealed class McpBridge(
                 throw new McpException("Есть неразрешённые спорные элементы – разрешите их в приложении.");
             }
 
-            logger.McpMutationRequested("sync_current", $"«{sync.LeftPath}» → «{sync.RightPath}», режим {sync.CurrentMode}, зеркало {sync.Mirror}");
+            logger.McpMutationRequested("sync_current", $"«{sync.Setup.LeftPath}» → «{sync.Setup.RightPath}», режим {sync.Setup.CurrentMode}, зеркало {sync.Setup.Mirror}");
             notifier.Notify("Агент запустил синхронизацию", StatusSeverity.Warning);
 
             return sync.SyncFromAutomationAsync(cancellationToken);
@@ -842,9 +842,9 @@ public sealed class McpBridge(
             throw new McpException("Страница «Синхронизация» сейчас занята другой операцией.");
         }
 
-        var targetLeft = string.IsNullOrWhiteSpace(left) ? sync.LeftPath.Trim() : left.Trim();
-        var targetRight = string.IsNullOrWhiteSpace(right) ? sync.RightPath.Trim() : right.Trim();
-        var targetMode = mode ?? sync.CurrentMode;
+        var targetLeft = string.IsNullOrWhiteSpace(left) ? sync.Setup.LeftPath.Trim() : left.Trim();
+        var targetRight = string.IsNullOrWhiteSpace(right) ? sync.Setup.RightPath.Trim() : right.Trim();
+        var targetMode = mode ?? sync.Setup.CurrentMode;
 
         if (compare)
         {
@@ -867,21 +867,21 @@ public sealed class McpBridge(
 
     private void ApplySyncPaths(string left, string right, SyncMode mode, string? exclusions)
     {
-        if (!string.Equals(sync.LeftPath, left, StringComparison.Ordinal))
+        if (!string.Equals(sync.Setup.LeftPath, left, StringComparison.Ordinal))
         {
-            sync.LeftPath = left;
+            sync.Setup.LeftPath = left;
         }
 
-        if (!string.Equals(sync.RightPath, right, StringComparison.Ordinal))
+        if (!string.Equals(sync.Setup.RightPath, right, StringComparison.Ordinal))
         {
-            sync.RightPath = right;
+            sync.Setup.RightPath = right;
         }
 
-        sync.SelectedModeIndex = SyncProfile.IndexOfMode(mode);
+        sync.Setup.SelectedModeIndex = SyncProfile.IndexOfMode(mode);
 
         if (exclusions is not null)
         {
-            sync.Exclusions = exclusions.Trim();
+            sync.Setup.Exclusions = exclusions.Trim();
         }
     }
 
@@ -894,7 +894,7 @@ public sealed class McpBridge(
         {
             if (allowed)
             {
-                sync.SelectedWinnerIndex = SyncProfile.IndexOfWinner(side);
+                sync.Setup.SelectedWinnerIndex = SyncProfile.IndexOfWinner(side);
             }
             else
             {
@@ -906,7 +906,7 @@ public sealed class McpBridge(
         {
             if (allowed)
             {
-                sync.Mirror = enabled;
+                sync.Setup.Mirror = enabled;
             }
             else
             {
@@ -1097,12 +1097,12 @@ public sealed class McpBridge(
 
     private McpSyncState ReadSyncState()
     {
-        return new(sync.LeftPath,
-            sync.RightPath,
-            sync.CurrentMode,
-            sync.CurrentWinner,
-            sync.Mirror,
-            sync.Exclusions,
+        return new(sync.Setup.LeftPath,
+            sync.Setup.RightPath,
+            sync.Setup.CurrentMode,
+            sync.Setup.CurrentWinner,
+            sync.Setup.Mirror,
+            sync.Setup.Exclusions,
             sync.IsBusy,
             sync.Ledger.HasResult,
             new Dictionary<string, int>

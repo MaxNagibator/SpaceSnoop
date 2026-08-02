@@ -6,7 +6,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
-             d:DataContext="{d:DesignInstance vm:SyncViewModel}"
+             d:DataContext="{d:DesignInstance vm:SyncRowsViewModel}"
              d:DesignWidth="1040">
 
     <UserControl.Resources>
@@ -44,7 +44,7 @@
         </Style>
     </UserControl.Resources>
 
-    <Grid>
+    <Grid DataContext="{Binding Rows}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -52,7 +52,7 @@
 
         <Grid Grid.Row="0"
               Margin="6,4,18,8"
-              Visibility="{Binding Ledger.HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+              Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -140,7 +140,7 @@
 
         <Grid Grid.Row="1"
               Margin="14,6,18,8"
-              Visibility="{Binding Ledger.HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+              Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="60" />
@@ -251,6 +251,6 @@
                 VerticalAlignment="Bottom"
                 Height="1"
                 Background="{DynamicResource Border.Subtle}"
-                Visibility="{Binding Ledger.HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+                Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
     </Grid>
 </UserControl>

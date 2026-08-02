@@ -17,13 +17,13 @@ public class SyncQuickProfileTests
         var settings = new MemorySettings();
         var vm = Create(settings);
 
-        vm.LeftPath = @"C:\Left";
-        vm.RightPath = @"C:\Right";
-        vm.SelectedModeIndex = 1;
-        vm.Mirror = true;
-        vm.Exclusions = "bin,obj";
+        vm.Setup.LeftPath = @"C:\Left";
+        vm.Setup.RightPath = @"C:\Right";
+        vm.Setup.SelectedModeIndex = 1;
+        vm.Setup.Mirror = true;
+        vm.Setup.Exclusions = "bin,obj";
 
-        vm.Profiles.SaveProfileCommand.Execute(null);
+        vm.Setup.Profiles.SaveProfileCommand.Execute(null);
 
         var profile = SyncProfileStore.Load(settings).Single();
 
@@ -36,7 +36,7 @@ public class SyncQuickProfileTests
             Assert.That(profile.Mirror, Is.True);
             Assert.That(profile.Exclusions, Is.EqualTo("bin,obj"));
             Assert.That(profile.Enabled, Is.False);
-            Assert.That(vm.Profiles.SelectedProfile?.Id, Is.EqualTo(profile.Id));
+            Assert.That(vm.Setup.Profiles.SelectedProfile?.Id, Is.EqualTo(profile.Id));
         }
     }
 
@@ -62,13 +62,13 @@ public class SyncQuickProfileTests
         ]);
 
         var vm = Create(settings);
-        vm.LeftPath = @"C:\NewLeft";
-        vm.RightPath = @"C:\NewRight";
-        vm.SelectedModeIndex = 2;
-        vm.Mirror = true;
-        vm.Exclusions = "new";
+        vm.Setup.LeftPath = @"C:\NewLeft";
+        vm.Setup.RightPath = @"C:\NewRight";
+        vm.Setup.SelectedModeIndex = 2;
+        vm.Setup.Mirror = true;
+        vm.Setup.Exclusions = "new";
 
-        var profileItem = vm.Profiles.Items.Single(profile => profile.Id == "abc");
+        var profileItem = vm.Setup.Profiles.Items.Single(profile => profile.Id == "abc");
         profileItem.RequestUpdateCommand.Execute(null);
         profileItem.ConfirmUpdateCommand.Execute(null);
 
@@ -111,7 +111,7 @@ public class SyncQuickProfileTests
         ]);
 
         var vm = Create(settings);
-        var profileItem = vm.Profiles.Items.Single(profile => profile.Id == "abc");
+        var profileItem = vm.Setup.Profiles.Items.Single(profile => profile.Id == "abc");
         profileItem.RequestRenameCommand.Execute(null);
         profileItem.EditName = "Docs";
         profileItem.ConfirmRenameCommand.Execute(null);
@@ -152,15 +152,15 @@ public class SyncQuickProfileTests
 
         var vm = Create(settings);
 
-        vm.Profiles.SelectedProfile = vm.Profiles.Items.Single(profile => profile.Id == "abc");
+        vm.Setup.Profiles.SelectedProfile = vm.Setup.Profiles.Items.Single(profile => profile.Id == "abc");
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(vm.LeftPath, Is.EqualTo(@"C:\Left"));
-            Assert.That(vm.RightPath, Is.EqualTo(@"C:\Right"));
-            Assert.That(vm.SelectedModeIndex, Is.EqualTo(1));
-            Assert.That(vm.Mirror, Is.True);
-            Assert.That(vm.Exclusions, Is.EqualTo("bin,obj"));
+            Assert.That(vm.Setup.LeftPath, Is.EqualTo(@"C:\Left"));
+            Assert.That(vm.Setup.RightPath, Is.EqualTo(@"C:\Right"));
+            Assert.That(vm.Setup.SelectedModeIndex, Is.EqualTo(1));
+            Assert.That(vm.Setup.Mirror, Is.True);
+            Assert.That(vm.Setup.Exclusions, Is.EqualTo("bin,obj"));
             Assert.That(settings.GetStringValue(SettingsKeys.SyncLeft), Is.EqualTo(@"C:\Left"));
             Assert.That(settings.GetStringValue(SettingsKeys.SyncRight), Is.EqualTo(@"C:\Right"));
             Assert.That(settings.GetStringValue(SettingsKeys.SyncMode), Is.EqualTo("1"));
@@ -185,16 +185,16 @@ public class SyncQuickProfileTests
         ]);
 
         var vm = Create(settings);
-        var profile = vm.Profiles.Items.Single(profile => profile.Id == "abc");
+        var profile = vm.Setup.Profiles.Items.Single(profile => profile.Id == "abc");
 
         profile.RequestDeleteCommand.Execute(null);
         profile.ConfirmDeleteCommand.Execute(null);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(vm.Profiles.Items.Select(profile => profile.Id), Is.EqualTo(new[] { SyncQuickProfilesViewModel.CurrentProfileId }));
+            Assert.That(vm.Setup.Profiles.Items.Select(profile => profile.Id), Is.EqualTo(new[] { SyncQuickProfilesViewModel.CurrentProfileId }));
             Assert.That(SyncProfileStore.Load(settings), Is.Empty);
-            Assert.That(vm.Profiles.SelectedProfile?.Id, Is.EqualTo(SyncQuickProfilesViewModel.CurrentProfileId));
+            Assert.That(vm.Setup.Profiles.SelectedProfile?.Id, Is.EqualTo(SyncQuickProfilesViewModel.CurrentProfileId));
         }
     }
 

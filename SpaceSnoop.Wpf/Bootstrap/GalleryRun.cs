@@ -284,8 +284,8 @@ public static class GalleryRun
         scan.SelectedNode = scan.Roots.FirstOrDefault();
 
         var sync = services.GetRequiredService<SyncViewModel>();
-        sync.LeftPath = fixture.Left;
-        sync.RightPath = fixture.Right;
+        sync.Setup.LeftPath = fixture.Left;
+        sync.Setup.RightPath = fixture.Right;
         await sync.CompareFromAutomationAsync(CancellationToken.None).ConfigureAwait(true);
     }
 

@@ -74,19 +74,19 @@ public static class GalleryDialogs
     private static void OpenDiff(IServiceProvider services)
     {
         var sync = services.GetRequiredService<SyncViewModel>();
-        var tree = sync.FlatView;
+        var tree = sync.Rows.FlatView;
         SyncNodeViewModel? row;
 
-        sync.FlatView = true;
+        sync.Rows.FlatView = true;
 
         try
         {
-            var modified = sync.Rows.Where(static row => row.IsFile && row.Status == ComparisonStatus.Modified).ToList();
+            var modified = sync.Rows.Rows.Where(static row => row.IsFile && row.Status == ComparisonStatus.Modified).ToList();
             row = modified.Find(static row => row.Name.EndsWith(TextSample, StringComparison.OrdinalIgnoreCase)) ?? modified.FirstOrDefault();
         }
         finally
         {
-            sync.FlatView = tree;
+            sync.Rows.FlatView = tree;
         }
 
         if (row is null)

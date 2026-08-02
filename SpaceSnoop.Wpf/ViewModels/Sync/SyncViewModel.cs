@@ -1,5 +1,4 @@
 ﻿using KeepShell.Services;
-using MahApps.Metro.IconPacks;
 using Microsoft.Win32;
 using SpaceSnoop.Core.Export;
 using SpaceSnoop.Wpf.Diff;
@@ -10,85 +9,27 @@ using System.Windows.Input;
 
 namespace SpaceSnoop.Wpf.ViewModels.Sync;
 
-public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPageStatus, ISyncRowHost
+public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPageStatus
 {
     private const long MaxDiffBytes = 5 * 1024 * 1024;
-    private static readonly SyncMode[] ModeOrder = [SyncMode.LeftToRight, SyncMode.RightToLeft, SyncMode.Bidirectional];
-    private static readonly SyncWinner[] WinnerOrder = [SyncWinner.Newest, SyncWinner.Left, SyncWinner.Right];
     private readonly ISettingsStore _settings;
     private readonly IDialogService _dialogs;
     private readonly ILogger<SyncViewModel> _logger;
     private readonly CompareDirectoriesUseCase _compare;
     private readonly ExecuteSyncUseCase _sync;
     private readonly ToastNotifier _notifier;
-    private readonly AgentPreferences _agent;
-    private readonly HashSet<DirectoryComparison> _collapsed = [];
-    private readonly HashSet<string> _collapsedSubGroups = new(StringComparer.OrdinalIgnoreCase);
 
     private ComparisonResult? _result;
     private SyncReport? _lastReport;
 
     private Dictionary<object, SyncOutcome> _outcomes = [];
     private Dictionary<DirectoryComparison, (long Left, long Right)>? _dirSizeCache;
-    private string? _activeProfileId;
     private bool _suppressPersist;
     private bool _gitPromptDeclined;
     private bool _hashesCompared;
-    private bool _gitGroupExpanded;
-
-    [ObservableProperty]
-    private string _leftPath = string.Empty;
-
-    [ObservableProperty]
-    private string _rightPath = string.Empty;
-
-    [ObservableProperty]
-    private bool _leftPathInvalid;
-
-    [ObservableProperty]
-    private bool _rightPathInvalid;
-
-    [ObservableProperty]
-    private string _exclusions = string.Empty;
-
-    [ObservableProperty]
-    private int _selectedModeIndex;
-
-    [ObservableProperty]
-    private bool _mirror;
-
-    [ObservableProperty]
-    private int _selectedWinnerIndex;
-
-    [ObservableProperty]
-    private bool _showIdentical;
-
-    [ObservableProperty]
-    private bool _showSizes = AppDefaults.SyncShowSizesDefault;
-
-    [ObservableProperty]
-    private bool _showModified = AppDefaults.SyncShowModifiedDefault;
-
-    [ObservableProperty]
-    private bool _blankAbsent;
 
     [ObservableProperty]
     private bool _verify = AppDefaults.SyncVerifyDefault;
-
-    [ObservableProperty]
-    private bool _hideApplied;
-
-    [ObservableProperty]
-    private bool _flatView;
-
-    [ObservableProperty]
-    private SyncSortField _rowSort = AppDefaults.SyncFlatSortDefault;
-
-    [ObservableProperty]
-    private bool _rowSortDescending;
-
-    [ObservableProperty]
-    private string _searchText = string.Empty;
 
     [ObservableProperty]
     private string _summaryText = "Сравнение не выполнялось.";
@@ -104,7 +45,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _settings = settings;
         _dialogs = dialogs;
         Operations = operations;
-        _agent = agent;
         _logger = logger;
         _compare = compare;
         _sync = sync;
@@ -115,12 +55,18 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         Git = new(settings, logger);
 
-        Ledger = new(Git, () => new(DirectionIconKind, DirectionText(), CurrentMode == SyncMode.Bidirectional));
+        Setup = new(settings, dialogs, operations, () => !IsBusy, message => Session.StatusCaption = message);
+        Setup.PathChanged += DiscardComparisonIfPathChanged;
+        Setup.ModeChanged += ReapplyMode;
+        Setup.ProfileSelected += ApplyProfile;
+
+        Rows = new(settings, operations, agent, CompareContentAsync, AskAgentAbout);
+        Rows.ActionsChanged += UpdateSummary;
+
+        Ledger = new(Git, () => new(Setup.DirectionIconKind, Setup.DirectionText(), Setup.CurrentMode == SyncMode.Bidirectional));
         Ledger.PropertyChanged += OnLedgerPropertyChanged;
 
-        Profiles = new(settings, dialogs, BuildCurrentProfile, ApplyProfile, () => !IsBusy, message => Session.StatusCaption = message);
         LoadSettings();
-        Profiles.Load();
         _settings.Changed += OnSettingsChanged;
     }
 
@@ -132,77 +78,13 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public SyncSessionViewModel Session { get; }
 
+    public SyncSetupViewModel Setup { get; }
+
+    public SyncRowsViewModel Rows { get; }
+
     public SyncLedgerViewModel Ledger { get; }
 
-    public bool ChatEnabled => _agent.Enabled;
-
     public OperationPreferences Operations { get; }
-
-    public RangeObservableCollection<SyncNodeViewModel> Rows { get; } = [];
-
-    public SyncQuickProfilesViewModel Profiles { get; }
-
-    public IReadOnlyList<SegmentOption> Modes => SyncOptions.Modes;
-
-    public IReadOnlyList<SegmentOption> Winners => SyncOptions.Winners;
-
-    public PackIconLucideKind DirectionIconKind => CurrentMode switch
-    {
-        SyncMode.RightToLeft => PackIconLucideKind.ArrowLeft,
-        SyncMode.Bidirectional => PackIconLucideKind.ArrowRightLeft,
-        _ => PackIconLucideKind.ArrowRight,
-    };
-
-    public string DirectionHint => CurrentMode switch
-    {
-        SyncMode.RightToLeft => "Направление: справа налево. Клик – сменить, ПКМ – поменять пути местами.",
-        SyncMode.Bidirectional => "Направление: двустороннее. Клик – сменить, ПКМ – поменять пути местами.",
-        _ => "Направление: слева направо. Клик – сменить, ПКМ – поменять пути местами.",
-    };
-
-    public bool MirrorApplicable => CurrentMode != SyncMode.Bidirectional || CurrentWinner is SyncWinner.Left or SyncWinner.Right;
-
-    public bool IsBidirectional => CurrentMode == SyncMode.Bidirectional;
-
-    public bool WinnerIsNewest => CurrentWinner == SyncWinner.Newest;
-
-    public bool ShowConflictResolvers => IsBidirectional && WinnerIsNewest;
-
-    public string WinnerHint => "Победитель решает изменённые и спорные файлы; при зеркале — что удалять на проигравшей стороне.";
-
-    public string MirrorHint => CurrentMode switch
-    {
-        SyncMode.RightToLeft => "Зеркало: удалять слева то, чего нет справа (в корзину).",
-        SyncMode.Bidirectional => CurrentWinner switch
-        {
-            SyncWinner.Left => "Зеркало победителя: удалять справа то, чего нет слева (в корзину).",
-            SyncWinner.Right => "Зеркало победителя: удалять слева то, чего нет справа (в корзину).",
-            _ => "Зеркало доступно при победителе «Слева» или «Справа».",
-        },
-        _ => "Зеркало: удалять справа то, чего нет слева (в корзину).",
-    };
-
-    public bool MirrorDeletes => Mirror && MirrorApplicable;
-
-    public bool ExclusionsEmpty => string.IsNullOrWhiteSpace(Exclusions);
-
-    public bool SearchTextEmpty => string.IsNullOrWhiteSpace(SearchText);
-
-    public bool SortByPath => RowSort is SyncSortField.Path or SyncSortField.None;
-
-    public bool SortBySize => RowSort == SyncSortField.Size;
-
-    public bool SortByModified => RowSort == SyncSortField.Modified;
-
-    public PackIconLucideKind SortDirectionIconKind => RowSortDescending
-        ? PackIconLucideKind.ArrowDown
-        : PackIconLucideKind.ArrowUp;
-
-    public bool ShowApplied
-    {
-        get => !HideApplied;
-        set => HideApplied = !value;
-    }
 
     public string PageTitle => "Синхронизация";
 
@@ -220,122 +102,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public ICommand CancelCommand => Session.CancelCommand;
 
-    public void NotifyActionsChanged()
-    {
-        foreach (var row in Rows)
-        {
-            row.RefreshSubtreeAction();
-        }
-
-        UpdateSummary();
-    }
-
-    public void AskAgentAbout(SyncNodeViewModel node)
-    {
-        AskAgentRequested?.Invoke(ChatQuestion.ForSyncNode(node.RelativePath,
-            node.Status,
-            node.IsDirectory,
-            node.LeftSizeText,
-            node.RightSizeText,
-            node.DiffReason));
-    }
-
-    public void ToggleExpand(DirectoryComparison dir)
-    {
-        if (!_collapsed.Remove(dir))
-        {
-            _collapsed.Add(dir);
-        }
-
-        RebuildRows();
-    }
-
-    public void ToggleGroup(string? key)
-    {
-        if (key is null)
-        {
-            _gitGroupExpanded = !_gitGroupExpanded;
-        }
-        else if (!_collapsedSubGroups.Remove(key))
-        {
-            _collapsedSubGroups.Add(key);
-        }
-
-        RebuildRows();
-    }
-
-    public void CollapseSubtree(DirectoryComparison dir)
-    {
-        SyncRowsProjector.AddCollapsed(_collapsed, dir);
-        RebuildRows();
-    }
-
-    public void ExpandSubtree(DirectoryComparison dir)
-    {
-        SyncRowsProjector.RemoveCollapsed(_collapsed, dir);
-        RebuildRows();
-    }
-
-    [RelayCommand]
-    public void CollapseAll()
-    {
-        if (_result is null)
-        {
-            return;
-        }
-
-        SyncRowsProjector.CollapseAllDirectories(_collapsed, _result.Root);
-        RebuildRows();
-    }
-
-    [RelayCommand]
-    public void ExpandAll()
-    {
-        if (_result is null)
-        {
-            return;
-        }
-
-        _collapsed.Clear();
-        RebuildRows();
-    }
-
-    public void ApplyToSubtree(DirectoryComparison dir, SyncAction action)
-    {
-        ApplyActionRecursive(dir, action);
-        RebuildRows();
-        UpdateSummary();
-    }
-
-    public async Task CompareContentAsync(FileComparison file)
-    {
-        if (_result is null)
-        {
-            return;
-        }
-
-        var leftPath = Path.Combine(_result.LeftPath, file.RelativePath);
-        var rightPath = Path.Combine(_result.RightPath, file.RelativePath);
-
-        FileDiffResult built;
-
-        try
-        {
-            built = await Task.Run(() => BuildContentDiff(leftPath, rightPath), CancellationToken.None);
-        }
-        catch (Exception ex)
-        {
-            _logger.ContentCompareFailed(ex, file.RelativePath);
-            _dialogs.Error("Сравнение содержимого", ex.Message);
-            return;
-        }
-
-        _logger.ContentCompareOpened(file.RelativePath, built.Added, built.Removed);
-
-        var dialog = new FileDiffDialogViewModel(_settings, file, leftPath, rightPath, built.Lines, built.Added, built.Removed, built.Unavailable);
-        await _dialogs.ShowAsync(dialog);
-    }
-
     public void ApplyProfile(SyncProfile profile)
     {
         ApplyProfile(profile, null);
@@ -344,13 +110,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     public void ApplyProfile(SyncProfile profile, ComparisonResult? comparison)
     {
         ClearComparison();
-        LeftPath = profile.Left;
-        RightPath = profile.Right;
-        Exclusions = profile.Exclusions;
-        SelectedModeIndex = Math.Clamp(profile.Mode, 0, ModeOrder.Length - 1);
-        Mirror = profile.Mirror;
-        SelectedWinnerIndex = SyncProfile.IndexOfWinner(profile.Winner);
-        _activeProfileId = profile.Id;
+        Setup.Apply(profile);
 
         if (comparison is null)
         {
@@ -400,7 +160,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
 
         var result = _result;
-        var options = new ComparisonExportOptions(CurrentMode, CurrentWinner, Mirror, Exclusions.Trim());
+        var options = new ComparisonExportOptions(Setup.CurrentMode, Setup.CurrentWinner, Setup.Mirror, Setup.Exclusions.Trim());
 
         return () => SyncPlanExport.Build(result, options, AppInfo.Version, entryLimit);
     }
@@ -413,7 +173,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
 
         var result = _result;
-        var options = new ComparisonExportOptions(CurrentMode, CurrentWinner, Mirror, Exclusions.Trim());
+        var options = new ComparisonExportOptions(Setup.CurrentMode, Setup.CurrentWinner, Setup.Mirror, Setup.Exclusions.Trim());
 
         var git = Git.LeftState is null && Git.RightState is null
             ? null
@@ -434,52 +194,12 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     {
         if (key == SettingsKeys.ScheduleProfiles)
         {
-            Profiles.Load();
+            Setup.Profiles.Load();
         }
-        else if (key == SettingsKeys.SyncGroupFolders && _result is not null && FlatView)
+        else if (key == SettingsKeys.SyncGroupFolders && _result is not null && Rows.FlatView)
         {
-            RebuildRows();
+            Rows.Rebuild();
         }
-    }
-
-    private static void ApplyActionRecursive(DirectoryComparison dir, SyncAction action)
-    {
-        if (dir.Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly)
-        {
-            dir.Action = DirActionFor(dir, action);
-        }
-
-        foreach (var file in dir.Files)
-        {
-            if (file.Status != ComparisonStatus.Identical)
-            {
-                file.Action = action;
-            }
-        }
-
-        foreach (var sub in dir.SubDirectories)
-        {
-            ApplyActionRecursive(sub, action);
-        }
-    }
-
-    private static SyncAction DirActionFor(DirectoryComparison dir, SyncAction requested)
-    {
-        return dir.Status == ComparisonStatus.LeftOnly
-            ? requested switch
-            {
-                SyncAction.CopyToRight => SyncAction.CopyToRight,
-                SyncAction.DeleteLeft => SyncAction.DeleteLeft,
-                SyncAction.Skip => SyncAction.Skip,
-                _ => dir.Action,
-            }
-            : requested switch
-            {
-                SyncAction.CopyToLeft => SyncAction.CopyToLeft,
-                SyncAction.DeleteRight => SyncAction.DeleteRight,
-                SyncAction.Skip => SyncAction.Skip,
-                _ => dir.Action,
-            };
     }
 
     private static FileDiffResult BuildContentDiff(string leftPath, string rightPath)
@@ -533,11 +253,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         return false;
     }
 
-    private static bool PathMissing(string path)
-    {
-        return !string.IsNullOrWhiteSpace(path) && !Directory.Exists(path.Trim());
-    }
-
     private static int CountGitDirectories(DirectoryComparison dir)
     {
         var count = 0;
@@ -556,15 +271,53 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         return count;
     }
 
+    private async Task CompareContentAsync(FileComparison file)
+    {
+        if (_result is null)
+        {
+            return;
+        }
+
+        var leftPath = Path.Combine(_result.LeftPath, file.RelativePath);
+        var rightPath = Path.Combine(_result.RightPath, file.RelativePath);
+
+        FileDiffResult built;
+
+        try
+        {
+            built = await Task.Run(() => BuildContentDiff(leftPath, rightPath), CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _logger.ContentCompareFailed(ex, file.RelativePath);
+            _dialogs.Error("Сравнение содержимого", ex.Message);
+            return;
+        }
+
+        _logger.ContentCompareOpened(file.RelativePath, built.Added, built.Removed);
+
+        var dialog = new FileDiffDialogViewModel(_settings, file, leftPath, rightPath, built.Lines, built.Added, built.Removed, built.Unavailable);
+        await _dialogs.ShowAsync(dialog);
+    }
+
+    private void AskAgentAbout(SyncNodeViewModel node)
+    {
+        AskAgentRequested?.Invoke(ChatQuestion.ForSyncNode(node.RelativePath,
+            node.Status,
+            node.IsDirectory,
+            node.LeftSizeText,
+            node.RightSizeText,
+            node.DiffReason));
+    }
+
     private void AdoptComparison(ComparisonResult comparison)
     {
         _result = comparison;
         _dirSizeCache = SyncRowsProjector.BuildDirSizeCache(comparison.Root);
         _outcomes = [];
         _hashesCompared = false;
-        comparison.ApplyMode(CurrentMode, Mirror, CurrentWinner);
-        SyncRowsProjector.CollapseAllDirectories(_collapsed, comparison.Root);
-        RebuildRows();
+        comparison.ApplyMode(Setup.CurrentMode, Setup.Mirror, Setup.CurrentWinner);
+        Rows.Update(_result, _outcomes, _dirSizeCache, collapseAll: true);
         UpdateSummary();
         SummaryText = "Результат сравнения перенесён со страницы «Обзор».";
         _ = ReadGitStateAsync();
@@ -628,18 +381,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     }
 
     [RelayCommand(CanExecute = nameof(CanRun))]
-    private void BrowseLeft()
-    {
-        Browse(path => LeftPath = path);
-    }
-
-    [RelayCommand(CanExecute = nameof(CanRun))]
-    private void BrowseRight()
-    {
-        Browse(path => RightPath = path);
-    }
-
-    [RelayCommand(CanExecute = nameof(CanRun))]
     private Task CompareAsync()
     {
         return ExecuteCompareAsync(CancellationToken.None);
@@ -647,8 +388,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     private async Task ExecuteCompareAsync(CancellationToken external)
     {
-        var left = LeftPath.Trim();
-        var right = RightPath.Trim();
+        var left = Setup.LeftPath.Trim();
+        var right = Setup.RightPath.Trim();
 
         if (string.IsNullOrEmpty(left) || string.IsNullOrEmpty(right))
         {
@@ -672,7 +413,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         _logger.CompareStarted(left, right);
 
-        var request = new CompareDirectoriesRequest(left, right, Exclusions, CurrentMode, CurrentWinner, Mirror);
+        var request = new CompareDirectoriesRequest(left, right, Setup.Exclusions, Setup.CurrentMode, Setup.CurrentWinner, Setup.Mirror);
 
         var prepared = await Session.RunAsync("Сравнение каталогов:", (token, progress) =>
         {
@@ -691,8 +432,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _dirSizeCache = prepared.Sizes;
         _outcomes = [];
         _hashesCompared = false;
-        SyncRowsProjector.CollapseAllDirectories(_collapsed, _result.Root);
-        RebuildRows();
+        Rows.Update(_result, _outcomes, _dirSizeCache, collapseAll: true);
         UpdateSummary();
         SummaryText = $"Сравнение завершено за {stopwatch.Elapsed.TotalSeconds:F2} с";
         Session.StatusCaption = SummaryText;
@@ -742,15 +482,15 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             }
         }
 
-        var updatedExclusions = AddGitExclusion(Exclusions);
+        var updatedExclusions = AddGitExclusion(Setup.Exclusions);
 
-        if (string.Equals(updatedExclusions, Exclusions, StringComparison.Ordinal))
+        if (string.Equals(updatedExclusions, Setup.Exclusions, StringComparison.Ordinal))
         {
             return;
         }
 
         _logger.SyncGitFoldersSkipped(gitFolders);
-        Exclusions = updatedExclusions;
+        Setup.Exclusions = updatedExclusions;
         await CompareAsync();
     }
 
@@ -796,7 +536,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _dirSizeCache = sizes;
         _outcomes = [];
         _hashesCompared = true;
-        RebuildRows();
+        Rows.Update(_result, _outcomes, _dirSizeCache);
         UpdateSummary();
         SummaryText = $"Хеши вычислены за {stopwatch.Elapsed.TotalSeconds:F2} с";
         Session.StatusCaption = SummaryText;
@@ -866,7 +606,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         var planned = Ledger.CurrentPlan;
         var stopwatch = Stopwatch.StartNew();
 
-        _logger.SyncStarted(CurrentMode);
+        _logger.SyncStarted(Setup.CurrentMode);
 
         var verify = Verify;
 
@@ -898,7 +638,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         WriteSyncLog(report, interactive);
         _lastReport = report;
         _outcomes = SyncOutcomes.Build(result, report.Errors, report.Mismatches);
-        RebuildRows();
+        Rows.Update(_result, _outcomes, _dirSizeCache);
         Ledger.RefreshAfterSync(_outcomes);
         RaiseProfileRun(null, report, (long)stopwatch.Elapsed.TotalMilliseconds);
         await ReadGitStateAsync();
@@ -985,7 +725,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
 
         var count = _result.ResolveAllConflicts(action);
-        RebuildRows();
+        Rows.Rebuild();
         UpdateSummary();
         Session.StatusCaption = $"Разрешено элементов: {count}.";
     }
@@ -1037,59 +777,11 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     private string BuildExportFileName()
     {
-        var trimmed = LeftPath.Trim().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var trimmed = Setup.LeftPath.Trim().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         var raw = Path.GetFileName(trimmed);
         var name = string.Join("_", raw.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
 
         return $"sync-compare-{(name.Length == 0 ? "root" : name)}-{DateTime.Now:yyyyMMdd-HHmmss}.json";
-    }
-
-    [RelayCommand]
-    private void CycleMode()
-    {
-        SelectedModeIndex = (SelectedModeIndex + 1) % ModeOrder.Length;
-    }
-
-    [RelayCommand]
-    private void SwapPaths()
-    {
-        (LeftPath, RightPath) = (RightPath, LeftPath);
-    }
-
-    partial void OnSelectedModeIndexChanged(int value)
-    {
-        Persist(SettingsKeys.SyncMode, value.ToString());
-        Profiles.MarkCurrent();
-        OnPropertyChanged(nameof(DirectionIconKind));
-        OnPropertyChanged(nameof(DirectionHint));
-        OnPropertyChanged(nameof(MirrorApplicable));
-        OnPropertyChanged(nameof(IsBidirectional));
-        OnPropertyChanged(nameof(MirrorHint));
-        OnPropertyChanged(nameof(MirrorDeletes));
-        OnPropertyChanged(nameof(WinnerIsNewest));
-        OnPropertyChanged(nameof(ShowConflictResolvers));
-        ReapplyMode();
-    }
-
-    partial void OnSelectedWinnerIndexChanged(int value)
-    {
-        Persist(SettingsKeys.SyncWinner, value.ToString());
-        Profiles.MarkCurrent();
-        OnPropertyChanged(nameof(MirrorApplicable));
-        OnPropertyChanged(nameof(MirrorHint));
-        OnPropertyChanged(nameof(MirrorDeletes));
-        OnPropertyChanged(nameof(WinnerIsNewest));
-        OnPropertyChanged(nameof(ShowConflictResolvers));
-        ReapplyMode();
-    }
-
-    partial void OnMirrorChanged(bool value)
-    {
-        Persist(SettingsKeys.SyncMirror, value ? "true" : "false");
-        Profiles.MarkCurrent();
-        OnPropertyChanged(nameof(MirrorHint));
-        OnPropertyChanged(nameof(MirrorDeletes));
-        ReapplyMode();
     }
 
     private void OnSessionPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -1098,12 +790,10 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         {
             case nameof(IsBusy):
                 OnPropertyChanged(nameof(IsBusy));
-                Profiles.NotifyCanSaveChanged();
+                Setup.NotifyBusyChanged();
                 CompareCommand.NotifyCanExecuteChanged();
                 HashCommand.NotifyCanExecuteChanged();
                 SyncCommand.NotifyCanExecuteChanged();
-                BrowseLeftCommand.NotifyCanExecuteChanged();
-                BrowseRightCommand.NotifyCanExecuteChanged();
                 ExportComparisonCommand.NotifyCanExecuteChanged();
                 break;
 
@@ -1135,39 +825,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             return;
         }
 
-        _result.ApplyMode(CurrentMode, Mirror, CurrentWinner);
-        RebuildRows();
+        _result.ApplyMode(Setup.CurrentMode, Setup.Mirror, Setup.CurrentWinner);
+        Rows.Rebuild();
         UpdateSummary();
-    }
-
-    partial void OnShowIdenticalChanged(bool value)
-    {
-        Persist(SettingsKeys.SyncShowIdentical, value ? "true" : "false");
-
-        if (_result is not null)
-        {
-            RebuildRows();
-        }
-    }
-
-    partial void OnShowSizesChanged(bool value)
-    {
-        Persist(SettingsKeys.SyncShowSizes, value ? "true" : "false");
-    }
-
-    partial void OnShowModifiedChanged(bool value)
-    {
-        Persist(SettingsKeys.SyncShowModified, value ? "true" : "false");
-    }
-
-    partial void OnBlankAbsentChanged(bool value)
-    {
-        Persist(SettingsKeys.SyncBlankAbsent, value ? "true" : "false");
-
-        if (_result is not null)
-        {
-            RebuildRows();
-        }
     }
 
     partial void OnVerifyChanged(bool value)
@@ -1175,80 +835,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         Persist(SettingsKeys.SyncVerify, value ? "true" : "false");
     }
 
-    partial void OnHideAppliedChanged(bool value)
-    {
-        OnPropertyChanged(nameof(ShowApplied));
-        Persist(SettingsKeys.SyncHideApplied, value ? "true" : "false");
-
-        if (_result is not null)
-        {
-            RebuildRows();
-        }
-    }
-
-    partial void OnFlatViewChanged(bool value)
-    {
-        Persist(SettingsKeys.SyncFlatView, value ? "true" : "false");
-
-        if (_result is not null)
-        {
-            RebuildRows();
-        }
-    }
-
-    partial void OnRowSortChanged(SyncSortField value)
-    {
-        Persist(SettingsKeys.SyncFlatSort, value.ToString());
-        NotifySortChanged();
-
-        if (_result is not null)
-        {
-            RebuildRows();
-        }
-    }
-
-    partial void OnRowSortDescendingChanged(bool value)
-    {
-        Persist(SettingsKeys.SyncFlatSortDesc, value ? "true" : "false");
-        NotifySortChanged();
-
-        if (_result is not null)
-        {
-            RebuildRows();
-        }
-    }
-
-    partial void OnSearchTextChanged(string value)
-    {
-        OnPropertyChanged(nameof(SearchTextEmpty));
-
-        if (_result is not null)
-        {
-            RebuildRows();
-        }
-    }
-
-    partial void OnLeftPathChanged(string value)
-    {
-        Persist(SettingsKeys.SyncLeft, value);
-        LeftPathInvalid = PathMissing(value);
-        _activeProfileId = null;
-        Profiles.MarkCurrent();
-        DiscardComparisonIfPathChanged();
-    }
-
-    partial void OnRightPathChanged(string value)
-    {
-        Persist(SettingsKeys.SyncRight, value);
-        RightPathInvalid = PathMissing(value);
-        _activeProfileId = null;
-        Profiles.MarkCurrent();
-        DiscardComparisonIfPathChanged();
-    }
-
     private void RaiseProfileRun(ComparisonResult? comparison, SyncReport? report, long elapsedMs)
     {
-        if (_activeProfileId is { } id)
+        if (Setup.ActiveProfileId is { } id)
         {
             ProfileRunCompleted?.Invoke(new(id, comparison, report, elapsedMs));
         }
@@ -1261,30 +850,10 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             return;
         }
 
-        if (!string.Equals(LeftPath.Trim(), _result.LeftPath, StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(RightPath.Trim(), _result.RightPath, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(Setup.LeftPath.Trim(), _result.LeftPath, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(Setup.RightPath.Trim(), _result.RightPath, StringComparison.OrdinalIgnoreCase))
         {
             ClearComparison();
-        }
-    }
-
-    partial void OnExclusionsChanged(string value)
-    {
-        OnPropertyChanged(nameof(ExclusionsEmpty));
-        Persist(SettingsKeys.SyncExclusions, value);
-        Profiles.MarkCurrent();
-    }
-
-    private void Browse(Action<string> assign)
-    {
-        var dialog = new OpenFolderDialog
-        {
-            Title = "Выберите каталог",
-        };
-
-        if (dialog.ShowDialog() == true)
-        {
-            assign(dialog.FolderName);
         }
     }
 
@@ -1295,40 +864,9 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _dirSizeCache = null;
         _outcomes = [];
         _hashesCompared = false;
-        _collapsed.Clear();
-        Rows.ReplaceAll([]);
+        Rows.Update(null, _outcomes, null);
         Git.Clear();
         UpdateSummary();
-    }
-
-    private void RebuildRows()
-    {
-        var result = _result;
-
-        if (result is null)
-        {
-            Rows.ReplaceAll([]);
-            return;
-        }
-
-        var request = new SyncRowsRequest
-        {
-            Result = result,
-            FlatView = FlatView,
-            SearchText = SearchText,
-            ShowIdentical = ShowIdentical,
-            HideApplied = HideApplied,
-            RowSort = RowSort,
-            RowSortDescending = RowSortDescending,
-            Outcomes = _outcomes,
-            DirSizeCache = _dirSizeCache,
-            Collapsed = _collapsed,
-            CollapsedSubGroups = _collapsedSubGroups,
-            GitGroupExpanded = _gitGroupExpanded,
-            GroupFolders = Operations.GroupFolders,
-        };
-
-        Rows.ReplaceAll(SyncRowsProjector.Build(request, this));
     }
 
     private void UpdateSummary()
@@ -1345,75 +883,11 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
               + $"конфликтов: {Ledger.ConflictCount}";
     }
 
-    private string DirectionText()
-    {
-        return CurrentMode switch
-        {
-            SyncMode.RightToLeft => "справа налево",
-            SyncMode.Bidirectional => "в обе стороны",
-            _ => "слева направо",
-        };
-    }
-
-    [RelayCommand]
-    private void SortByColumn(SyncSortField field)
-    {
-        if (RowSort == field)
-        {
-            RowSortDescending = !RowSortDescending;
-            return;
-        }
-
-        RowSort = field;
-        RowSortDescending = field is SyncSortField.Size or SyncSortField.Modified;
-    }
-
-    private void NotifySortChanged()
-    {
-        OnPropertyChanged(nameof(SortByPath));
-        OnPropertyChanged(nameof(SortBySize));
-        OnPropertyChanged(nameof(SortByModified));
-        OnPropertyChanged(nameof(SortDirectionIconKind));
-    }
-
-    private SyncProfile BuildCurrentProfile(string id, string name, SyncProfile? existing = null)
-    {
-        return new()
-        {
-            Id = id,
-            Name = name,
-            Left = LeftPath.Trim(),
-            Right = RightPath.Trim(),
-            Mode = SelectedModeIndex,
-            Mirror = Mirror,
-            Winner = CurrentWinner,
-            Exclusions = Exclusions.Trim(),
-            Interval = existing?.Interval ?? ScheduleInterval.Daily,
-            Time = existing?.Time ?? "03:00",
-            Enabled = existing?.Enabled ?? false,
-        };
-    }
-
     private void LoadSettings()
     {
         _suppressPersist = true;
 
-        LeftPath = _settings.GetStringValue(SettingsKeys.SyncLeft) ?? string.Empty;
-        RightPath = _settings.GetStringValue(SettingsKeys.SyncRight) ?? string.Empty;
-        Exclusions = _settings.GetStringValue(SettingsKeys.SyncExclusions) ?? Operations.DefaultExclusions;
-
-        SelectedModeIndex = Math.Clamp(_settings.GetInt(SettingsKeys.SyncMode), 0, ModeOrder.Length - 1);
-        Mirror = _settings.GetBool(SettingsKeys.SyncMirror);
-        SelectedWinnerIndex = Math.Clamp(_settings.GetInt(SettingsKeys.SyncWinner), 0, WinnerOrder.Length - 1);
-        ShowIdentical = _settings.GetBool(SettingsKeys.SyncShowIdentical);
-        ShowSizes = _settings.GetBool(SettingsKeys.SyncShowSizes, AppDefaults.SyncShowSizesDefault);
-        ShowModified = _settings.GetBool(SettingsKeys.SyncShowModified);
-        BlankAbsent = _settings.GetBool(SettingsKeys.SyncBlankAbsent);
         Verify = _settings.GetBool(SettingsKeys.SyncVerify, AppDefaults.SyncVerifyDefault);
-        HideApplied = _settings.GetBool(SettingsKeys.SyncHideApplied);
-        FlatView = _settings.GetBool(SettingsKeys.SyncFlatView);
-        RowSort = _settings.GetEnum(SettingsKeys.SyncFlatSort, AppDefaults.SyncFlatSortDefault);
-        RowSortDescending = _settings.GetBool(SettingsKeys.SyncFlatSortDesc);
 
         _suppressPersist = false;
     }
@@ -1427,10 +901,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         _settings.SetValue(key, value);
     }
-
-    internal SyncMode CurrentMode => ModeOrder[Math.Clamp(SelectedModeIndex, 0, ModeOrder.Length - 1)];
-
-    internal SyncWinner CurrentWinner => WinnerOrder[Math.Clamp(SelectedWinnerIndex, 0, WinnerOrder.Length - 1)];
 
     private sealed record ComparePreparation(ComparisonResult Result, Dictionary<DirectoryComparison, (long Left, long Right)> Sizes);
 
