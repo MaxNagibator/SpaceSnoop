@@ -1,4 +1,4 @@
-<UserControl x:Class="SpaceSnoop.Wpf.Views.Sync.SyncDiffHeaderBar"
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Sync.SyncDiffHeaderBar"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Sync"
@@ -52,7 +52,7 @@
 
         <Grid Grid.Row="0"
               Margin="6,4,18,8"
-              Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+              Visibility="{Binding Ledger.HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -140,7 +140,7 @@
 
         <Grid Grid.Row="1"
               Margin="14,6,18,8"
-              Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+              Visibility="{Binding Ledger.HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="60" />
@@ -251,6 +251,6 @@
                 VerticalAlignment="Bottom"
                 Height="1"
                 Background="{DynamicResource Border.Subtle}"
-                Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+                Visibility="{Binding Ledger.HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
     </Grid>
 </UserControl>

@@ -79,7 +79,7 @@
                      ScrollViewer.VerticalScrollBarVisibility="Auto"
                      VirtualizingStackPanel.IsVirtualizing="True"
                      VirtualizingStackPanel.VirtualizationMode="Recycling"
-                     Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+                     Visibility="{Binding Ledger.HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
 
             <sync:SyncDiffEmptyState Grid.Row="1" />
 

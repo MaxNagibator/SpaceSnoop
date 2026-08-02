@@ -1,4 +1,4 @@
-namespace SpaceSnoop.Wpf.Views.Sync;
+﻿namespace SpaceSnoop.Wpf.Views.Sync;
 
 public partial class SyncDiffEmptyState : UserControl
 {

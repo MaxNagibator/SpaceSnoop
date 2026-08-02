@@ -1,4 +1,4 @@
-<UserControl x:Class="SpaceSnoop.Wpf.Views.Sync.SyncDiffEmptyState"
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Sync.SyncDiffEmptyState"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Sync"
@@ -17,5 +17,5 @@
                           ActionCommand="{Binding CompareCommand}"
                           VerticalAlignment="Center"
                           HorizontalAlignment="Center"
-                          Visibility="{Binding HasResult, Converter={StaticResource InverseBoolToVisibility}, FallbackValue=Visible}" />
+                          Visibility="{Binding Ledger.HasResult, Converter={StaticResource InverseBoolToVisibility}, FallbackValue=Visible}" />
 </UserControl>
