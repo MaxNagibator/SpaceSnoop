@@ -20,13 +20,13 @@ public sealed partial class SyncNodeViewModel : ObservableObject
 
     private readonly DirectoryComparison? _dir;
     private readonly FileComparison? _file;
-    private readonly SyncViewModel _owner;
+    private readonly ISyncRowHost _owner;
     private readonly bool _flat;
     private readonly string? _groupKey;
     private bool _subtreeActionable;
     private SyncAction? _subtreeAction;
 
-    public SyncNodeViewModel(DirectoryComparison dir, int indent, bool isExpanded, long leftSize, long rightSize, SyncViewModel owner, bool flat = false)
+    internal SyncNodeViewModel(DirectoryComparison dir, int indent, bool isExpanded, long leftSize, long rightSize, ISyncRowHost owner, bool flat = false)
     {
         _dir = dir;
         _owner = owner;
@@ -48,7 +48,7 @@ public sealed partial class SyncNodeViewModel : ObservableObject
         (_subtreeActionable, _subtreeAction) = ComputeSubtreeAction(dir);
     }
 
-    public SyncNodeViewModel(FileComparison file, int indent, SyncViewModel owner, bool flat = false)
+    internal SyncNodeViewModel(FileComparison file, int indent, ISyncRowHost owner, bool flat = false)
     {
         _file = file;
         _owner = owner;
@@ -67,7 +67,7 @@ public sealed partial class SyncNodeViewModel : ObservableObject
         }
     }
 
-    private SyncNodeViewModel(SyncViewModel owner, string? groupKey, string headerText, int indent, bool expanded)
+    private SyncNodeViewModel(ISyncRowHost owner, string? groupKey, string headerText, int indent, bool expanded)
     {
         _owner = owner;
         _flat = true;
@@ -246,12 +246,12 @@ public sealed partial class SyncNodeViewModel : ObservableObject
         _ => BothSidesActions,
     };
 
-    public static SyncNodeViewModel CreateGroupHeader(int groupedCount, bool expanded, SyncViewModel owner)
+    internal static SyncNodeViewModel CreateGroupHeader(int groupedCount, bool expanded, ISyncRowHost owner)
     {
         return new(owner, null, $"Служебные файлы ({groupedCount})", 0, expanded);
     }
 
-    public static SyncNodeViewModel CreateSubGroupHeader(string folder, int count, bool expanded, SyncViewModel owner)
+    internal static SyncNodeViewModel CreateSubGroupHeader(string folder, int count, bool expanded, ISyncRowHost owner)
     {
         return new(owner, folder, $"{folder} ({count})", 1, expanded);
     }

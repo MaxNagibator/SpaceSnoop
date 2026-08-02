@@ -10,7 +10,7 @@ using System.Windows.Input;
 
 namespace SpaceSnoop.Wpf.ViewModels.Sync;
 
-public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPageStatus
+public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPageStatus, ISyncRowHost
 {
     private const long MaxDiffBytes = 5 * 1024 * 1024;
     private static readonly SyncMode[] ModeOrder = [SyncMode.LeftToRight, SyncMode.RightToLeft, SyncMode.Bidirectional];
@@ -35,7 +35,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     private Dictionary<object, SyncOutcome> _outcomes = [];
     private Dictionary<DirectoryComparison, (long Left, long Right)>? _dirSizeCache;
-    private HashSet<object>? _searchHits;
     private CancellationTokenSource? _cts;
     private string? _activeProfileId;
     private bool _suppressPersist;
@@ -527,13 +526,13 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     public void CollapseSubtree(DirectoryComparison dir)
     {
-        AddCollapsed(dir);
+        SyncRowsProjector.AddCollapsed(_collapsed, dir);
         RebuildRows();
     }
 
     public void ExpandSubtree(DirectoryComparison dir)
     {
-        RemoveCollapsed(dir);
+        SyncRowsProjector.RemoveCollapsed(_collapsed, dir);
         RebuildRows();
     }
 
@@ -545,7 +544,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             return;
         }
 
-        CollapseAllDirectories(_result.Root);
+        SyncRowsProjector.CollapseAllDirectories(_collapsed, _result.Root);
         RebuildRows();
     }
 
@@ -621,121 +620,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         AdoptComparison(comparison);
         StatusCaption = $"Профиль применён: {profile.Name}. Результат сравнения перенесён.";
-    }
-
-    internal static IEnumerable<FileComparison> SortFiles(IEnumerable<FileComparison> files, SyncSortField field, bool descending)
-    {
-        return field switch
-        {
-            SyncSortField.Size => descending
-                ? files.OrderByDescending(FileSize)
-                : files.OrderBy(FileSize),
-            SyncSortField.Status => descending
-                ? files.OrderByDescending(file => (int)file.Status).ThenBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
-                : files.OrderBy(file => (int)file.Status).ThenBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase),
-            SyncSortField.Modified => descending
-                ? files.OrderByDescending(FileModified).ThenBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
-                : files.OrderBy(FileModified).ThenBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase),
-            _ => descending
-                ? files.OrderByDescending(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
-                : files.OrderBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase),
-        };
-
-        static long FileSize(FileComparison file)
-        {
-            return Math.Max(file.LeftSize ?? 0, file.RightSize ?? 0);
-        }
-
-        static DateTime FileModified(FileComparison file)
-        {
-            var left = file.LeftModified ?? DateTime.MinValue;
-            var right = file.RightModified ?? DateTime.MinValue;
-
-            return left > right ? left : right;
-        }
-    }
-
-    internal static IEnumerable<DirectoryComparison> CollectEmptyDirs(DirectoryComparison dir, bool hideApplied, IReadOnlyDictionary<object, SyncOutcome> outcomes)
-    {
-        foreach (var sub in dir.SubDirectories)
-        {
-            if (sub.Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly && SubtreeHasNoFiles(sub))
-            {
-                if (!hideApplied || outcomes.GetValueOrDefault(sub) != SyncOutcome.Applied)
-                {
-                    yield return sub;
-                }
-
-                continue;
-            }
-
-            foreach (var nested in CollectEmptyDirs(sub, hideApplied, outcomes))
-            {
-                yield return nested;
-            }
-        }
-
-        static bool SubtreeHasNoFiles(DirectoryComparison node)
-        {
-            return node.Files.Count == 0 && node.SubDirectories.All(SubtreeHasNoFiles);
-        }
-    }
-
-    internal static IEnumerable<FileComparison> CollectVisibleFiles(DirectoryComparison dir, bool showIdentical, bool hideApplied, IReadOnlyDictionary<object, SyncOutcome> outcomes)
-    {
-        foreach (var sub in dir.SubDirectories)
-        {
-            foreach (var file in CollectVisibleFiles(sub, showIdentical, hideApplied, outcomes))
-            {
-                yield return file;
-            }
-        }
-
-        foreach (var file in dir.Files)
-        {
-            if (!showIdentical && file.Status == ComparisonStatus.Identical)
-            {
-                continue;
-            }
-
-            if (hideApplied && outcomes.GetValueOrDefault(file) == SyncOutcome.Applied)
-            {
-                continue;
-            }
-
-            yield return file;
-        }
-    }
-
-    internal static string[] ParseGroupFolders(string folders)
-    {
-        return folders.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-    }
-
-    internal static string? GroupedKey(string relativePath, IReadOnlyCollection<string> folders)
-    {
-        if (folders.Count == 0)
-        {
-            return null;
-        }
-
-        foreach (var segment in relativePath.Split('/', '\\'))
-        {
-            foreach (var folder in folders)
-            {
-                if (string.Equals(segment, folder, StringComparison.OrdinalIgnoreCase))
-                {
-                    return folder;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    internal static bool IsGroupedPath(string relativePath, IReadOnlyCollection<string> folders)
-    {
-        return GroupedKey(relativePath, folders) is not null;
     }
 
     internal static string AddGitExclusion(string exclusions)
@@ -1057,42 +941,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         return stats;
     }
 
-    private static Dictionary<DirectoryComparison, (long Left, long Right)> BuildDirSizeCache(DirectoryComparison root)
-    {
-        var cache = new Dictionary<DirectoryComparison, (long Left, long Right)>();
-        Accumulate(root, cache);
-        return cache;
-    }
-
-    private static (long Left, long Right) Accumulate(DirectoryComparison dir, Dictionary<DirectoryComparison, (long Left, long Right)> cache)
-    {
-        long left = 0;
-        long right = 0;
-
-        foreach (var file in dir.Files)
-        {
-            if (file.LeftSize.HasValue)
-            {
-                left += file.LeftSize.Value;
-            }
-
-            if (file.RightSize.HasValue)
-            {
-                right += file.RightSize.Value;
-            }
-        }
-
-        foreach (var sub in dir.SubDirectories)
-        {
-            var (subLeft, subRight) = Accumulate(sub, cache);
-            left += subLeft;
-            right += subRight;
-        }
-
-        cache[dir] = (left, right);
-        return (left, right);
-    }
-
     private static FileDiffResult BuildContentDiff(string leftPath, string rightPath)
     {
         var leftInfo = new FileInfo(leftPath);
@@ -1260,13 +1108,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         return string.Join(" ", parts);
     }
 
-    private static IEnumerable<T> FilterBySearch<T>(IEnumerable<T> items, string search, Func<T, string> path)
-    {
-        return search.Length == 0
-            ? items
-            : items.Where(item => path(item).Contains(search, StringComparison.OrdinalIgnoreCase));
-    }
-
     private static List<ConfirmLine> DescribeReceivers(IReadOnlyList<PlanReceiver> receivers, bool bothWays)
     {
         var lines = new List<ConfirmLine>();
@@ -1354,11 +1195,11 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     private void AdoptComparison(ComparisonResult comparison)
     {
         _result = comparison;
-        _dirSizeCache = BuildDirSizeCache(comparison.Root);
+        _dirSizeCache = SyncRowsProjector.BuildDirSizeCache(comparison.Root);
         _outcomes = [];
         _hashesCompared = false;
         comparison.ApplyMode(CurrentMode, Mirror, CurrentWinner);
-        CollapseAllDirectories(comparison.Root);
+        SyncRowsProjector.CollapseAllDirectories(_collapsed, comparison.Root);
         RebuildRows();
         UpdateSummary();
         SummaryText = "Результат сравнения перенесён со страницы «Обзор».";
@@ -1472,7 +1313,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         var prepared = await RunAsync("Сравнение каталогов:", (token, progress) =>
         {
             var compared = _compare.Execute(request, token, progress);
-            return new ComparePreparation(compared, BuildDirSizeCache(compared.Root));
+            return new ComparePreparation(compared, SyncRowsProjector.BuildDirSizeCache(compared.Root));
         }, external: external);
 
         stopwatch.Stop();
@@ -1486,7 +1327,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         _dirSizeCache = prepared.Sizes;
         _outcomes = [];
         _hashesCompared = false;
-        CollapseAllDirectories(_result.Root);
+        SyncRowsProjector.CollapseAllDirectories(_collapsed, _result.Root);
         RebuildRows();
         UpdateSummary();
         SummaryText = $"Сравнение завершено за {stopwatch.Elapsed.TotalSeconds:F2} с";
@@ -1683,7 +1524,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         {
             var done = 0;
             HashModifiedFiles(result.Root, result.LeftPath, result.RightPath, progress, ref done, token);
-            return BuildDirSizeCache(result.Root);
+            return SyncRowsProjector.BuildDirSizeCache(result.Root);
         }, ModifiedCount, CancellationToken.None);
 
         stopwatch.Stop();
@@ -2374,12 +2215,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         }
     }
 
-    private void CollapseAllDirectories(DirectoryComparison root)
-    {
-        _collapsed.Clear();
-        AddCollapsedChildren(root);
-    }
-
     private void ClearComparison()
     {
         _result = null;
@@ -2393,30 +2228,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         UpdateSummary();
     }
 
-    private void AddCollapsed(DirectoryComparison dir)
-    {
-        _collapsed.Add(dir);
-        AddCollapsedChildren(dir);
-    }
-
-    private void AddCollapsedChildren(DirectoryComparison dir)
-    {
-        foreach (var sub in dir.SubDirectories)
-        {
-            AddCollapsed(sub);
-        }
-    }
-
-    private void RemoveCollapsed(DirectoryComparison dir)
-    {
-        _collapsed.Remove(dir);
-
-        foreach (var sub in dir.SubDirectories)
-        {
-            RemoveCollapsed(sub);
-        }
-    }
-
     private void RebuildRows()
     {
         var result = _result;
@@ -2427,226 +2238,24 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             return;
         }
 
-        var buffer = FlatView ? BuildFlatRows(result.Root) : BuildTreeRows(result.Root);
-
-        Rows.ReplaceAll(buffer);
-    }
-
-    private List<SyncNodeViewModel> BuildFlatRows(DirectoryComparison root)
-    {
-        var search = SearchText.Trim();
-        var files = FilterBySearch(CollectVisibleFiles(root, ShowIdentical, HideApplied, _outcomes), search, static file => file.RelativePath);
-        var sortedFiles = SortFiles(files, RowSort, RowSortDescending).ToList();
-        var dirs = FilterBySearch(CollectEmptyDirs(root, HideApplied, _outcomes), search, static dir => dir.RelativePath);
-        var sortedDirs = dirs.OrderBy(dir => dir.RelativePath, StringComparer.OrdinalIgnoreCase).ToList();
-        var groupFolders = ParseGroupFolders(Operations.GroupFolders);
-        var buffer = new List<SyncNodeViewModel>();
-
-        AddUngroupedRows(buffer, sortedFiles, sortedDirs, groupFolders);
-        AddGroupedRows(buffer, sortedFiles, sortedDirs, groupFolders);
-        return buffer;
-    }
-
-    private List<SyncNodeViewModel> BuildTreeRows(DirectoryComparison root)
-    {
-        var buffer = new List<SyncNodeViewModel>();
-        var search = SearchText.Trim();
-        _searchHits = search.Length > 0 ? [] : null;
-
-        if (_searchHits is not null)
+        var request = new SyncRowsRequest
         {
-            CollectSearchHits(root, search, _searchHits);
-        }
-
-        FlattenDirectory(root, 0, buffer);
-        _searchHits = null;
-        return buffer;
-    }
-
-    internal static bool CollectSearchHits(DirectoryComparison dir, string search, HashSet<object> hits)
-    {
-        var matched = false;
-
-        foreach (var sub in dir.SubDirectories)
-        {
-            matched |= CollectSearchHits(sub, search, hits);
-        }
-
-        matched |= dir.Files.Any(file => Matches(file.RelativePath, search));
-
-        if (matched || Matches(dir.RelativePath, search))
-        {
-            hits.Add(dir);
-            matched = true;
-        }
-
-        return matched;
-    }
-
-    private static bool Matches(string path, string search)
-    {
-        return path.Contains(search, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private void AddUngroupedRows(
-        List<SyncNodeViewModel> buffer,
-        IReadOnlyList<FileComparison> files,
-        IReadOnlyList<DirectoryComparison> dirs,
-        IReadOnlyCollection<string> groupFolders)
-    {
-        foreach (var file in files.Where(file => !IsGroupedPath(file.RelativePath, groupFolders)))
-        {
-            buffer.Add(new(file, 0, this, true) { Outcome = _outcomes.GetValueOrDefault(file) });
-        }
-
-        foreach (var dir in dirs.Where(dir => !IsGroupedPath(dir.RelativePath, groupFolders)))
-        {
-            buffer.Add(new(dir, 0, false, 0, 0, this, true) { Outcome = _outcomes.GetValueOrDefault(dir) });
-        }
-    }
-
-    private void AddGroupedRows(
-        List<SyncNodeViewModel> buffer,
-        IReadOnlyList<FileComparison> files,
-        IReadOnlyList<DirectoryComparison> dirs,
-        IReadOnlyCollection<string> groupFolders)
-    {
-        var groupedFiles = files.Where(file => IsGroupedPath(file.RelativePath, groupFolders)).ToList();
-        var groupedDirs = dirs.Where(dir => IsGroupedPath(dir.RelativePath, groupFolders)).ToList();
-        var total = groupedFiles.Count + groupedDirs.Count;
-
-        if (total == 0)
-        {
-            return;
-        }
-
-        buffer.Add(SyncNodeViewModel.CreateGroupHeader(total, _gitGroupExpanded, this));
-
-        if (!_gitGroupExpanded)
-        {
-            return;
-        }
-
-        foreach (var folder in groupFolders.Distinct(StringComparer.OrdinalIgnoreCase))
-        {
-            AddGroup(buffer, folder, groupedFiles, groupedDirs, groupFolders);
-        }
-    }
-
-    private void AddGroup(
-        List<SyncNodeViewModel> buffer,
-        string folder,
-        IReadOnlyList<FileComparison> files,
-        IReadOnlyList<DirectoryComparison> dirs,
-        IReadOnlyCollection<string> groupFolders)
-    {
-        var subFiles = files.Where(file => string.Equals(GroupedKey(file.RelativePath, groupFolders), folder, StringComparison.OrdinalIgnoreCase)).ToList();
-        var subDirs = dirs.Where(dir => string.Equals(GroupedKey(dir.RelativePath, groupFolders), folder, StringComparison.OrdinalIgnoreCase)).ToList();
-        var total = subFiles.Count + subDirs.Count;
-
-        if (total == 0)
-        {
-            return;
-        }
-
-        var expanded = !_collapsedSubGroups.Contains(folder);
-        buffer.Add(SyncNodeViewModel.CreateSubGroupHeader(folder, total, expanded, this));
-
-        if (expanded)
-        {
-            AddGroupItems(buffer, subFiles, subDirs);
-        }
-    }
-
-    private void AddGroupItems(List<SyncNodeViewModel> buffer, IReadOnlyList<FileComparison> files, IReadOnlyList<DirectoryComparison> dirs)
-    {
-        foreach (var file in files)
-        {
-            buffer.Add(new(file, 2, this, true) { Outcome = _outcomes.GetValueOrDefault(file) });
-        }
-
-        foreach (var dir in dirs)
-        {
-            buffer.Add(new(dir, 2, false, 0, 0, this, true) { Outcome = _outcomes.GetValueOrDefault(dir) });
-        }
-    }
-
-    private void FlattenDirectory(DirectoryComparison dir, int indent, List<SyncNodeViewModel> buffer)
-    {
-        AddVisibleDirectories(dir, indent, buffer);
-        AddVisibleFiles(dir, indent, buffer);
-    }
-
-    private void AddVisibleDirectories(DirectoryComparison dir, int indent, List<SyncNodeViewModel> buffer)
-    {
-        foreach (var sub in SortDirectories(dir.SubDirectories))
-        {
-            if (!IsVisible(sub) || _searchHits?.Contains(sub) == false)
-            {
-                continue;
-            }
-
-            var outcome = _outcomes.GetValueOrDefault(sub);
-            var expanded = _searchHits is not null || !_collapsed.Contains(sub);
-            var sizes = _dirSizeCache?.GetValueOrDefault(sub);
-            buffer.Add(new(sub, indent, expanded, sizes?.Left ?? 0, sizes?.Right ?? 0, this) { Outcome = outcome });
-
-            if (expanded)
-            {
-                FlattenDirectory(sub, indent + 1, buffer);
-            }
-        }
-    }
-
-    private void AddVisibleFiles(DirectoryComparison dir, int indent, List<SyncNodeViewModel> buffer)
-    {
-        var search = _searchHits is null ? null : SearchText.Trim();
-
-        foreach (var file in SortFiles(dir.Files, RowSort, RowSortDescending))
-        {
-            if (!IsVisible(file) || (search is not null && !Matches(file.RelativePath, search)))
-            {
-                continue;
-            }
-
-            var outcome = _outcomes.GetValueOrDefault(file);
-            buffer.Add(new(file, indent, this) { Outcome = outcome });
-        }
-    }
-
-    private IEnumerable<DirectoryComparison> SortDirectories(IEnumerable<DirectoryComparison> dirs)
-    {
-        return RowSort switch
-        {
-            SyncSortField.Size => RowSortDescending
-                ? dirs.OrderByDescending(DirSize)
-                : dirs.OrderBy(DirSize),
-            SyncSortField.Status => RowSortDescending
-                ? dirs.OrderByDescending(sub => (int)sub.Status).ThenBy(sub => sub.Name, StringComparer.OrdinalIgnoreCase)
-                : dirs.OrderBy(sub => (int)sub.Status).ThenBy(sub => sub.Name, StringComparer.OrdinalIgnoreCase),
-            _ => RowSortDescending
-                ? dirs.OrderByDescending(sub => sub.Name, StringComparer.OrdinalIgnoreCase)
-                : dirs.OrderBy(sub => sub.Name, StringComparer.OrdinalIgnoreCase),
+            Result = result,
+            FlatView = FlatView,
+            SearchText = SearchText,
+            ShowIdentical = ShowIdentical,
+            HideApplied = HideApplied,
+            RowSort = RowSort,
+            RowSortDescending = RowSortDescending,
+            Outcomes = _outcomes,
+            DirSizeCache = _dirSizeCache,
+            Collapsed = _collapsed,
+            CollapsedSubGroups = _collapsedSubGroups,
+            GitGroupExpanded = _gitGroupExpanded,
+            GroupFolders = Operations.GroupFolders,
         };
 
-        long DirSize(DirectoryComparison sub)
-        {
-            var sizes = _dirSizeCache?.GetValueOrDefault(sub);
-
-            return sizes is null ? 0 : Math.Max(sizes.Value.Left, sizes.Value.Right);
-        }
-    }
-
-    private bool IsVisible(DirectoryComparison dir)
-    {
-        return (ShowIdentical || dir.Status != ComparisonStatus.Identical)
-               && (!HideApplied || _outcomes.GetValueOrDefault(dir) != SyncOutcome.Applied);
-    }
-
-    private bool IsVisible(FileComparison file)
-    {
-        return (ShowIdentical || file.Status != ComparisonStatus.Identical)
-               && (!HideApplied || _outcomes.GetValueOrDefault(file) != SyncOutcome.Applied);
+        Rows.ReplaceAll(SyncRowsProjector.Build(request, this));
     }
 
     private void UpdateSummary()

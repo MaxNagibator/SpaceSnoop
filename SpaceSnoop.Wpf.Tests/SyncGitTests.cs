@@ -27,14 +27,14 @@ public class SyncGitTests
     [TestCase("src/main.cs", ExpectedResult = false)]
     public bool Группируемый_путь_распознаётся_по_сегменту(string relativePath)
     {
-        return SyncViewModel.IsGroupedPath(relativePath, SyncViewModel.ParseGroupFolders(".git,bin,obj"));
+        return SyncRowsProjector.IsGroupedPath(relativePath, SyncRowsProjector.ParseGroupFolders(".git,bin,obj"));
     }
 
     [TestCase("", ExpectedResult = false)]
     [TestCase("  ,  ", ExpectedResult = false)]
     public bool Пустой_список_не_группирует(string folders)
     {
-        return SyncViewModel.IsGroupedPath(".git/config", SyncViewModel.ParseGroupFolders(folders));
+        return SyncRowsProjector.IsGroupedPath(".git/config", SyncRowsProjector.ParseGroupFolders(folders));
     }
 
     [TestCase(".git/config", ExpectedResult = ".git")]
@@ -44,7 +44,7 @@ public class SyncGitTests
     [TestCase("src/main.cs", ExpectedResult = null)]
     public string? Ключ_подгруппы_это_первый_совпавший_каталог(string relativePath)
     {
-        return SyncViewModel.GroupedKey(relativePath, SyncViewModel.ParseGroupFolders(".git,bin,obj"));
+        return SyncRowsProjector.GroupedKey(relativePath, SyncRowsProjector.ParseGroupFolders(".git,bin,obj"));
     }
 
     [Test]
