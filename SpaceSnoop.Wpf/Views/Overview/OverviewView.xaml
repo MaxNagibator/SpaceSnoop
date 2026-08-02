@@ -209,7 +209,7 @@
                                  Height="6"
                                  Minimum="0"
                                  Maximum="{Binding ProgressMax}"
-                                 Value="{Binding ProgressValue}"
+                                 Value="{Binding ProgressValue, Mode=OneWay}"
                                  IsIndeterminate="{Binding IsIndeterminate}"
                                  Margin="0,12,0,0"
                                  Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />

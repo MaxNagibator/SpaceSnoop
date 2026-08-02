@@ -24,12 +24,14 @@ public class BindingSmokeTests
     private const double WindowHeight = 900;
 
     private readonly BindingErrorSink _sink = new();
+    private readonly List<Exception> _dispatcherFailures = [];
 
     private ServiceProvider _services = null!;
     private KeepShellLogging _logging = null!;
     private MainWindow _window = null!;
     private ShellViewModel _shell = null!;
     private GalleryFixture _fixture = null!;
+    private DispatcherFrame? _frame;
 
     public static IReadOnlyList<string> Pages => SectionKey.All;
 
@@ -69,6 +71,8 @@ public class BindingSmokeTests
         _window.ShowInTaskbar = false;
         _window.Show();
 
+        Dispatcher.CurrentDispatcher.UnhandledException += OnDispatcherUnhandledException;
+
         Run(() => GalleryRun.ArrangeAsync(_services, _fixture));
 
         PresentationTraceSources.Refresh();
@@ -80,6 +84,7 @@ public class BindingSmokeTests
     public void OneTimeTearDown()
     {
         PresentationTraceSources.DataBindingSource.Listeners.Remove(_sink);
+        Dispatcher.CurrentDispatcher.UnhandledException -= OnDispatcherUnhandledException;
 
         _window?.Close();
         _services?.Dispose();
@@ -97,10 +102,22 @@ public class BindingSmokeTests
         }
     }
 
+    private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+        _dispatcherFailures.Add(e.Exception);
+        e.Handled = true;
+
+        if (_frame is not null)
+        {
+            _frame.Continue = false;
+        }
+    }
+
     [SetUp]
     public void SetUp()
     {
         _sink.Clear();
+        _dispatcherFailures.Clear();
     }
 
     [TestCaseSource(nameof(Pages))]
@@ -110,6 +127,7 @@ public class BindingSmokeTests
 
         Settle();
 
+        Assert.That(_dispatcherFailures, Is.Empty, () => string.Join(Environment.NewLine, _dispatcherFailures.Select(static failure => failure.Message)));
         Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
     }
 
@@ -158,7 +176,7 @@ public class BindingSmokeTests
         Assert.That(_sink.Errors, Is.Not.Empty, "Сенсор ошибок биндинга молчит – остальные проверки этого набора ничего не значат.");
     }
 
-    private static void Run(Func<Task> action)
+    private void Run(Func<Task> action)
     {
         var frame = new DispatcherFrame();
         ExceptionDispatchInfo? failure = null;
@@ -179,21 +197,50 @@ public class BindingSmokeTests
             }
         });
 
-        Dispatcher.PushFrame(frame);
+        PushFrame(frame);
         failure?.Throw();
     }
 
-    private static void Pump()
+    private void Pump()
     {
         var frame = new DispatcherFrame();
         _ = Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(() => frame.Continue = false));
-        Dispatcher.PushFrame(frame);
+        PushFrame(frame);
+    }
+
+    private void PushFrame(DispatcherFrame frame)
+    {
+        _frame = frame;
+
+        try
+        {
+            Dispatcher.PushFrame(frame);
+        }
+        finally
+        {
+            _frame = null;
+        }
     }
 
     private void Settle()
     {
         Pump();
-        _window.UpdateLayout();
+
+        if (_dispatcherFailures.Count > 0)
+        {
+            return;
+        }
+
+        try
+        {
+            _window.UpdateLayout();
+        }
+        catch (Exception exception)
+        {
+            _dispatcherFailures.Add(exception);
+            return;
+        }
+
         Pump();
     }
 }
