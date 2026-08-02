@@ -23,7 +23,8 @@
         <controls:ScanToolbar Grid.Row="0"
                               Margin="0,0,0,12" />
 
-        <controls:ScanProgressPanel Grid.Row="1" />
+        <controls:ScanProgressPanel Grid.Row="1"
+                                    DataContext="{Binding Progress}" />
 
         <!--  Плашка отмены: появляется когда сканирование прервано пользователем  -->
         <Border Grid.Row="2"

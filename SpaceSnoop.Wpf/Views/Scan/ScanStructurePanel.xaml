@@ -621,7 +621,8 @@
 
             <Grid Grid.Row="1"
                   Margin="0,4,0,0"
-                  Visibility="{Binding TreemapVisible, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                  DataContext="{Binding Treemap}"
+                  Visibility="{Binding DataContext.TreemapVisible, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
@@ -678,9 +679,9 @@
                     <Grid>
                         <controls:TreemapView x:Name="Treemap"
                                               ItemsSource="{Binding TreemapTiles}"
-                                              Intensity="{Binding Intensity}"
-                                              Performance="{Binding Performance}"
-                                              SelectedItem="{Binding SelectedNode, Mode=TwoWay}"
+                                              Intensity="{Binding DataContext.Intensity, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                              Performance="{Binding DataContext.Performance, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                              SelectedItem="{Binding DataContext.SelectedNode, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
                                               DrillCommand="{Binding DrillIntoCommand}"
                                               NodeContextMenu="{StaticResource ScanNodeMenu}"
                                               NodeTooltipTemplate="{StaticResource TreemapTooltip}"
