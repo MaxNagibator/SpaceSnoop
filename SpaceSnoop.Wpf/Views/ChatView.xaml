@@ -17,7 +17,7 @@
         </Grid.ColumnDefinitions>
 
         <chat:ChatHistoryPanel Grid.Column="0"
-                               Visibility="{Binding IsHistoryVisible, Converter={StaticResource BoolToVisibility}}" />
+                               Visibility="{Binding History.IsHistoryVisible, Converter={StaticResource BoolToVisibility}}" />
 
         <Grid Grid.Column="1">
             <Grid.RowDefinitions>

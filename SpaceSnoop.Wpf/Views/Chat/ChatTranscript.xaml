@@ -345,7 +345,7 @@
             <TextBlock Style="{StaticResource Chat.Subhead}"
                        Text="{Binding Greeting}" />
             <TextBlock Style="{StaticResource Chat.Hint}"
-                       Text="{Binding EmptyStateHint}" />
+                       Text="{Binding Gates.EmptyStateHint}" />
 
             <ItemsControl ItemsSource="{x:Static chatvm:ChatViewModel.Examples}"
                           Margin="0,20,0,0">

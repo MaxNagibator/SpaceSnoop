@@ -25,7 +25,7 @@
             <Border Style="{StaticResource Chat.Notice}"
                     Margin="0,0,0,10"
                     BorderBrush="{DynamicResource Accent.Primary}"
-                    Visibility="{Binding PendingNavigation, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}">
+                    Visibility="{Binding Gates.PendingNavigation, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -37,22 +37,22 @@
                     <iconPacks:PackIconLucide Grid.Column="0"
                                               Style="{StaticResource Chat.NoticeIcon}"
                                               Foreground="{DynamicResource Accent.Primary}"
-                                              Kind="{Binding PendingNavigation.Icon}" />
+                                              Kind="{Binding Gates.PendingNavigation.Icon}" />
 
                     <TextBlock Grid.Column="1"
                                Style="{StaticResource Chat.NoticeText}"
-                               Text="{Binding PendingNavigation.Text}" />
+                               Text="{Binding Gates.PendingNavigation.Text}" />
 
                     <Button Grid.Column="2"
                             Style="{StaticResource Button.Primary}"
-                            Command="{Binding OpenPendingPageCommand}"
-                            Content="{Binding PendingNavigation.ActionText}"
+                            Command="{Binding Gates.OpenPendingPageCommand}"
+                            Content="{Binding Gates.PendingNavigation.ActionText}"
                             Padding="10,2"
                             Margin="8,0,0,0" />
 
                     <Button Grid.Column="3"
                             Style="{StaticResource Button.Icon}"
-                            Command="{Binding DismissPendingPageCommand}"
+                            Command="{Binding Gates.DismissPendingPageCommand}"
                             ToolTip="Скрыть"
                             AutomationProperties.Name="Скрыть"
                             Margin="4,0,0,0">
@@ -65,13 +65,13 @@
 
             <Border Style="{StaticResource Chat.Notice}"
                     Margin="0,0,0,10"
-                    ToolTip="{Binding MutationsNotice}"
-                    Visibility="{Binding MutationsAllowed, Converter={StaticResource BoolToVisibility}}">
+                    ToolTip="{Binding Gates.MutationsNotice}"
+                    Visibility="{Binding Gates.MutationsAllowed, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Style="{StaticResource Chat.NoticeIcon}"
                                               Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}" />
                     <TextBlock Style="{StaticResource Chat.NoticeText}"
-                               Text="{Binding MutationsNoticeShort}" />
+                               Text="{Binding Gates.MutationsNoticeShort}" />
                 </StackPanel>
             </Border>
 
@@ -101,16 +101,16 @@
                             VerticalAlignment="Bottom"
                             Margin="8,0,0,0">
                     <Button Style="{StaticResource Button.Icon}"
-                            Command="{Binding ToggleHistoryCommand}"
-                            ToolTip="{Binding HistoryToggleHint}"
-                            AutomationProperties.Name="{Binding HistoryToggleHint}">
+                            Command="{Binding History.ToggleHistoryCommand}"
+                            ToolTip="{Binding History.HistoryToggleHint}"
+                            AutomationProperties.Name="{Binding History.HistoryToggleHint}">
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.PanelLeft}"
                                                   Width="16"
                                                   Height="16" />
                     </Button>
 
                     <Button Style="{StaticResource Button.Icon}"
-                            Command="{Binding NewConversationCommand}"
+                            Command="{Binding History.NewConversationCommand}"
                             ToolTip="Новый разговор"
                             AutomationProperties.Name="Новый разговор"
                             Margin="8,0,0,0">
@@ -157,8 +157,8 @@
 
                 <ComboBox Grid.Column="0"
                           Style="{StaticResource Chat.Selector}"
-                          ItemsSource="{Binding AgentModel.ModelOptions}"
-                          SelectedItem="{Binding AgentModel.SelectedModel, Mode=TwoWay}"
+                          ItemsSource="{Binding Gates.AgentModel.ModelOptions}"
+                          SelectedItem="{Binding Gates.AgentModel.SelectedModel, Mode=TwoWay}"
                           ToolTip="Модель агента – применяется со следующего сообщения"
                           AutomationProperties.Name="Модель агента">
                     <ComboBox.ItemTemplate>
@@ -171,8 +171,8 @@
 
                 <ComboBox Grid.Column="1"
                           Style="{StaticResource Chat.Selector}"
-                          ItemsSource="{Binding AgentModel.EffortOptions}"
-                          SelectedItem="{Binding AgentModel.SelectedEffort, Mode=TwoWay}"
+                          ItemsSource="{Binding Gates.AgentModel.EffortOptions}"
+                          SelectedItem="{Binding Gates.AgentModel.SelectedEffort, Mode=TwoWay}"
                           Margin="4,0,0,0"
                           ToolTip="Глубина рассуждений – чем выше, тем дольше и дороже ответ"
                           AutomationProperties.Name="Глубина рассуждений" />

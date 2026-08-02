@@ -44,12 +44,12 @@
     <StackPanel>
         <Border Style="{StaticResource Chat.Banner}"
                 BorderBrush="{DynamicResource Border.Subtle}"
-                Visibility="{Binding IsDetectingCli, Converter={StaticResource BoolToVisibility}}">
+                Visibility="{Binding Gates.IsDetectingCli, Converter={StaticResource BoolToVisibility}}">
             <StackPanel Orientation="Horizontal">
                 <iconPacks:PackIconLucide Style="{StaticResource Chat.BannerIcon}"
                                           Kind="{x:Static iconPacks:PackIconLucideKind.LoaderCircle}"
                                           Foreground="{DynamicResource Fg.Muted}" />
-                <TextBlock Text="{Binding DetectingCliText}"
+                <TextBlock Text="{Binding Gates.DetectingCliText}"
                            Style="{StaticResource TextBlock.Subtle}"
                            VerticalAlignment="Center" />
             </StackPanel>
@@ -57,21 +57,21 @@
 
         <Border Style="{StaticResource Chat.Banner}"
                 BorderBrush="{DynamicResource State.Warning}"
-                Visibility="{Binding ShowCliMissingBanner, Converter={StaticResource BoolToVisibility}}">
+                Visibility="{Binding Gates.ShowCliMissingBanner, Converter={StaticResource BoolToVisibility}}">
             <StackPanel>
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Style="{StaticResource Chat.BannerIcon}"
                                               Kind="{x:Static iconPacks:PackIconLucideKind.BotOff}"
                                               Foreground="{DynamicResource State.Warning}" />
-                    <TextBlock Text="{Binding CliMissingTitle}"
+                    <TextBlock Text="{Binding Gates.CliMissingTitle}"
                                FontWeight="{DynamicResource Font.Weight.SemiBold}"
                                VerticalAlignment="Center" />
                 </StackPanel>
                 <TextBlock Style="{StaticResource Chat.BannerText}"
-                           Text="{Binding CliMissingText}" />
+                           Text="{Binding Gates.CliMissingText}" />
                 <Button Style="{StaticResource Button.Secondary}"
                         Content="Проверить снова"
-                        Command="{Binding RecheckCliCommand}"
+                        Command="{Binding Gates.RecheckCliCommand}"
                         HorizontalAlignment="Left"
                         Margin="0,10,0,0" />
             </StackPanel>
@@ -79,7 +79,7 @@
 
         <Border Style="{StaticResource Chat.Banner}"
                 BorderBrush="{DynamicResource State.Info}"
-                Visibility="{Binding ShowConsentBanner, Converter={StaticResource BoolToVisibility}}">
+                Visibility="{Binding Gates.ShowConsentBanner, Converter={StaticResource BoolToVisibility}}">
             <StackPanel>
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Style="{StaticResource Chat.BannerIcon}"
@@ -90,12 +90,12 @@
                                VerticalAlignment="Center" />
                 </StackPanel>
                 <TextBlock Style="{StaticResource Chat.BannerText}"
-                           Text="{Binding ConsentText}" />
+                           Text="{Binding Gates.ConsentText}" />
                 <TextBlock Style="{StaticResource Chat.BannerText}"
                            Text="Продолжение разговора заставляет CLI хранить весь диалог – сообщения и то, что вернули инструменты, то есть пути и размеры с ваших дисков – локально, в своей рабочей папке, привязанной к текущему каталогу запуска." />
                 <Button Style="{StaticResource Button.Primary}"
                         Content="Разрешить"
-                        Command="{Binding GrantConsentCommand}"
+                        Command="{Binding Gates.GrantConsentCommand}"
                         HorizontalAlignment="Left"
                         Margin="0,10,0,0" />
             </StackPanel>
@@ -103,7 +103,7 @@
 
         <Border Style="{StaticResource Chat.Banner}"
                 BorderBrush="{DynamicResource State.Warning}"
-                Visibility="{Binding ShowMcpBanner, Converter={StaticResource BoolToVisibility}}">
+                Visibility="{Binding Gates.ShowMcpBanner, Converter={StaticResource BoolToVisibility}}">
             <StackPanel>
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Style="{StaticResource Chat.BannerIcon}"
@@ -117,25 +117,25 @@
                            Text="Без него у Шныря нет ни одного инструмента приложения – он не сможет ни просканировать диск, ни посмотреть сравнение." />
                 <Button Style="{StaticResource Button.Primary}"
                         Content="Включить MCP-сервер"
-                        Command="{Binding EnableMcpCommand}"
+                        Command="{Binding Gates.EnableMcpCommand}"
                         HorizontalAlignment="Left"
                         Margin="0,10,0,0" />
                 <TextBlock Style="{StaticResource Chat.BannerText}"
                            Foreground="{DynamicResource State.Error}"
-                           Text="{Binding McpServer.LastError}"
-                           Visibility="{Binding McpServer.LastError, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
+                           Text="{Binding Gates.McpServer.LastError}"
+                           Visibility="{Binding Gates.McpServer.LastError, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
             </StackPanel>
         </Border>
 
         <Border Style="{StaticResource Chat.Notice}"
                 Margin="16,12,16,0"
-                ToolTip="{Binding ShellNotice}"
-                Visibility="{Binding ShowShellBanner, Converter={StaticResource BoolToVisibility}}">
+                ToolTip="{Binding Gates.ShellNotice}"
+                Visibility="{Binding Gates.ShowShellBanner, Converter={StaticResource BoolToVisibility}}">
             <StackPanel Orientation="Horizontal">
                 <iconPacks:PackIconLucide Style="{StaticResource Chat.NoticeIcon}"
                                           Kind="{x:Static iconPacks:PackIconLucideKind.SquareTerminal}" />
                 <TextBlock Style="{StaticResource Chat.NoticeText}"
-                           Text="{Binding ShellNoticeShort}" />
+                           Text="{Binding Gates.ShellNoticeShort}" />
             </StackPanel>
         </Border>
     </StackPanel>

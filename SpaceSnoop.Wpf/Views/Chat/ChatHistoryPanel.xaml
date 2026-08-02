@@ -45,7 +45,7 @@
 
                 <Button Grid.Column="1"
                         Style="{StaticResource Button.Icon}"
-                        Command="{Binding NewConversationCommand}"
+                        Command="{Binding History.NewConversationCommand}"
                         ToolTip="Новый разговор"
                         AutomationProperties.Name="Новый разговор">
                     <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Plus}"
@@ -58,12 +58,12 @@
                           Padding="10,0,10,0"
                           VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled"
-                          Visibility="{Binding HasConversations, Converter={StaticResource BoolToVisibility}}">
-                <ItemsControl ItemsSource="{Binding Conversations}">
+                          Visibility="{Binding History.HasConversations, Converter={StaticResource BoolToVisibility}}">
+                <ItemsControl ItemsSource="{Binding History.Conversations}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type chatvm:ChatConversationViewModel}">
                             <Button Style="{StaticResource Chat.HistoryItem}"
-                                    Command="{Binding DataContext.SelectConversationCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    Command="{Binding DataContext.History.SelectConversationCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                     CommandParameter="{Binding}"
                                     ToolTip="{Binding Title}">
                                 <Grid>
@@ -81,7 +81,7 @@
 
                                     <Button Grid.Column="1"
                                             Style="{StaticResource Chat.HistoryDelete}"
-                                            Command="{Binding DataContext.DeleteConversationCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            Command="{Binding DataContext.History.DeleteConversationCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             CommandParameter="{Binding}"
                                             ToolTip="Удалить разговор"
                                             AutomationProperties.Name="Удалить разговор">
@@ -101,15 +101,15 @@
                        VerticalAlignment="Center"
                        Margin="16,0,16,24"
                        Text="Прошлых разговоров нет. Спросите о чём-нибудь – разговор сохранится сам и переживёт перезапуск."
-                       Visibility="{Binding HasConversations, Converter={StaticResource InverseBoolToVisibility}}" />
+                       Visibility="{Binding History.HasConversations, Converter={StaticResource InverseBoolToVisibility}}" />
 
             <Button Grid.Row="2"
                     Style="{StaticResource Button.Ghost}"
-                    Command="{Binding ClearHistoryCommand}"
+                    Command="{Binding History.ClearHistoryCommand}"
                     Margin="10,8,10,12"
                     HorizontalAlignment="Stretch"
                     ToolTip="Убрать из истории все разговоры"
-                    Visibility="{Binding HasConversations, Converter={StaticResource BoolToVisibility}}">
+                    Visibility="{Binding History.HasConversations, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
                                               Width="13"
