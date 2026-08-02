@@ -51,15 +51,7 @@ internal static class ScanLookup
             }
         }
 
-        foreach (var file in dir.Files)
-        {
-            if (string.Equals(Normalize(file.AbsolutePath), target, StringComparison.OrdinalIgnoreCase))
-            {
-                return file;
-            }
-        }
-
-        return null;
+        return dir.Files.FirstOrDefault(file => string.Equals(Normalize(file.AbsolutePath), target, StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool IsInside(string directory, string target)

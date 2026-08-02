@@ -757,11 +757,13 @@ public sealed class McpBridge(
         }
 
         var deferred = DeferOrNavigate(SectionKey.Scan);
-        notifier.Notify(start
-            ? $"Агент запустил сканирование: {target}"
-            : deferred
-                ? "Агент подготовил страницу «Сканирование»"
-                : "Агент открыл страницу «Сканирование»");
+
+        notifier.Notify((start, deferred) switch
+        {
+            (true, _) => $"Агент запустил сканирование: {target}",
+            (false, true) => "Агент подготовил страницу «Сканирование»",
+            _ => "Агент открыл страницу «Сканирование»",
+        });
 
         return (start ? scan.ScanFromAutomationAsync(target, cancellationToken) : null, deferred);
     }
@@ -856,11 +858,12 @@ public sealed class McpBridge(
 
         var deferred = DeferOrNavigate(SectionKey.Sync);
 
-        notifier.Notify(compare
-            ? $"Агент запустил сравнение: {targetLeft} → {targetRight}"
-            : deferred
-                ? "Агент подготовил страницу «Синхронизация»"
-                : "Агент открыл страницу «Синхронизация»");
+        notifier.Notify((compare, deferred) switch
+        {
+            (true, _) => $"Агент запустил сравнение: {targetLeft} → {targetRight}",
+            (false, true) => "Агент подготовил страницу «Синхронизация»",
+            _ => "Агент открыл страницу «Синхронизация»",
+        });
 
         return (compare ? sync.Operations.CompareFromAutomationAsync(cancellationToken) : null, deferred, ignored);
     }

@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System.Globalization;
+using System.IO;
 
 namespace SpaceSnoop.Wpf.Bootstrap;
 
@@ -49,7 +50,7 @@ public sealed class SyncProfile
 
     public static bool IsValidTime(string value)
     {
-        return TimeSpan.TryParse(value.Trim(), out var time) && time >= TimeSpan.Zero && time.TotalHours < 24;
+        return TimeSpan.TryParse(value.Trim(), CultureInfo.InvariantCulture, out var time) && time >= TimeSpan.Zero && time.TotalHours < 24;
     }
 
     public static string? MirrorSource(SyncMode mode, SyncWinner winner, string left, string right)

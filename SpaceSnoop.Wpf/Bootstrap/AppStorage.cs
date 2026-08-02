@@ -60,11 +60,11 @@ public static class AppStorage
         File.Delete(LegacyAppDataMarkerPath);
     }
 
-    public static void Migrate(string source, string destination)
+    public static int Migrate(string source, string destination)
     {
         if (string.Equals(Path.GetFullPath(source), Path.GetFullPath(destination), StringComparison.OrdinalIgnoreCase))
         {
-            return;
+            return 0;
         }
 
         EnsureExists(destination);
@@ -108,23 +108,19 @@ public static class AppStorage
             }
         }
 
-        foreach (var file in copied)
-        {
-            TryDelete(file);
-        }
+        return copied.Count(static file => !TryDelete(file));
     }
 
-    private static void TryDelete(string path)
+    private static bool TryDelete(string path)
     {
         try
         {
             File.Delete(path);
+            return true;
         }
-        catch (IOException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-        }
-        catch (UnauthorizedAccessException)
-        {
+            return false;
         }
     }
 

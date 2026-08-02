@@ -1,6 +1,7 @@
 ﻿using MahApps.Metro.IconPacks;
 using Microsoft.Win32;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 
 namespace SpaceSnoop.Wpf.ViewModels.Sync;
@@ -367,7 +368,7 @@ public sealed partial class SyncProfileViewModel : ObservableObject
     {
         if (Enabled)
         {
-            TimeSpan.TryParse(Time, out var time);
+            TimeSpan.TryParse(Time, CultureInfo.InvariantCulture, out var time);
 
             if (!SyncScheduler.Create(TaskName, ToModel().Interval, time, $"{AppInfo.SyncArgument} {Id}", out var error))
             {

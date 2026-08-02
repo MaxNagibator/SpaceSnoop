@@ -199,7 +199,7 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
         return value is { Length: > 0 } ? value : "–";
     }
 
-    private static void TryKill(Process process)
+    private void TryKill(Process process)
     {
         try
         {
@@ -210,10 +210,11 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
         }
         catch (Exception exception) when (exception is InvalidOperationException or Win32Exception)
         {
+            _logger.AgentProcessKillFailed(exception);
         }
     }
 
-    private static void TryDelete(string path)
+    private void TryDelete(string path)
     {
         try
         {
@@ -221,10 +222,11 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
+            _logger.AgentTempFileLeft(exception, path);
         }
     }
 
-    private static async Task DrainStderrAsync(Process process, List<string> tail, string? mcpToken, IAgentTranscript? transcript)
+    private async Task DrainStderrAsync(Process process, List<string> tail, string? mcpToken, IAgentTranscript? transcript)
     {
         const int maxLines = 20;
 
@@ -244,6 +246,7 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
         }
         catch (Exception exception) when (exception is IOException or ObjectDisposedException or InvalidOperationException)
         {
+            _logger.AgentStderrReadFailed(exception);
         }
     }
 

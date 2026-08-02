@@ -10,6 +10,7 @@ public sealed partial class ScanNodeViewModel : ObservableObject
     private readonly ScanSortState? _sort;
     private readonly ILogger _logger;
     private readonly ScanNodeFactory? _factory;
+    private IReadOnlyList<ScanNodeViewModel>? _previewTiles;
     private bool _loaded;
 
     [ObservableProperty]
@@ -133,19 +134,7 @@ public sealed partial class ScanNodeViewModel : ObservableObject
 
     public bool CanUnmarkContents => IsDirectory && HasMarkedContents;
 
-    public IReadOnlyList<ScanNodeViewModel> PreviewTiles
-    {
-        get
-        {
-            EnsureLoaded();
-
-            return Children
-                .Where(static c => c.Weight > 0)
-                .OrderByDescending(static c => c.Weight)
-                .Take(AppDefaults.TreemapPreviewLimit)
-                .ToList();
-        }
-    }
+    public IReadOnlyList<ScanNodeViewModel> PreviewTiles => _previewTiles ??= BuildPreviewTiles();
 
     private bool HasMarkedContents => Space is DirectorySpace dir && EnumerateChildren(dir).Any(HasDeletedRecursive);
 
@@ -178,6 +167,7 @@ public sealed partial class ScanNodeViewModel : ObservableObject
             .Select(item => _factory!.Create(item, localMax, dir.TotalSize, Root!, _sort));
 
         Children.ReplaceAll(ordered);
+        _previewTiles = null;
     }
 
     public void RefreshMarks()
@@ -199,6 +189,7 @@ public sealed partial class ScanNodeViewModel : ObservableObject
 
         var ordered = Children.OrderBy(static child => child.Space!, _sort).ToList();
         Children.ReplaceAll(ordered);
+        _previewTiles = null;
 
         foreach (var child in Children)
         {
@@ -209,6 +200,17 @@ public sealed partial class ScanNodeViewModel : ObservableObject
     private static IEnumerable<SpaceBase> EnumerateChildren(DirectorySpace dir)
     {
         return dir.SubDirectories.Cast<SpaceBase>().Concat(dir.Files);
+    }
+
+    private IReadOnlyList<ScanNodeViewModel> BuildPreviewTiles()
+    {
+        EnsureLoaded();
+
+        return Children
+            .Where(static c => c.Weight > 0)
+            .OrderByDescending(static c => c.Weight)
+            .Take(AppDefaults.TreemapPreviewLimit)
+            .ToList();
     }
 
     internal static void RestoreRecursive(SpaceBase space)
@@ -369,12 +371,9 @@ public sealed partial class ScanNodeViewModel : ObservableObject
             OnPropertyChanged(nameof(CanUnmarkContents));
         }
 
-        foreach (var child in Children)
+        foreach (var child in Children.Where(static child => !ReferenceEquals(child, Dummy)))
         {
-            if (!ReferenceEquals(child, Dummy))
-            {
-                child.RefreshMarkRecursive();
-            }
+            child.RefreshMarkRecursive();
         }
     }
 }

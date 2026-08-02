@@ -146,6 +146,9 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1259, Level = LogLevel.Information, Message = "Пакетно удалено профилей: {Count}")]
     public static partial void ScheduleBulkRemoved(this ILogger logger, int count);
 
+    [LoggerMessage(EventId = 1260, Level = LogLevel.Warning, Message = "Журнал синхронизации «{Path}» не прочитан – история показана без него")]
+    public static partial void SyncLogFileUnreadable(this ILogger logger, Exception exception, string path);
+
     [LoggerMessage(EventId = 1300, Level = LogLevel.Warning, Message = "Не удалось положить лог-секцию в буфер обмена")]
     public static partial void ClipboardLogSectionFailed(this ILogger logger, Exception exception);
 
@@ -169,6 +172,9 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 1403, Level = LogLevel.Error, Message = "Не удалось изменить расположение данных: {Path}")]
     public static partial void StorageLocationChangeFailed(this ILogger logger, Exception exception, string path);
+
+    [LoggerMessage(EventId = 1404, Level = LogLevel.Warning, Message = "После переноса данных в прежнем расположении осталось файлов: {Count} (заняты другим процессом)")]
+    public static partial void StorageSourceFilesLeft(this ILogger logger, int count);
 
     [LoggerMessage(EventId = 1500, Level = LogLevel.Warning, Message = "Не удалось открыть проводник для {Path}")]
     public static partial void OpenExplorerFailed(this ILogger logger, Exception exception, string path);
@@ -241,6 +247,9 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 1804, Level = LogLevel.Warning, Message = "Не удалось скачать обновление: {Url}")]
     public static partial void UpdateDownloadFailed(this ILogger logger, Exception exception, string url);
+
+    [LoggerMessage(EventId = 1805, Level = LogLevel.Debug, Message = "Незавершённая загрузка не удалена: {Path}")]
+    public static partial void UpdateTempFileLeft(this ILogger logger, Exception exception, string path);
 
     [LoggerMessage(EventId = 1900, Level = LogLevel.Information, Message = "Пакетное сравнение начато: пар {Total}")]
     public static partial void OverviewCompareStarted(this ILogger logger, int total);
@@ -373,6 +382,15 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 2126, Level = LogLevel.Debug, Message = "Переход на страницу «{Page}» отложен до конца хода агента")]
     public static partial void AgentNavigationDeferred(this ILogger logger, string page);
+
+    [LoggerMessage(EventId = 2127, Level = LogLevel.Debug, Message = "Процесс CLI агента не остановлен – возможно, он уже завершился")]
+    public static partial void AgentProcessKillFailed(this ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 2128, Level = LogLevel.Debug, Message = "Временный файл хода агента не удалён: {Path}")]
+    public static partial void AgentTempFileLeft(this ILogger logger, Exception exception, string path);
+
+    [LoggerMessage(EventId = 2129, Level = LogLevel.Debug, Message = "Чтение stderr CLI агента оборвано – хвост вывода неполон")]
+    public static partial void AgentStderrReadFailed(this ILogger logger, Exception exception);
 
     [LoggerMessage(EventId = 2200, Level = LogLevel.Information, Message = "Снимок сохранён: {Path} ({Width}×{Height})")]
     public static partial void ViewCaptured(this ILogger logger, string path, int width, int height);

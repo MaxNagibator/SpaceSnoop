@@ -1,4 +1,6 @@
-﻿namespace SpaceSnoop.Wpf.Bootstrap;
+﻿using System.Globalization;
+
+namespace SpaceSnoop.Wpf.Bootstrap;
 
 public static class ScheduleReconciler
 {
@@ -28,7 +30,7 @@ public static class ScheduleReconciler
                 continue;
             }
 
-            TimeSpan.TryParse(profile.Time, out var time);
+            TimeSpan.TryParse(profile.Time, CultureInfo.InvariantCulture, out var time);
 
             if (!SyncScheduler.Create(taskName, profile.Interval, time, $"{AppInfo.SyncArgument} {profile.Id}", out var error))
             {

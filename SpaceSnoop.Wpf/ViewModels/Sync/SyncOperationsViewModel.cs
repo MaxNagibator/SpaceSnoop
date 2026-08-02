@@ -83,11 +83,12 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
     {
         var parts = exclusions.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-        return parts.Any(static part => string.Equals(part, ".git", StringComparison.OrdinalIgnoreCase))
-            ? exclusions
-            : string.IsNullOrWhiteSpace(exclusions)
-                ? ".git"
-                : $"{exclusions.TrimEnd()},.git";
+        if (parts.Any(static part => string.Equals(part, ".git", StringComparison.OrdinalIgnoreCase)))
+        {
+            return exclusions;
+        }
+
+        return string.IsNullOrWhiteSpace(exclusions) ? ".git" : $"{exclusions.TrimEnd()},.git";
     }
 
     public void NotifyBusyChanged()
@@ -631,15 +632,19 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
 
         var toastVolume = report.CopiedBytes > 0 ? $" · {SizeFormatter.Format(report.CopiedBytes)}" : string.Empty;
 
-        var syncToastMessage = report.Errors.Count > 0
-            ? $"Синхронизация: применено {report.SuccessCount:N0}, ошибок: {report.Errors.Count:N0}"
-            : report.Mismatches.Count > 0
-                ? $"Синхронизация: применено {report.SuccessCount:N0} · расхождений: {report.Mismatches.Count:N0}"
-                : $"Синхронизация завершена: применено {report.SuccessCount:N0}{toastVolume}";
+        var syncToastMessage = report switch
+        {
+            { Errors.Count: > 0 } => $"Синхронизация: применено {report.SuccessCount:N0}, ошибок: {report.Errors.Count:N0}",
+            { Mismatches.Count: > 0 } => $"Синхронизация: применено {report.SuccessCount:N0} · расхождений: {report.Mismatches.Count:N0}",
+            _ => $"Синхронизация завершена: применено {report.SuccessCount:N0}{toastVolume}",
+        };
 
-        var syncToastSeverity = report.Errors.Count > 0 ? StatusSeverity.Error
-            : report.Mismatches.Count > 0 ? StatusSeverity.Warning
-            : StatusSeverity.Success;
+        var syncToastSeverity = report switch
+        {
+            { Errors.Count: > 0 } => StatusSeverity.Error,
+            { Mismatches.Count: > 0 } => StatusSeverity.Warning,
+            _ => StatusSeverity.Success,
+        };
 
         _notifier.Notify(syncToastMessage, syncToastSeverity);
 

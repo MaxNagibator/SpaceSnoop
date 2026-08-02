@@ -267,7 +267,12 @@ public sealed partial class SyncGitViewModel : ObservableObject
 
     private static string FormatBranch(GitRepoState? git)
     {
-        return git is null ? string.Empty : git.IsDetached ? "detached" : git.Branch;
+        if (git is null)
+        {
+            return string.Empty;
+        }
+
+        return git.IsDetached ? "detached" : git.Branch;
     }
 
     private static string FormatHead(GitRepoState? git)
@@ -287,7 +292,12 @@ public sealed partial class SyncGitViewModel : ObservableObject
 
     private static string FormatDirty(GitRepoState? git)
     {
-        return git is null ? string.Empty : git.IsDirty ? $"{git.DirtyCount} изм." : "чисто";
+        if (git is null)
+        {
+            return string.Empty;
+        }
+
+        return git.IsDirty ? $"{git.DirtyCount} изм." : "чисто";
     }
 
     private static string FormatUpstream(GitRepoState? git)

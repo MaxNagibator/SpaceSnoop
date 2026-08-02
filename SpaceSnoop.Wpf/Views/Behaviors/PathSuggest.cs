@@ -52,20 +52,11 @@ public static class PathSuggest
                 return [];
             }
 
-            var matches = new List<string>();
-
-            foreach (var match in Directory.EnumerateDirectories(directory, prefix + "*"))
-            {
-                if (Path.GetFileName(match).StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                {
-                    matches.Add(directory + Path.GetFileName(match));
-
-                    if (matches.Count >= MaxCandidates)
-                    {
-                        break;
-                    }
-                }
-            }
+            var matches = Directory.EnumerateDirectories(directory, prefix + "*")
+                .Where(match => Path.GetFileName(match).StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                .Take(MaxCandidates)
+                .Select(match => directory + Path.GetFileName(match))
+                .ToList();
 
             matches.Sort(StringComparer.OrdinalIgnoreCase);
             return matches;

@@ -163,13 +163,13 @@ public sealed class TreemapView : FrameworkElement
         _toolTip.IsOpen = false;
     }
 
-    protected override void OnRender(DrawingContext context)
+    protected override void OnRender(DrawingContext drawingContext)
     {
         var startedAt = Stopwatch.GetTimestamp();
         var width = ActualWidth;
         var height = ActualHeight;
 
-        context.DrawRectangle(Brushes.Transparent, null, new(0, 0, width, height));
+        drawingContext.DrawRectangle(Brushes.Transparent, null, new(0, 0, width, height));
 
         var nodes = Nodes();
         var weights = new double[nodes.Count];
@@ -195,7 +195,7 @@ public sealed class TreemapView : FrameworkElement
             var bounds = new Rect(layout[i].X + inset, layout[i].Y + inset, layout[i].Width, layout[i].Height);
             tiles[i] = (bounds, node);
 
-            DrawTile(context, node, Deflate(bounds, inset), style);
+            DrawTile(drawingContext, node, Deflate(bounds, inset), style);
         }
 
         _tiles = tiles;
@@ -219,9 +219,12 @@ public sealed class TreemapView : FrameworkElement
 
         fill.Freeze();
 
-        var pen = ReferenceEquals(node, SelectedItem) ? style.Selection
-            : node.IsMarkedDeleted ? style.Deleted
-            : null;
+        var pen = (ReferenceEquals(node, SelectedItem), node.IsMarkedDeleted) switch
+        {
+            (true, _) => style.Selection,
+            (false, true) => style.Deleted,
+            _ => null,
+        };
 
         var radius = node.IsDirectory ? CornerRadius : 0;
 

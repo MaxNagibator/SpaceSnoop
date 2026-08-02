@@ -34,9 +34,12 @@ internal readonly record struct FreshnessSummary(
 
             var delta = left - right;
 
-            return delta.Duration() <= DirectoryComparer.FatTimestampTolerance ? NewerSide.Tie
-                : delta > TimeSpan.Zero ? NewerSide.Left
-                : NewerSide.Right;
+            if (delta.Duration() <= DirectoryComparer.FatTimestampTolerance)
+            {
+                return NewerSide.Tie;
+            }
+
+            return delta > TimeSpan.Zero ? NewerSide.Left : NewerSide.Right;
         }
     }
 

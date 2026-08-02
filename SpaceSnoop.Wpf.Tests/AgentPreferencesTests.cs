@@ -149,7 +149,7 @@ public class AgentPreferencesTests
         Seed(store => store.SetValue(SettingsKeys.AgentModelShared, "sonnet"));
 
         var first = Open();
-        var preferences = new AgentPreferences(first) { Model = string.Empty };
+        _ = new AgentPreferences(first) { Model = string.Empty };
         first.Flush();
 
         Assert.That(new AgentPreferences(Open()).ModelFor(AgentBackendKind.Claude), Is.Empty);

@@ -83,13 +83,16 @@ public sealed record ScheduleStatus
         var current = new StringBuilder();
         var quoted = false;
 
-        for (var i = 0; i < line.Length; i++)
+        var i = 0;
+
+        while (i < line.Length)
         {
             var symbol = line[i];
+            i++;
 
             if (symbol == '"')
             {
-                if (quoted && i + 1 < line.Length && line[i + 1] == '"')
+                if (quoted && i < line.Length && line[i] == '"')
                 {
                     current.Append('"');
                     i++;

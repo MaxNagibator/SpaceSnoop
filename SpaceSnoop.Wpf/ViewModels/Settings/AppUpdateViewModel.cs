@@ -73,10 +73,12 @@ public sealed partial class AppUpdateViewModel : ObservableObject
         _preferences.PropertyChanged += OnPreferencesChanged;
     }
 
-    public string PillText =>
-        IsDownloading ? $"Загрузка {DownloadPercent}%"
-        : _downloadedPath is not null ? "Готово к установке"
-        : $"Доступна версия {VersionLabel}";
+    public string PillText => (IsDownloading, _downloadedPath) switch
+    {
+        (true, _) => $"Загрузка {DownloadPercent}%",
+        (false, not null) => "Готово к установке",
+        _ => $"Доступна версия {VersionLabel}",
+    };
 
     public bool HasReleaseNotes => !string.IsNullOrWhiteSpace(ReleaseNotes);
 
@@ -299,7 +301,7 @@ public sealed partial class AppUpdateViewModel : ObservableObject
         return path is not null && File.Exists(path) && new FileInfo(path).Length > AppDefaults.SelfContainedExeThreshold;
     }
 
-    private static void TryDelete(string path)
+    private void TryDelete(string path)
     {
         try
         {
@@ -308,11 +310,9 @@ public sealed partial class AppUpdateViewModel : ObservableObject
                 File.Delete(path);
             }
         }
-        catch (IOException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-        }
-        catch (UnauthorizedAccessException)
-        {
+            _logger.UpdateTempFileLeft(exception, path);
         }
     }
 

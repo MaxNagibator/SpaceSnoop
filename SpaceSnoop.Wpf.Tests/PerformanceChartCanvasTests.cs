@@ -132,7 +132,7 @@ public class PerformanceChartCanvasTests
     [Test]
     public void Без_курсора_вертикали_на_графике_нет()
     {
-        Assert.That(Lines(Render(Sample())).Any(static line => line.Geometry.StartPoint.X == line.Geometry.EndPoint.X), Is.False);
+        Assert.That(Lines(Render(Sample())).Any(static line => Math.Abs(line.Geometry.StartPoint.X - line.Geometry.EndPoint.X) < 0.01), Is.False);
     }
 
     private static bool IsDashed((Pen Pen, LineGeometry Geometry) line, params double[] dashes)
@@ -179,6 +179,15 @@ public class PerformanceChartCanvasTests
         return Render(Canvas(data), width, height);
     }
 
+    private static DrawingGroup? Render(PerformanceChartCanvas canvas, double width = 400, double height = 200)
+    {
+        canvas.Measure(new(width, height));
+        canvas.Arrange(new Rect(0, 0, width, height));
+        canvas.UpdateLayout();
+
+        return VisualTreeHelper.GetDrawing(canvas);
+    }
+
     private static PerformanceChartCanvas Canvas(PerformanceChartData data)
     {
         return new()
@@ -193,15 +202,6 @@ public class PerformanceChartCanvasTests
             SurfaceBrush = Brushes.White,
             TextBrush = Brushes.Black,
         };
-    }
-
-    private static DrawingGroup? Render(PerformanceChartCanvas canvas, double width = 400, double height = 200)
-    {
-        canvas.Measure(new(width, height));
-        canvas.Arrange(new Rect(0, 0, width, height));
-        canvas.UpdateLayout();
-
-        return VisualTreeHelper.GetDrawing(canvas);
     }
 
     private static PerformanceChartData Sample()

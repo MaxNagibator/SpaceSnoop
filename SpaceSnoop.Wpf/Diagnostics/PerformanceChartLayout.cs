@@ -85,7 +85,13 @@ public static class PerformanceChartLayout
 
         var magnitude = Math.Pow(10, Math.Floor(Math.Log10(value)));
         var normalized = value / magnitude;
-        var step = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+        var step = normalized switch
+        {
+            <= 1 => 1,
+            <= 2 => 2,
+            <= 5 => 5,
+            _ => 10,
+        };
 
         return step * magnitude;
     }
@@ -148,15 +154,7 @@ public static class PerformanceChartLayout
 
     private static long MemoryUnit(long maxBytes)
     {
-        foreach (var unit in MemoryUnits)
-        {
-            if (maxBytes >= unit)
-            {
-                return unit;
-            }
-        }
-
-        return 1;
+        return MemoryUnits.FirstOrDefault(unit => maxBytes >= unit, 1);
     }
 
     private static IReadOnlyList<PerformanceTick> BuildTimeTicks(double spanMs)

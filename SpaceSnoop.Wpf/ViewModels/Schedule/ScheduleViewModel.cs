@@ -376,8 +376,10 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
 
         Persist();
 
+        var rest = applied < targets.Length ? " (остальные не прошли проверку, причина в карточке)" : string.Empty;
+
         BulkMessage = value
-            ? $"Включено: {applied} из {targets.Length}" + (applied < targets.Length ? " (остальные не прошли проверку, причина в карточке)" : string.Empty)
+            ? $"Включено: {applied} из {targets.Length}{rest}"
             : $"Выключено: {applied}";
 
         _logger.ScheduleBulkApplied(value ? "включение" : "выключение", applied);
@@ -533,7 +535,8 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
 
         var lines = SyncLog.ReadTail(
             static line => line.StartsWith('[') && line.Contains("Автосинхронизация"),
-            40);
+            40,
+            _logger);
 
         foreach (var line in lines)
         {

@@ -102,7 +102,7 @@ public class ScanTreemapViewModelTests
         Assert.That(treemap.TreemapBreadcrumbs, Has.Count.EqualTo(3));
 
         treemap.DrillToCrumbCommand.Execute(big);
-        var outsider = deep.Children.First();
+        var outsider = deep.Children[0];
         treemap.DrillToCrumbCommand.Execute(outsider);
 
         using (Assert.EnterMultipleScope())

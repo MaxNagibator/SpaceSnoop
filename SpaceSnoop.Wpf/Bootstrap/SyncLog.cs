@@ -37,12 +37,12 @@ public static class SyncLog
         logger.Information("{Entry}", builder.ToString().TrimEnd());
     }
 
-    public static IReadOnlyList<string> ReadTail(Func<string, bool> match, int count)
+    public static IReadOnlyList<string> ReadTail(Func<string, bool> match, int count, Microsoft.Extensions.Logging.ILogger? logger = null)
     {
-        return ReadTail(AppStorage.DataDirectory, match, count);
+        return ReadTail(AppStorage.DataDirectory, match, count, logger);
     }
 
-    internal static IReadOnlyList<string> ReadTail(string directory, Func<string, bool> match, int count)
+    internal static IReadOnlyList<string> ReadTail(string directory, Func<string, bool> match, int count, Microsoft.Extensions.Logging.ILogger? logger = null)
     {
         var files = Directory
             .EnumerateFiles(directory, FileGlob)
@@ -69,8 +69,9 @@ public static class SyncLog
                     }
                 }
             }
-            catch (IOException)
+            catch (IOException exception)
             {
+                logger?.SyncLogFileUnreadable(exception, file);
             }
         }
 

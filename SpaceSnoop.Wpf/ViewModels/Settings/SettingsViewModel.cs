@@ -356,7 +356,12 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
             if (ReferenceEquals(confirm.Chosen, migrate))
             {
                 _settings.Flush();
-                AppStorage.Migrate(source, destination);
+                var left = AppStorage.Migrate(source, destination);
+
+                if (left > 0)
+                {
+                    _logger.StorageSourceFilesLeft(left);
+                }
             }
 
             AppStorage.SetUseAppData(useAppData);

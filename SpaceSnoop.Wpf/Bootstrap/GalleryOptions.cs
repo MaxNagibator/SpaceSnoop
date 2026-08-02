@@ -32,10 +32,13 @@ public sealed record GalleryOptions(
         var rest = args.ToList();
         var positional = true;
 
-        for (var index = 0; index < rest.Count; index++)
+        var index = 0;
+
+        while (index < rest.Count)
         {
             var key = rest[index].Trim();
             var value = index + 1 < rest.Count ? rest[index + 1].Trim() : string.Empty;
+            index++;
 
             switch (key.ToLowerInvariant())
             {

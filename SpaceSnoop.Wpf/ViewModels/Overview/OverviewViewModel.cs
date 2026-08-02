@@ -571,9 +571,12 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
 
     private void NotifyResult(string caption, int ok, int failed)
     {
-        var severity = failed > 0 ? StatusSeverity.Error
-            : ok == 0 ? StatusSeverity.Warning
-            : StatusSeverity.Success;
+        var severity = (failed, ok) switch
+        {
+            ( > 0, _) => StatusSeverity.Error,
+            (_, 0) => StatusSeverity.Warning,
+            _ => StatusSeverity.Success,
+        };
 
         _notifier.Notify(caption, severity);
     }
