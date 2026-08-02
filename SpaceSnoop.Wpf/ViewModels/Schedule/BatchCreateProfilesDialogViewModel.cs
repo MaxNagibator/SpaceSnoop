@@ -1,6 +1,5 @@
 ﻿using KeepShell.Services.Modal;
 using MahApps.Metro.IconPacks;
-using Microsoft.Win32;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 
@@ -10,6 +9,7 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
 {
     private readonly IReadOnlyList<SyncProfile> _existing;
     private readonly ISettingsStore _settings;
+    private readonly IFilePicker _filePicker;
 
     [ObservableProperty]
     private string _sourceParent = string.Empty;
@@ -32,9 +32,10 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
     [ObservableProperty]
     private int _selectedSort;
 
-    public BatchCreateProfilesDialogViewModel(ISettingsStore settings)
+    public BatchCreateProfilesDialogViewModel(ISettingsStore settings, IFilePicker filePicker)
     {
         _settings = settings;
+        _filePicker = filePicker;
         _existing = SyncProfileStore.Load(settings);
         PathSuggest = settings.GetBool(SettingsKeys.SyncPathSuggest, AppDefaults.SyncPathSuggestDefault);
 
@@ -140,13 +141,11 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
         return exclusions;
     }
 
-    private static void Browse(Action<string> assign)
+    private void Browse(Action<string> assign)
     {
-        var dialog = new OpenFolderDialog { Title = "Выберите каталог" };
-
-        if (dialog.ShowDialog() == true)
+        if (_filePicker.PickFolder("Выберите каталог") is { } path)
         {
-            assign(dialog.FolderName);
+            assign(path);
         }
     }
 

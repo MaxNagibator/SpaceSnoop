@@ -1,14 +1,10 @@
-﻿using Microsoft.Extensions.Logging.Abstractions;
-using System.Diagnostics;
-
-namespace SpaceSnoop.Wpf.ViewModels.Scan;
+﻿namespace SpaceSnoop.Wpf.ViewModels.Scan;
 
 public sealed partial class ScanNodeViewModel : ObservableObject
 {
     private static readonly ScanNodeViewModel Dummy = new();
 
     private readonly ScanSortState? _sort;
-    private readonly ILogger _logger;
     private readonly ScanNodeFactory? _factory;
     private IReadOnlyList<ScanNodeViewModel>? _previewTiles;
     private bool _loaded;
@@ -22,7 +18,7 @@ public sealed partial class ScanNodeViewModel : ObservableObject
     [ObservableProperty]
     private bool _isSelected;
 
-    internal ScanNodeViewModel(SpaceBase space, double siblingMax, double parentTotal, SpaceBase root, DriveCapacity? drive, ScanSortState sort, ILogger logger, ScanNodeFactory factory)
+    internal ScanNodeViewModel(SpaceBase space, double siblingMax, double parentTotal, SpaceBase root, DriveCapacity? drive, ScanSortState sort, ScanNodeFactory factory)
     {
         Space = space;
         Fraction = siblingMax;
@@ -30,7 +26,6 @@ public sealed partial class ScanNodeViewModel : ObservableObject
         Root = root;
         Drive = drive;
         _sort = sort;
-        _logger = logger;
         _factory = factory;
         _isMarkedDeleted = space.IsDeleted;
 
@@ -42,7 +37,6 @@ public sealed partial class ScanNodeViewModel : ObservableObject
 
     private ScanNodeViewModel()
     {
-        _logger = NullLogger.Instance;
     }
 
     public RangeObservableCollection<ScanNodeViewModel> Children { get; } = [];
@@ -265,20 +259,13 @@ public sealed partial class ScanNodeViewModel : ObservableObject
             return;
         }
 
-        try
+        if (Space is DirectorySpace || _factory?.RevealFiles == false)
         {
-            if (Space is DirectorySpace || _factory?.RevealFiles == false)
-            {
-                Process.Start(new ProcessStartInfo(Space.AbsolutePath) { UseShellExecute = true });
-            }
-            else
-            {
-                Process.Start(SystemExecutable.Explorer, $"/select,\"{Space.AbsolutePath}\"");
-            }
+            _factory?.Shell.Open(Space.AbsolutePath);
         }
-        catch (Exception ex)
+        else
         {
-            _logger.OpenExplorerFailed(ex, Space.AbsolutePath);
+            _factory?.Shell.Reveal(Space.AbsolutePath);
         }
     }
 

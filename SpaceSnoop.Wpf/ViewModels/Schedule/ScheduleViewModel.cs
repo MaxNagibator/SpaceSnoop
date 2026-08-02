@@ -31,10 +31,12 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
     [ObservableProperty]
     private string _bulkMessage = string.Empty;
 
-    public ScheduleViewModel(ISettingsStore settings, IDialogService dialogs, ILogger<ScheduleViewModel> logger)
+    public ScheduleViewModel(ISettingsStore settings, IDialogService dialogs, IFilePicker filePicker, IShellLauncher shell, ILogger<ScheduleViewModel> logger)
     {
         Settings = settings;
         _dialogs = dialogs;
+        FilePicker = filePicker;
+        Shell = shell;
         _logger = logger;
 
         ReloadProfiles();
@@ -49,6 +51,10 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
     }
 
     public ISettingsStore Settings { get; }
+
+    public IFilePicker FilePicker { get; }
+
+    public IShellLauncher Shell { get; }
 
     public IReadOnlyList<SegmentOption> Modes => SyncOptions.Modes;
 
@@ -329,17 +335,11 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
             _ => "справа",
         };
 
-        var choice = StyledMessageBox.Show($"""
-                                            У выбранных профилей с включённым «Зеркалом» ({mirrored}) смена направления меняет сторону удаления: лишнее будет уходить в корзину {side}.
+        return _dialogs.ConfirmWarning("Смена направления", $"""
+                                                              У выбранных профилей с включённым «Зеркалом» ({mirrored}) смена направления меняет сторону удаления: лишнее будет уходить в корзину {side}.
 
-                                            Сменить направление?
-                                            """,
-            "Смена направления",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning,
-            MessageBoxResult.No);
-
-        return choice == MessageBoxResult.Yes;
+                                                              Сменить направление?
+                                                              """);
     }
 
     private void SetMirror(bool value)
@@ -451,7 +451,7 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
     [RelayCommand]
     private async Task CreateBatch()
     {
-        var dialog = new BatchCreateProfilesDialogViewModel(Settings);
+        var dialog = new BatchCreateProfilesDialogViewModel(Settings, FilePicker);
 
         if (!await _dialogs.ShowAsync(dialog) || dialog.CreatedProfiles.Count == 0)
         {

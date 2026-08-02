@@ -1,5 +1,4 @@
-﻿using Microsoft.Extensions.Logging.Abstractions;
-using SpaceSnoop.Core.Domain;
+﻿using SpaceSnoop.Core.Domain;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.ViewModels.Scan;
 using System.IO;
@@ -16,7 +15,7 @@ public class ScanTreemapViewModelTests
         Directory.CreateDirectory(_tempDir);
 
         var settings = new MemorySettings();
-        _factory = new(NullLogger<ScanNodeViewModel>.Instance, new(settings), new(settings));
+        _factory = new(new(settings), new(settings), new FakeShellLauncher());
     }
 
     [TearDown]

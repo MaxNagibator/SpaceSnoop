@@ -1,6 +1,6 @@
 ﻿namespace SpaceSnoop.Wpf.Bootstrap;
 
-public sealed class ScanNodeFactory(ILogger<ScanNodeViewModel> logger, ScanPreferences preferences, AgentPreferences agent)
+public sealed class ScanNodeFactory(ScanPreferences preferences, AgentPreferences agent, IShellLauncher shell)
 {
     public event Action<ScanNodeViewModel>? ArchiveRequested;
     public event Action<ScanNodeViewModel>? AskAgentRequested;
@@ -10,14 +10,16 @@ public sealed class ScanNodeFactory(ILogger<ScanNodeViewModel> logger, ScanPrefe
 
     public bool ChatEnabled => agent.Enabled;
 
+    public IShellLauncher Shell => shell;
+
     public ScanNodeViewModel Create(SpaceBase space, double siblingMax, double parentTotal, SpaceBase root, ScanSortState sort)
     {
-        return new(space, siblingMax, parentTotal, root, null, sort, logger, this);
+        return new(space, siblingMax, parentTotal, root, null, sort, this);
     }
 
     public ScanNodeViewModel CreateRoot(SpaceBase space, ScanSortState sort)
     {
-        return new(space, space.TotalSize, space.TotalSize, space, DriveCapacity.TryRead(space.AbsolutePath), sort, logger, this);
+        return new(space, space.TotalSize, space.TotalSize, space, DriveCapacity.TryRead(space.AbsolutePath), sort, this);
     }
 
     public void RaiseMarksChanged()

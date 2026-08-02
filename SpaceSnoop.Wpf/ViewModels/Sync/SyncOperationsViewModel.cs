@@ -1,5 +1,4 @@
 ﻿using KeepShell.Services;
-using Microsoft.Win32;
 using SpaceSnoop.Core.Export;
 using SpaceSnoop.Wpf.Diff;
 using System.Diagnostics;
@@ -17,6 +16,7 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
     private readonly CompareDirectoriesUseCase _compare;
     private readonly ExecuteSyncUseCase _sync;
     private readonly ToastNotifier _notifier;
+    private readonly IFilePicker _filePicker;
     private readonly SyncSetupViewModel _setup;
     private readonly SyncSessionViewModel _session;
     private readonly SyncGitViewModel _git;
@@ -44,6 +44,7 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
         CompareDirectoriesUseCase compare,
         ExecuteSyncUseCase sync,
         ToastNotifier notifier,
+        IFilePicker filePicker,
         SyncSetupViewModel setup,
         SyncSessionViewModel session,
         SyncGitViewModel git,
@@ -56,6 +57,7 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
         _compare = compare;
         _sync = sync;
         _notifier = notifier;
+        _filePicker = filePicker;
         _setup = setup;
         _session = session;
         _git = git;
@@ -727,16 +729,13 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
             return;
         }
 
-        var dialog = new SaveFileDialog
+        var path = _filePicker.SaveFile(new FileSaveRequest("Экспорт сравнения", "JSON (*.json)|*.json")
         {
-            Title = "Экспорт сравнения",
-            Filter = "JSON (*.json)|*.json",
-            DefaultExt = ".json",
-            AddExtension = true,
+            DefaultExtension = ".json",
             FileName = BuildExportFileName(),
-        };
+        });
 
-        if (dialog.ShowDialog() != true)
+        if (path is null)
         {
             return;
         }
@@ -745,16 +744,16 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
         {
             var model = BuildExportModel(ComparisonExport.DefaultEntryLimit)!;
 
-            File.WriteAllText(dialog.FileName, ComparisonExport.ToJson(model));
-            _logger.ComparisonExported(dialog.FileName, model.Entries.Count, model.OmittedEntries);
+            File.WriteAllText(path, ComparisonExport.ToJson(model));
+            _logger.ComparisonExported(path, model.Entries.Count, model.OmittedEntries);
 
             var omitted = model.OmittedEntries > 0 ? $", пропущено {model.OmittedEntries:N0}" : string.Empty;
-            _session.StatusCaption = $"Сравнение выгружено: {Path.GetFileName(dialog.FileName)}";
+            _session.StatusCaption = $"Сравнение выгружено: {Path.GetFileName(path)}";
             _notifier.Notify($"Сравнение выгружено: записей {model.Entries.Count:N0}{omitted}", StatusSeverity.Success);
         }
         catch (Exception ex)
         {
-            _logger.ComparisonExportFailed(ex, dialog.FileName);
+            _logger.ComparisonExportFailed(ex, path);
             _dialogs.Error("Экспорт сравнения", ex.Message);
         }
     }

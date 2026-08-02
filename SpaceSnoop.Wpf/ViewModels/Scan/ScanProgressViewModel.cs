@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
 using System.IO;
-using System.Windows.Threading;
 
 namespace SpaceSnoop.Wpf.ViewModels.Scan;
 
@@ -9,7 +8,7 @@ public sealed partial class ScanProgressViewModel : ObservableObject
     private static readonly TimeSpan ProgressPollInterval = TimeSpan.FromMilliseconds(120);
 
     private readonly PerformanceMonitor _performance;
-    private readonly DispatcherTimer _progressTimer;
+    private readonly IUiTimer _progressTimer;
 
     private ScanProgress? _progress;
     private Stopwatch? _scanStopwatch;
@@ -55,12 +54,11 @@ public sealed partial class ScanProgressViewModel : ObservableObject
     [ObservableProperty]
     private string _scanPercentText = string.Empty;
 
-    public ScanProgressViewModel(PerformanceMonitor performance)
+    public ScanProgressViewModel(PerformanceMonitor performance, IUiDispatcher uiDispatcher)
     {
         _performance = performance;
 
-        _progressTimer = new() { Interval = ProgressPollInterval };
-        _progressTimer.Tick += OnProgressTick;
+        _progressTimer = uiDispatcher.CreateTimer(ProgressPollInterval, OnProgressTick);
     }
 
     public bool IsIndeterminate => !_progressFraction.HasValue;
@@ -132,7 +130,7 @@ public sealed partial class ScanProgressViewModel : ObservableObject
         return _scanStopwatch?.Elapsed ?? TimeSpan.Zero;
     }
 
-    private void OnProgressTick(object? sender, EventArgs e)
+    private void OnProgressTick()
     {
         UpdateLiveProgress();
     }

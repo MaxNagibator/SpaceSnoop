@@ -1,6 +1,7 @@
 ﻿global using CommunityToolkit.Mvvm.ComponentModel;
 global using CommunityToolkit.Mvvm.Input;
 global using KeepShell.Bootstrap;
+global using KeepShell.Services.Platform;
 global using KeepShell.ViewModels;
 global using Microsoft.Extensions.Logging;
 global using SpaceSnoop.Core;

@@ -1,6 +1,5 @@
 ﻿using KeepShell.Services;
 using MahApps.Metro.IconPacks;
-using Microsoft.Win32;
 using System.IO;
 
 namespace SpaceSnoop.Wpf.ViewModels.Sync;
@@ -12,6 +11,7 @@ public sealed partial class SyncSetupViewModel : ObservableObject
 
     private readonly ISettingsStore _settings;
     private readonly OperationPreferences _operations;
+    private readonly IFilePicker _filePicker;
     private readonly Func<bool> _canRun;
 
     private string? _activeProfileId;
@@ -48,11 +48,13 @@ public sealed partial class SyncSetupViewModel : ObservableObject
         ISettingsStore settings,
         IDialogService dialogs,
         OperationPreferences operations,
+        IFilePicker filePicker,
         Func<bool> canRun,
         Action<string> setStatus)
     {
         _settings = settings;
         _operations = operations;
+        _filePicker = filePicker;
         _canRun = canRun;
 
         Profiles = new(settings, dialogs, BuildCurrentProfile, RaiseProfileSelected, canRun, setStatus);
@@ -153,16 +155,11 @@ public sealed partial class SyncSetupViewModel : ObservableObject
         return !string.IsNullOrWhiteSpace(path) && !Directory.Exists(path.Trim());
     }
 
-    private static void Browse(Action<string> assign)
+    private void Browse(Action<string> assign)
     {
-        var dialog = new OpenFolderDialog
+        if (_filePicker.PickFolder("Выберите каталог") is { } path)
         {
-            Title = "Выберите каталог",
-        };
-
-        if (dialog.ShowDialog() == true)
-        {
-            assign(dialog.FolderName);
+            assign(path);
         }
     }
 

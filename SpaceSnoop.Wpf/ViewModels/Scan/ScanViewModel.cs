@@ -1,5 +1,4 @@
 ﻿using KeepShell.Services;
-using Microsoft.Win32;
 using SpaceSnoop.Core.Export;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -20,6 +19,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     private readonly ILogger<ScanViewModel> _logger;
     private readonly ToastNotifier _notifier;
     private readonly PerformanceMonitor _performance;
+    private readonly IFilePicker _filePicker;
 
     private readonly ScanSortState _sortState = new();
 
@@ -80,7 +80,9 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         ArchiveProgressDialogFactory archiveDialogFactory,
         ILogger<ScanViewModel> logger,
         ToastNotifier notifier,
-        PerformanceMonitor performance)
+        PerformanceMonitor performance,
+        IFilePicker filePicker,
+        IUiDispatcher uiDispatcher)
     {
         _calculator = calculator;
         _performance = performance;
@@ -92,13 +94,14 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         _archiveDialogFactory = archiveDialogFactory;
         _logger = logger;
         _notifier = notifier;
+        _filePicker = filePicker;
 
         Inspector = inspector;
         Preferences = preferences;
         Preferences.PropertyChanged += OnPreferencesChanged;
         Inspector.Intensity = Preferences.Intensity;
 
-        Progress = new(performance);
+        Progress = new(performance, uiDispatcher);
         Progress.PropertyChanged += OnProgressPropertyChanged;
 
         Summary = new();
@@ -637,17 +640,10 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     [RelayCommand(CanExecute = nameof(CanStart))]
     private async Task BrowseAsync()
     {
-        var dialog = new OpenFolderDialog
-        {
-            Title = "Выберите каталог для сканирования",
-        };
-
-        if (dialog.ShowDialog() != true)
+        if (_filePicker.PickFolder("Выберите каталог для сканирования") is not { } path)
         {
             return;
         }
-
-        var path = dialog.FolderName;
 
         if (!HasDrive(path))
         {

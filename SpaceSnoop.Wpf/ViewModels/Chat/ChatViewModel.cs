@@ -2,7 +2,6 @@
 using MahApps.Metro.IconPacks;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.IO;
 
 namespace SpaceSnoop.Wpf.ViewModels.Chat;
@@ -15,6 +14,9 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
     private readonly ChatHistoryStore _history;
     private readonly AgentTranscriptStore _transcripts;
     private readonly IDialogService _dialogs;
+    private readonly IClipboardService _clipboard;
+    private readonly IShellLauncher _shell;
+    private readonly IUiDispatcher _uiDispatcher;
     private readonly ILogger<ChatViewModel> _logger;
 
     private bool _detectStarted;
@@ -72,6 +74,9 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         ChatHistoryStore history,
         AgentTranscriptStore transcripts,
         IDialogService dialogs,
+        IClipboardService clipboard,
+        IShellLauncher shell,
+        IUiDispatcher uiDispatcher,
         ILogger<ChatViewModel> logger)
     {
         _backends = backends;
@@ -80,6 +85,9 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         _history = history;
         _transcripts = transcripts;
         _dialogs = dialogs;
+        _clipboard = clipboard;
+        _shell = shell;
+        _uiDispatcher = uiDispatcher;
         AgentModel = agentModel;
         Mcp = mcp;
         McpServer = mcpServer;
@@ -230,15 +238,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
             _sessionDropped = IsBusy;
         }
 
-        var dispatcher = Application.Current?.Dispatcher;
-
-        if (dispatcher is not null && !dispatcher.CheckAccess())
-        {
-            dispatcher.BeginInvoke(NotifyGatesChanged);
-            return;
-        }
-
-        NotifyGatesChanged();
+        _uiDispatcher.Invoke(NotifyGatesChanged);
     }
 
     [RelayCommand]
@@ -424,14 +424,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
             return;
         }
 
-        try
-        {
-            Clipboard.SetText(message.Text);
-        }
-        catch (Exception exception)
-        {
-            _logger.AgentMessageCopyFailed(exception);
-        }
+        _clipboard.TrySetText(message.Text);
     }
 
     [RelayCommand]
@@ -442,20 +435,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
             return;
         }
 
-        try
-        {
-            var arguments = File.Exists(path) ? $"/select,\"{path}\"" : $"\"{_transcripts.DirectoryPath}\"";
-
-            Process.Start(new ProcessStartInfo(SystemExecutable.Explorer)
-            {
-                Arguments = arguments,
-                UseShellExecute = false,
-            });
-        }
-        catch (Exception exception)
-        {
-            _logger.AgentTranscriptOpenFailed(exception, path);
-        }
+        _shell.Reveal(File.Exists(path) ? path : _transcripts.DirectoryPath);
     }
 
     [RelayCommand(CanExecute = nameof(CanManageConversation))]
@@ -814,15 +794,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         _sessionId = null;
         _logger.AgentBackendChanged(Backend.DisplayName);
 
-        var dispatcher = Application.Current?.Dispatcher;
-
-        if (dispatcher is not null && !dispatcher.CheckAccess())
-        {
-            dispatcher.BeginInvoke(ReloadBackend);
-            return;
-        }
-
-        ReloadBackend();
+        _uiDispatcher.Invoke(ReloadBackend);
     }
 
     private void ReloadBackend()

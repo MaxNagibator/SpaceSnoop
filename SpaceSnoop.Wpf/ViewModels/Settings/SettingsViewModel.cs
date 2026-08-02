@@ -1,7 +1,6 @@
 ﻿using KeepShell.Services;
 using MahApps.Metro.IconPacks;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.IO.Compression;
 
 namespace SpaceSnoop.Wpf.ViewModels.Settings;
@@ -21,6 +20,9 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     private readonly ISettingsStore _settings;
     private readonly IDialogService _dialogs;
     private readonly AgentBackends _agentBackends;
+    private readonly IClipboardService _clipboard;
+    private readonly IShellLauncher _shell;
+    private readonly IApplicationLifetime _lifetime;
     private readonly ILogger<SettingsViewModel> _logger;
 
     [ObservableProperty]
@@ -45,6 +47,9 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         AgentBackends agentBackends,
         ISettingsStore settings,
         IDialogService dialogs,
+        IClipboardService clipboard,
+        IShellLauncher shellLauncher,
+        IApplicationLifetime lifetime,
         ILogger<SettingsViewModel> logger)
     {
         Agent = agent;
@@ -60,6 +65,9 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         McpServer = mcpServer;
         _settings = settings;
         _dialogs = dialogs;
+        _clipboard = clipboard;
+        _shell = shellLauncher;
+        _lifetime = lifetime;
         _logger = logger;
 
         Theme.PropertyChanged += OnThemePropertyChanged;
@@ -370,22 +378,21 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         catch (Exception exception)
         {
             _logger.StorageLocationChangeFailed(exception, destination);
-            StyledMessageBox.Show($"Не удалось изменить расположение данных.{Environment.NewLine}{Environment.NewLine}{exception.Message}",
-                "Расположение данных",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
+            _dialogs.Error("Расположение данных", $"Не удалось изменить расположение данных.{Environment.NewLine}{Environment.NewLine}{exception.Message}");
 
             return;
         }
 
         var executable = Environment.ProcessPath;
 
-        if (!string.IsNullOrEmpty(executable))
+        if (!string.IsNullOrEmpty(executable) && !_shell.Start(executable))
         {
-            Process.Start(executable);
+            _dialogs.Error("Расположение данных", "Данные перенесены, но перезапустить программу не удалось – закройте и откройте её сами.");
+
+            return;
         }
 
-        Application.Current.Shutdown();
+        _lifetime.Shutdown();
     }
 
     [RelayCommand]
@@ -400,31 +407,19 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         try
         {
             _settings.Flush();
-
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = SystemExecutable.Explorer,
-                Arguments = $"/select,\"{SettingsFilePath}\"",
-                UseShellExecute = true,
-            });
         }
         catch (Exception exception)
         {
-            _logger.ShowSettingsFileFailed(exception, SettingsFilePath);
+            _logger.SettingsFlushFailed(exception, SettingsFilePath);
         }
+
+        _shell.Reveal(SettingsFilePath);
     }
 
     [RelayCommand]
     private void CopyMcpConnection()
     {
-        try
-        {
-            Clipboard.SetText(McpConnectSnippet);
-        }
-        catch (Exception exception)
-        {
-            _logger.CopySettingsPathFailed(exception);
-        }
+        _clipboard.TrySetText(McpConnectSnippet);
     }
 
     private string BuildMcpJson()
@@ -447,13 +442,6 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     [RelayCommand]
     private void CopySettingsPath()
     {
-        try
-        {
-            Clipboard.SetText(SettingsFilePath);
-        }
-        catch (Exception exception)
-        {
-            _logger.CopySettingsPathFailed(exception);
-        }
+        _clipboard.TrySetText(SettingsFilePath);
     }
 }

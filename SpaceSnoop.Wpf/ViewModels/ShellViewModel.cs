@@ -24,6 +24,8 @@ public sealed partial class ShellViewModel : ShellViewModelBase
 
     private readonly NavigationItem _logsItem;
 
+    private readonly IApplicationLifetime _lifetime;
+
     [ObservableProperty]
     private bool _isTarkovBootPlaying;
 
@@ -44,9 +46,11 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         ShellPreferences preferences,
         AppUpdateViewModel appUpdate,
         ToastHostViewModel toasts,
-        PerformanceHudViewModel hud)
+        PerformanceHudViewModel hud,
+        IApplicationLifetime lifetime)
         : base(modal)
     {
+        _lifetime = lifetime;
         Toasts = toasts;
         Hud = hud;
         Theme = theme;
@@ -252,7 +256,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
     {
         if (AdminElevation.TryRestartAsAdmin())
         {
-            Application.Current.Shutdown();
+            _lifetime.Shutdown();
         }
     }
 

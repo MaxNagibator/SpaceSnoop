@@ -8,7 +8,7 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
 
     private readonly ToastNotifier _notifier;
 
-    private readonly ILogger<PerformanceViewModel> _logger;
+    private readonly IClipboardService _clipboard;
 
     private bool _active;
 
@@ -59,11 +59,11 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
         PerformanceChartViewModel chart,
         ShellPreferences preferences,
         ToastNotifier notifier,
-        ILogger<PerformanceViewModel> logger)
+        IClipboardService clipboard)
     {
         _monitor = monitor;
         _notifier = notifier;
-        _logger = logger;
+        _clipboard = clipboard;
 
         Chart = chart;
         Chart.ChartHeight = AppDefaults.PerformanceChartPageHeight;
@@ -120,14 +120,12 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
     [RelayCommand]
     private void CopySummary()
     {
-        try
+        if (_clipboard.TrySetText(PerformanceReport.Build(_monitor.Snapshot, AppInfo.Version)))
         {
-            Clipboard.SetText(PerformanceReport.Build(_monitor.Snapshot, AppInfo.Version));
             _notifier.Notify("Сводка скопирована в буфер обмена");
         }
-        catch (Exception exception)
+        else
         {
-            _logger.PerformanceSummaryCopyFailed(exception);
             _notifier.Notify("Не удалось скопировать сводку", StatusSeverity.Warning);
         }
     }

@@ -10,7 +10,7 @@ public sealed partial class ScanInspectorViewModel : ObservableObject
     private const double MaxInspectorWidth = 900;
 
     private readonly ISettingsStore _settings;
-    private readonly ILogger<ScanInspectorViewModel> _logger;
+    private readonly IClipboardService _clipboard;
     private bool _suppressPersist;
 
     [ObservableProperty]
@@ -100,10 +100,10 @@ public sealed partial class ScanInspectorViewModel : ObservableObject
     [ObservableProperty]
     private double _intensity = AppDefaults.IntensityDefault;
 
-    public ScanInspectorViewModel(ISettingsStore settings, ILogger<ScanInspectorViewModel> logger)
+    public ScanInspectorViewModel(ISettingsStore settings, IClipboardService clipboard)
     {
         _settings = settings;
-        _logger = logger;
+        _clipboard = clipboard;
         LoadSettings();
     }
 
@@ -231,14 +231,7 @@ public sealed partial class ScanInspectorViewModel : ObservableObject
 
     private void TryCopy(string? value)
     {
-        try
-        {
-            Clipboard.SetText(value ?? string.Empty);
-        }
-        catch (Exception ex)
-        {
-            _logger.ClipboardTextCopyFailed(ex);
-        }
+        _clipboard.TrySetText(value ?? string.Empty);
     }
 
     [RelayCommand]

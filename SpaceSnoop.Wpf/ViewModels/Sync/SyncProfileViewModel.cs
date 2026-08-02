@@ -1,6 +1,4 @@
 ﻿using MahApps.Metro.IconPacks;
-using Microsoft.Win32;
-using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 
@@ -199,13 +197,11 @@ public sealed partial class SyncProfileViewModel : ObservableObject
         IsStale = status.Exists && SyncScheduler.IsStale(status.Action, Environment.ProcessPath ?? string.Empty);
     }
 
-    private static void Browse(Action<string> assign)
+    private void Browse(Action<string> assign)
     {
-        var dialog = new OpenFolderDialog { Title = "Выберите каталог" };
-
-        if (dialog.ShowDialog() == true)
+        if (_parent.FilePicker.PickFolder("Выберите каталог") is { } path)
         {
-            assign(dialog.FolderName);
+            assign(path);
         }
     }
 
@@ -342,19 +338,14 @@ public sealed partial class SyncProfileViewModel : ObservableObject
             return;
         }
 
-        try
+        if (_parent.Shell.Start(exe, AppInfo.SyncArgument, Id))
         {
-            var info = new ProcessStartInfo(exe) { UseShellExecute = false };
-            info.ArgumentList.Add(AppInfo.SyncArgument);
-            info.ArgumentList.Add(Id);
-            Process.Start(info);
-
             _parent.LogRunNow(DisplayName);
             Message = "Запущено в фоне – результат появится в истории.";
         }
-        catch (Exception exception)
+        else
         {
-            Message = $"Не удалось запустить: {exception.Message}";
+            Message = "Не удалось запустить";
         }
     }
 

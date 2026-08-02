@@ -11,7 +11,17 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
     [ObservableProperty]
     private string _summaryText = "Сравнение не выполнялось.";
 
-    public SyncViewModel(ISettingsStore settings, IDialogService dialogs, OperationPreferences operations, AgentPreferences agent, ILogger<SyncViewModel> logger, CompareDirectoriesUseCase compare, ExecuteSyncUseCase sync, ToastNotifier notifier, PerformanceMonitor performance)
+    public SyncViewModel(
+        ISettingsStore settings,
+        IDialogService dialogs,
+        OperationPreferences operations,
+        AgentPreferences agent,
+        ILogger<SyncViewModel> logger,
+        CompareDirectoriesUseCase compare,
+        ExecuteSyncUseCase sync,
+        ToastNotifier notifier,
+        PerformanceMonitor performance,
+        IFilePicker filePicker)
     {
         _settings = settings;
 
@@ -20,13 +30,13 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         Git = new(settings, logger);
 
-        Setup = new(settings, dialogs, operations, () => !IsBusy, message => Session.StatusCaption = message);
+        Setup = new(settings, dialogs, operations, filePicker, () => !IsBusy, message => Session.StatusCaption = message);
         Setup.ProfileSelected += ApplyProfile;
 
         Ledger = new(Git, () => new(Setup.DirectionIconKind, Setup.DirectionText(), Setup.CurrentMode == SyncMode.Bidirectional));
         Ledger.PropertyChanged += OnLedgerPropertyChanged;
 
-        Operations = new(settings, dialogs, logger, compare, sync, notifier, Setup, Session, Git, Ledger, summary => SummaryText = summary);
+        Operations = new(settings, dialogs, logger, compare, sync, notifier, filePicker, Setup, Session, Git, Ledger, summary => SummaryText = summary);
         Operations.ComparisonChanged += OnComparisonChanged;
         Operations.ProfileRunCompleted += RaiseProfileRun;
 

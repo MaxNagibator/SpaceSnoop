@@ -128,7 +128,7 @@ public static class GalleryDialogs
 
     private static BatchCreateProfilesDialogViewModel CreateBatch(IServiceProvider services, GalleryFixture fixture)
     {
-        return new(services.GetRequiredService<ISettingsStore>())
+        return new(services.GetRequiredService<ISettingsStore>(), services.GetRequiredService<IFilePicker>())
         {
             SourceParent = fixture.Left,
             DestParent = fixture.Right,

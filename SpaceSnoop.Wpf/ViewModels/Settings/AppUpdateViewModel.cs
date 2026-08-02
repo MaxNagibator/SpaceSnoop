@@ -1,6 +1,5 @@
 ﻿using KeepShell.Services;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Text.Json;
@@ -15,6 +14,7 @@ public sealed partial class AppUpdateViewModel : ObservableObject
     private readonly UpdatePreferences _preferences;
     private readonly ISettingsStore _settings;
     private readonly IDialogService _dialogs;
+    private readonly IShellLauncher _shell;
     private readonly ILogger<AppUpdateViewModel> _logger;
 
     private string? _latestTag;
@@ -63,11 +63,12 @@ public sealed partial class AppUpdateViewModel : ObservableObject
     [ObservableProperty]
     private bool _isChangelogLoading;
 
-    public AppUpdateViewModel(UpdatePreferences preferences, ISettingsStore settings, IDialogService dialogs, ILogger<AppUpdateViewModel> logger)
+    public AppUpdateViewModel(UpdatePreferences preferences, ISettingsStore settings, IDialogService dialogs, IShellLauncher shell, ILogger<AppUpdateViewModel> logger)
     {
         _preferences = preferences;
         _settings = settings;
         _dialogs = dialogs;
+        _shell = shell;
         _logger = logger;
 
         _preferences.PropertyChanged += OnPreferencesChanged;
@@ -490,7 +491,7 @@ public sealed partial class AppUpdateViewModel : ObservableObject
 
         if (_downloadedPath is not null && File.Exists(_downloadedPath))
         {
-            OpenFolder(_downloadedPath);
+            _shell.Reveal(_downloadedPath);
             return;
         }
 
@@ -510,7 +511,7 @@ public sealed partial class AppUpdateViewModel : ObservableObject
 
         if (_dialogs.Confirm("Доступно обновление", browse))
         {
-            OpenUrl(_releaseUrl ?? AppInfo.ReleasesUrl);
+            _shell.Open(_releaseUrl ?? AppInfo.ReleasesUrl);
         }
     }
 
@@ -583,7 +584,7 @@ public sealed partial class AppUpdateViewModel : ObservableObject
 
             if (announce && _dialogs.Confirm("Обновление скачано", $"Файл сохранён рядом с программой:{Environment.NewLine}{target}{Environment.NewLine}{Environment.NewLine}Открыть папку?"))
             {
-                OpenFolder(target);
+                _shell.Reveal(target);
             }
         }
         catch (Exception ex)
@@ -611,35 +612,6 @@ public sealed partial class AppUpdateViewModel : ObservableObject
 
         var notes = ReleaseNotes.Length <= 1200 ? ReleaseNotes : ReleaseNotes[..1200] + "…";
         return $"{Environment.NewLine}Изменения:{Environment.NewLine}{notes}{Environment.NewLine}";
-    }
-
-    private void OpenFolder(string filePath)
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = SystemExecutable.Explorer,
-                Arguments = $"/select,\"{filePath}\"",
-                UseShellExecute = true,
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.OpenExplorerFailed(ex, filePath);
-        }
-    }
-
-    private void OpenUrl(string url)
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-        }
-        catch (Exception ex)
-        {
-            _logger.OpenUrlFailed(ex, url);
-        }
     }
 }
 

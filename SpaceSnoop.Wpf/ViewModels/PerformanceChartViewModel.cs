@@ -1,12 +1,11 @@
-﻿using System.Windows.Threading;
-
-namespace SpaceSnoop.Wpf.ViewModels;
+﻿namespace SpaceSnoop.Wpf.ViewModels;
 
 public sealed partial class PerformanceChartViewModel : ObservableObject, ILogsPanel
 {
     private readonly PerformanceMonitor _monitor;
     private readonly ISettingsStore _settings;
-    private readonly DispatcherTimer _timer;
+    private readonly IApplicationLifetime _lifetime;
+    private readonly IUiTimer _timer;
 
     [ObservableProperty]
     private bool _isExpanded;
@@ -29,17 +28,13 @@ public sealed partial class PerformanceChartViewModel : ObservableObject, ILogsP
     [ObservableProperty]
     private double _chartHeight = AppDefaults.PerformanceChartPanelHeight;
 
-    public PerformanceChartViewModel(PerformanceMonitor monitor, ISettingsStore settings)
+    public PerformanceChartViewModel(PerformanceMonitor monitor, ISettingsStore settings, IUiDispatcher uiDispatcher, IApplicationLifetime lifetime)
     {
         _monitor = monitor;
         _settings = settings;
+        _lifetime = lifetime;
 
-        _timer = new(DispatcherPriority.Background, Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher)
-        {
-            Interval = TimeSpan.FromMilliseconds(AppDefaults.PerformanceChartRefreshMs),
-        };
-
-        _timer.Tick += OnTick;
+        _timer = uiDispatcher.CreateTimer(TimeSpan.FromMilliseconds(AppDefaults.PerformanceChartRefreshMs), OnTick);
 
         IsExpanded = _settings.GetBool(SettingsKeys.PerformanceChart, AppDefaults.PerformanceChartExpandedDefault);
     }
@@ -72,9 +67,9 @@ public sealed partial class PerformanceChartViewModel : ObservableObject, ILogsP
         _settings.SetBool(SettingsKeys.PerformanceChart, value);
     }
 
-    private void OnTick(object? sender, EventArgs e)
+    private void OnTick()
     {
-        if (Application.Current?.MainWindow?.WindowState == WindowState.Minimized)
+        if (_lifetime.IsMainWindowMinimized)
         {
             return;
         }

@@ -186,6 +186,6 @@ public class ScheduleBulkTests
 
     private static ScheduleViewModel Create(ISettingsStore settings)
     {
-        return new(settings, new NoopDialogs(), NullLogger<ScheduleViewModel>.Instance);
+        return new(settings, new NoopDialogs(), new FakeFilePicker(), new FakeShellLauncher(), NullLogger<ScheduleViewModel>.Instance);
     }
 }

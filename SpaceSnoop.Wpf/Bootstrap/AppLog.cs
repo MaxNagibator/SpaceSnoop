@@ -149,23 +149,11 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1260, Level = LogLevel.Warning, Message = "Журнал синхронизации «{Path}» не прочитан – история показана без него")]
     public static partial void SyncLogFileUnreadable(this ILogger logger, Exception exception, string path);
 
-    [LoggerMessage(EventId = 1300, Level = LogLevel.Warning, Message = "Не удалось положить лог-секцию в буфер обмена")]
-    public static partial void ClipboardLogSectionFailed(this ILogger logger, Exception exception);
-
     [LoggerMessage(EventId = 1301, Level = LogLevel.Error, Message = "Не удалось открыть форму репорта")]
     public static partial void ReportFormFailed(this ILogger logger, Exception exception);
 
-    [LoggerMessage(EventId = 1302, Level = LogLevel.Warning, Message = "Не удалось скопировать сведения об окружении в буфер обмена")]
-    public static partial void DiagnosticsCopyFailed(this ILogger logger, Exception exception);
-
-    [LoggerMessage(EventId = 1303, Level = LogLevel.Warning, Message = "Не удалось открыть ссылку {Url}")]
-    public static partial void OpenUrlFailed(this ILogger logger, Exception exception, string url);
-
-    [LoggerMessage(EventId = 1400, Level = LogLevel.Warning, Message = "Не удалось показать файл настроек {Path}")]
-    public static partial void ShowSettingsFileFailed(this ILogger logger, Exception exception, string path);
-
-    [LoggerMessage(EventId = 1401, Level = LogLevel.Warning, Message = "Не удалось скопировать путь к файлу настроек")]
-    public static partial void CopySettingsPathFailed(this ILogger logger, Exception exception);
+    [LoggerMessage(EventId = 1400, Level = LogLevel.Warning, Message = "Не удалось сохранить файл настроек {Path} перед показом в проводнике")]
+    public static partial void SettingsFlushFailed(this ILogger logger, Exception exception, string path);
 
     [LoggerMessage(EventId = 1402, Level = LogLevel.Information, Message = "Расположение данных изменено: {Path}")]
     public static partial void StorageLocationChanged(this ILogger logger, string path);
@@ -175,12 +163,6 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 1404, Level = LogLevel.Warning, Message = "После переноса данных в прежнем расположении осталось файлов: {Count} (заняты другим процессом)")]
     public static partial void StorageSourceFilesLeft(this ILogger logger, int count);
-
-    [LoggerMessage(EventId = 1500, Level = LogLevel.Warning, Message = "Не удалось открыть проводник для {Path}")]
-    public static partial void OpenExplorerFailed(this ILogger logger, Exception exception, string path);
-
-    [LoggerMessage(EventId = 1501, Level = LogLevel.Warning, Message = "Не удалось скопировать текст в буфер обмена")]
-    public static partial void ClipboardTextCopyFailed(this ILogger logger, Exception exception);
 
     [LoggerMessage(EventId = 1600, Level = LogLevel.Information, Message = "Docker: снимок получен, категорий – {Count}")]
     public static partial void DockerSnapshotLoaded(this ILogger logger, int count);
@@ -341,9 +323,6 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 2112, Level = LogLevel.Warning, Message = "Поиск CLI агента «{Backend}» сорвался")]
     public static partial void AgentCliDetectionFailed(this ILogger logger, Exception exception, string backend);
 
-    [LoggerMessage(EventId = 2113, Level = LogLevel.Warning, Message = "Не удалось скопировать сообщение чата в буфер обмена")]
-    public static partial void AgentMessageCopyFailed(this ILogger logger, Exception exception);
-
     [LoggerMessage(EventId = 2114, Level = LogLevel.Information, Message = "Каталог моделей «{Backend}» обновлён: {Count}")]
     public static partial void AgentModelsLoaded(this ILogger logger, string backend, int count);
 
@@ -373,9 +352,6 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 2123, Level = LogLevel.Warning, Message = "Транскрипт хода агента «{Path}» не пишется")]
     public static partial void AgentTranscriptFailed(this ILogger logger, Exception exception, string path);
-
-    [LoggerMessage(EventId = 2124, Level = LogLevel.Warning, Message = "Не удалось открыть транскрипт хода агента «{Path}»")]
-    public static partial void AgentTranscriptOpenFailed(this ILogger logger, Exception exception, string path);
 
     [LoggerMessage(EventId = 2125, Level = LogLevel.Information, Message = "Разговор откачен к вопросу: убрано сообщений {Count}, сессия CLI сброшена")]
     public static partial void ChatRewound(this ILogger logger, int count);
@@ -412,7 +388,4 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 2301, Level = LogLevel.Warning, Message = "Подписчик на замер производительности бросил исключение")]
     public static partial void PerformanceListenerFailed(this ILogger logger, Exception exception);
-
-    [LoggerMessage(EventId = 2302, Level = LogLevel.Warning, Message = "Сводку производительности не удалось положить в буфер обмена")]
-    public static partial void PerformanceSummaryCopyFailed(this ILogger logger, Exception exception);
 }
