@@ -245,7 +245,7 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
 
         await ReadGitStateAsync();
 
-        if (_result is not null && await _git.OfferToSkipAsync(_result, _setup.Exclusions) is { } exclusions)
+        if (_result is not null && await _git.OfferToSkipAsync(_result, () => _setup.Exclusions) is { } exclusions)
         {
             _setup.Exclusions = exclusions;
             await CompareAsync();

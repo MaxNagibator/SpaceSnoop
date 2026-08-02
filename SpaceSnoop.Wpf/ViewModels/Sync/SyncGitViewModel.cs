@@ -254,7 +254,7 @@ public sealed partial class SyncGitViewModel : ObservableObject
         NotifyChanged();
     }
 
-    internal async Task<string?> OfferToSkipAsync(ComparisonResult result, string exclusions)
+    internal async Task<string?> OfferToSkipAsync(ComparisonResult result, Func<string> exclusions)
     {
         if (_gitPromptDeclined)
         {
@@ -292,9 +292,10 @@ public sealed partial class SyncGitViewModel : ObservableObject
             }
         }
 
-        var updated = AddGitExclusion(exclusions);
+        var current = exclusions();
+        var updated = AddGitExclusion(current);
 
-        if (string.Equals(updated, exclusions, StringComparison.Ordinal))
+        if (string.Equals(updated, current, StringComparison.Ordinal))
         {
             return null;
         }
