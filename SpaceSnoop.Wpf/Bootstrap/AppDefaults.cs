@@ -96,8 +96,7 @@ public static class AppDefaults
     public const int PerformanceHitchMs = 500;
     public const int PerformanceHitchLogIntervalSeconds = 5;
     public const int PerformanceHitchRowsMax = 20;
-    public const int PerformanceRenderSamples = 60;
-    public const double PerformanceRenderSlowMs = 16;
+    public const double PerformanceFrameSlowMs = 50;
     public const bool PerformanceChartExpandedDefault = false;
     public const PerformanceChartWindow PerformanceChartWindowDefault = PerformanceChartWindow.Seconds300;
     public const int PerformanceChartRefreshMs = 1000;

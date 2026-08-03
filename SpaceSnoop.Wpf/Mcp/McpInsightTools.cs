@@ -81,10 +81,11 @@ internal sealed class McpInsightTools(
             snapshot.Gen1Collections,
             snapshot.Gen2Collections,
             Math.Round(snapshot.StartupSeconds, 2),
-            Math.Round(snapshot.RenderLastMs, 1),
-            Math.Round(snapshot.RenderPeakMs, 1),
-            Math.Round(snapshot.RenderAverageMs, 1),
-            snapshot.RenderCount,
+            Math.Round(snapshot.FrameLastMs, 1),
+            Math.Round(snapshot.FramePeakMs, 1),
+            Math.Round(snapshot.FrameAverageMs, 1),
+            snapshot.FrameCount,
+            snapshot.SlowFrameCount,
             McpFormat.DescribeOperation(snapshot.Operation),
             ReadHistory(historySeconds, historyPoints)));
     }

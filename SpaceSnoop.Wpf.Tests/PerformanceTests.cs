@@ -4,6 +4,7 @@ using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Converters;
 using SpaceSnoop.Wpf.Diagnostics;
 using SpaceSnoop.Wpf.ViewModels.Sync;
+using System.Diagnostics;
 using System.Globalization;
 
 namespace SpaceSnoop.Wpf.Tests;
@@ -301,22 +302,22 @@ public class PerformanceTests
     }
 
     [Test]
-    public void Сводка_разводит_отсутствие_кадров_и_нулевую_стоимость_отрисовки()
+    public void Сводка_разводит_неизмеренные_кадры_и_измеренные_без_просадок()
     {
         var noFrames = PerformanceSnapshot.Empty with { CapturedAtUtc = DateTime.UtcNow, SampleCount = 20 };
 
         var drawn = noFrames with
         {
-            RenderLastMs = 4.28,
-            RenderPeakMs = 21.5,
-            RenderAverageMs = 7,
-            RenderCount = 31,
+            FrameLastMs = 16.7,
+            FramePeakMs = 21.5,
+            FrameAverageMs = 17,
+            FrameCount = 31,
         };
 
         Assert.Multiple(() =>
         {
-            Assert.That(PerformanceReport.Build(noFrames, "2.8.42"), Does.Contain("Отрисовка карты диска: кадров не было"));
-            Assert.That(PerformanceReport.Build(drawn, "2.8.42"), Does.Contain("4,3 мс, пик 21,5 мс, среднее 7,0 мс за 31 кадр"));
+            Assert.That(PerformanceReport.Build(noFrames, "2.8.42"), Does.Contain("Кадры окна: не измерялись"));
+            Assert.That(PerformanceReport.Build(drawn, "2.8.42"), Does.Contain("Кадры окна: пик 21,5 мс, среднее 17,0 мс за 31 кадр, дольше 50 мс – 0"));
         });
     }
 
@@ -454,22 +455,31 @@ public class PerformanceTests
     }
 
     [Test]
-    public void Плитка_отрисовки_ведёт_самым_долгим_кадром()
+    public void Плитка_кадров_ведёт_пиком_и_отделяет_долгие_кадры_от_спокойных()
     {
-        var snapshot = PerformanceSnapshot.Empty with
+        var quiet = PerformanceSnapshot.Empty with
         {
-            RenderLastMs = 4.2,
-            RenderPeakMs = 31.7,
-            RenderAverageMs = 9.4,
-            RenderCount = 60,
+            FrameLastMs = 16.7,
+            FramePeakMs = 18.2,
+            FrameAverageMs = 16.7,
+            FrameCount = 620,
+        };
+
+        var slow = quiet with
+        {
+            FramePeakMs = 214.8,
+            FrameAverageMs = 17.2,
+            FrameCount = 420,
+            SlowFrameCount = 3,
         };
 
         Assert.Multiple(() =>
         {
-            Assert.That(PerformanceFormat.TileRender(snapshot), Is.EqualTo("31,7 мс"));
-            Assert.That(PerformanceFormat.TileRenderHint(snapshot), Is.EqualTo("последний 4,2 мс · среднее 9,4 мс · 60 кадров"));
-            Assert.That(PerformanceFormat.TileRender(PerformanceSnapshot.Empty), Is.EqualTo("кадров не было"));
-            Assert.That(PerformanceFormat.TileRenderHint(PerformanceSnapshot.Empty), Does.Contain("ни разу не рисовали"));
+            Assert.That(PerformanceFormat.TileFrame(slow), Is.EqualTo("214,8 мс"));
+            Assert.That(PerformanceFormat.TileFrameHint(slow), Is.EqualTo("3 долгих кадра из 420 · среднее 17,2 мс"));
+            Assert.That(PerformanceFormat.TileFrameHint(quiet), Is.EqualTo("дольше 50 мс не было · среднее 16,7 мс"));
+            Assert.That(PerformanceFormat.TileFrame(PerformanceSnapshot.Empty), Is.EqualTo("кадров ещё нет"));
+            Assert.That(PerformanceFormat.TileFrameHint(PerformanceSnapshot.Empty), Does.Contain("на этой странице"));
         });
     }
 
@@ -730,6 +740,46 @@ public class PerformanceTests
             Assert.That(named.Delay, Is.EqualTo("812 мс"));
             Assert.That(named.Operation, Is.EqualTo("Сравнение"));
             Assert.That(idle.Operation, Is.EqualTo("вне операций"));
+        });
+    }
+
+    [Test]
+    public void Кадры_считаются_по_промежуткам_а_первая_отметка_только_заводит_отсчёт()
+    {
+        var frames = new PerformanceFrames(50);
+        var start = Stopwatch.GetTimestamp();
+
+        frames.Mark(start);
+        frames.Mark(start + (Stopwatch.Frequency / 100));
+        frames.Mark(start + (Stopwatch.Frequency / 5));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(frames.Count, Is.EqualTo(2));
+            Assert.That(frames.SlowCount, Is.EqualTo(1));
+            Assert.That(frames.PeakMs, Is.EqualTo(190).Within(1));
+            Assert.That(frames.LastMs, Is.EqualTo(190).Within(1));
+            Assert.That(frames.AverageMs, Is.EqualTo(100).Within(1));
+        });
+    }
+
+    [Test]
+    public void Пауза_зонда_не_записывает_простой_как_один_гигантский_кадр()
+    {
+        var frames = new PerformanceFrames(50);
+        var start = Stopwatch.GetTimestamp();
+
+        frames.Mark(start);
+        frames.Mark(start + (Stopwatch.Frequency / 100));
+        frames.Pause();
+        frames.Mark(start + (Stopwatch.Frequency * 60));
+        frames.Mark(start + (Stopwatch.Frequency * 60) + (Stopwatch.Frequency / 100));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(frames.Count, Is.EqualTo(2));
+            Assert.That(frames.SlowCount, Is.Zero);
+            Assert.That(frames.PeakMs, Is.EqualTo(10).Within(1));
         });
     }
 }

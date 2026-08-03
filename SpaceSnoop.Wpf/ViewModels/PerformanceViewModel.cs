@@ -14,6 +14,8 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
 
     private bool _active;
 
+    private IDisposable? _frames;
+
     [ObservableProperty]
     private string _delayText = string.Empty;
 
@@ -45,13 +47,13 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
     private string _startupHint = string.Empty;
 
     [ObservableProperty]
-    private string _renderText = string.Empty;
+    private string _frameText = string.Empty;
 
     [ObservableProperty]
-    private string _renderHint = string.Empty;
+    private string _frameHint = string.Empty;
 
     [ObservableProperty]
-    private bool _isRenderSlow;
+    private bool _isFrameSlow;
 
     [ObservableProperty]
     private string _windowText = string.Empty;
@@ -128,10 +130,13 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
 
         if (!active)
         {
+            _frames?.Dispose();
+            _frames = null;
             return;
         }
 
         _monitor.Start();
+        _frames ??= _monitor.WatchFrames();
         Apply(_monitor.Snapshot);
     }
 
@@ -205,9 +210,9 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
         StartupText = PerformanceFormat.TileStartup(snapshot);
         StartupHint = PerformanceFormat.TileStartupHint(snapshot);
 
-        RenderText = PerformanceFormat.TileRender(snapshot);
-        RenderHint = PerformanceFormat.TileRenderHint(snapshot);
-        IsRenderSlow = snapshot.RenderPeakMs >= AppDefaults.PerformanceRenderSlowMs;
+        FrameText = PerformanceFormat.TileFrame(snapshot);
+        FrameHint = PerformanceFormat.TileFrameHint(snapshot);
+        IsFrameSlow = snapshot.SlowFrameCount > 0;
         WindowText = PerformanceFormat.TileWindow(snapshot);
         StaleText = PerformanceFormat.StaleWarning(snapshot, DateTime.UtcNow);
 

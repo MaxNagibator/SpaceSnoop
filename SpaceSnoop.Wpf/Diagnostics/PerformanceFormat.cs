@@ -91,16 +91,23 @@ public static class PerformanceFormat
             : $"пик и среднее – по {Plural.Format(snapshot.SampleCount, "замеру", "замерам", "замерам")} за {snapshot.ObservedSpanSeconds:N1} с";
     }
 
-    public static string TileRender(PerformanceSnapshot snapshot)
+    public static string TileFrame(PerformanceSnapshot snapshot)
     {
-        return snapshot.RenderCount == 0 ? "кадров не было" : $"{snapshot.RenderPeakMs:N1} мс";
+        return snapshot.FrameCount == 0 ? "кадров ещё нет" : $"{snapshot.FramePeakMs:N1} мс";
     }
 
-    public static string TileRenderHint(PerformanceSnapshot snapshot)
+    public static string TileFrameHint(PerformanceSnapshot snapshot)
     {
-        return snapshot.RenderCount == 0
-            ? "карту диска с начала сбора ни разу не рисовали"
-            : $"последний {snapshot.RenderLastMs:N1} мс · среднее {snapshot.RenderAverageMs:N1} мс · {Plural.Format(snapshot.RenderCount, "кадр", "кадра", "кадров")}";
+        if (snapshot.FrameCount == 0)
+        {
+            return "кадры считаем на этой странице и в операциях";
+        }
+
+        var average = $"среднее {snapshot.FrameAverageMs:N1} мс";
+
+        return snapshot.SlowFrameCount == 0
+            ? $"дольше {AppDefaults.PerformanceFrameSlowMs:N0} мс не было · {average}"
+            : $"{Plural.Format(snapshot.SlowFrameCount, "долгий кадр", "долгих кадра", "долгих кадров")} из {snapshot.FrameCount:N0} · {average}";
     }
 
     public static string TileStartup(PerformanceSnapshot snapshot)

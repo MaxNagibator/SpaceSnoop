@@ -201,15 +201,15 @@
 
                 <Border Style="{StaticResource Performance.Tile}">
                     <StackPanel>
-                        <TextBlock Text="Самая долгая отрисовка карты"
+                        <TextBlock Text="Самый долгий кадр окна"
                                    Style="{StaticResource Performance.TileCaption}" />
 
-                        <TextBlock Text="{Binding RenderText}">
+                        <TextBlock Text="{Binding FrameText}">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock"
                                        BasedOn="{StaticResource Performance.TileValue}">
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsRenderSlow}"
+                                        <DataTrigger Binding="{Binding IsFrameSlow}"
                                                      Value="True">
                                             <Setter Property="Foreground"
                                                     Value="{DynamicResource State.Warning}" />
@@ -219,10 +219,10 @@
                             </TextBlock.Style>
                         </TextBlock>
 
-                        <TextBlock Text="{Binding RenderHint}"
+                        <TextBlock Text="{Binding FrameHint}"
                                    Style="{StaticResource Performance.TileHint}" />
 
-                        <TextBlock Text="построение кадра на UI-потоке, без растеризации"
+                        <TextBlock Text="промежуток между кадрами всего окна"
                                    Style="{StaticResource Performance.TileHint}"
                                    Margin="0,2,0,0" />
                     </StackPanel>

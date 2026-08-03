@@ -34,14 +34,14 @@ public static class PerformanceReport
 
         text.AppendLine(CultureInfo.CurrentCulture, $"Старт приложения: {snapshot.StartupSeconds:N2} с");
 
-        if (snapshot.RenderCount == 0)
+        if (snapshot.FrameCount == 0)
         {
-            text.AppendLine("Отрисовка карты диска: кадров не было");
+            text.AppendLine("Кадры окна: не измерялись");
         }
         else
         {
             text.AppendLine(CultureInfo.CurrentCulture,
-                $"Отрисовка карты диска: {snapshot.RenderLastMs:N1} мс, пик {snapshot.RenderPeakMs:N1} мс, среднее {snapshot.RenderAverageMs:N1} мс за {Plural.Format(snapshot.RenderCount, "кадр", "кадра", "кадров")}");
+                $"Кадры окна: пик {snapshot.FramePeakMs:N1} мс, среднее {snapshot.FrameAverageMs:N1} мс за {Plural.Format(snapshot.FrameCount, "кадр", "кадра", "кадров")}, дольше {AppDefaults.PerformanceFrameSlowMs:N0} мс – {snapshot.SlowFrameCount}");
         }
 
         var tile = PerformanceFormat.TileOperation(snapshot.Operation, lastRun);

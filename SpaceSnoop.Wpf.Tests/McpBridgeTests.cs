@@ -124,16 +124,17 @@ public class McpBridgeTests
     }
 
     [Test]
-    public void Стоимость_отрисовки_выходит_в_JSON_отдельными_полями()
+    public void Кадры_окна_выходят_в_JSON_отдельными_полями()
     {
         var json = JsonDocument.Parse(McpFormat.Serialize(Performance(null))).RootElement;
 
         Assert.Multiple(() =>
         {
-            Assert.That(json.GetProperty("renderLastMs").GetDouble(), Is.EqualTo(4.3));
-            Assert.That(json.GetProperty("renderPeakMs").GetDouble(), Is.EqualTo(21.5));
-            Assert.That(json.GetProperty("renderAverageMs").GetDouble(), Is.EqualTo(7));
-            Assert.That(json.GetProperty("renderCount").GetInt32(), Is.EqualTo(31));
+            Assert.That(json.GetProperty("frameLastMs").GetDouble(), Is.EqualTo(4.3));
+            Assert.That(json.GetProperty("framePeakMs").GetDouble(), Is.EqualTo(21.5));
+            Assert.That(json.GetProperty("frameAverageMs").GetDouble(), Is.EqualTo(7));
+            Assert.That(json.GetProperty("frameCount").GetInt32(), Is.EqualTo(31));
+            Assert.That(json.GetProperty("slowFrameCount").GetInt32(), Is.EqualTo(2));
         });
     }
 
@@ -324,6 +325,7 @@ public class McpBridgeTests
             21.5,
             7,
             31,
+            2,
             null,
             history);
     }

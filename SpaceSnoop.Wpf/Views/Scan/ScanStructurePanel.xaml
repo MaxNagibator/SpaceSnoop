@@ -755,7 +755,6 @@
                         <controls:TreemapView x:Name="Treemap"
                                               ItemsSource="{Binding TreemapTiles}"
                                               Intensity="{Binding DataContext.Intensity, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                              Performance="{Binding DataContext.Performance, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                               SelectedItem="{Binding DataContext.SelectedNode, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
                                               DrillCommand="{Binding DrillIntoCommand}"
                                               NodeContextMenu="{StaticResource ScanNodeMenu}"

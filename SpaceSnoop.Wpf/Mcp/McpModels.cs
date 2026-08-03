@@ -44,10 +44,11 @@ internal sealed record McpPerformance(
     int Gen1CollectionsTotal,
     int Gen2CollectionsTotal,
     double StartupSeconds,
-    double RenderLastMs,
-    double RenderPeakMs,
-    double RenderAverageMs,
-    int RenderCount,
+    double FrameLastMs,
+    double FramePeakMs,
+    double FrameAverageMs,
+    int FrameCount,
+    int SlowFrameCount,
     McpPerformanceOperation? Operation,
     McpPerformanceHistory? History);
 

@@ -3,7 +3,6 @@ using SpaceSnoop.Wpf.Converters;
 using System.Collections;
 using System.Collections.Specialized;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Globalization;
 using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
@@ -46,9 +45,6 @@ public sealed class TreemapView : FrameworkElement
 
     public static readonly DependencyProperty DrillCommandProperty =
         DependencyProperty.Register(nameof(DrillCommand), typeof(ICommand), typeof(TreemapView));
-
-    public static readonly DependencyProperty PerformanceProperty =
-        DependencyProperty.Register(nameof(Performance), typeof(PerformanceMonitor), typeof(TreemapView));
 
     public static readonly DependencyProperty NodeContextMenuProperty =
         DependencyProperty.Register(nameof(NodeContextMenu), typeof(ContextMenu), typeof(TreemapView));
@@ -115,12 +111,6 @@ public sealed class TreemapView : FrameworkElement
         set => SetValue(DrillCommandProperty, value);
     }
 
-    public PerformanceMonitor? Performance
-    {
-        get => ReadDependencyValue<PerformanceMonitor>(PerformanceProperty);
-        set => SetValue(PerformanceProperty, value);
-    }
-
     public ContextMenu? NodeContextMenu
     {
         get => (ContextMenu?)GetValue(NodeContextMenuProperty);
@@ -165,7 +155,6 @@ public sealed class TreemapView : FrameworkElement
 
     protected override void OnRender(DrawingContext drawingContext)
     {
-        var startedAt = Stopwatch.GetTimestamp();
         var width = ActualWidth;
         var height = ActualHeight;
 
@@ -199,8 +188,6 @@ public sealed class TreemapView : FrameworkElement
         }
 
         _tiles = tiles;
-
-        Performance?.ReportRender(Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
     }
 
     private void DrawTile(DrawingContext context, ScanNodeViewModel node, Rect tile, TileStyle style)

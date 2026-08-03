@@ -15,11 +15,12 @@ public sealed record PerformanceSnapshot(
     int Gen2Collections,
     PerformanceHistoryStats History,
     double StartupSeconds,
-    double RenderLastMs,
-    double RenderPeakMs,
-    double RenderAverageMs,
-    int RenderCount,
+    double FrameLastMs,
+    double FramePeakMs,
+    double FrameAverageMs,
+    int FrameCount,
+    int SlowFrameCount,
     PerformanceOperation? Operation)
 {
-    public static PerformanceSnapshot Empty { get; } = new(DateTime.MinValue, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, default, 0, 0, 0, 0, 0, null);
+    public static PerformanceSnapshot Empty { get; } = new(DateTime.MinValue, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, default, 0, 0, 0, 0, 0, 0, null);
 }

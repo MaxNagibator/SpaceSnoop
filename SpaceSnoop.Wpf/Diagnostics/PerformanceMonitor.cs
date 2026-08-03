@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace SpaceSnoop.Wpf.Diagnostics;
@@ -9,7 +10,7 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
 
     private readonly PerformanceSamples _delays = new(AppDefaults.PerformanceWindowSamples);
 
-    private readonly PerformanceSamples _renders = new(AppDefaults.PerformanceRenderSamples);
+    private readonly PerformanceFrames _frames = new(AppDefaults.PerformanceFrameSlowMs);
 
     private readonly PerformanceHistoryBuffer _history = new(AppDefaults.PerformanceHistorySamples);
 
@@ -23,7 +24,9 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
 
     private long _lastHitchLog;
 
-    private int _renderCount;
+    private int _frameLeases;
+
+    private bool _frameHooked;
 
     private long _workingSetPeak;
 
@@ -54,6 +57,8 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
 
         _timer ??= CreateTimer();
         _timer.Start();
+
+        SyncFrameProbe();
     }
 
     public void Reset()
@@ -86,8 +91,7 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
         {
             _delays.Clear();
             _history.Clear();
-            _renders.Clear();
-            _renderCount = 0;
+            _frames.Clear();
             _workingSetPeak = 0;
 
             _lastTick = Stopwatch.GetTimestamp();
@@ -109,6 +113,8 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
 
         Volatile.Write(ref _operation, null);
         Volatile.Write(ref _snapshot, PerformanceSnapshot.Empty with { StartupSeconds = _startup.TotalSeconds });
+
+        SyncFrameProbe();
     }
 
     public void ReportStartup(TimeSpan elapsed)
@@ -119,20 +125,15 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
     public void ReportOperation(PerformanceOperation? operation)
     {
         Volatile.Write(ref _operation, operation);
+        SyncFrameProbe();
     }
 
-    public void ReportRender(double milliseconds)
+    public IDisposable WatchFrames()
     {
-        if (!_running || _disposed)
-        {
-            return;
-        }
+        Interlocked.Increment(ref _frameLeases);
+        SyncFrameProbe();
 
-        lock (_lock)
-        {
-            _renders.Add(milliseconds);
-            _renderCount++;
-        }
+        return new FrameLease(this);
     }
 
     public PerformanceHistory CaptureHistory(TimeSpan since, int maxPoints)
@@ -157,6 +158,8 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
         _running = false;
         Updated = null;
 
+        SyncFrameProbe();
+
         if (_timer is null)
         {
             return;
@@ -165,6 +168,57 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
         _timer.Stop();
         _timer.Tick -= OnTick;
         _timer = null;
+    }
+
+    private void ReleaseFrames()
+    {
+        Interlocked.Decrement(ref _frameLeases);
+        SyncFrameProbe();
+    }
+
+    private void SyncFrameProbe()
+    {
+        var dispatcher = Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
+
+        if (!dispatcher.CheckAccess())
+        {
+            dispatcher.BeginInvoke(SyncFrameProbe);
+            return;
+        }
+
+        var wanted = _running
+            && !_disposed
+            && (Volatile.Read(ref _frameLeases) > 0 || Volatile.Read(ref _operation) is not null);
+
+        if (wanted == _frameHooked)
+        {
+            return;
+        }
+
+        _frameHooked = wanted;
+
+        if (wanted)
+        {
+            CompositionTarget.Rendering += OnFrame;
+            return;
+        }
+
+        CompositionTarget.Rendering -= OnFrame;
+
+        lock (_lock)
+        {
+            _frames.Pause();
+        }
+    }
+
+    private void OnFrame(object? sender, EventArgs e)
+    {
+        var now = Stopwatch.GetTimestamp();
+
+        lock (_lock)
+        {
+            _frames.Mark(now);
+        }
     }
 
     private DispatcherTimer CreateTimer()
@@ -242,10 +296,11 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
             sample.Gen2Collections,
             _history.Stats(),
             _startup.TotalSeconds,
-            _renders.Last,
-            _renders.Peak(),
-            _renders.Average(),
-            _renderCount,
+            _frames.LastMs,
+            _frames.PeakMs,
+            _frames.AverageMs,
+            _frames.Count,
+            _frames.SlowCount,
             operation));
     }
 
@@ -263,5 +318,15 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
 
         _lastHitchLog = now;
         logger.PerformanceHitch((long)delay, operation?.Name ?? "нет операции");
+    }
+
+    private sealed class FrameLease(PerformanceMonitor monitor) : IDisposable
+    {
+        private PerformanceMonitor? _monitor = monitor;
+
+        public void Dispose()
+        {
+            Interlocked.Exchange(ref _monitor, null)?.ReleaseFrames();
+        }
     }
 }
