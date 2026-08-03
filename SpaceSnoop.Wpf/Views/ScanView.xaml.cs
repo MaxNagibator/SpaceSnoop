@@ -52,6 +52,14 @@ public partial class ScanView : UserControl, IView<ScanViewModel>
         }
     }
 
+    private void OnContentAreaSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (e.WidthChanged)
+        {
+            ApplyInspectorLayout();
+        }
+    }
+
     private void OnInspectorSplitterDragCompleted(object sender, DragCompletedEventArgs e)
     {
         var inspector = _vm?.Inspector;
@@ -103,7 +111,14 @@ public partial class ScanView : UserControl, IView<ScanViewModel>
         else
         {
             InspectorColumn.SetCurrentValue(ColumnDefinition.MinWidthProperty, MinPanelWidth);
-            InspectorColumn.SetCurrentValue(ColumnDefinition.WidthProperty, new GridLength(_vm.Inspector.InspectorWidth));
+            InspectorColumn.SetCurrentValue(ColumnDefinition.WidthProperty, new GridLength(Math.Min(_vm.Inspector.InspectorWidth, AvailableInspectorWidth())));
         }
+    }
+
+    private double AvailableInspectorWidth()
+    {
+        var free = ContentArea.ActualWidth - StructureColumn.MinWidth - SplitterColumn.ActualWidth;
+
+        return free > MinPanelWidth ? free : MinPanelWidth;
     }
 }

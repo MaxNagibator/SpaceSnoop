@@ -253,6 +253,9 @@
                     <TextBlock Text="Ничего не выбрано"
                                Style="{StaticResource TextBlock.Heading}"
                                HorizontalAlignment="Center"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"
+                               MaxWidth="300"
                                Margin="0,12,0,0" />
                     <TextBlock Text="Кликните узел дерева – здесь появятся путь, размеры, доли и крупнейшие вложения."
                                Style="{StaticResource TextBlock.Subtle}"

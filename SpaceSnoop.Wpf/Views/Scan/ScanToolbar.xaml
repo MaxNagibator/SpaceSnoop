@@ -12,38 +12,40 @@
             Padding="14,10">
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Column="0"
-                        Orientation="Horizontal"
-                        VerticalAlignment="Center">
-                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.HardDrive}"
-                                          Width="16"
-                                          Height="16"
-                                          VerticalAlignment="Center"
-                                          Margin="2,0,10,0"
-                                          Foreground="{DynamicResource Fg.Secondary}" />
-                <ComboBox ItemsSource="{Binding Drives.Items}"
-                          SelectedValue="{Binding SelectedDrive}"
-                          SelectedValuePath="Path"
-                          Style="{StaticResource ComboBox.Toolbar}"
-                          MinWidth="230"
-                          Margin="0,0,8,0"
-                          ToolTip="Диск или каталог для анализа">
-                    <ComboBox.ItemTemplate>
-                        <DataTemplate DataType="{x:Type vm:DriveItem}">
-                            <TextBlock Text="{Binding Label}"
-                                       TextTrimming="CharacterEllipsis" />
-                        </DataTemplate>
-                    </ComboBox.ItemTemplate>
-                </ComboBox>
+            <WrapPanel Grid.Column="0"
+                       VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="0,2,14,2">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.HardDrive}"
+                                              Width="16"
+                                              Height="16"
+                                              VerticalAlignment="Center"
+                                              Margin="2,0,10,0"
+                                              Foreground="{DynamicResource Fg.Secondary}" />
+                    <ComboBox ItemsSource="{Binding Drives.Items}"
+                              SelectedValue="{Binding SelectedDrive}"
+                              SelectedValuePath="Path"
+                              Style="{StaticResource ComboBox.Toolbar}"
+                              MinWidth="180"
+                              MaxWidth="340"
+                              ToolTip="Диск или каталог для анализа">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:DriveItem}">
+                                <TextBlock Text="{Binding Label}"
+                                           TextTrimming="CharacterEllipsis" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </StackPanel>
 
                 <Button Style="{StaticResource Button.Secondary}"
                         Command="{Binding BrowseCommand}"
-                        Margin="0,0,14,0"
+                        Margin="0,2,14,2"
                         ToolTip="Выбрать каталог">
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderOpen}"
@@ -57,7 +59,7 @@
 
                 <Button Style="{StaticResource Button.Primary}"
                         Command="{Binding StartCommand}"
-                        Margin="0,0,6,0">
+                        Margin="0,2,6,2">
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Play}"
                                                   Width="15"
@@ -70,6 +72,7 @@
 
                 <Button Style="{StaticResource Button.Ghost}"
                         Command="{Binding StopCommand}"
+                        Margin="0,2,0,2"
                         ToolTip="Остановить сканирование (ESC)">
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Square}"
@@ -80,11 +83,12 @@
                         <TextBlock Text="Стоп" />
                     </StackPanel>
                 </Button>
-            </StackPanel>
+            </WrapPanel>
 
-            <StackPanel Grid.Column="2"
+            <StackPanel Grid.Column="1"
                         Orientation="Horizontal"
-                        VerticalAlignment="Center">
+                        VerticalAlignment="Center"
+                        Margin="10,0,0,0">
                 <Button Style="{StaticResource Button.Destructive}"
                         Command="{Binding Marks.DeleteMarkedCommand}"
                         ToolTip="Переместить помеченные элементы в корзину (пометка – ПКМ по узлу)">

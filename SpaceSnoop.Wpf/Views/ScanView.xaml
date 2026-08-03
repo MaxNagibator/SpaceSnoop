@@ -52,11 +52,15 @@
         <controls:ScanSummaryStrip Grid.Row="3"
                                    DataContext="{Binding Summary}" />
 
-        <Grid Grid.Row="4">
+        <Grid Grid.Row="4"
+              x:Name="ContentArea"
+              SizeChanged="OnContentAreaSizeChanged">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"
-                                  MinWidth="340" />
-                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition x:Name="StructureColumn"
+                                  Width="*"
+                                  MinWidth="260" />
+                <ColumnDefinition x:Name="SplitterColumn"
+                                  Width="Auto" />
                 <ColumnDefinition x:Name="InspectorColumn"
                                   Width="380"
                                   MinWidth="280" />
