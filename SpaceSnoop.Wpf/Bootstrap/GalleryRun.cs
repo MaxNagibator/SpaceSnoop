@@ -16,6 +16,7 @@ internal sealed record GalleryIndex(
     int Width,
     int Height,
     double Scale,
+    double FontScale,
     IReadOnlyList<string> Unknown,
     IReadOnlyList<GalleryFrame> Frames);
 
@@ -299,7 +300,15 @@ public static class GalleryRun
 
     private static void WriteIndex(GalleryOptions options, IReadOnlyList<GalleryFrame> frames)
     {
-        var index = new GalleryIndex(AppInfo.Name, AppInfo.Version, options.Width, options.Height, options.Scale, options.Unknown, frames);
+        var index = new GalleryIndex(
+            AppInfo.Name,
+            AppInfo.Version,
+            options.Width,
+            options.Height,
+            options.Scale,
+            options.FontScale,
+            options.Unknown,
+            frames);
         File.WriteAllText(Path.Combine(options.Directory, IndexFileName), JsonSerializer.Serialize(index, JsonOptions));
     }
 }

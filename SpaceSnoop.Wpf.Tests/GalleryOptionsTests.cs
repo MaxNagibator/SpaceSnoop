@@ -1,4 +1,5 @@
-﻿using SpaceSnoop.Wpf.Bootstrap;
+﻿using KeepShell.Bootstrap;
+using SpaceSnoop.Wpf.Bootstrap;
 
 namespace SpaceSnoop.Wpf.Tests;
 
@@ -146,6 +147,15 @@ public class GalleryOptionsTests
     public void Масштаб_кадра_разбирается_и_зажимается(string value, double scale)
     {
         Assert.That(GalleryOptions.Parse(["--scale", value], Default).Scale, Is.EqualTo(scale));
+    }
+
+    [TestCase("1.6", 1.6)]
+    [TestCase("0.1", FontScaleManager.MinScale)]
+    [TestCase("10", FontScaleManager.MaxScale)]
+    [TestCase("мусор", FontScaleManager.DefaultScale)]
+    public void Масштаб_шрифта_разбирается_и_зажимается(string value, double fontScale)
+    {
+        Assert.That(GalleryOptions.Parse(["--font-scale", value], Default).FontScale, Is.EqualTo(fontScale));
     }
 
     [Test]

@@ -244,6 +244,7 @@ public partial class App : Application
 
                 AppThemes.Register();
                 ThemeManager.Apply(AppThemes.LightKey);
+                FontScaleManager.Initialize(options.FontScale);
                 ViewLocator.InstallIntoApplication();
 
                 _services = ConfigureServices(settings, _logging!);

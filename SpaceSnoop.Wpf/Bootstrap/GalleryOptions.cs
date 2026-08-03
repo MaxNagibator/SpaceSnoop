@@ -9,6 +9,7 @@ public sealed record GalleryOptions(
     int Width,
     int Height,
     double Scale,
+    double FontScale,
     string Element,
     IReadOnlyList<string> Unknown)
 {
@@ -26,6 +27,7 @@ public sealed record GalleryOptions(
         var width = AppDefaults.GalleryWidthDefault;
         var height = AppDefaults.GalleryHeightDefault;
         var scale = AppDefaults.ViewCaptureScaleDefault;
+        var fontScale = FontScaleManager.DefaultScale;
         var element = string.Empty;
         var unknown = new List<string>();
 
@@ -84,6 +86,12 @@ public sealed record GalleryOptions(
                     positional = false;
                     break;
 
+                case "--font-scale":
+                    fontScale = ParseFontScale(value, fontScale);
+                    index++;
+                    positional = false;
+                    break;
+
                 default:
                     if (positional && key.Length > 0 && !key.StartsWith('-'))
                     {
@@ -99,7 +107,7 @@ public sealed record GalleryOptions(
             }
         }
 
-        return new(directory, pages, dialogs, tips, themes, width, height, scale, element, unknown);
+        return new(directory, pages, dialogs, tips, themes, width, height, scale, fontScale, element, unknown);
     }
 
     private static double ParseScale(string value, double scale)
@@ -107,6 +115,13 @@ public sealed record GalleryOptions(
         return double.TryParse(value, System.Globalization.CultureInfo.InvariantCulture, out var parsed)
             ? Math.Clamp(parsed, AppDefaults.ViewCaptureScaleMin, AppDefaults.ViewCaptureScaleMax)
             : scale;
+    }
+
+    private static double ParseFontScale(string value, double fontScale)
+    {
+        return double.TryParse(value, System.Globalization.CultureInfo.InvariantCulture, out var parsed)
+            ? FontScaleManager.Clamp(parsed)
+            : fontScale;
     }
 
     private static IReadOnlyList<string> ParsePages(string value, List<string> unknown)
