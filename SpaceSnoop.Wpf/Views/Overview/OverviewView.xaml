@@ -112,16 +112,18 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" MaxWidth="240" />
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Row="0"
                                 Grid.Column="0"
-                                VerticalAlignment="Center">
+                                VerticalAlignment="Center"
+                                Margin="0,0,12,0">
                         <TextBlock Text="Сравнение всех профилей"
                                    FontWeight="{DynamicResource Font.Weight.SemiBold}"
                                    FontSize="{DynamicResource Font.Size.L}"
+                                   TextWrapping="Wrap"
                                    Foreground="{DynamicResource Fg.Primary}" />
                         <TextBlock Text="{Binding StatusCaption}"
                                    Style="{StaticResource TextBlock.Subtle}"
@@ -129,15 +131,15 @@
                                    Margin="0,4,0,0" />
                     </StackPanel>
 
-                    <StackPanel Grid.Row="0"
-                                Grid.Column="1"
-                                Orientation="Horizontal"
-                                VerticalAlignment="Center">
+                    <WrapPanel Grid.Row="0"
+                               Grid.Column="1"
+                               HorizontalAlignment="Right"
+                               VerticalAlignment="Center">
                         <Button Style="{StaticResource Button.Ghost}"
                                 Command="{Binding Batch.SkipCurrentCommand}"
                                 MinHeight="{DynamicResource Control.Height.Default}"
                                 Padding="14,6"
-                                Margin="0,0,8,0"
+                                Margin="0,2,8,2"
                                 ToolTip="Пропустить текущий профиль и перейти к следующему"
                                 Visibility="{Binding Batch.IsBatchRunning, Converter={StaticResource BoolToVisibility}}">
                             <StackPanel Orientation="Horizontal">
@@ -154,13 +156,13 @@
                                 Content="Отмена"
                                 MinHeight="{DynamicResource Control.Height.Default}"
                                 Padding="14,6"
-                                Margin="0,0,8,0"
+                                Margin="0,2,8,2"
                                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
                         <Button Style="{StaticResource Button.Ghost}"
                                 Command="{Binding CycleAllDirectionsCommand}"
                                 MinHeight="{DynamicResource Control.Height.Default}"
                                 Padding="14,6"
-                                Margin="0,0,8,0"
+                                Margin="0,2,8,2"
                                 ToolTip="Сменить направление синхронизации у всех профилей"
                                 AutomationProperties.Name="Сменить направление всем">
                             <StackPanel Orientation="Horizontal">
@@ -176,7 +178,7 @@
                                 Command="{Binding Batch.CompareAllCommand}"
                                 MinHeight="{DynamicResource Control.Height.Default}"
                                 Padding="14,6"
-                                Margin="0,0,8,0">
+                                Margin="0,2,8,2">
                             <StackPanel Orientation="Horizontal">
                                 <iconPacks:PackIconLucide
                                     Kind="{x:Static iconPacks:PackIconLucideKind.GitCompareArrows}"
@@ -191,6 +193,7 @@
                                 Command="{Binding Batch.SyncAllCommand}"
                                 MinHeight="{DynamicResource Control.Height.Default}"
                                 Padding="14,6"
+                                Margin="0,2,0,2"
                                 ToolTip="Синхронизировать все профили (удаления – в корзину)">
                             <StackPanel Orientation="Horizontal">
                                 <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderSync}"
@@ -201,7 +204,7 @@
                                 <TextBlock Text="Синхронизировать всё" />
                             </StackPanel>
                         </Button>
-                    </StackPanel>
+                    </WrapPanel>
 
                     <ProgressBar Grid.Row="1"
                                  Grid.Column="0"
