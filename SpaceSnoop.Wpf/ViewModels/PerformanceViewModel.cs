@@ -72,6 +72,12 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
     private string _operationRate = string.Empty;
 
     [ObservableProperty]
+    private string? _operationTraversal;
+
+    [ObservableProperty]
+    private string? _operationTraversalDetail;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasHitches))]
     private ImmutableArray<PerformanceHitchText> _hitches = [];
 
@@ -220,5 +226,7 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
         OperationText = tile.Value;
         OperationVolume = tile.Volume;
         OperationRate = tile.Rate;
+        OperationTraversal = tile.Traversal;
+        OperationTraversalDetail = tile.TraversalDetail;
     }
 }

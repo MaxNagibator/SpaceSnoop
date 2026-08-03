@@ -96,7 +96,12 @@ public static class PerformanceFormat
     {
         if (current is { } running)
         {
-            return new($"Сейчас идёт: {running.Name}", Elapsed(running.Elapsed), Volume(running), RunningRate(running));
+            return new($"Сейчас идёт: {running.Name}",
+                Elapsed(running.Elapsed),
+                Volume(running),
+                RunningRate(running),
+                Traversal(running),
+                TraversalDetail(running));
         }
 
         if (last is { } finished)
@@ -104,7 +109,9 @@ public static class PerformanceFormat
             return new($"Последний прогон: {finished.Name}",
                 Elapsed(finished.Elapsed),
                 Volume(finished),
-                Rate(finished) ?? "скорость: прогон слишком короткий");
+                Rate(finished) ?? "скорость: прогон слишком короткий",
+                Traversal(finished),
+                TraversalDetail(finished));
         }
 
         return new("Последний прогон",
@@ -261,6 +268,37 @@ public static class PerformanceFormat
         return parts.Count > 0 ? string.Join(" · ", parts) : null;
     }
 
+    public static string? Traversal(PerformanceOperation? operation)
+    {
+        if (operation?.Traversal is not { } traversal)
+        {
+            return null;
+        }
+
+        var parts = new List<string>(2) { $"обход: {Directories(traversal.Directories)}" };
+
+        if (operation.DirectoriesPerSecond is { } rate)
+        {
+            parts.Add($"{rate:N0} {Plural.Word((long)rate, "каталог", "каталога", "каталогов")}/с");
+        }
+
+        return string.Join(" · ", parts);
+    }
+
+    public static string? TraversalDetail(PerformanceOperation? operation)
+    {
+        if (operation?.Traversal is not { } traversal)
+        {
+            return null;
+        }
+
+        var threads = Plural.Format(traversal.Parallelism, "поток", "потока", "потоков");
+
+        return traversal.FailedDirectories > 0
+            ? $"{threads} · {Directories(traversal.FailedDirectories)} без доступа"
+            : $"{threads} · пропусков нет";
+    }
+
     public static string? Remaining(PerformanceOperation? operation)
     {
         return operation?.Remaining() is { } remaining ? $"≈ {Duration(remaining)}" : null;
@@ -283,6 +321,11 @@ public static class PerformanceFormat
         return value.TotalHours >= 1
             ? $"{(int)value.TotalHours}:{value.Minutes:00}:{value.Seconds:00}"
             : $"{value.Minutes}:{value.Seconds:00}";
+    }
+
+    private static string Directories(long count)
+    {
+        return $"{count:N0} {Plural.Word(count, "каталог", "каталога", "каталогов")}";
     }
 
     private static string Volume(PerformanceOperation operation)

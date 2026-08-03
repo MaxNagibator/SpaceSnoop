@@ -570,6 +570,41 @@ public class PerformanceTests
     }
 
     [Test]
+    public void Плитка_операции_показывает_обход_только_у_сканирования()
+    {
+        var scan = new PerformanceOperation("Сканирование", 900, 1000, TimeSpan.FromSeconds(4), Traversal: new(120, 3, 8));
+        var sync = new PerformanceOperation("Синхронизация", 900, 1000, TimeSpan.FromSeconds(4));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(PerformanceFormat.TileOperation(null, scan).Traversal, Is.EqualTo("обход: 120 каталогов · 30 каталогов/с"));
+            Assert.That(PerformanceFormat.TileOperation(null, scan).TraversalDetail, Is.EqualTo("8 потоков · 3 каталога без доступа"));
+            Assert.That(PerformanceFormat.TileOperation(null, sync).Traversal, Is.Null);
+            Assert.That(PerformanceFormat.TileOperation(null, sync).TraversalDetail, Is.Null);
+        });
+    }
+
+    [Test]
+    public void Обход_без_пропусков_говорит_об_этом_прямо()
+    {
+        var scan = new PerformanceOperation("Сканирование", 900, 1000, TimeSpan.FromSeconds(4), Traversal: new(120, 0, 1));
+
+        Assert.That(PerformanceFormat.TraversalDetail(scan), Is.EqualTo("1 поток · пропусков нет"));
+    }
+
+    [Test]
+    public void Слишком_короткий_прогон_не_выдаёт_скорость_обхода_за_измеренную()
+    {
+        var scan = new PerformanceOperation("Сканирование", 900, 1000, TimeSpan.FromMilliseconds(50), Traversal: new(120, 0, 4));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(scan.DirectoriesPerSecond, Is.Null);
+            Assert.That(PerformanceFormat.Traversal(scan), Is.EqualTo("обход: 120 каталогов"));
+        });
+    }
+
+    [Test]
     public void До_первого_прогона_плитка_операции_не_выдаёт_нули_за_замеры()
     {
         var tile = PerformanceFormat.TileOperation(null, null);

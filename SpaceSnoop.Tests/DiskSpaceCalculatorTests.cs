@@ -1,4 +1,5 @@
 ﻿using SpaceSnoop.Core;
+using SpaceSnoop.Core.Domain;
 
 namespace SpaceSnoop.Tests;
 
@@ -119,6 +120,25 @@ public class DiskSpaceCalculatorTests
             Assert.That(snapshot.DirectoriesScanned, Is.EqualTo(3));
             Assert.That(snapshot.TopLevelTotal, Is.EqualTo(2));
             Assert.That(snapshot.TopLevelCompleted, Is.EqualTo(2));
+        }
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void Calculate_CountsDirectoryItCouldNotRead(bool multithreaded)
+    {
+        var calculator = new DiskSpaceCalculator();
+        var progress = new ScanProgress();
+        var missing = new DirectoryInfo(Path.Combine(_tempDir, "vanished"));
+
+        var result = multithreaded
+            ? calculator.CalculateMultithreaded(missing, 4, progress, CancellationToken.None)
+            : calculator.Calculate(missing, progress, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.State, Is.EqualTo(SpaceState.Error));
+            Assert.That(progress.CreateSnapshot().DirectoriesFailed, Is.EqualTo(1));
         }
     }
 

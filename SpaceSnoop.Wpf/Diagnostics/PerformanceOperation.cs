@@ -7,11 +7,14 @@ public sealed record PerformanceOperation(
     TimeSpan Elapsed,
     long? TotalItems = null,
     long? TotalBytes = null,
-    EtaBasis Basis = EtaBasis.None)
+    EtaBasis Basis = EtaBasis.None,
+    PerformanceTraversal? Traversal = null)
 {
     public double? ItemsPerSecond => Rate(Items);
 
     public double? BytesPerSecond => Rate(Bytes);
+
+    public double? DirectoriesPerSecond => Traversal is { } traversal ? Rate(traversal.Directories) : null;
 
     public TimeSpan? Remaining()
     {

@@ -14,6 +14,7 @@ public sealed partial class ScanProgressViewModel : ObservableObject
     private Stopwatch? _scanStopwatch;
     private double? _progressFraction;
     private long? _estimatedTotalBytes;
+    private int _parallelism = 1;
 
     [ObservableProperty]
     private bool _isScanning;
@@ -61,6 +62,8 @@ public sealed partial class ScanProgressViewModel : ObservableObject
         _progressTimer = uiDispatcher.CreateTimer(ProgressPollInterval, OnProgressTick);
     }
 
+    public PerformanceTraversal? Traversal { get; private set; }
+
     public bool IsIndeterminate => !_progressFraction.HasValue;
 
     public double ProgressValue => _progressFraction ?? 0;
@@ -95,11 +98,13 @@ public sealed partial class ScanProgressViewModel : ObservableObject
         }
     }
 
-    internal ScanProgress Begin(DirectoryInfo directory, string path)
+    internal ScanProgress Begin(DirectoryInfo directory, string path, int parallelism)
     {
         _estimatedTotalBytes = EstimateTotalBytes(directory);
+        _parallelism = Math.Max(1, parallelism);
         _progress = new();
         _scanStopwatch = Stopwatch.StartNew();
+        Traversal = null;
 
         ResetLiveProgress(path);
         _progressTimer.Start();
@@ -113,6 +118,11 @@ public sealed partial class ScanProgressViewModel : ObservableObject
         _scanStopwatch?.Stop();
         _performance.ReportOperation(null);
 
+        if (_progress is { } progress)
+        {
+            Traversal = Describe(progress.CreateSnapshot());
+        }
+
         _progress = null;
         _progressFraction = null;
         _estimatedTotalBytes = null;
@@ -121,6 +131,11 @@ public sealed partial class ScanProgressViewModel : ObservableObject
         OnPropertyChanged(nameof(ProgressValue));
 
         return _scanStopwatch?.Elapsed ?? TimeSpan.Zero;
+    }
+
+    private PerformanceTraversal Describe(ScanProgressSnapshot snapshot)
+    {
+        return new(snapshot.DirectoriesScanned, snapshot.DirectoriesFailed, _parallelism);
     }
 
     private void OnProgressTick()
@@ -182,7 +197,8 @@ public sealed partial class ScanProgressViewModel : ObservableObject
             snapshot.BytesScanned,
             elapsed,
             TotalBytes: _estimatedTotalBytes,
-            Basis: EtaBasis.Bytes);
+            Basis: EtaBasis.Bytes,
+            Traversal: Describe(snapshot));
 
         ScanThroughputText = PerformanceFormat.Rate(operation) ?? "–";
         ScanRemainingText = PerformanceFormat.Remaining(operation) ?? string.Empty;

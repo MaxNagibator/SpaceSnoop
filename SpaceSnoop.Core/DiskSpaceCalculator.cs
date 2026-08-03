@@ -127,6 +127,7 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator>? logger = null)
         {
             _log.ScanDirectorySkipped(exception, directory.FullName);
             directorySpace.Error();
+            progress?.FailDirectory();
         }
 
         return directorySpace;
@@ -156,6 +157,7 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator>? logger = null)
         {
             _log.ScanDirectorySkipped(exception, directory.FullName);
             directorySpace.Error();
+            progress?.FailDirectory();
             return directorySpace;
         }
 

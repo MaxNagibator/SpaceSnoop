@@ -390,7 +390,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
         SelectedNode = null;
 
-        var progress = Progress.Begin(directory, path);
+        var progress = Progress.Begin(directory, path, Preferences.UseMultithreading ? Preferences.MaxParallelism : 1);
 
         _logger.ScanStarted(path, Preferences.UseMultithreading, Preferences.MaxParallelism);
 

@@ -272,6 +272,15 @@
                         <TextBlock Text="{Binding OperationRate}"
                                    Style="{StaticResource Performance.TileHint}"
                                    Margin="0,2,0,0" />
+
+                        <TextBlock Text="{Binding OperationTraversal}"
+                                   Style="{StaticResource Performance.TileHint}"
+                                   Margin="0,2,0,0"
+                                   Visibility="{Binding OperationTraversal, Converter={StaticResource NullToVisibility}, TargetNullValue=Collapsed}" />
+
+                        <TextBlock Text="{Binding OperationTraversalDetail}"
+                                   Style="{StaticResource Performance.TileHint}"
+                                   Visibility="{Binding OperationTraversalDetail, Converter={StaticResource NullToVisibility}, TargetNullValue=Collapsed}" />
                     </StackPanel>
                 </Border>
             </UniformGrid>
