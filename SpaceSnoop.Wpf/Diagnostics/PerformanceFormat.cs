@@ -113,6 +113,39 @@ public static class PerformanceFormat
             "после прогона здесь будут объём и скорость");
     }
 
+    public static string HitchesHint =>
+        $"Список живёт в кольце последних {AppDefaults.PerformanceHistorySecondsMax / 60} мин: просадки постарше вытесняются, а «Сбросить» чистит список вместе с окном замеров";
+
+    public static PerformanceHitchText HitchText(PerformanceHitchRow row)
+    {
+        return new(row.TimeUtc.ToLocalTime().ToString("HH:mm:ss"),
+            $"{Math.Round(row.DelayMs):N0} мс",
+            row.Operation ?? "вне операций");
+    }
+
+    public static string HitchesCaption(PerformanceHitches hitches)
+    {
+        var threshold = $"Просадок от {AppDefaults.PerformanceHitchMs} мс";
+
+        if (hitches.SpanSeconds < 1)
+        {
+            return $"{threshold} пока нет: сбор только запущен";
+        }
+
+        var window = $"за {Duration(TimeSpan.FromSeconds(hitches.SpanSeconds))} наблюдения";
+
+        if (hitches.Total == 0)
+        {
+            return $"{threshold} {window} не было";
+        }
+
+        var counted = Plural.Format(hitches.Total, "просадка", "просадки", "просадок");
+
+        return hitches.Total > hitches.Rows.Length
+            ? $"{counted} {window}, ниже последние {hitches.Rows.Length}"
+            : $"{counted} {window}";
+    }
+
     public static string? StaleWarning(PerformanceSnapshot snapshot, DateTime nowUtc)
     {
         if (snapshot.CapturedAtUtc == DateTime.MinValue)

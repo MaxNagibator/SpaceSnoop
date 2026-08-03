@@ -622,4 +622,45 @@ public class PerformanceTests
 
         Assert.That(columns, Is.EqualTo(expected));
     }
+
+    [Test]
+    public void Подпись_просадок_называет_окно_и_обрезку_списка()
+    {
+        var moment = new DateTime(2026, 8, 1, 10, 0, 0, DateTimeKind.Utc);
+        var quiet = new PerformanceHitches([], 0, 75);
+        var trimmed = new PerformanceHitches([new(moment, 900, "Сканирование"), new(moment, 700, null)], 37, 300);
+        var whole = new PerformanceHitches([new(moment, 900, "Сканирование")], 1, 75);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(PerformanceFormat.HitchesCaption(PerformanceHitches.Empty), Does.Contain("сбор только запущен"));
+            Assert.That(PerformanceFormat.HitchesCaption(quiet), Is.EqualTo($"Просадок от {AppDefaults.PerformanceHitchMs} мс за 1:15 наблюдения не было"));
+            Assert.That(PerformanceFormat.HitchesCaption(trimmed), Is.EqualTo("37 просадок за 5:00 наблюдения, ниже последние 2"));
+            Assert.That(PerformanceFormat.HitchesCaption(whole), Is.EqualTo("1 просадка за 1:15 наблюдения"));
+        });
+    }
+
+    [Test]
+    public void Подпись_просадок_не_умалчивает_о_кольце_и_сбросе()
+    {
+        Assert.That(PerformanceFormat.HitchesHint,
+            Does.Contain($"{AppDefaults.PerformanceHistorySecondsMax / 60} мин").And.Contain("Сбросить"));
+    }
+
+    [Test]
+    public void Строка_просадки_несёт_время_задержку_и_операцию()
+    {
+        var moment = new DateTime(2026, 8, 1, 10, 30, 5, DateTimeKind.Utc);
+
+        var named = PerformanceFormat.HitchText(new(moment, 812.4, "Сравнение"));
+        var idle = PerformanceFormat.HitchText(new(moment, 500, null));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(named.Time, Is.EqualTo(moment.ToLocalTime().ToString("HH:mm:ss")));
+            Assert.That(named.Delay, Is.EqualTo("812 мс"));
+            Assert.That(named.Operation, Is.EqualTo("Сравнение"));
+            Assert.That(idle.Operation, Is.EqualTo("вне операций"));
+        });
+    }
 }

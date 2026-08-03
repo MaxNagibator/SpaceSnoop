@@ -98,6 +98,36 @@ internal sealed class PerformanceHistoryBuffer(int capacity)
             builder.ToImmutable());
     }
 
+    public PerformanceHitches Hitches(long now, DateTime capturedAtUtc, double thresholdMs, int maxRows)
+    {
+        if (_count == 0)
+        {
+            return PerformanceHitches.Empty;
+        }
+
+        var builder = ImmutableArray.CreateBuilder<PerformanceHitchRow>(Math.Min(_count, Math.Max(0, maxRows)));
+        var total = 0;
+
+        for (var offset = 0; offset < _count; offset++)
+        {
+            var sample = At(offset);
+
+            if (sample.UiDelayMs < thresholdMs)
+            {
+                continue;
+            }
+
+            total++;
+
+            if (builder.Count < maxRows)
+            {
+                builder.Add(new(capturedAtUtc - Stopwatch.GetElapsedTime(sample.Timestamp, now), sample.UiDelayMs, sample.Operation));
+            }
+        }
+
+        return new(builder.ToImmutable(), total, Stopwatch.GetElapsedTime(At(_count - 1).Timestamp, At(0).Timestamp).TotalSeconds);
+    }
+
     private int CountWithin(long now, TimeSpan since)
     {
         if (since <= TimeSpan.Zero)

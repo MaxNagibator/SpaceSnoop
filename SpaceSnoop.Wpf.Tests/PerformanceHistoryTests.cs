@@ -333,6 +333,82 @@ public class PerformanceHistoryTests
         Assert.That(monitor.IsRunning, Is.False);
     }
 
+    [Test]
+    public void Просадки_читаются_из_кольца_без_свёртки()
+    {
+        var now = Stopwatch.GetTimestamp();
+        var buffer = new PerformanceHistoryBuffer(8);
+
+        buffer.Add(Sample(now, 6, "Сканирование", delayMs: 900));
+        buffer.Add(Sample(now, 5, "Сканирование", delayMs: 700));
+        buffer.Add(Sample(now, 4, "Сканирование", delayMs: 4));
+        buffer.Add(Sample(now, 1, "Сравнение", delayMs: 600));
+
+        var hitches = buffer.Hitches(now, DateTime.UnixEpoch, 500, 10);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(hitches.Total, Is.EqualTo(3));
+            Assert.That(hitches.Rows.Select(static row => row.DelayMs), Is.EqualTo(new[] { 600d, 700d, 900d }));
+            Assert.That(hitches.Rows[0].Operation, Is.EqualTo("Сравнение"));
+            Assert.That(hitches.SpanSeconds, Is.EqualTo(5).Within(0.05));
+        });
+    }
+
+    [Test]
+    public void Предел_строк_режет_список_просадок_но_не_счётчик()
+    {
+        var now = Stopwatch.GetTimestamp();
+        var buffer = new PerformanceHistoryBuffer(8);
+
+        for (var ago = 5; ago >= 1; ago--)
+        {
+            buffer.Add(Sample(now, ago, $"точка {ago}", delayMs: 600));
+        }
+
+        var hitches = buffer.Hitches(now, DateTime.UnixEpoch, 500, 2);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(hitches.Total, Is.EqualTo(5));
+            Assert.That(hitches.Rows.Select(static row => row.Operation), Is.EqualTo(new[] { "точка 1", "точка 2" }));
+        });
+    }
+
+    [Test]
+    public void Время_просадки_отсчитывается_от_момента_съёма()
+    {
+        var now = Stopwatch.GetTimestamp();
+        var buffer = new PerformanceHistoryBuffer(4);
+        var capturedAt = new DateTime(2026, 8, 1, 10, 0, 0, DateTimeKind.Utc);
+
+        buffer.Add(Sample(now, 3, "Сканирование", delayMs: 900));
+
+        var row = buffer.Hitches(now, capturedAt, 500, 10).Rows[0];
+
+        Assert.That(row.TimeUtc, Is.EqualTo(capturedAt.AddSeconds(-3)).Within(TimeSpan.FromMilliseconds(50)));
+    }
+
+    [Test]
+    public void Тихое_кольцо_не_придумывает_просадок()
+    {
+        var now = Stopwatch.GetTimestamp();
+        var buffer = new PerformanceHistoryBuffer(4);
+
+        buffer.Add(Sample(now, 2, "Сканирование", delayMs: 4));
+        buffer.Add(Sample(now, 1, "Сканирование", delayMs: 6));
+
+        var hitches = buffer.Hitches(now, DateTime.UnixEpoch, 500, 10);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(hitches.Total, Is.Zero);
+            Assert.That(hitches.Rows, Is.Empty);
+            Assert.That(hitches.SpanSeconds, Is.EqualTo(1).Within(0.05));
+            Assert.That(new PerformanceHistoryBuffer(4).Hitches(now, DateTime.UnixEpoch, 500, 10), Is.SameAs(PerformanceHitches.Empty));
+        });
+    }
+
     private static PerformanceSample Sample(long now, double agoSeconds, string operation, int gen0 = 0, double delayMs = 0)
     {
         return new(now - (long)(agoSeconds * Stopwatch.Frequency), delayMs, 0, 0, gen0, 0, 0, operation);

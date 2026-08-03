@@ -143,6 +143,14 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
         }
     }
 
+    public PerformanceHitches CaptureHitches(double thresholdMs, int maxRows)
+    {
+        lock (_lock)
+        {
+            return _history.Hitches(Stopwatch.GetTimestamp(), DateTime.UtcNow, thresholdMs, maxRows);
+        }
+    }
+
     public void Dispose()
     {
         _disposed = true;

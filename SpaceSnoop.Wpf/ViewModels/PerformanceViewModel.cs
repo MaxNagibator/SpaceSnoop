@@ -1,4 +1,6 @@
-﻿namespace SpaceSnoop.Wpf.ViewModels;
+﻿using System.Collections.Immutable;
+
+namespace SpaceSnoop.Wpf.ViewModels;
 
 public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
 {
@@ -69,6 +71,13 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
     [ObservableProperty]
     private string _operationRate = string.Empty;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasHitches))]
+    private ImmutableArray<PerformanceHitchText> _hitches = [];
+
+    [ObservableProperty]
+    private string _hitchesCaption = string.Empty;
+
     public PerformanceViewModel(
         PerformanceMonitor monitor,
         PerformanceRunTracker runs,
@@ -90,11 +99,16 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
         _monitor.Updated += OnMonitorUpdated;
         _runs.Changed += OnRunsChanged;
         Apply(_monitor.Snapshot);
+        ApplyHitches();
     }
 
     public PerformanceChartViewModel Chart { get; }
 
     public ShellPreferences Preferences { get; }
+
+    public bool HasHitches => Hitches.Length > 0;
+
+    public string HitchesHint => PerformanceFormat.HitchesHint;
 
     public string PageTitle => "Производительность";
 
@@ -149,6 +163,20 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
     private void OnChartRefreshed(object? sender, EventArgs e)
     {
         StaleText = PerformanceFormat.StaleWarning(_monitor.Snapshot, DateTime.UtcNow);
+        ApplyHitches();
+    }
+
+    private void ApplyHitches()
+    {
+        var hitches = _monitor.CaptureHitches(AppDefaults.PerformanceHitchMs, AppDefaults.PerformanceHitchRowsMax);
+        var rows = ImmutableArray.CreateRange(hitches.Rows, PerformanceFormat.HitchText);
+
+        if (!Hitches.AsSpan().SequenceEqual(rows.AsSpan()))
+        {
+            Hitches = rows;
+        }
+
+        HitchesCaption = PerformanceFormat.HitchesCaption(hitches);
     }
 
     private void OnRunsChanged(object? sender, EventArgs e)
