@@ -5,15 +5,13 @@ using System.Windows.Input;
 
 namespace SpaceSnoop.Wpf.ViewModels.Docker;
 
-public sealed partial class DockerViewModel(
-    DockerService docker,
-    IDialogService dialogs,
-    ILogger<DockerViewModel> logger)
-    : ObservableObject, IPageHeader, IPageRefresh, IPageStatus
+public sealed partial class DockerViewModel : ObservableObject, IPageHeader, IPageRefresh, IPageStatus
 {
+    private readonly DockerService _docker;
+    private readonly IDialogService _dialogs;
+    private readonly ILogger<DockerViewModel> _logger;
+
     private bool _loadedOnce;
-    private CancellationTokenSource? _compactCts;
-    private bool _compactCancellationAllowed;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanRun))]
@@ -33,6 +31,17 @@ public sealed partial class DockerViewModel(
 
     [ObservableProperty]
     private bool _pruneAllVolumes;
+
+    public DockerViewModel(DockerService docker, IDialogService dialogs, ILogger<DockerViewModel> logger)
+    {
+        _docker = docker;
+        _dialogs = dialogs;
+        _logger = logger;
+
+        Compact = new(this, docker, dialogs, logger);
+    }
+
+    public DockerCompactViewModel Compact { get; }
 
     public ObservableCollection<DockerBucketViewModel> Buckets { get; } = [];
 
@@ -56,7 +65,7 @@ public sealed partial class DockerViewModel(
 
     public double ProgressMax => 1;
 
-    public ICommand? CancelCommand => _compactCts is null || !_compactCancellationAllowed ? null : CancelCompactCommand;
+    public ICommand? CancelCommand => Compact.CanCancel ? Compact.CancelCommand : null;
 
     ICommand IPageRefresh.RefreshCommand => RefreshCommand;
 
@@ -69,6 +78,18 @@ public sealed partial class DockerViewModel(
 
         _loadedOnce = true;
         await RefreshAsync();
+    }
+
+    internal void NotifyCancelChanged()
+    {
+        OnPropertyChanged(nameof(CancelCommand));
+    }
+
+    internal void ForgetSnapshot()
+    {
+        Buckets.Clear();
+        Groups.Clear();
+        _loadedOnce = false;
     }
 
     private static string Summarize(string output)
@@ -89,7 +110,7 @@ public sealed partial class DockerViewModel(
         StatusText = "Опрашиваю Docker…";
         try
         {
-            var snapshot = await docker.GetSnapshotAsync(CancellationToken.None);
+            var snapshot = await _docker.GetSnapshotAsync(CancellationToken.None);
 
             Buckets.Clear();
             IsAvailable = snapshot.Available;
@@ -103,18 +124,18 @@ public sealed partial class DockerViewModel(
 
                 await LoadObjectsAsync();
 
-                logger.DockerSnapshotLoaded(snapshot.Buckets.Count);
+                _logger.DockerSnapshotLoaded(snapshot.Buckets.Count);
                 StatusText = $"Обновлено: категорий – {snapshot.Buckets.Count}.";
             }
             else
             {
-                logger.DockerUnavailable(snapshot.Error ?? "неизвестно");
+                _logger.DockerUnavailable(snapshot.Error ?? "неизвестно");
                 StatusText = "Docker недоступен.";
             }
         }
         catch (Exception ex)
         {
-            logger.DockerUnavailable(ex.Message);
+            _logger.DockerUnavailable(ex.Message);
             IsAvailable = false;
             UnavailableReason = ex.Message;
             Buckets.Clear();
@@ -129,7 +150,7 @@ public sealed partial class DockerViewModel(
 
     private async Task LoadObjectsAsync()
     {
-        var inventory = await docker.GetInventoryAsync(CancellationToken.None);
+        var inventory = await _docker.GetInventoryAsync(CancellationToken.None);
 
         var groups = inventory
             .GroupBy(o => o.Kind)
@@ -142,7 +163,7 @@ public sealed partial class DockerViewModel(
             Groups.Add(group);
         }
 
-        logger.DockerInventoryLoaded(inventory.Count, groups.Count);
+        _logger.DockerInventoryLoaded(inventory.Count, groups.Count);
     }
 
     [RelayCommand]
@@ -167,13 +188,13 @@ public sealed partial class DockerViewModel(
         StatusText = $"Удаляю {kind} «{target.Name}»…";
         try
         {
-            await docker.RemoveAsync(target, CancellationToken.None);
-            logger.DockerObjectRemoved(target.Kind.ToString(), target.Name);
+            await _docker.RemoveAsync(target, CancellationToken.None);
+            _logger.DockerObjectRemoved(target.Kind.ToString(), target.Name);
         }
         catch (Exception ex)
         {
-            logger.DockerObjectRemoveFailed(ex, target.Kind.ToString(), target.Name);
-            dialogs.Error($"Удалить {kind}", ex.Message);
+            _logger.DockerObjectRemoveFailed(ex, target.Kind.ToString(), target.Name);
+            _dialogs.Error($"Удалить {kind}", ex.Message);
             IsBusy = false;
             return;
         }
@@ -200,7 +221,7 @@ public sealed partial class DockerViewModel(
     {
         try
         {
-            var snapshot = await docker.GetSnapshotAsync(CancellationToken.None);
+            var snapshot = await _docker.GetSnapshotAsync(CancellationToken.None);
             if (!snapshot.Available)
             {
                 return;
@@ -210,7 +231,7 @@ public sealed partial class DockerViewModel(
         }
         catch (Exception ex)
         {
-            logger.DockerUnavailable(ex.Message);
+            _logger.DockerUnavailable(ex.Message);
         }
     }
 
@@ -285,39 +306,6 @@ public sealed partial class DockerViewModel(
             () => RunCleanupAsync(DockerCleanupTarget.UnusedVolumes, "Удалить неиспользуемые тома", allUnused));
     }
 
-    [RelayCommand]
-    private async Task CompactAsync()
-    {
-        if (!CanRun)
-        {
-            return;
-        }
-
-        var confirm = new ConfirmDialogViewModel(
-            "Сжать диск Docker",
-            PackIconLucideKind.Shrink,
-            [
-                "WSL и Docker будут остановлены.",
-                "Образ данных (VHDX) сожмётся, освободившееся место вернётся системе.",
-                "Операция может занять много времени. После неё Docker нужно запустить заново.",
-                "Перед операцией рекомендуется сделать резервную копию данных Docker.",
-            ],
-            [
-                new("Отмена", ConfirmChoiceKind.Dismissive),
-                new("Сжать диск", ConfirmChoiceKind.Primary),
-            ])
-        {
-            Warning = "Экспериментальная операция. После запуска diskpart сжатие нельзя безопасно прервать.",
-        };
-
-        if (!await dialogs.ShowAsync(confirm))
-        {
-            return;
-        }
-
-        await CompactCoreAsync();
-    }
-
     private async Task ConfirmCleanupAsync(
         string title,
         PackIconLucideKind iconKind,
@@ -342,160 +330,12 @@ public sealed partial class DockerViewModel(
             Warning = "Docker удаляет мимо корзины – вернуть удалённое нельзя.",
         };
 
-        if (!await dialogs.ShowAsync(confirm))
+        if (!await _dialogs.ShowAsync(confirm))
         {
             return;
         }
 
         await run();
-    }
-
-    private async Task CompactCoreAsync()
-    {
-        _compactCts = new();
-        _compactCancellationAllowed = true;
-        OnPropertyChanged(nameof(CancelCommand));
-        IsBusy = true;
-        StatusText = "Сжимаю образ диска Docker…";
-        var dockerStopped = false;
-        try
-        {
-            logger.DockerCompactStarted();
-            var uiContext = SynchronizationContext.Current;
-
-            void AnnounceCompacting()
-            {
-                StatusText = "Сжимаю образ disk\\docker_data.vhdx… Отмена недоступна после запуска diskpart.";
-                OnPropertyChanged(nameof(CancelCommand));
-            }
-
-            void StageChanged(DockerCompactStage stage)
-            {
-                if (stage != DockerCompactStage.Compacting)
-                {
-                    return;
-                }
-
-                dockerStopped = true;
-                _compactCancellationAllowed = false;
-
-                if (uiContext is null)
-                {
-                    AnnounceCompacting();
-                }
-                else
-                {
-                    uiContext.Post(_ => AnnounceCompacting(), null);
-                }
-            }
-
-            var result = await docker.CompactAsync(_compactCts.Token, stageChanged: StageChanged);
-            dockerStopped = result.DockerStopped;
-
-            if (result.RequiresWslShutdownConfirmation)
-            {
-                if (!await ConfirmWslShutdownFallbackAsync(result))
-                {
-                    StatusText = result.DockerStopped
-                        ? "Сжатие отменено. Docker остановлен – запустите его заново."
-                        : "Сжатие отменено.";
-                    return;
-                }
-
-                var fallbackResult = await docker.CompactAsync(
-                    _compactCts.Token,
-                    allowWslShutdownFallback: true,
-                    stageChanged: StageChanged);
-                var attempts = new List<DockerCompactStep>(result.Steps)
-                {
-                    new("Повтор после подтверждения остановки WSL", true, "Повторена операция с подтверждённым fallback."),
-                };
-                attempts.AddRange(fallbackResult.Steps);
-                result = fallbackResult with { Steps = attempts };
-                dockerStopped = result.DockerStopped;
-            }
-
-            if (result.Status == DockerCompactStatus.Canceled)
-            {
-                logger.DockerCompactCancelled();
-                StatusText = result.DockerStopped
-                    ? "Сжатие отменено. Docker остановлен – запустите его заново."
-                    : "Сжатие отменено.";
-                return;
-            }
-
-            if (!result.Succeeded)
-            {
-                var failure = new InvalidOperationException(result.Summary);
-                logger.DockerCompactFailed(failure);
-                dialogs.Error("Сжатие диска Docker", result.ToDisplayText());
-                StatusText = result.DockerStopped
-                    ? "Сжатие не выполнено. Docker остановлен – запустите его заново."
-                    : "Сжатие не выполнено.";
-                return;
-            }
-
-            logger.DockerCompactFinished(result.Summary);
-            dialogs.Info("Сжатие диска Docker", result.ToDisplayText());
-            StatusText = "Готово. Запустите Docker заново.";
-            Buckets.Clear();
-            Groups.Clear();
-            _loadedOnce = false;
-        }
-        catch (OperationCanceledException)
-        {
-            logger.DockerCompactCancelled();
-            StatusText = dockerStopped
-                ? "Сжатие отменено. Docker остановлен – запустите его заново."
-                : "Сжатие отменено.";
-        }
-        catch (Exception ex)
-        {
-            logger.DockerCompactFailed(ex);
-            dialogs.Error("Сжатие диска Docker", ex.Message);
-            StatusText = dockerStopped
-                ? "Сжатие не выполнено. Docker остановлен – запустите его заново."
-                : "Сжатие не выполнено.";
-        }
-        finally
-        {
-            IsBusy = false;
-            _compactCancellationAllowed = false;
-            _compactCts.Dispose();
-            _compactCts = null;
-            OnPropertyChanged(nameof(CancelCommand));
-        }
-    }
-
-    [RelayCommand]
-    private void CancelCompact()
-    {
-        _compactCts?.Cancel();
-    }
-
-    private async Task<bool> ConfirmWslShutdownFallbackAsync(DockerCompactResult result)
-    {
-        var distributions = result.WslDistributions.Count > 0
-            ? string.Join(", ", result.WslDistributions)
-            : "дистрибутивы WSL";
-
-        var confirm = new ConfirmDialogViewModel(
-            "Остановить WSL целиком?",
-            PackIconLucideKind.TriangleAlert,
-            [
-                "Docker Desktop не удалось остановить штатно.",
-                "Fallback выполнит wsl --shutdown и остановит все перечисленные дистрибутивы.",
-                $"Будут остановлены: {distributions}.",
-            ],
-            [
-                new("Отмена", ConfirmChoiceKind.Dismissive),
-                new("Остановить WSL", ConfirmChoiceKind.Destructive),
-            ])
-        {
-            Warning = "Другие работающие WSL-дистрибутивы тоже будут остановлены.",
-        };
-
-        return await dialogs.ShowAsync(confirm);
     }
 
     private async Task RunCleanupAsync(DockerCleanupTarget target, string title, bool allUnused = false)
@@ -509,15 +349,15 @@ public sealed partial class DockerViewModel(
         StatusText = $"{title}…";
         try
         {
-            logger.DockerCleanupStarted(target.ToString());
-            var result = await docker.PruneAsync(target, allUnused, CancellationToken.None);
-            logger.DockerCleanupFinished(target.ToString(), Summarize(result));
-            dialogs.Info(title, string.IsNullOrWhiteSpace(result) ? "Готово. Освобождать было нечего." : result);
+            _logger.DockerCleanupStarted(target.ToString());
+            var result = await _docker.PruneAsync(target, allUnused, CancellationToken.None);
+            _logger.DockerCleanupFinished(target.ToString(), Summarize(result));
+            _dialogs.Info(title, string.IsNullOrWhiteSpace(result) ? "Готово. Освобождать было нечего." : result);
         }
         catch (Exception ex)
         {
-            logger.DockerCleanupFailed(ex, target.ToString());
-            dialogs.Error(title, ex.Message);
+            _logger.DockerCleanupFailed(ex, target.ToString());
+            _dialogs.Error(title, ex.Message);
             IsBusy = false;
             return;
         }

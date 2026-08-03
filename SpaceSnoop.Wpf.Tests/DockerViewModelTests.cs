@@ -15,7 +15,7 @@ public sealed class DockerViewModelTests
     {
         var vm = CreateViewModel(diskpart: Success("DiskPart successfully compacted the virtual disk file."));
 
-        await vm.CompactCommand.ExecuteAsync(null);
+        await vm.Compact.RunCommand.ExecuteAsync(null);
 
         Assert.That(vm.StatusText, Is.EqualTo("Готово. Запустите Docker заново."));
         Assert.That(vm.IsBusy, Is.False);
@@ -27,7 +27,7 @@ public sealed class DockerViewModelTests
     {
         var vm = CreateViewModel(diskpart: new(1, string.Empty, "DiskPart error: compact failed"));
 
-        await vm.CompactCommand.ExecuteAsync(null);
+        await vm.Compact.RunCommand.ExecuteAsync(null);
 
         Assert.That(vm.StatusText, Does.Contain("Docker остановлен"));
     }

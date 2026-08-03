@@ -207,7 +207,7 @@ public sealed partial class SyncProfileViewModel : ObservableObject
 
     partial void OnIsSelectedChanged(bool value)
     {
-        _parent.NotifySelectionChanged();
+        _parent.Bulk.NotifySelectionChanged();
     }
 
     partial void OnEnabledChanged(bool value)

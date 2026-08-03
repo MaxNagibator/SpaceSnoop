@@ -93,7 +93,7 @@ public sealed partial class FileDiffDialogViewModel : ObservableObject, IDialogV
 
         if (sizeDelta > 0 && timeDiffers)
         {
-            return $"Размер отличается на {SizeFormatter.Format(sizeDelta)}, время – на {SyncNodeViewModel.FormatDelta(timeDelta)}.";
+            return $"Размер отличается на {SizeFormatter.Format(sizeDelta)}, время – на {SyncNodeText.FormatDelta(timeDelta)}.";
         }
 
         if (sizeDelta > 0)
@@ -103,7 +103,7 @@ public sealed partial class FileDiffDialogViewModel : ObservableObject, IDialogV
 
         if (timeDiffers)
         {
-            return $"Размер совпадает, отличается только время изменения (Δ {SyncNodeViewModel.FormatDelta(timeDelta)}) – копирование меняет метку, на содержимое не влияет.";
+            return $"Размер совпадает, отличается только время изменения (Δ {SyncNodeText.FormatDelta(timeDelta)}) – копирование меняет метку, на содержимое не влияет.";
         }
 
         return "Размер и строки совпадают – различие в служебных метаданных файла.";

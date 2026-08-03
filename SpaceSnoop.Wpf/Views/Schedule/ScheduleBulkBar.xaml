@@ -6,7 +6,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
-             d:DataContext="{d:DesignInstance vm:ScheduleViewModel}"
+             d:DataContext="{d:DesignInstance vm:ScheduleBulkViewModel}"
              d:DesignWidth="900">
 
     <UserControl.Resources>
@@ -100,7 +100,7 @@
                          Grid.Column="1"
                          Style="{StaticResource ListBox.Segmented}"
                          ItemsSource="{Binding Modes}"
-                         SelectedIndex="{Binding BulkModeIndex}"
+                         SelectedIndex="{Binding ModeIndex}"
                          HorizontalAlignment="Left"
                          AutomationProperties.Name="Направление для выбранных профилей" />
 
@@ -113,7 +113,7 @@
                          Grid.Column="1"
                          Style="{StaticResource ListBox.Segmented}"
                          ItemsSource="{Binding Winners}"
-                         SelectedIndex="{Binding BulkWinnerIndex}"
+                         SelectedIndex="{Binding WinnerIndex}"
                          HorizontalAlignment="Left"
                          Margin="0,10,0,0"
                          ToolTip="Действует только в двустороннем режиме"
@@ -129,7 +129,7 @@
                             Orientation="Horizontal"
                             Margin="0,12,0,0">
                     <Button Style="{StaticResource Bulk.Action}"
-                            Command="{Binding BulkMirrorOnCommand}"
+                            Command="{Binding MirrorOnCommand}"
                             ToolTip="Удалять на приёмнике лишнее (применяется там, где зеркало допустимо)">
                         <StackPanel Orientation="Horizontal">
                             <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FlipHorizontal2}"
@@ -141,7 +141,7 @@
                         </StackPanel>
                     </Button>
                     <Button Style="{StaticResource Bulk.Action}"
-                            Command="{Binding BulkMirrorOffCommand}">
+                            Command="{Binding MirrorOffCommand}">
                         <StackPanel Orientation="Horizontal">
                             <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Ban}"
                                                       Width="13"
@@ -166,14 +166,14 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBox Grid.Column="0"
-                             Text="{Binding BulkExclusions, UpdateSourceTrigger=PropertyChanged}"
+                             Text="{Binding Exclusions, UpdateSourceTrigger=PropertyChanged}"
                              Style="{StaticResource TextBox.Toolbar}"
                              VerticalAlignment="Center"
                              ToolTip="Через запятую, например .git,bin,obj. Пустое поле очищает исключения."
                              AutomationProperties.Name="Исключения для выбранных профилей" />
                     <Button Grid.Column="1"
                             Style="{StaticResource Bulk.Action}"
-                            Command="{Binding BulkApplyExclusionsCommand}"
+                            Command="{Binding ApplyExclusionsCommand}"
                             Margin="8,0,0,0"
                             Content="Применить" />
                 </Grid>
@@ -189,12 +189,12 @@
                             Margin="0,12,0,0">
                     <ComboBox Style="{StaticResource ComboBox.Form}"
                               ItemsSource="{Binding Intervals}"
-                              SelectedIndex="{Binding BulkIntervalIndex}"
+                              SelectedIndex="{Binding IntervalIndex}"
                               Width="200"
                               VerticalAlignment="Center"
                               Margin="0,0,8,0"
                               AutomationProperties.Name="Периодичность для выбранных профилей" />
-                    <TextBox Text="{Binding BulkTime, UpdateSourceTrigger=PropertyChanged}"
+                    <TextBox Text="{Binding Time, UpdateSourceTrigger=PropertyChanged}"
                              Style="{StaticResource TextBox.Toolbar}"
                              Width="90"
                              VerticalAlignment="Center"
@@ -202,7 +202,7 @@
                              ToolTip="Время запуска в формате ЧЧ:ММ"
                              AutomationProperties.Name="Время запуска для выбранных профилей" />
                     <Button Style="{StaticResource Bulk.Action}"
-                            Command="{Binding BulkApplyScheduleCommand}"
+                            Command="{Binding ApplyScheduleCommand}"
                             Content="Применить" />
                 </StackPanel>
 
@@ -222,7 +222,7 @@
 
                     <Button Grid.Column="0"
                             Style="{StaticResource Bulk.Action}"
-                            Command="{Binding BulkEnableCommand}"
+                            Command="{Binding EnableCommand}"
                             ToolTip="Создать задачи Планировщика для выбранных профилей">
                         <StackPanel Orientation="Horizontal">
                             <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.CalendarCheck}"
@@ -236,7 +236,7 @@
                     <Button Grid.Column="1"
                             Style="{StaticResource Bulk.Action}"
                             HorizontalAlignment="Left"
-                            Command="{Binding BulkDisableCommand}">
+                            Command="{Binding DisableCommand}">
                         <StackPanel Orientation="Horizontal">
                             <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.CalendarOff}"
                                                       Width="13"
@@ -249,7 +249,7 @@
 
                     <Button Grid.Column="2"
                             Style="{StaticResource Button.Ghost}"
-                            Command="{Binding BulkDeleteCommand}"
+                            Command="{Binding DeleteCommand}"
                             Foreground="{DynamicResource State.Error}"
                             MinHeight="{DynamicResource Control.Height.Default}"
                             Padding="12,6"
@@ -266,7 +266,7 @@
                 </Grid>
             </Grid>
 
-            <TextBlock Text="{Binding BulkMessage}"
+            <TextBlock Text="{Binding Message}"
                        TextWrapping="Wrap">
                 <TextBlock.Style>
                     <Style TargetType="TextBlock"
@@ -274,7 +274,7 @@
                         <Setter Property="Margin"
                                 Value="0,12,0,0" />
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding BulkMessage}"
+                            <DataTrigger Binding="{Binding Message}"
                                          Value="">
                                 <Setter Property="Visibility"
                                         Value="Collapsed" />

@@ -71,7 +71,7 @@
                 <StackPanel Grid.Column="1"
                             Orientation="Horizontal">
                     <Button Style="{StaticResource Button.Ghost}"
-                            Command="{Binding SelectAllProfilesCommand}"
+                            Command="{Binding Bulk.SelectAllCommand}"
                             MinHeight="{DynamicResource Control.Height.Default}"
                             Padding="14,6"
                             Margin="0,0,8,0"
@@ -127,7 +127,7 @@
                 </StackPanel>
             </Border>
 
-            <schedule:ScheduleBulkBar />
+            <schedule:ScheduleBulkBar DataContext="{Binding Bulk}" />
 
             <ItemsControl ItemsSource="{Binding Profiles}">
                 <ItemsControl.ItemTemplate>

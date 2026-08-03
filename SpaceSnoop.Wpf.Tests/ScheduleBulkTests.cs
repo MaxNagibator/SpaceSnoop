@@ -18,7 +18,7 @@ public class ScheduleBulkTests
 
         vm.Profiles[0].IsSelected = true;
         vm.Profiles[2].IsSelected = true;
-        vm.BulkModeIndex = 1;
+        vm.Bulk.ModeIndex = 1;
 
         var stored = SyncProfileStore.Load(settings);
 
@@ -36,8 +36,8 @@ public class ScheduleBulkTests
         var settings = Seed();
         var vm = Create(settings);
 
-        vm.SelectAllProfilesCommand.Execute(null);
-        vm.BulkWinnerIndex = 2;
+        vm.Bulk.SelectAllCommand.Execute(null);
+        vm.Bulk.WinnerIndex = 2;
 
         Assert.That(SyncProfileStore.Load(settings).Select(profile => profile.Winner),
             Is.All.EqualTo(SyncWinner.Right));
@@ -49,9 +49,9 @@ public class ScheduleBulkTests
         var settings = Seed();
         var vm = Create(settings);
 
-        vm.SelectAllProfilesCommand.Execute(null);
+        vm.Bulk.SelectAllCommand.Execute(null);
         vm.Profiles[1].SelectedModeIndex = 2;
-        vm.BulkMirrorOnCommand.Execute(null);
+        vm.Bulk.MirrorOnCommand.Execute(null);
 
         var stored = SyncProfileStore.Load(settings);
 
@@ -60,7 +60,7 @@ public class ScheduleBulkTests
             Assert.That(stored[0].Mirror, Is.True);
             Assert.That(stored[1].Mirror, Is.False);
             Assert.That(stored[2].Mirror, Is.True);
-            Assert.That(vm.BulkMessage, Does.Contain("пропущено 1"));
+            Assert.That(vm.Bulk.Message, Does.Contain("пропущено 1"));
         }
     }
 
@@ -71,12 +71,12 @@ public class ScheduleBulkTests
         var vm = Create(settings);
 
         vm.Profiles[0].IsSelected = true;
-        vm.BulkModeIndex = 1;
+        vm.Bulk.ModeIndex = 1;
         vm.Profiles[1].IsSelected = true;
 
-        Assert.That(vm.BulkModeIndex, Is.EqualTo(-1));
+        Assert.That(vm.Bulk.ModeIndex, Is.EqualTo(-1));
 
-        vm.BulkModeIndex = 1;
+        vm.Bulk.ModeIndex = 1;
 
         Assert.That(SyncProfileStore.Load(settings)[1].Mode, Is.EqualTo(1));
     }
@@ -89,11 +89,11 @@ public class ScheduleBulkTests
 
         vm.Profiles[1].IsSelected = true;
         vm.Profiles[1].SelectedModeIndex = 2;
-        vm.BulkMirrorOnCommand.Execute(null);
+        vm.Bulk.MirrorOnCommand.Execute(null);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(vm.BulkMessage, Does.StartWith("Зеркало неприменимо"));
+            Assert.That(vm.Bulk.Message, Does.StartWith("Зеркало неприменимо"));
             Assert.That(SyncProfileStore.Load(settings)[1].Mirror, Is.False);
         }
     }
@@ -104,9 +104,9 @@ public class ScheduleBulkTests
         var settings = Seed();
         var vm = Create(settings);
 
-        vm.SelectAllProfilesCommand.Execute(null);
-        vm.BulkExclusions = "   ";
-        vm.BulkApplyExclusionsCommand.Execute(null);
+        vm.Bulk.SelectAllCommand.Execute(null);
+        vm.Bulk.Exclusions = "   ";
+        vm.Bulk.ApplyExclusionsCommand.Execute(null);
 
         Assert.That(SyncProfileStore.Load(settings).Select(profile => profile.Exclusions), Is.All.Empty);
     }
@@ -118,15 +118,15 @@ public class ScheduleBulkTests
         var settings = Seed();
         var vm = Create(settings);
 
-        vm.SelectAllProfilesCommand.Execute(null);
-        vm.BulkIntervalIndex = 0;
-        vm.BulkTime = time;
-        vm.BulkApplyScheduleCommand.Execute(null);
+        vm.Bulk.SelectAllCommand.Execute(null);
+        vm.Bulk.IntervalIndex = 0;
+        vm.Bulk.Time = time;
+        vm.Bulk.ApplyScheduleCommand.Execute(null);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(SyncProfileStore.Load(settings).Select(profile => profile.Time), Is.All.EqualTo("03:00"));
-            Assert.That(vm.BulkMessage, Does.Contain("ЧЧ:ММ"));
+            Assert.That(vm.Bulk.Message, Does.Contain("ЧЧ:ММ"));
         }
     }
 
@@ -137,9 +137,9 @@ public class ScheduleBulkTests
         var vm = Create(settings);
 
         vm.Profiles[1].IsSelected = true;
-        vm.BulkIntervalIndex = 1;
-        vm.BulkTime = "07:30";
-        vm.BulkApplyScheduleCommand.Execute(null);
+        vm.Bulk.IntervalIndex = 1;
+        vm.Bulk.Time = "07:30";
+        vm.Bulk.ApplyScheduleCommand.Execute(null);
 
         var stored = SyncProfileStore.Load(settings);
 
@@ -158,15 +158,15 @@ public class ScheduleBulkTests
         var settings = Seed();
         var vm = Create(settings);
 
-        vm.SelectAllProfilesCommand.Execute(null);
-        vm.BulkModeIndex = 2;
-        vm.ClearSelectionCommand.Execute(null);
+        vm.Bulk.SelectAllCommand.Execute(null);
+        vm.Bulk.ModeIndex = 2;
+        vm.Bulk.ClearSelectionCommand.Execute(null);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(vm.HasSelection, Is.False);
-            Assert.That(vm.BulkModeIndex, Is.EqualTo(-1));
-            Assert.That(vm.BulkMessage, Is.Empty);
+            Assert.That(vm.Bulk.HasSelection, Is.False);
+            Assert.That(vm.Bulk.ModeIndex, Is.EqualTo(-1));
+            Assert.That(vm.Bulk.Message, Is.Empty);
         }
     }
 

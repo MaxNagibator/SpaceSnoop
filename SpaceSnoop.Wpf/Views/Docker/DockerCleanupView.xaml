@@ -146,7 +146,7 @@
                            Text="Операция экспериментальная и может занять много времени. После запуска diskpart безопасная отмена недоступна – дождитесь конца и запустите Docker заново. Если штатная остановка не сработает, приложение отдельно спросит про остановку всего WSL." />
             </Expander>
             <Button Style="{StaticResource Button.Secondary}"
-                    Command="{Binding CompactCommand}"
+                    Command="{Binding Compact.RunCommand}"
                     IsEnabled="{Binding CanRun}"
                     HorizontalAlignment="Left"
                     Margin="0,10,0,0">

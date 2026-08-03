@@ -81,8 +81,8 @@ public class UpdateCheckTests
                    - Исправлена синхронизация
                    """;
 
-        Assert.That(AppUpdateViewModel.ExtractChanges(body), Is.EqualTo("- Добавлена карта\r\n  Карта теперь рисуется пиксельным буфером.\r\n- Исправлена синхронизация"));
-        var items = AppUpdateViewModel.ExtractChangeItems(body);
+        Assert.That(ReleaseChangelog.ExtractChanges(body), Is.EqualTo("- Добавлена карта\r\n  Карта теперь рисуется пиксельным буфером.\r\n- Исправлена синхронизация"));
+        var items = ReleaseChangelog.ExtractChangeItems(body);
 
         using (Assert.EnterMultipleScope())
         {
@@ -102,11 +102,11 @@ public class UpdateCheckTests
                    Вторая строка.
                    """;
 
-        var items = AppUpdateViewModel.ExtractChangeItems(body);
+        var items = ReleaseChangelog.ExtractChangeItems(body);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(AppUpdateViewModel.ExtractChanges(body), Is.EqualTo("Просто текст без заголовков.\r\nВторая строка."));
+            Assert.That(ReleaseChangelog.ExtractChanges(body), Is.EqualTo("Просто текст без заголовков.\r\nВторая строка."));
             Assert.That(items, Has.Count.EqualTo(1));
             Assert.That(items[0].Summary, Is.EqualTo("Просто текст без заголовков."));
             Assert.That(items[0].Details, Is.EqualTo(["Вторая строка."]));
@@ -128,8 +128,8 @@ public class UpdateCheckTests
                    Скачиваний: [![всего](badge)](url)
                    """;
 
-        Assert.That(AppUpdateViewModel.ExtractChanges(body), Is.Empty);
-        Assert.That(AppUpdateViewModel.ExtractChangeItems(body), Is.Empty);
+        Assert.That(ReleaseChangelog.ExtractChanges(body), Is.Empty);
+        Assert.That(ReleaseChangelog.ExtractChangeItems(body), Is.Empty);
     }
 
     [Test]
@@ -143,7 +143,7 @@ public class UpdateCheckTests
                    - Второй пункт
                    """;
 
-        var items = AppUpdateViewModel.ExtractChangeItems(body);
+        var items = ReleaseChangelog.ExtractChangeItems(body);
 
         using (Assert.EnterMultipleScope())
         {
@@ -158,7 +158,7 @@ public class UpdateCheckTests
     [TestCase(null, null)]
     public void Ссылка_сравнения_извлекается_из_тела_релиза(string? body, string? expected)
     {
-        Assert.That(AppUpdateViewModel.ExtractCompareUrl(body), Is.EqualTo(expected));
+        Assert.That(ReleaseChangelog.ExtractCompareUrl(body), Is.EqualTo(expected));
     }
 
     [Test]
@@ -189,7 +189,7 @@ public class UpdateCheckTests
             """;
 
         using var document = JsonDocument.Parse(json);
-        var entries = AppUpdateViewModel.BuildChangelogEntries(document.RootElement);
+        var entries = ReleaseChangelog.BuildChangelogEntries(document.RootElement);
 
         using (Assert.EnterMultipleScope())
         {
@@ -221,7 +221,7 @@ public class UpdateCheckTests
             """;
 
         using var document = JsonDocument.Parse(json);
-        var notes = AppUpdateViewModel.BuildReleaseNotes(document.RootElement);
+        var notes = ReleaseChangelog.BuildReleaseNotes(document.RootElement);
 
         using (Assert.EnterMultipleScope())
         {
@@ -242,7 +242,7 @@ public class UpdateCheckTests
             """;
 
         using var document = JsonDocument.Parse(json);
-        var notes = AppUpdateViewModel.BuildReleaseNotes(document.RootElement);
+        var notes = ReleaseChangelog.BuildReleaseNotes(document.RootElement);
 
         using (Assert.EnterMultipleScope())
         {
