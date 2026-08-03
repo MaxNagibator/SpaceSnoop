@@ -147,6 +147,7 @@ public class McpBridgeTests
             Assert.That(json.GetProperty("gen0CollectionsTotal").GetInt32(), Is.EqualTo(4));
             Assert.That(json.TryGetProperty("gen0Collections", out _), Is.False);
             Assert.That(json.GetProperty("history").TryGetProperty("gen0Collections", out _), Is.False);
+            Assert.That(json.GetProperty("workingSetPeakBytes").GetInt64(), Is.EqualTo(4096));
         });
     }
 
@@ -313,6 +314,8 @@ public class McpBridgeTests
             "512 Б",
             1024,
             "1 КБ",
+            4096,
+            "4 КБ",
             4,
             1,
             0,

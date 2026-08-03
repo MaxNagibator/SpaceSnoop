@@ -38,6 +38,8 @@ internal sealed record McpPerformance(
     string Managed,
     long WorkingSetBytes,
     string WorkingSet,
+    long WorkingSetPeakBytes,
+    string WorkingSetPeak,
     int Gen0CollectionsTotal,
     int Gen1CollectionsTotal,
     int Gen2CollectionsTotal,

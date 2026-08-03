@@ -26,7 +26,13 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
     private string _memoryHint = string.Empty;
 
     [ObservableProperty]
+    private string _memoryPeakText = string.Empty;
+
+    [ObservableProperty]
     private string _collectionsText = string.Empty;
+
+    [ObservableProperty]
+    private string _collectionsWindowText = string.Empty;
 
     [ObservableProperty]
     private string _startupText = string.Empty;
@@ -142,10 +148,12 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
         DelayHint = PerformanceFormat.TileDelayHint(snapshot);
         IsHitch = snapshot.UiPeakMs >= AppDefaults.PerformanceHitchMs;
 
-        MemoryText = SizeFormatter.Format(snapshot.ManagedBytes);
-        MemoryHint = $"процесс {SizeFormatter.Format(snapshot.WorkingSetBytes)}";
+        MemoryText = PerformanceFormat.TileMemory(snapshot);
+        MemoryHint = PerformanceFormat.TileMemoryHint(snapshot);
+        MemoryPeakText = PerformanceFormat.TileMemoryPeak(snapshot);
 
-        CollectionsText = $"{snapshot.Gen0Collections} / {snapshot.Gen1Collections} / {snapshot.Gen2Collections}";
+        CollectionsText = PerformanceFormat.TileCollections(snapshot);
+        CollectionsWindowText = PerformanceFormat.TileCollectionsWindow(snapshot);
         StartupText = PerformanceFormat.TileStartup(snapshot);
         StartupHint = PerformanceFormat.TileStartupHint(snapshot);
 

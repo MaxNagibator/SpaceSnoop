@@ -33,6 +33,23 @@ internal sealed class PerformanceHistoryBuffer(int capacity)
         _next = 0;
     }
 
+    public PerformanceHistoryStats Stats()
+    {
+        if (_count == 0)
+        {
+            return default;
+        }
+
+        var newest = At(0);
+        var oldest = At(_count - 1);
+
+        return new(Stopwatch.GetElapsedTime(oldest.Timestamp, newest.Timestamp).TotalSeconds,
+            _count,
+            newest.Gen0Collections - oldest.Gen0Collections,
+            newest.Gen1Collections - oldest.Gen1Collections,
+            newest.Gen2Collections - oldest.Gen2Collections);
+    }
+
     public PerformanceHistory Capture(long now, DateTime capturedAtUtc, TimeSpan since, int maxPoints)
     {
         var total = CountWithin(now, since);

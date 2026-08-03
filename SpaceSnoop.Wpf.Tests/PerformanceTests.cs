@@ -406,9 +406,49 @@ public class PerformanceTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(PerformanceFormat.TileDelay(snapshot), Is.EqualTo("2 мс"));
-            Assert.That(PerformanceFormat.TileDelayHint(snapshot), Is.EqualTo("пик 640 мс · среднее 35 мс"));
+            Assert.That(PerformanceFormat.TileDelay(snapshot), Is.EqualTo("640 мс"));
+            Assert.That(PerformanceFormat.TileDelayHint(snapshot), Is.EqualTo("сейчас 2 мс · среднее 35 мс"));
             Assert.That(PerformanceFormat.TileWindow(snapshot), Is.EqualTo("окно: 20 замеров за 10,4 с"));
+        });
+    }
+
+    [Test]
+    public void Плитка_памяти_ведёт_рабочим_набором_и_несёт_пик_за_сеанс()
+    {
+        var snapshot = PerformanceSnapshot.Empty with
+        {
+            ManagedBytes = 40 * 1024 * 1024,
+            WorkingSetBytes = 580 * 1024 * 1024,
+            WorkingSetPeakBytes = 612 * 1024 * 1024,
+        };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(PerformanceFormat.TileMemory(snapshot), Is.EqualTo(SizeFormatter.Format(580 * 1024 * 1024)));
+            Assert.That(PerformanceFormat.TileMemoryHint(snapshot), Does.Contain(SizeFormatter.Format(40 * 1024 * 1024)));
+            Assert.That(PerformanceFormat.TileMemoryPeak(snapshot), Is.EqualTo($"пик за сеанс {SizeFormatter.Format(612 * 1024 * 1024)}"));
+            Assert.That(PerformanceFormat.TileMemoryPeak(PerformanceSnapshot.Empty), Does.Contain("замеров ещё нет"));
+        });
+    }
+
+    [Test]
+    public void Сборки_за_окно_не_путаются_с_суммой_от_старта()
+    {
+        var snapshot = PerformanceSnapshot.Empty with
+        {
+            Gen0Collections = 22,
+            Gen1Collections = 10,
+            Gen2Collections = 5,
+            History = new(75, 150, 3, 1, 0),
+        };
+
+        var single = snapshot with { History = new(0, 1, 0, 0, 0) };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(PerformanceFormat.TileCollections(snapshot), Is.EqualTo("22 / 10 / 5"));
+            Assert.That(PerformanceFormat.TileCollectionsWindow(snapshot), Is.EqualTo("за последние 1:15: 3 / 1 / 0"));
+            Assert.That(PerformanceFormat.TileCollectionsWindow(single), Does.Contain("мерить не по чему"));
         });
     }
 

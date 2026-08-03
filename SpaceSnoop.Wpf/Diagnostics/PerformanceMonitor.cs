@@ -25,6 +25,8 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
 
     private int _renderCount;
 
+    private long _workingSetPeak;
+
     private PerformanceOperation? _operation;
 
     private TimeSpan _startup;
@@ -86,6 +88,7 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
             _history.Clear();
             _renders.Clear();
             _renderCount = 0;
+            _workingSetPeak = 0;
 
             _lastTick = Stopwatch.GetTimestamp();
             _lastHitchLog = 0;
@@ -215,6 +218,8 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
 
     private void Publish(PerformanceSample sample, PerformanceOperation? operation)
     {
+        _workingSetPeak = Math.Max(_workingSetPeak, sample.WorkingSetBytes);
+
         Volatile.Write(ref _snapshot, new(DateTime.UtcNow,
             sample.UiDelayMs,
             _delays.Peak(),
@@ -223,9 +228,11 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
             _delays.SpanSeconds(SampleInterval.TotalMilliseconds),
             sample.ManagedBytes,
             sample.WorkingSetBytes,
+            _workingSetPeak,
             sample.Gen0Collections,
             sample.Gen1Collections,
             sample.Gen2Collections,
+            _history.Stats(),
             _startup.TotalSeconds,
             _renders.Last,
             _renders.Peak(),

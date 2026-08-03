@@ -27,10 +27,10 @@ public static class PerformanceReport
         }
 
         text.AppendLine(CultureInfo.CurrentCulture,
-            $"Память: {SizeFormatter.Format(snapshot.ManagedBytes)} управляемой, {SizeFormatter.Format(snapshot.WorkingSetBytes)} процесс");
+            $"Память: {SizeFormatter.Format(snapshot.WorkingSetBytes)} процесс, {SizeFormatter.Format(snapshot.ManagedBytes)} управляемой, {PerformanceFormat.TileMemoryPeak(snapshot)}");
 
         text.AppendLine(CultureInfo.CurrentCulture,
-            $"Сборок мусора с начала сбора: {snapshot.Gen0Collections} / {snapshot.Gen1Collections} / {snapshot.Gen2Collections}");
+            $"Сборок мусора с начала сбора: {snapshot.Gen0Collections} / {snapshot.Gen1Collections} / {snapshot.Gen2Collections} ({PerformanceFormat.TileCollectionsWindow(snapshot)})");
 
         text.AppendLine(CultureInfo.CurrentCulture, $"Старт приложения: {snapshot.StartupSeconds:N2} с");
 

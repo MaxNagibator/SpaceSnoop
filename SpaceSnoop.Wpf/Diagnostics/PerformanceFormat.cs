@@ -32,14 +32,45 @@ public static class PerformanceFormat
 
     public static string TileDelay(PerformanceSnapshot snapshot)
     {
-        return snapshot.SampleCount == 0 ? "нет замеров" : $"{Math.Round(snapshot.UiDelayMs):N0} мс";
+        return snapshot.SampleCount == 0 ? "нет замеров" : $"{Math.Round(snapshot.UiPeakMs):N0} мс";
     }
 
     public static string TileDelayHint(PerformanceSnapshot snapshot)
     {
         return snapshot.SampleCount == 0
             ? "сбор только запущен или сброшен"
-            : $"пик {Math.Round(snapshot.UiPeakMs):N0} мс · среднее {Math.Round(snapshot.UiAverageMs):N0} мс";
+            : $"сейчас {Math.Round(snapshot.UiDelayMs):N0} мс · среднее {Math.Round(snapshot.UiAverageMs):N0} мс";
+    }
+
+    public static string TileMemory(PerformanceSnapshot snapshot)
+    {
+        return SizeFormatter.Format(snapshot.WorkingSetBytes);
+    }
+
+    public static string TileMemoryHint(PerformanceSnapshot snapshot)
+    {
+        return $"управляемой {SizeFormatter.Format(snapshot.ManagedBytes)}";
+    }
+
+    public static string TileMemoryPeak(PerformanceSnapshot snapshot)
+    {
+        return snapshot.WorkingSetPeakBytes > 0
+            ? $"пик за сеанс {SizeFormatter.Format(snapshot.WorkingSetPeakBytes)}"
+            : "пик за сеанс: замеров ещё нет";
+    }
+
+    public static string TileCollections(PerformanceSnapshot snapshot)
+    {
+        return $"{snapshot.Gen0Collections} / {snapshot.Gen1Collections} / {snapshot.Gen2Collections}";
+    }
+
+    public static string TileCollectionsWindow(PerformanceSnapshot snapshot)
+    {
+        var history = snapshot.History;
+
+        return history.SampleCount < 2
+            ? "за окно наблюдения: мерить не по чему"
+            : $"за последние {Duration(TimeSpan.FromSeconds(history.SpanSeconds))}: {history.Gen0Collections} / {history.Gen1Collections} / {history.Gen2Collections}";
     }
 
     public static string TileWindow(PerformanceSnapshot snapshot)

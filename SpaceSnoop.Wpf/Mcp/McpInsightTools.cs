@@ -75,6 +75,8 @@ internal sealed class McpInsightTools(
             SizeFormatter.Format(snapshot.ManagedBytes),
             snapshot.WorkingSetBytes,
             SizeFormatter.Format(snapshot.WorkingSetBytes),
+            snapshot.WorkingSetPeakBytes,
+            SizeFormatter.Format(snapshot.WorkingSetPeakBytes),
             snapshot.Gen0Collections,
             snapshot.Gen1Collections,
             snapshot.Gen2Collections,

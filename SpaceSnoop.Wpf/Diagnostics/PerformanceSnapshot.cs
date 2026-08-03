@@ -9,9 +9,11 @@ public sealed record PerformanceSnapshot(
     double ObservedSpanSeconds,
     long ManagedBytes,
     long WorkingSetBytes,
+    long WorkingSetPeakBytes,
     int Gen0Collections,
     int Gen1Collections,
     int Gen2Collections,
+    PerformanceHistoryStats History,
     double StartupSeconds,
     double RenderLastMs,
     double RenderPeakMs,
@@ -19,5 +21,5 @@ public sealed record PerformanceSnapshot(
     int RenderCount,
     PerformanceOperation? Operation)
 {
-    public static PerformanceSnapshot Empty { get; } = new(DateTime.MinValue, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, null);
+    public static PerformanceSnapshot Empty { get; } = new(DateTime.MinValue, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, default, 0, 0, 0, 0, 0, null);
 }

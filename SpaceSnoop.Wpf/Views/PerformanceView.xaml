@@ -115,7 +115,7 @@
             <WrapPanel>
                 <Border Style="{StaticResource Performance.Tile}">
                     <StackPanel>
-                        <TextBlock Text="Отклик UI-потока"
+                        <TextBlock Text="Пик отклика UI-потока"
                                    Style="{StaticResource Performance.TileCaption}" />
 
                         <StackPanel Orientation="Horizontal">
@@ -143,24 +143,24 @@
                             </iconPacks:PackIconLucide>
 
                             <TextBlock Text="{Binding DelayText}"
-                                       VerticalAlignment="Center"
-                                       Style="{StaticResource Performance.TileValue}" />
+                                       VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock"
+                                           BasedOn="{StaticResource Performance.TileValue}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsHitch}"
+                                                         Value="True">
+                                                <Setter Property="Foreground"
+                                                        Value="{DynamicResource State.Warning}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                         </StackPanel>
 
-                        <TextBlock Text="{Binding DelayHint}">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock"
-                                       BasedOn="{StaticResource Performance.TileHint}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsHitch}"
-                                                     Value="True">
-                                            <Setter Property="Foreground"
-                                                    Value="{DynamicResource State.Warning}" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
+                        <TextBlock Text="{Binding DelayHint}"
+                                   Style="{StaticResource Performance.TileHint}" />
 
                         <TextBlock Text="{Binding WindowText}"
                                    Style="{StaticResource Performance.TileHint}"
@@ -170,7 +170,7 @@
 
                 <Border Style="{StaticResource Performance.Tile}">
                     <StackPanel>
-                        <TextBlock Text="Память"
+                        <TextBlock Text="Память процесса"
                                    Style="{StaticResource Performance.TileCaption}" />
 
                         <TextBlock Text="{Binding MemoryText}"
@@ -178,6 +178,10 @@
 
                         <TextBlock Text="{Binding MemoryHint}"
                                    Style="{StaticResource Performance.TileHint}" />
+
+                        <TextBlock Text="{Binding MemoryPeakText}"
+                                   Style="{StaticResource Performance.TileHint}"
+                                   Margin="0,2,0,0" />
                     </StackPanel>
                 </Border>
 
@@ -191,6 +195,10 @@
 
                         <TextBlock Text="поколения 0 / 1 / 2 с начала сбора"
                                    Style="{StaticResource Performance.TileHint}" />
+
+                        <TextBlock Text="{Binding CollectionsWindowText}"
+                                   Style="{StaticResource Performance.TileHint}"
+                                   Margin="0,2,0,0" />
                     </StackPanel>
                 </Border>
 

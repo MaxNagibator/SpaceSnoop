@@ -239,6 +239,27 @@ public class PerformanceHistoryTests
     }
 
     [Test]
+    public void Скаляры_кольца_снимаются_без_материализации_точек()
+    {
+        var now = Stopwatch.GetTimestamp();
+        var buffer = new PerformanceHistoryBuffer(8);
+
+        buffer.Add(Sample(now, 30, "давняя", 5));
+        buffer.Add(Sample(now, 4, "недавняя", 7));
+        buffer.Add(Sample(now, 1, "свежая", 9));
+
+        var stats = buffer.Stats();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(stats.SampleCount, Is.EqualTo(3));
+            Assert.That(stats.SpanSeconds, Is.EqualTo(29).Within(0.5));
+            Assert.That(stats.Gen0Collections, Is.EqualTo(4));
+            Assert.That(new PerformanceHistoryBuffer(4).Stats().SampleCount, Is.Zero);
+        });
+    }
+
+    [Test]
     public void Пустое_окно_наблюдения_не_покрывает_времени()
     {
         Assert.That(new PerformanceSamples(20).SpanSeconds(500), Is.Zero);
