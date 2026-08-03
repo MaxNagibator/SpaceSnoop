@@ -18,15 +18,44 @@
         </Grid.RowDefinitions>
 
         <DockPanel Grid.Row="0"
-                   Margin="0,0,0,6"
-                   Visibility="{Binding Data.HasData, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                   Margin="0,0,0,6">
+            <Border DockPanel.Dock="Right"
+                    Background="{DynamicResource Bg.SurfaceAlt}"
+                    CornerRadius="{DynamicResource Radius.M}"
+                    Padding="2"
+                    Margin="12,0,0,0"
+                    VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal">
+                    <RadioButton Style="{StaticResource RadioButton.Segment}"
+                                 Content="30 с"
+                                 IsChecked="{Binding Window, Converter={StaticResource EnumToBoolean}, ConverterParameter=Seconds30}"
+                                 ToolTip="Показать последние 30 секунд"
+                                 AutomationProperties.Name="Окно графика: 30 секунд" />
+
+                    <RadioButton Style="{StaticResource RadioButton.Segment}"
+                                 Content="1 мин"
+                                 IsChecked="{Binding Window, Converter={StaticResource EnumToBoolean}, ConverterParameter=Seconds60}"
+                                 ToolTip="Показать последнюю минуту"
+                                 AutomationProperties.Name="Окно графика: 1 минута" />
+
+                    <RadioButton Style="{StaticResource RadioButton.Segment}"
+                                 Content="5 мин"
+                                 IsChecked="{Binding Window, Converter={StaticResource EnumToBoolean}, ConverterParameter=Seconds300}"
+                                 ToolTip="Показать все накопленные замеры – кольцо держит 5 минут"
+                                 AutomationProperties.Name="Окно графика: 5 минут" />
+                </StackPanel>
+            </Border>
+
             <TextBlock DockPanel.Dock="Right"
                        Text="{Binding WindowText}"
                        Style="{StaticResource TextBlock.Subtle}"
                        VerticalAlignment="Center"
-                       Margin="12,0,0,0" />
+                       Margin="12,0,0,0"
+                       Visibility="{Binding Data.HasData, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
 
-            <StackPanel Orientation="Horizontal">
+            <StackPanel Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        Visibility="{Binding Data.HasData, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
                 <iconPacks:PackIconLucide Width="14"
                                           Height="14"
                                           VerticalAlignment="Center"

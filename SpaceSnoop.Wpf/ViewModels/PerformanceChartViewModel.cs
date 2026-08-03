@@ -28,6 +28,9 @@ public sealed partial class PerformanceChartViewModel : ObservableObject, ILogsP
     [ObservableProperty]
     private double _chartHeight = AppDefaults.PerformanceChartPanelHeight;
 
+    [ObservableProperty]
+    private PerformanceChartWindow _window;
+
     public PerformanceChartViewModel(PerformanceMonitor monitor, ISettingsStore settings, IUiDispatcher uiDispatcher, IApplicationLifetime lifetime)
     {
         _monitor = monitor;
@@ -37,6 +40,7 @@ public sealed partial class PerformanceChartViewModel : ObservableObject, ILogsP
         _timer = uiDispatcher.CreateTimer(TimeSpan.FromMilliseconds(AppDefaults.PerformanceChartRefreshMs), OnTick);
 
         IsExpanded = _settings.GetBool(SettingsKeys.PerformanceChart, AppDefaults.PerformanceChartExpandedDefault);
+        _window = RestoreWindow(settings);
     }
 
     public event EventHandler? Refreshed;
@@ -55,6 +59,7 @@ public sealed partial class PerformanceChartViewModel : ObservableObject, ILogsP
     {
         if (active)
         {
+            Window = RestoreWindow(_settings);
             Refresh();
             _timer.Start();
 
@@ -67,6 +72,19 @@ public sealed partial class PerformanceChartViewModel : ObservableObject, ILogsP
     partial void OnIsExpandedChanged(bool value)
     {
         _settings.SetBool(SettingsKeys.PerformanceChart, value);
+    }
+
+    partial void OnWindowChanged(PerformanceChartWindow value)
+    {
+        _settings.SetEnum(SettingsKeys.PerformanceChartWindow, value);
+        Refresh();
+    }
+
+    private static PerformanceChartWindow RestoreWindow(ISettingsStore settings)
+    {
+        var window = settings.GetEnum(SettingsKeys.PerformanceChartWindow, AppDefaults.PerformanceChartWindowDefault);
+
+        return window == PerformanceChartWindow.None ? AppDefaults.PerformanceChartWindowDefault : window;
     }
 
     private void OnTick()
@@ -83,7 +101,7 @@ public sealed partial class PerformanceChartViewModel : ObservableObject, ILogsP
     {
         _monitor.Start();
 
-        var data = PerformanceChartLayout.Build(_monitor.CaptureHistory(TimeSpan.Zero, AppDefaults.PerformanceHistoryPointsMax));
+        var data = PerformanceChartLayout.Build(_monitor.CaptureHistory(TimeSpan.FromSeconds((int)Window), AppDefaults.PerformanceHistoryPointsMax));
 
         Data = data;
         VerdictText = PerformanceFormat.ChartVerdict(data);

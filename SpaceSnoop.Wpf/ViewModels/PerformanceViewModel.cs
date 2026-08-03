@@ -113,7 +113,7 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
     public string PageTitle => "Производительность";
 
     public string? PageDescription =>
-        $"Задержка UI-потока, память и сборки мусора. График держит последние {AppDefaults.PerformanceHistorySecondsMax / 60} мин, просадкой считается задержка от {AppDefaults.PerformanceHitchMs} мс.";
+        $"Задержка UI-потока, память и сборки мусора. Замеры живут {AppDefaults.PerformanceHistorySecondsMax / 60} мин, окно графика выбирается полосой, просадка – от {AppDefaults.PerformanceHitchMs} мс.";
 
     public void SetActive(bool active)
     {

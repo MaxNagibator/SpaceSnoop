@@ -104,6 +104,39 @@ public class PlatformGatewayTests
         }
     }
 
+    [Test]
+    public void Выбранное_окно_графика_переживает_перезапуск_панели()
+    {
+        var settings = new MemorySettings();
+
+        Chart(settings).Window = PerformanceChartWindow.Seconds30;
+
+        Assert.That(Chart(settings).Window, Is.EqualTo(PerformanceChartWindow.Seconds30));
+    }
+
+    [Test]
+    public void Панель_подхватывает_окно_выбранное_у_соседней()
+    {
+        var settings = new MemorySettings();
+        var page = Chart(settings);
+        var panel = Chart(settings);
+
+        page.Window = PerformanceChartWindow.Seconds60;
+        panel.SetActive(true);
+
+        Assert.That(panel.Window, Is.EqualTo(PerformanceChartWindow.Seconds60));
+    }
+
+    [TestCase("None")]
+    [TestCase("Seconds45")]
+    public void Непригодное_значение_в_настройках_не_оставляет_график_без_окна(string stored)
+    {
+        var settings = new MemorySettings();
+        settings.SetValue(SettingsKeys.PerformanceChartWindow, stored);
+
+        Assert.That(Chart(settings).Window, Is.EqualTo(AppDefaults.PerformanceChartWindowDefault));
+    }
+
     [TestCase(true, "Запущено в фоне – результат появится в истории.")]
     [TestCase(false, "Не удалось запустить")]
     public void Профиль_расписания_сообщает_о_судьбе_фонового_запуска(bool succeeds, string expected)
@@ -123,6 +156,11 @@ public class PlatformGatewayTests
             Assert.That(shell.Started[0], Does.Contain(AppInfo.SyncArgument).And.EndWith("one"));
             Assert.That(profile.Message, Is.EqualTo(expected));
         }
+    }
+
+    private static PerformanceChartViewModel Chart(MemorySettings settings)
+    {
+        return new(new(NullLogger<PerformanceMonitor>.Instance), settings, new FakeUiDispatcher(), new FakeApplicationLifetime());
     }
 
     private FileInfo MakeFile(string name, long size)

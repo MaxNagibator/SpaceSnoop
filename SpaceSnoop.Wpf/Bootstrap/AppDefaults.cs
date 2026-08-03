@@ -99,6 +99,7 @@ public static class AppDefaults
     public const int PerformanceRenderSamples = 60;
     public const double PerformanceRenderSlowMs = 16;
     public const bool PerformanceChartExpandedDefault = false;
+    public const PerformanceChartWindow PerformanceChartWindowDefault = PerformanceChartWindow.Seconds300;
     public const int PerformanceChartRefreshMs = 1000;
     public const double PerformanceChartPanelHeight = 160;
     public const double PerformanceChartPageHeight = 300;
