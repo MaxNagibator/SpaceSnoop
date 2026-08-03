@@ -369,7 +369,7 @@ public sealed class TreemapView : FrameworkElement
 
     private void OnItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(ScanNodeViewModel.IsMarkedDeleted) or nameof(ScanNodeViewModel.IsSelected) or "" or null)
+        if (e.PropertyName is nameof(ScanNodeViewModel.IsMarkedDeleted) or "" or null)
         {
             InvalidateVisual();
         }
