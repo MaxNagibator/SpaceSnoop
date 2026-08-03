@@ -1,8 +1,6 @@
-﻿using System.Windows.Input;
+﻿namespace SpaceSnoop.Wpf.ViewModels;
 
-namespace SpaceSnoop.Wpf.ViewModels;
-
-public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader, IPageRefresh
+public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
 {
     private readonly PerformanceMonitor _monitor;
 
@@ -34,6 +32,9 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
     private string _startupText = string.Empty;
 
     [ObservableProperty]
+    private string _startupHint = string.Empty;
+
+    [ObservableProperty]
     private string _renderText = string.Empty;
 
     [ObservableProperty]
@@ -44,6 +45,9 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
 
     [ObservableProperty]
     private string _windowText = string.Empty;
+
+    [ObservableProperty]
+    private string? _staleText;
 
     [ObservableProperty]
     private string? _operationText;
@@ -67,6 +71,7 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
 
         Chart = chart;
         Chart.ChartHeight = AppDefaults.PerformanceChartPageHeight;
+        Chart.Refreshed += OnChartRefreshed;
         Preferences = preferences;
 
         _monitor.Updated += OnMonitorUpdated;
@@ -82,10 +87,6 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
     public string? PageDescription =>
         $"Задержка UI-потока, память и сборки мусора. График держит последние {AppDefaults.PerformanceHistorySecondsMax / 60} мин, просадкой считается задержка от {AppDefaults.PerformanceHitchMs} мс.";
 
-    public string? RefreshTooltip => "Перечитать замеры прямо сейчас";
-
-    ICommand IPageRefresh.RefreshCommand => RefreshCommand;
-
     public void SetActive(bool active)
     {
         _active = active;
@@ -98,14 +99,6 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
 
         _monitor.Start();
         Apply(_monitor.Snapshot);
-    }
-
-    [RelayCommand]
-    private void Refresh()
-    {
-        _monitor.Start();
-        Apply(_monitor.Snapshot);
-        Chart.Refresh();
     }
 
     [RelayCommand]
@@ -138,17 +131,23 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
         }
     }
 
+    private void OnChartRefreshed(object? sender, EventArgs e)
+    {
+        StaleText = PerformanceFormat.StaleWarning(_monitor.Snapshot, DateTime.UtcNow);
+    }
+
     private void Apply(PerformanceSnapshot snapshot)
     {
-        DelayText = $"{Math.Round(snapshot.UiDelayMs):N0} мс";
-        DelayHint = $"пик {Math.Round(snapshot.UiPeakMs):N0} мс · среднее {Math.Round(snapshot.UiAverageMs):N0} мс";
+        DelayText = PerformanceFormat.TileDelay(snapshot);
+        DelayHint = PerformanceFormat.TileDelayHint(snapshot);
         IsHitch = snapshot.UiPeakMs >= AppDefaults.PerformanceHitchMs;
 
         MemoryText = SizeFormatter.Format(snapshot.ManagedBytes);
         MemoryHint = $"процесс {SizeFormatter.Format(snapshot.WorkingSetBytes)}";
 
         CollectionsText = $"{snapshot.Gen0Collections} / {snapshot.Gen1Collections} / {snapshot.Gen2Collections}";
-        StartupText = $"{snapshot.StartupSeconds:N2} с";
+        StartupText = PerformanceFormat.TileStartup(snapshot);
+        StartupHint = PerformanceFormat.TileStartupHint(snapshot);
 
         RenderText = snapshot.RenderCount == 0 ? "нет кадров" : $"{snapshot.RenderLastMs:N1} мс";
 
@@ -157,7 +156,8 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
             : $"пик {snapshot.RenderPeakMs:N1} мс · среднее {snapshot.RenderAverageMs:N1} мс · {Plural.Format(snapshot.RenderCount, "кадр", "кадра", "кадров")}";
 
         IsRenderSlow = snapshot.RenderPeakMs >= AppDefaults.PerformanceRenderSlowMs;
-        WindowText = $"{Plural.Format(snapshot.SampleCount, "замер", "замера", "замеров")} за {snapshot.ObservedSpanSeconds:N1} с";
+        WindowText = PerformanceFormat.TileWindow(snapshot);
+        StaleText = PerformanceFormat.StaleWarning(snapshot, DateTime.UtcNow);
 
         OperationText = snapshot.Operation?.Name;
         OperationHint = DescribeOperation(snapshot.Operation);

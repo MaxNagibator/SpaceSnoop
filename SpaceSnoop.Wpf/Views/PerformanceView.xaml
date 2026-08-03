@@ -94,6 +94,24 @@
                 </StackPanel>
             </DockPanel>
 
+            <Border Style="{StaticResource Card.Inset}"
+                    Padding="12,8"
+                    Margin="0,0,10,10"
+                    Visibility="{Binding StaleText, Converter={StaticResource NullToVisibility}, TargetNullValue=Collapsed}">
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
+                                              Width="16"
+                                              Height="16"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,8,0"
+                                              Foreground="{DynamicResource State.Warning}" />
+
+                    <TextBlock Text="{Binding StaleText}"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource State.Warning}" />
+                </StackPanel>
+            </Border>
+
             <WrapPanel>
                 <Border Style="{StaticResource Performance.Tile}">
                     <StackPanel>
@@ -125,26 +143,26 @@
                             </iconPacks:PackIconLucide>
 
                             <TextBlock Text="{Binding DelayText}"
-                                       VerticalAlignment="Center">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock"
-                                           BasedOn="{StaticResource Performance.TileValue}">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsHitch}"
-                                                         Value="True">
-                                                <Setter Property="Foreground"
-                                                        Value="{DynamicResource State.Warning}" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
+                                       VerticalAlignment="Center"
+                                       Style="{StaticResource Performance.TileValue}" />
                         </StackPanel>
 
-                        <TextBlock Text="{Binding DelayHint}"
-                                   Style="{StaticResource Performance.TileHint}" />
+                        <TextBlock Text="{Binding DelayHint}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock"
+                                       BasedOn="{StaticResource Performance.TileHint}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsHitch}"
+                                                     Value="True">
+                                            <Setter Property="Foreground"
+                                                    Value="{DynamicResource State.Warning}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
 
-                        <TextBlock Text="{Binding WindowText, StringFormat=окно: {0}}"
+                        <TextBlock Text="{Binding WindowText}"
                                    Style="{StaticResource Performance.TileHint}"
                                    Margin="0,2,0,0" />
                     </StackPanel>
@@ -184,7 +202,7 @@
                         <TextBlock Text="{Binding StartupText}"
                                    Style="{StaticResource Performance.TileValue}" />
 
-                        <TextBlock Text="от запуска до первого кадра окна"
+                        <TextBlock Text="{Binding StartupHint}"
                                    Style="{StaticResource Performance.TileHint}" />
                     </StackPanel>
                 </Border>

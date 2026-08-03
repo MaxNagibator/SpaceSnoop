@@ -39,6 +39,8 @@ public sealed partial class PerformanceChartViewModel : ObservableObject, ILogsP
         IsExpanded = _settings.GetBool(SettingsKeys.PerformanceChart, AppDefaults.PerformanceChartExpandedDefault);
     }
 
+    public event EventHandler? Refreshed;
+
     public string Title => "График производительности";
 
     public string ChartDescription =>
@@ -88,6 +90,8 @@ public sealed partial class PerformanceChartViewModel : ObservableObject, ILogsP
         MemoryText = PerformanceFormat.ChartMemory(data);
         WindowText = PerformanceFormat.ChartWindow(data);
         OperationsText = DescribeOperations(data);
+
+        Refreshed?.Invoke(this, EventArgs.Empty);
     }
 
     private static string? DescribeOperations(PerformanceChartData data)

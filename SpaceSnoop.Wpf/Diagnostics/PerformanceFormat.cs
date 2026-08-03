@@ -30,6 +30,51 @@ public static class PerformanceFormat
         return $"Память {SizeFormatter.Format(managedBytes)} · процесс {SizeFormatter.Format(workingSetBytes)}";
     }
 
+    public static string TileDelay(PerformanceSnapshot snapshot)
+    {
+        return snapshot.SampleCount == 0 ? "нет замеров" : $"{Math.Round(snapshot.UiDelayMs):N0} мс";
+    }
+
+    public static string TileDelayHint(PerformanceSnapshot snapshot)
+    {
+        return snapshot.SampleCount == 0
+            ? "сбор только запущен или сброшен"
+            : $"пик {Math.Round(snapshot.UiPeakMs):N0} мс · среднее {Math.Round(snapshot.UiAverageMs):N0} мс";
+    }
+
+    public static string TileWindow(PerformanceSnapshot snapshot)
+    {
+        return snapshot.SampleCount == 0
+            ? "окно: замеров ещё нет"
+            : $"окно: {Plural.Format(snapshot.SampleCount, "замер", "замера", "замеров")} за {snapshot.ObservedSpanSeconds:N1} с";
+    }
+
+    public static string TileStartup(PerformanceSnapshot snapshot)
+    {
+        return snapshot.StartupSeconds > 0 ? $"{snapshot.StartupSeconds:N2} с" : "не измерялся";
+    }
+
+    public static string TileStartupHint(PerformanceSnapshot snapshot)
+    {
+        return snapshot.StartupSeconds > 0
+            ? "от запуска до первого кадра окна"
+            : "окно не показывалось, замер не доложен";
+    }
+
+    public static string? StaleWarning(PerformanceSnapshot snapshot, DateTime nowUtc)
+    {
+        if (snapshot.CapturedAtUtc == DateTime.MinValue)
+        {
+            return null;
+        }
+
+        var ageMs = (nowUtc - snapshot.CapturedAtUtc).TotalMilliseconds;
+
+        return ageMs > 2 * AppDefaults.PerformanceSampleIntervalMs
+            ? $"Снимок сделан {Ago(ageMs)}: UI-поток не успевает снимать замеры, числа ниже устарели"
+            : null;
+    }
+
     public static string ChartVerdict(PerformanceChartData data)
     {
         if (!data.HasData)

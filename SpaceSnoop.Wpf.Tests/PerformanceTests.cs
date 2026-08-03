@@ -1,5 +1,6 @@
 ﻿using SpaceSnoop.Core;
 using SpaceSnoop.Core.Domain;
+using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Diagnostics;
 using SpaceSnoop.Wpf.ViewModels.Sync;
 using System.Globalization;
@@ -375,6 +376,71 @@ public class PerformanceTests
         report.AddApplied(SyncAction.CopyToRight, "a.txt", 512);
 
         Assert.That(SyncSessionViewModel.DescribeRate("Синхронизация", report, TimeSpan.FromMilliseconds(80)), Is.Empty);
+    }
+
+    [Test]
+    public void Плитка_отклика_не_выдаёт_ноль_за_измеренный()
+    {
+        var justReset = PerformanceSnapshot.Empty with { CapturedAtUtc = DateTime.UtcNow };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(PerformanceFormat.TileDelay(justReset), Is.EqualTo("нет замеров"));
+            Assert.That(PerformanceFormat.TileDelayHint(justReset), Does.Not.Contain("пик"));
+            Assert.That(PerformanceFormat.TileWindow(justReset), Is.EqualTo("окно: замеров ещё нет"));
+        });
+    }
+
+    [Test]
+    public void Признак_просадки_стоит_на_пике_а_не_на_мгновенной_задержке()
+    {
+        var snapshot = PerformanceSnapshot.Empty with
+        {
+            CapturedAtUtc = DateTime.UtcNow,
+            UiDelayMs = 2,
+            UiPeakMs = 640,
+            UiAverageMs = 35,
+            SampleCount = 20,
+            ObservedSpanSeconds = 10.4,
+        };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(PerformanceFormat.TileDelay(snapshot), Is.EqualTo("2 мс"));
+            Assert.That(PerformanceFormat.TileDelayHint(snapshot), Is.EqualTo("пик 640 мс · среднее 35 мс"));
+            Assert.That(PerformanceFormat.TileWindow(snapshot), Is.EqualTo("окно: 20 замеров за 10,4 с"));
+        });
+    }
+
+    [Test]
+    public void Недоложенный_старт_отличается_от_мгновенного()
+    {
+        var missing = PerformanceSnapshot.Empty with { CapturedAtUtc = DateTime.UtcNow };
+        var measured = missing with { StartupSeconds = 1.25 };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(PerformanceFormat.TileStartup(missing), Is.EqualTo("не измерялся"));
+            Assert.That(PerformanceFormat.TileStartupHint(missing), Does.Contain("не доложен"));
+            Assert.That(PerformanceFormat.TileStartup(measured), Is.EqualTo("1,25 с"));
+            Assert.That(PerformanceFormat.TileStartupHint(measured), Does.Contain("первого кадра"));
+        });
+    }
+
+    [Test]
+    public void Возраст_снимка_объявляется_только_после_двух_интервалов_съёма()
+    {
+        var now = new DateTime(2026, 8, 1, 10, 0, 0, DateTimeKind.Utc);
+
+        var fresh = PerformanceSnapshot.Empty with { CapturedAtUtc = now.AddMilliseconds(-AppDefaults.PerformanceSampleIntervalMs) };
+        var stale = PerformanceSnapshot.Empty with { CapturedAtUtc = now.AddSeconds(-30) };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(PerformanceFormat.StaleWarning(PerformanceSnapshot.Empty, now), Is.Null);
+            Assert.That(PerformanceFormat.StaleWarning(fresh, now), Is.Null);
+            Assert.That(PerformanceFormat.StaleWarning(stale, now), Does.Contain("30 с назад"));
+        });
     }
 
     [TestCase(0, 0, "0:00")]
