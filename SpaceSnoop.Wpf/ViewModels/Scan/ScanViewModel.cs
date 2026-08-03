@@ -16,6 +16,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     private readonly ILogger<ScanViewModel> _logger;
     private readonly ToastNotifier _notifier;
     private readonly PerformanceMonitor _performance;
+    private readonly PerformanceRunTracker _runs;
     private readonly IFilePicker _filePicker;
 
     private readonly ScanSortState _sortState = new();
@@ -72,11 +73,13 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         ILogger<ScanViewModel> logger,
         ToastNotifier notifier,
         PerformanceMonitor performance,
+        PerformanceRunTracker runs,
         IFilePicker filePicker,
         IUiDispatcher uiDispatcher)
     {
         _calculator = calculator;
         _performance = performance;
+        _runs = runs;
         _dialogs = dialogs;
         _settings = settings;
         _nodeFactory = nodeFactory;

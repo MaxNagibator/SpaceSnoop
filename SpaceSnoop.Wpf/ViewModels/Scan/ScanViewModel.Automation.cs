@@ -108,7 +108,7 @@ public sealed partial class ScanViewModel : IScanAutomation
         Treemap.SetRoot(node);
 
         LastScanElapsed = elapsed;
-        Summary.Apply(result, elapsed);
+        _runs.Report(Summary.Apply(result, elapsed));
         HasResult = true;
         Marks.RecountMarked();
 

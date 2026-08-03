@@ -28,12 +28,16 @@ public sealed partial class ScanSummaryViewModel : ObservableObject
     [ObservableProperty]
     private string _resultRateText = NoValue;
 
-    public void Apply(DirectorySpace result, TimeSpan elapsed)
+    public PerformanceOperation Apply(DirectorySpace result, TimeSpan elapsed)
     {
         ResultPath = result.AbsolutePath;
         Refresh(result);
-        ResultElapsedText = ScanProgressViewModel.FormatElapsed(elapsed);
-        ResultRateText = PerformanceFormat.Rate(new("Сканирование", result.TotalFileCount, result.Size, elapsed)) ?? NoValue;
+        ResultElapsedText = PerformanceFormat.Elapsed(elapsed);
+
+        var run = new PerformanceOperation("Сканирование", result.TotalFileCount, result.Size, elapsed);
+        ResultRateText = PerformanceFormat.Rate(run) ?? NoValue;
+
+        return run;
     }
 
     public void Refresh(DirectorySpace result)

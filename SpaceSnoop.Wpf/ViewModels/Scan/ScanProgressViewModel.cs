@@ -95,13 +95,6 @@ public sealed partial class ScanProgressViewModel : ObservableObject
         }
     }
 
-    internal static string FormatElapsed(TimeSpan elapsed)
-    {
-        return elapsed.TotalSeconds < 60
-            ? $"{elapsed.TotalSeconds:F1} с"
-            : $"{(int)elapsed.TotalMinutes}:{elapsed.Seconds:D2}";
-    }
-
     internal ScanProgress Begin(DirectoryInfo directory, string path)
     {
         _estimatedTotalBytes = EstimateTotalBytes(directory);
@@ -142,7 +135,7 @@ public sealed partial class ScanProgressViewModel : ObservableObject
         ScanDirCountText = "0";
         ScanFileCountText = "0";
         ScanBytesText = SizeFormatter.Format(0);
-        ScanElapsedText = FormatElapsed(TimeSpan.Zero);
+        ScanElapsedText = PerformanceFormat.Elapsed(TimeSpan.Zero);
         ScanThroughputText = "–";
         ScanRemainingText = string.Empty;
         ScanHasRemaining = false;
@@ -169,7 +162,7 @@ public sealed partial class ScanProgressViewModel : ObservableObject
         ScanDirCountText = snapshot.DirectoriesScanned.ToString("N0");
         ScanFileCountText = snapshot.FilesScanned.ToString("N0");
         ScanBytesText = SizeFormatter.Format(snapshot.BytesScanned);
-        ScanElapsedText = FormatElapsed(elapsed);
+        ScanElapsedText = PerformanceFormat.Elapsed(elapsed);
 
         ScanHasBranches = snapshot.TopLevelTotal > 0;
         ScanTopLevelText = ScanHasBranches

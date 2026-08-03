@@ -175,6 +175,7 @@ public partial class App : Application
         services.AddSingleton<ErrorReportService>();
 
         services.AddSingleton<PerformanceMonitor>();
+        services.AddSingleton<PerformanceRunTracker>();
         services.AddSingleton<PerformanceHudViewModel>();
 
         services.AddSingleton<ScanInspectorViewModel>();

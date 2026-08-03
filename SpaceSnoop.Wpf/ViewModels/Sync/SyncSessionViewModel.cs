@@ -10,6 +10,7 @@ public sealed partial class SyncSessionViewModel : ObservableObject
     private readonly ILogger _logger;
     private readonly ToastNotifier _notifier;
     private readonly PerformanceMonitor _performance;
+    private readonly PerformanceRunTracker _runs;
     private readonly Action<string> _reportSummary;
 
     private CancellationTokenSource? _cts;
@@ -40,12 +41,14 @@ public sealed partial class SyncSessionViewModel : ObservableObject
         ILogger logger,
         ToastNotifier notifier,
         PerformanceMonitor performance,
+        PerformanceRunTracker runs,
         Action<string> reportSummary)
     {
         _dialogs = dialogs;
         _logger = logger;
         _notifier = notifier;
         _performance = performance;
+        _runs = runs;
         _reportSummary = reportSummary;
     }
 
@@ -115,6 +118,7 @@ public sealed partial class SyncSessionViewModel : ObservableObject
         ProgressDetail = StatusCaption;
 
         var stopwatch = Stopwatch.StartNew();
+        PerformanceOperation? measured = null;
 
         var progress = new Progress<OperationProgress>(update =>
         {
@@ -144,7 +148,7 @@ public sealed partial class SyncSessionViewModel : ObservableObject
             // TODO: остаток стоит на одном большом файле – SyncEngine докладывает прогресс только после
             // копирования файла целиком; заменить на потоковое копирование вместо File.Copy, если
             // синхронизация крупных файлов станет обычным сценарием.
-            var measured = new PerformanceOperation(operation,
+            var current = new PerformanceOperation(operation,
                 update.Completed,
                 update.Bytes,
                 stopwatch.Elapsed,
@@ -152,16 +156,21 @@ public sealed partial class SyncSessionViewModel : ObservableObject
                 totalBytes > 0 ? totalBytes : null,
                 totalBytes > 0 ? EtaBasis.Bytes : EtaBasis.Items);
 
-            ProgressRateText = PerformanceFormat.Rate(measured) ?? string.Empty;
-            ProgressRemainingText = PerformanceFormat.Remaining(measured) ?? string.Empty;
+            measured = current;
+
+            ProgressRateText = PerformanceFormat.Rate(current) ?? string.Empty;
+            ProgressRemainingText = PerformanceFormat.Remaining(current) ?? string.Empty;
             HasProgressRate = ProgressRateText.Length > 0 || ProgressRemainingText.Length > 0;
 
-            _performance.ReportOperation(measured);
+            _performance.ReportOperation(current);
         });
 
         try
         {
-            return await Task.Run(() => work(token, progress), token);
+            var result = await Task.Run(() => work(token, progress), token);
+            _runs.Report(Finished(operation, measured, stopwatch.Elapsed));
+
+            return result;
         }
         catch (OperationCanceledException)
         {
@@ -187,6 +196,13 @@ public sealed partial class SyncSessionViewModel : ObservableObject
             _cts?.Dispose();
             _cts = null;
         }
+    }
+
+    private static PerformanceOperation Finished(string name, PerformanceOperation? measured, TimeSpan elapsed)
+    {
+        return measured is null
+            ? new(name, 0, 0, elapsed)
+            : measured with { Elapsed = elapsed, TotalItems = null, TotalBytes = null, Basis = EtaBasis.None };
     }
 
     [RelayCommand]

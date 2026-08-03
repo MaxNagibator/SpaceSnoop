@@ -7,7 +7,7 @@ public static class Plural
         return $"{count} {Word(count, one, few, many)}";
     }
 
-    public static string Word(int count, string one, string few, string many)
+    public static string Word(long count, string one, string few, string many)
     {
         var tail = Math.Abs(count) % 100;
 

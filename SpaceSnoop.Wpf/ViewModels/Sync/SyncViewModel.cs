@@ -21,11 +21,12 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         ExecuteSyncUseCase sync,
         ToastNotifier notifier,
         PerformanceMonitor performance,
+        PerformanceRunTracker runs,
         IFilePicker filePicker)
     {
         _settings = settings;
 
-        Session = new(dialogs, logger, notifier, performance, summary => SummaryText = summary);
+        Session = new(dialogs, logger, notifier, performance, runs, summary => SummaryText = summary);
         Session.PropertyChanged += OnSessionPropertyChanged;
 
         Git = new(settings, dialogs, logger);

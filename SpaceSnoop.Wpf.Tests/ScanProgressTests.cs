@@ -22,24 +22,6 @@ public class ScanProgressTests
 
     private CultureInfo _culture = CultureInfo.CurrentCulture;
 
-    [TestCase(0, "0,0 с")]
-    [TestCase(0.04, "0,0 с")]
-    [TestCase(12.34, "12,3 с")]
-    [TestCase(59.94, "59,9 с")]
-    public void Меньше_минуты_считается_секундами_с_десятой(double seconds, string expected)
-    {
-        Assert.That(ScanProgressViewModel.FormatElapsed(TimeSpan.FromSeconds(seconds)), Is.EqualTo(expected));
-    }
-
-    [TestCase(60, "1:00")]
-    [TestCase(61.5, "1:01")]
-    [TestCase(3599, "59:59")]
-    [TestCase(3661, "61:01")]
-    public void От_минуты_считается_минутами_и_секундами_без_часовой_части(double seconds, string expected)
-    {
-        Assert.That(ScanProgressViewModel.FormatElapsed(TimeSpan.FromSeconds(seconds)), Is.EqualTo(expected));
-    }
-
     [Test]
     public void Оценка_объёма_есть_только_у_корня_диска()
     {

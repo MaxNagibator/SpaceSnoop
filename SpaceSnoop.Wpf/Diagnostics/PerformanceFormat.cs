@@ -92,6 +92,27 @@ public static class PerformanceFormat
             : "окно не показывалось, замер не доложен";
     }
 
+    public static PerformanceOperationTile TileOperation(PerformanceOperation? current, PerformanceOperation? last)
+    {
+        if (current is { } running)
+        {
+            return new($"Сейчас идёт: {running.Name}", Elapsed(running.Elapsed), Volume(running), RunningRate(running));
+        }
+
+        if (last is { } finished)
+        {
+            return new($"Последний прогон: {finished.Name}",
+                Elapsed(finished.Elapsed),
+                Volume(finished),
+                Rate(finished) ?? "скорость: прогон слишком короткий");
+        }
+
+        return new("Последний прогон",
+            "нет прогонов",
+            "сканирование и синхронизация ещё не запускались",
+            "после прогона здесь будут объём и скорость");
+    }
+
     public static string? StaleWarning(PerformanceSnapshot snapshot, DateTime nowUtc)
     {
         if (snapshot.CapturedAtUtc == DateTime.MinValue)
@@ -212,6 +233,13 @@ public static class PerformanceFormat
         return operation?.Remaining() is { } remaining ? $"≈ {Duration(remaining)}" : null;
     }
 
+    public static string Elapsed(TimeSpan value)
+    {
+        return value.TotalSeconds < 60
+            ? $"{value.TotalSeconds:F1} с"
+            : $"{(int)value.TotalMinutes}:{value.Seconds:D2}";
+    }
+
     public static string Duration(TimeSpan value)
     {
         if (value < TimeSpan.Zero)
@@ -222,5 +250,39 @@ public static class PerformanceFormat
         return value.TotalHours >= 1
             ? $"{(int)value.TotalHours}:{value.Minutes:00}:{value.Seconds:00}"
             : $"{value.Minutes}:{value.Seconds:00}";
+    }
+
+    private static string Volume(PerformanceOperation operation)
+    {
+        var parts = new List<string>(2);
+
+        if (operation.Items > 0)
+        {
+            parts.Add($"{operation.Items:N0} {Plural.Word(operation.Items, "файл", "файла", "файлов")}");
+        }
+
+        if (operation.Bytes > 0)
+        {
+            parts.Add(SizeFormatter.Format(operation.Bytes));
+        }
+
+        return parts.Count > 0 ? string.Join(" · ", parts) : "объём не докладывался";
+    }
+
+    private static string RunningRate(PerformanceOperation operation)
+    {
+        var parts = new List<string>(2);
+
+        if (Rate(operation) is { } rate)
+        {
+            parts.Add(rate);
+        }
+
+        if (Remaining(operation) is { } remaining)
+        {
+            parts.Add($"осталось {remaining}");
+        }
+
+        return parts.Count > 0 ? string.Join(" · ", parts) : "скорость: рано мерить";
     }
 }

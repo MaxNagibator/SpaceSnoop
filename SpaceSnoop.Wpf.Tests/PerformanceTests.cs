@@ -1,6 +1,7 @@
 ﻿using SpaceSnoop.Core;
 using SpaceSnoop.Core.Domain;
 using SpaceSnoop.Wpf.Bootstrap;
+using SpaceSnoop.Wpf.Converters;
 using SpaceSnoop.Wpf.Diagnostics;
 using SpaceSnoop.Wpf.ViewModels.Sync;
 using System.Globalization;
@@ -294,7 +295,7 @@ public class PerformanceTests
             Assert.That(text, Does.Contain("2.8.42"));
             Assert.That(text, Does.Contain("пик 640 мс"));
             Assert.That(text, Does.Contain("20 замеров за 10,0 с"));
-            Assert.That(text, Does.Contain("Операция: Сканирование"));
+            Assert.That(text, Does.Contain("Сейчас идёт: Сканирование – 2,0 с"));
             Assert.That(text, Does.Not.Contain("Замеров ещё нет"));
         });
     }
@@ -336,7 +337,7 @@ public class PerformanceTests
             Assert.That(text, Does.Contain("Замеров ещё нет"));
             Assert.That(text, Does.Not.Contain("Отклик UI"));
             Assert.That(text, Does.Contain(SizeFormatter.Format(4096)));
-            Assert.That(text, Does.Not.Contain("Операция:"));
+            Assert.That(text, Does.Contain("Последний прогон – нет прогонов"));
         });
     }
 
@@ -521,5 +522,104 @@ public class PerformanceTests
         var snapshot = PerformanceSnapshot.Empty with { UiDelayMs = 3, UiPeakMs = 800 };
 
         Assert.That(PerformanceFormat.Summary(snapshot), Does.Contain("пик 800 мс"));
+    }
+
+    [TestCase(0, "0,0 с")]
+    [TestCase(0.04, "0,0 с")]
+    [TestCase(12.34, "12,3 с")]
+    [TestCase(59.94, "59,9 с")]
+    [TestCase(60, "1:00")]
+    [TestCase(61.5, "1:01")]
+    [TestCase(3599, "59:59")]
+    [TestCase(3661, "61:01")]
+    public void Длительность_прогона_держит_секунды_до_минуты_и_минуты_дальше(double seconds, string expected)
+    {
+        Assert.That(PerformanceFormat.Elapsed(TimeSpan.FromSeconds(seconds)), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void Плитка_операции_в_простое_показывает_итог_последнего_прогона()
+    {
+        var last = new PerformanceOperation("Синхронизация", 4200, 4_500_000_000, TimeSpan.FromSeconds(12));
+
+        var tile = PerformanceFormat.TileOperation(null, last);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(tile.Caption, Is.EqualTo("Последний прогон: Синхронизация"));
+            Assert.That(tile.Value, Is.EqualTo("12,0 с"));
+            Assert.That(tile.Volume, Does.Contain("файлов").And.Contain(SizeFormatter.Format(4_500_000_000)));
+            Assert.That(tile.Rate, Does.Contain("/с"));
+        });
+    }
+
+    [Test]
+    public void Идущая_операция_вытесняет_итог_и_несёт_остаток()
+    {
+        var current = new PerformanceOperation("Сканирование", 1000, 2000, TimeSpan.FromSeconds(2), TotalItems: 2000, Basis: EtaBasis.Items);
+        var last = new PerformanceOperation("Синхронизация", 10, 20, TimeSpan.FromSeconds(30));
+
+        var tile = PerformanceFormat.TileOperation(current, last);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(tile.Caption, Is.EqualTo("Сейчас идёт: Сканирование"));
+            Assert.That(tile.Value, Is.EqualTo("2,0 с"));
+            Assert.That(tile.Rate, Does.Contain("осталось ≈ 0:02"));
+        });
+    }
+
+    [Test]
+    public void До_первого_прогона_плитка_операции_не_выдаёт_нули_за_замеры()
+    {
+        var tile = PerformanceFormat.TileOperation(null, null);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(tile.Caption, Is.EqualTo("Последний прогон"));
+            Assert.That(tile.Value, Is.EqualTo("нет прогонов"));
+            Assert.That(tile.Volume, Does.Contain("ещё не запускались"));
+            Assert.That(tile.Rate, Does.Not.Contain("0"));
+        });
+    }
+
+    [Test]
+    public void В_плитке_стоит_последний_завершившийся_прогон_а_сброс_её_обнуляет()
+    {
+        var tracker = new PerformanceRunTracker();
+        var changes = 0;
+
+        tracker.Changed += (_, _) => changes++;
+
+        tracker.Report(new("Сканирование", 10, 20, TimeSpan.FromSeconds(3)));
+        tracker.Report(new("Синхронизация", 5, 6, TimeSpan.FromSeconds(1)));
+
+        var afterRuns = tracker.Last;
+
+        tracker.Clear();
+
+        var afterClear = tracker.Last;
+
+        tracker.Clear();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(afterRuns?.Name, Is.EqualTo("Синхронизация"));
+            Assert.That(afterClear, Is.Null);
+            Assert.That(changes, Is.EqualTo(3));
+        });
+    }
+
+    [TestCase(1030d, 14d, 3)]
+    [TestCase(1030d, 22.4d, 3)]
+    [TestCase(590d, 14d, 2)]
+    [TestCase(590d, 22.4d, 2)]
+    [TestCase(430d, 22.4d, 1)]
+    [TestCase(0d, 14d, 3)]
+    public void Плитки_раскладываются_по_ширине_с_оглядкой_на_масштаб_шрифта(double width, double fontSize, int expected)
+    {
+        var columns = TileColumnsConverter.Columns(width, fontSize, AppDefaults.PerformanceTileMinWidth, AppDefaults.PerformanceTileColumnsMax);
+
+        Assert.That(columns, Is.EqualTo(expected));
     }
 }

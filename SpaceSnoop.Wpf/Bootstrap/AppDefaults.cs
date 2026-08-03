@@ -102,6 +102,9 @@ public static class AppDefaults
     public const double PerformanceChartPanelHeight = 160;
     public const double PerformanceChartPageHeight = 300;
     public const int PerformanceChartDotLimit = 40;
+    public const double PerformanceTileMinWidth = 200;
+    public const int PerformanceTileColumnsMax = 3;
+    public const double ShellBaseFontSize = 14;
 
     public const string UpdateRepositoryDefault = AppInfo.RepoSlug;
     public const bool UpdateCheckOnStartupDefault = true;

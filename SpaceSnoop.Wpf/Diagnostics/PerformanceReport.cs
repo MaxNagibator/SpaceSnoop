@@ -5,7 +5,7 @@ namespace SpaceSnoop.Wpf.Diagnostics;
 
 public static class PerformanceReport
 {
-    public static string Build(PerformanceSnapshot snapshot, string version)
+    public static string Build(PerformanceSnapshot snapshot, string version, PerformanceOperation? lastRun = null)
     {
         var text = new StringBuilder();
 
@@ -44,10 +44,8 @@ public static class PerformanceReport
                 $"Отрисовка карты диска: {snapshot.RenderLastMs:N1} мс, пик {snapshot.RenderPeakMs:N1} мс, среднее {snapshot.RenderAverageMs:N1} мс за {Plural.Format(snapshot.RenderCount, "кадр", "кадра", "кадров")}");
         }
 
-        if (PerformanceFormat.Operation(snapshot.Operation) is { } operation)
-        {
-            text.AppendLine(CultureInfo.CurrentCulture, $"Операция: {operation}");
-        }
+        var tile = PerformanceFormat.TileOperation(snapshot.Operation, lastRun);
+        text.AppendLine(CultureInfo.CurrentCulture, $"{tile.Caption} – {tile.Value}, {tile.Volume}, {tile.Rate}");
 
         return text.ToString();
     }
