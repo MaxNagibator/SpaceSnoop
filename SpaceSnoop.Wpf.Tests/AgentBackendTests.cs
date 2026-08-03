@@ -112,6 +112,49 @@ public class AgentBackendTests
         Assert.That(path, Is.EqualTo(@"C:\A\codex.exe"));
     }
 
+    [Test]
+    public void Настоящий_exe_запускается_напрямую()
+    {
+        var info = AgentCli.CreateStartInfo(@"C:\A\claude.exe", ["--model", "sonnet"]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(info.FileName, Is.EqualTo(@"C:\A\claude.exe"));
+            Assert.That(info.ArgumentList, Is.EqualTo(new[] { "--model", "sonnet" }));
+            Assert.That(info.Arguments, Is.Empty);
+        });
+    }
+
+    [TestCase(@"C:\A\claude.cmd")]
+    [TestCase(@"C:\A\claude.BAT")]
+    public void Шим_запускается_через_командный_процессор(string path)
+    {
+        var info = AgentCli.CreateStartInfo(path, ["--model", "sonnet"]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(Path.GetFileName(info.FileName), Is.EqualTo("cmd.exe").IgnoreCase);
+            Assert.That(info.ArgumentList, Is.Empty);
+            Assert.That(info.Arguments, Is.EqualTo($"/s /c \"{path} --model sonnet\""));
+        });
+    }
+
+    [TestCase(@"C:\Program Files\claude.cmd", ExpectedResult = "/s /c \"\"C:\\Program Files\\claude.cmd\" --model sonnet\"")]
+    [TestCase(@"C:\A\claude.cmd", ExpectedResult = "/s /c \"C:\\A\\claude.cmd --model sonnet\"")]
+    public string Пробел_в_пути_шима_уходит_в_кавычках(string path)
+    {
+        return AgentCli.BuildScriptArguments(path, ["--model", "sonnet"]);
+    }
+
+    [TestCase("модель&calc", ExpectedResult = "/s /c \"c.cmd \"модель&calc\"\"")]
+    [TestCase("a|b", ExpectedResult = "/s /c \"c.cmd \"a|b\"\"")]
+    [TestCase("с пробелом", ExpectedResult = "/s /c \"c.cmd \"с пробелом\"\"")]
+    [TestCase("--model", ExpectedResult = "/s /c \"c.cmd --model\"")]
+    public string Метасимволы_командного_процессора_не_разрывают_команду(string argument)
+    {
+        return AgentCli.BuildScriptArguments("c.cmd", [argument]);
+    }
+
     [TestCase("2.1.220 (Claude Code)", ExpectedResult = "2.1.220")]
     [TestCase("codex-cli 0.145.0", ExpectedResult = "0.145.0")]
     [TestCase("2.1.220", ExpectedResult = "2.1.220")]

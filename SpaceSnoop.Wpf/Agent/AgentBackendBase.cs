@@ -252,23 +252,11 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
 
     private static ProcessStartInfo BuildProcessStartInfo(string executablePath, AgentLaunch launch)
     {
-        var info = new ProcessStartInfo(executablePath)
-        {
-            UseShellExecute = false,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true,
-            StandardInputEncoding = Encoding.UTF8,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8,
-            WorkingDirectory = AppStorage.DataDirectory,
-        };
+        var info = AgentCli.CreateStartInfo(executablePath, launch.Arguments);
 
-        foreach (var argument in launch.Arguments)
-        {
-            info.ArgumentList.Add(argument);
-        }
+        info.RedirectStandardInput = true;
+        info.StandardInputEncoding = Encoding.UTF8;
+        info.WorkingDirectory = AppStorage.DataDirectory;
 
         foreach (var (name, value) in launch.Environment)
         {

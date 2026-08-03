@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+﻿using System.Buffers;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
@@ -7,6 +8,8 @@ namespace SpaceSnoop.Wpf.Agent;
 
 public static class AgentCli
 {
+    private static readonly SearchValues<char> CmdSpecials = SearchValues.Create(" \t\"&|<>^()%!");
+
     public static AgentCliInfo? Detect(IReadOnlyList<string> executableNames, string? overridePath, IReadOnlyList<string> extraDirectories)
     {
         var path = ResolveExecutable(executableNames, overridePath, CandidateDirectories(extraDirectories), File.Exists);
@@ -77,29 +80,109 @@ public static class AgentCli
         return directories;
     }
 
-    // TODO: .cmd/.bat находятся, но запускаются напрямую (Process.Start без cmd.exe) и падают
-    //       Win32Exception; сейчас спасает порядок поиска (.exe по всем каталогам раньше шимов),
-    //       апгрейд – запуск через "cmd.exe /c", если встретится установка вообще без .exe.
+    public static ProcessStartInfo CreateStartInfo(string path, IReadOnlyList<string> arguments)
+    {
+        var info = new ProcessStartInfo
+        {
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8,
+        };
+
+        if (IsScript(path))
+        {
+            info.FileName = CommandProcessor();
+            info.Arguments = BuildScriptArguments(path, arguments);
+
+            return info;
+        }
+
+        info.FileName = path;
+
+        foreach (var argument in arguments)
+        {
+            info.ArgumentList.Add(argument);
+        }
+
+        return info;
+    }
+
+    internal static bool IsScript(string path)
+    {
+        var extension = Path.GetExtension(path);
+
+        return string.Equals(extension, ".cmd", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(extension, ".bat", StringComparison.OrdinalIgnoreCase);
+    }
+
+    // TODO: аргумент с `%` уезжает в cmd.exe и раскрывается как переменная окружения; апгрейд –
+    //       запуск шима через сгенерированный временный .cmd с `setlocal disabledelayedexpansion`,
+    //       если в аргументах появится текст человека, а не флаги и пути.
+    internal static string BuildScriptArguments(string path, IReadOnlyList<string> arguments)
+    {
+        var builder = new StringBuilder("/s /c \"").Append(Quote(path));
+
+        foreach (var argument in arguments)
+        {
+            builder.Append(' ').Append(Quote(argument));
+        }
+
+        return builder.Append('"').ToString();
+    }
+
+    private static string CommandProcessor()
+    {
+        var comSpec = Environment.GetEnvironmentVariable("ComSpec");
+
+        return string.IsNullOrWhiteSpace(comSpec) ? "cmd.exe" : comSpec;
+    }
+
+    private static string Quote(string value)
+    {
+        if (value.Length > 0 && value.AsSpan().IndexOfAny(CmdSpecials) < 0)
+        {
+            return value;
+        }
+
+        var builder = new StringBuilder("\"");
+
+        for (var index = 0; index < value.Length; index++)
+        {
+            var slashes = 0;
+
+            while (index < value.Length && value[index] == '\\')
+            {
+                slashes++;
+                index++;
+            }
+
+            if (index == value.Length)
+            {
+                builder.Append('\\', slashes * 2);
+                break;
+            }
+
+            if (value[index] == '"')
+            {
+                builder.Append('\\', (slashes * 2) + 1).Append('"');
+            }
+            else
+            {
+                builder.Append('\\', slashes).Append(value[index]);
+            }
+        }
+
+        return builder.Append('"').ToString();
+    }
+
     public static string Run(string path, params string[] arguments)
     {
         try
         {
-            var info = new ProcessStartInfo(path)
-            {
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-                StandardOutputEncoding = Encoding.UTF8,
-                StandardErrorEncoding = Encoding.UTF8,
-            };
-
-            foreach (var argument in arguments)
-            {
-                info.ArgumentList.Add(argument);
-            }
-
-            using var process = Process.Start(info);
+            using var process = Process.Start(CreateStartInfo(path, arguments));
 
             if (process is null)
             {
