@@ -64,6 +64,7 @@ internal sealed class PerformanceHistoryBuffer(int capacity)
         var newest = At(0);
         var oldest = newest;
         var worst = newest;
+        var anchor = newest;
         var taken = 0;
 
         for (var offset = 0; offset < total; offset++)
@@ -71,7 +72,12 @@ internal sealed class PerformanceHistoryBuffer(int capacity)
             var sample = At(offset);
             oldest = sample;
 
-            if (taken == 0 || sample.UiDelayMs > worst.UiDelayMs)
+            if (taken == 0)
+            {
+                anchor = sample;
+                worst = sample;
+            }
+            else if (sample.UiDelayMs > worst.UiDelayMs)
             {
                 worst = sample;
             }
@@ -83,7 +89,7 @@ internal sealed class PerformanceHistoryBuffer(int capacity)
                 continue;
             }
 
-            builder.Add(Project(worst, now));
+            builder.Add(Project(worst, anchor.Timestamp, now));
             taken = 0;
         }
 
@@ -151,9 +157,9 @@ internal sealed class PerformanceHistoryBuffer(int capacity)
         return _samples[(_next - 1 - offset + _samples.Length) % _samples.Length];
     }
 
-    private static PerformancePoint Project(PerformanceSample sample, long now)
+    private static PerformancePoint Project(PerformanceSample sample, long timestamp, long now)
     {
-        return new(Stopwatch.GetElapsedTime(sample.Timestamp, now).TotalMilliseconds,
+        return new(Stopwatch.GetElapsedTime(timestamp, now).TotalMilliseconds,
             sample.UiDelayMs,
             sample.ManagedBytes,
             sample.WorkingSetBytes,

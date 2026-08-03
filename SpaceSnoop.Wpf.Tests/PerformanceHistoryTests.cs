@@ -112,6 +112,27 @@ public class PerformanceHistoryTests
     }
 
     [Test]
+    public void Свёрнутая_точка_встаёт_по_границе_бакета_а_не_по_худшему_замеру()
+    {
+        var now = Stopwatch.GetTimestamp();
+        var buffer = new PerformanceHistoryBuffer(8);
+
+        buffer.Add(Sample(now, 4, "просадка", delayMs: 900));
+        buffer.Add(Sample(now, 3, "тихо", delayMs: 1));
+        buffer.Add(Sample(now, 2, "тихо", delayMs: 2));
+        buffer.Add(Sample(now, 1, "тихо", delayMs: 3));
+
+        var points = buffer.Capture(now, DateTime.UnixEpoch, TimeSpan.Zero, 2).Points;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(points[0].UiDelayMs, Is.EqualTo(900));
+            Assert.That(points[0].AgeMs, Is.EqualTo(3000).Within(50));
+            Assert.That(points[0].AgeMs - points[1].AgeMs, Is.EqualTo(2000).Within(50));
+        });
+    }
+
+    [Test]
     public void Свёрнутыми_считаются_только_замеры_внутри_окна()
     {
         var now = Stopwatch.GetTimestamp();

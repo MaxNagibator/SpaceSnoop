@@ -73,7 +73,8 @@ public static class PerformanceChartLayout
             peak,
             memoryMin,
             memoryMax,
-            history.SpanSeconds);
+            history.SpanSeconds,
+            history.Folded);
     }
 
     internal static double NiceCeil(double value)

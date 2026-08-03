@@ -1,5 +1,6 @@
 ﻿using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Diagnostics;
+using System.Diagnostics;
 
 namespace SpaceSnoop.Wpf.Tests;
 
@@ -283,6 +284,40 @@ public class PerformanceChartTests
             [Point(1000), Point(500)]);
 
         Assert.That(PerformanceFormat.ChartWindow(PerformanceChartLayout.Build(history)), Is.EqualTo("за 1:35 · 2 замера"));
+    }
+
+    [Test]
+    public void Подпись_окна_не_выдаёт_точки_графика_за_все_замеры()
+    {
+        var history = new PerformanceHistory(DateTime.UnixEpoch, 95, 0, 0, 0, 179,
+            [Point(1000), Point(500)]);
+
+        Assert.That(PerformanceFormat.ChartWindow(PerformanceChartLayout.Build(history)), Is.EqualTo("за 1:35 · 181 замер (2 точки)"));
+    }
+
+    [Test]
+    public void Свёртка_не_рвёт_линию_на_замерах_без_пропусков()
+    {
+        var now = Stopwatch.GetTimestamp();
+        var buffer = new PerformanceHistoryBuffer(64);
+        var ago = 20.0;
+
+        for (var index = 0; index < 40; index++)
+        {
+            var hitch = index == 20;
+
+            buffer.Add(new(now - (long)(ago * Stopwatch.Frequency), hitch ? 340 : 5, 0, 0, 0, 0, 0, null));
+            ago -= hitch ? 0.84 : 0.5;
+        }
+
+        var data = PerformanceChartLayout.Build(buffer.Capture(now, DateTime.UnixEpoch, TimeSpan.Zero, 20));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(data.Points, Has.Count.EqualTo(20));
+            Assert.That(data.Delay, Has.Count.EqualTo(1));
+            Assert.That(data.PeakDelayMs, Is.EqualTo(340));
+        });
     }
 
     [Test]

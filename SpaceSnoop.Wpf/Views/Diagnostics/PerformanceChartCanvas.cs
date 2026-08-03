@@ -190,7 +190,7 @@ public sealed class PerformanceChartCanvas : FrameworkElement
         _delayPlot = new(left, top, right - left, delayHeight);
         top += delayHeight + PlotGap;
 
-        DrawText(drawingContext, "Память", fontSize, LabelBrush, new(left, top));
+        DrawText(drawingContext, "Память, управляемая", fontSize, LabelBrush, new(left, top));
         top += headerHeight;
 
         _memoryPlot = new(left, top, right - left, body - delayHeight);

@@ -388,7 +388,7 @@ public class PerformanceTests
         {
             Assert.That(PerformanceFormat.TileDelay(justReset), Is.EqualTo("нет замеров"));
             Assert.That(PerformanceFormat.TileDelayHint(justReset), Does.Not.Contain("пик"));
-            Assert.That(PerformanceFormat.TileWindow(justReset), Is.EqualTo("окно: замеров ещё нет"));
+            Assert.That(PerformanceFormat.TileWindow(justReset), Is.EqualTo("пик и среднее – замеров ещё нет"));
         });
     }
 
@@ -409,7 +409,7 @@ public class PerformanceTests
         {
             Assert.That(PerformanceFormat.TileDelay(snapshot), Is.EqualTo("640 мс"));
             Assert.That(PerformanceFormat.TileDelayHint(snapshot), Is.EqualTo("сейчас 2 мс · среднее 35 мс"));
-            Assert.That(PerformanceFormat.TileWindow(snapshot), Is.EqualTo("окно: 20 замеров за 10,4 с"));
+            Assert.That(PerformanceFormat.TileWindow(snapshot), Is.EqualTo("пик и среднее – по 20 замерам за 10,4 с"));
         });
     }
 
@@ -451,6 +451,20 @@ public class PerformanceTests
             Assert.That(PerformanceFormat.TileCollectionsWindow(snapshot), Is.EqualTo("за последние 1:15: 3 / 1 / 0"));
             Assert.That(PerformanceFormat.TileCollectionsWindow(single), Does.Contain("мерить не по чему"));
         });
+    }
+
+    [Test]
+    public void Окно_равное_всему_сбору_не_повторяет_счётчики_второй_строкой()
+    {
+        var snapshot = PerformanceSnapshot.Empty with
+        {
+            Gen0Collections = 19,
+            Gen1Collections = 18,
+            Gen2Collections = 2,
+            History = new(192, 358, 19, 18, 2),
+        };
+
+        Assert.That(PerformanceFormat.TileCollectionsWindow(snapshot), Is.EqualTo("сбор идёт 3:12, окно покрывает его целиком"));
     }
 
     [Test]

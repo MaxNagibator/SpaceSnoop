@@ -68,16 +68,27 @@ public static class PerformanceFormat
     {
         var history = snapshot.History;
 
-        return history.SampleCount < 2
-            ? "за окно наблюдения: мерить не по чему"
-            : $"за последние {Duration(TimeSpan.FromSeconds(history.SpanSeconds))}: {history.Gen0Collections} / {history.Gen1Collections} / {history.Gen2Collections}";
+        if (history.SampleCount < 2)
+        {
+            return "за окно наблюдения: мерить не по чему";
+        }
+
+        var span = Duration(TimeSpan.FromSeconds(history.SpanSeconds));
+
+        var sameAsSession = history.Gen0Collections == snapshot.Gen0Collections
+            && history.Gen1Collections == snapshot.Gen1Collections
+            && history.Gen2Collections == snapshot.Gen2Collections;
+
+        return sameAsSession
+            ? $"сбор идёт {span}, окно покрывает его целиком"
+            : $"за последние {span}: {history.Gen0Collections} / {history.Gen1Collections} / {history.Gen2Collections}";
     }
 
     public static string TileWindow(PerformanceSnapshot snapshot)
     {
         return snapshot.SampleCount == 0
-            ? "окно: замеров ещё нет"
-            : $"окно: {Plural.Format(snapshot.SampleCount, "замер", "замера", "замеров")} за {snapshot.ObservedSpanSeconds:N1} с";
+            ? "пик и среднее – замеров ещё нет"
+            : $"пик и среднее – по {Plural.Format(snapshot.SampleCount, "замеру", "замерам", "замерам")} за {snapshot.ObservedSpanSeconds:N1} с";
     }
 
     public static string TileStartup(PerformanceSnapshot snapshot)
@@ -210,13 +221,17 @@ public static class PerformanceFormat
     public static string ChartMemory(PerformanceChartData data)
     {
         return data.MemoryMaxBytes > data.MemoryMinBytes
-            ? $"Память {SizeFormatter.Format(data.MemoryMinBytes)} – {SizeFormatter.Format(data.MemoryMaxBytes)}"
-            : $"Память {SizeFormatter.Format(data.MemoryMaxBytes)}";
+            ? $"Управляемая память {SizeFormatter.Format(data.MemoryMinBytes)} – {SizeFormatter.Format(data.MemoryMaxBytes)}"
+            : $"Управляемая память {SizeFormatter.Format(data.MemoryMaxBytes)}";
     }
 
     public static string ChartWindow(PerformanceChartData data)
     {
-        return $"за {Duration(TimeSpan.FromSeconds(data.SpanSeconds))} · {Plural.Format(data.Points.Count, "замер", "замера", "замеров")}";
+        var window = $"за {Duration(TimeSpan.FromSeconds(data.SpanSeconds))} · {Plural.Format(data.Points.Count + data.Folded, "замер", "замера", "замеров")}";
+
+        return data.Folded > 0
+            ? $"{window} ({Plural.Format(data.Points.Count, "точка", "точки", "точек")})"
+            : window;
     }
 
     public static string Collections(int gen0, int gen1, int gen2)

@@ -37,7 +37,8 @@ public sealed record PerformanceChartData(
     double PeakDelayMs,
     long MemoryMinBytes,
     long MemoryMaxBytes,
-    double SpanSeconds)
+    double SpanSeconds,
+    int Folded = 0)
 {
     public static PerformanceChartData Empty { get; } =
         new([], [], [], [], [], [], PerformanceScale.Empty, PerformanceScale.Empty, 0, 0, 0, 0);
