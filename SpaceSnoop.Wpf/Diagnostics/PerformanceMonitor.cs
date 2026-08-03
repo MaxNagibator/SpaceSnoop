@@ -10,7 +10,9 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
 
     private readonly PerformanceSamples _delays = new(AppDefaults.PerformanceWindowSamples);
 
-    private readonly PerformanceFrames _frames = new(AppDefaults.PerformanceFrameSlowMs);
+    private readonly PerformanceFrames _frames = new(AppDefaults.PerformanceFrameSlowMs, AppDefaults.PerformanceFrameGapMs);
+
+    private readonly Dispatcher _dispatcher = Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
 
     private readonly PerformanceHistoryBuffer _history = new(AppDefaults.PerformanceHistorySamples);
 
@@ -26,7 +28,7 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
 
     private int _frameLeases;
 
-    private bool _frameHooked;
+    private volatile bool _frameHooked;
 
     private long _workingSetPeak;
 
@@ -176,19 +178,25 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
         SyncFrameProbe();
     }
 
+    private bool FrameProbeWanted()
+    {
+        return _running && !_disposed && (Volatile.Read(ref _frameLeases) > 0 || Volatile.Read(ref _operation) is not null);
+    }
+
     private void SyncFrameProbe()
     {
-        var dispatcher = Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
-
-        if (!dispatcher.CheckAccess())
+        if (FrameProbeWanted() == _frameHooked)
         {
-            dispatcher.BeginInvoke(SyncFrameProbe);
             return;
         }
 
-        var wanted = _running
-            && !_disposed
-            && (Volatile.Read(ref _frameLeases) > 0 || Volatile.Read(ref _operation) is not null);
+        if (!_dispatcher.CheckAccess())
+        {
+            _dispatcher.BeginInvoke(SyncFrameProbe);
+            return;
+        }
+
+        var wanted = FrameProbeWanted();
 
         if (wanted == _frameHooked)
         {
@@ -223,7 +231,7 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
 
     private DispatcherTimer CreateTimer()
     {
-        var timer = new DispatcherTimer(DispatcherPriority.Background, Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher)
+        var timer = new DispatcherTimer(DispatcherPriority.Background, _dispatcher)
         {
             Interval = SampleInterval,
         };

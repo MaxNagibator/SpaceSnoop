@@ -746,7 +746,7 @@ public class PerformanceTests
     [Test]
     public void Кадры_считаются_по_промежуткам_а_первая_отметка_только_заводит_отсчёт()
     {
-        var frames = new PerformanceFrames(50);
+        var frames = new PerformanceFrames(50, 2000);
         var start = Stopwatch.GetTimestamp();
 
         frames.Mark(start);
@@ -766,7 +766,7 @@ public class PerformanceTests
     [Test]
     public void Пауза_зонда_не_записывает_простой_как_один_гигантский_кадр()
     {
-        var frames = new PerformanceFrames(50);
+        var frames = new PerformanceFrames(50, 2000);
         var start = Stopwatch.GetTimestamp();
 
         frames.Mark(start);
@@ -778,6 +778,26 @@ public class PerformanceTests
         Assert.Multiple(() =>
         {
             Assert.That(frames.Count, Is.EqualTo(2));
+            Assert.That(frames.SlowCount, Is.Zero);
+            Assert.That(frames.PeakMs, Is.EqualTo(10).Within(1));
+        });
+    }
+
+    [Test]
+    public void Свёрнутое_окно_не_превращается_в_кадр_длиной_в_свой_простой()
+    {
+        var frames = new PerformanceFrames(50, 2000);
+        var start = Stopwatch.GetTimestamp();
+
+        frames.Mark(start);
+        frames.Mark(start + (Stopwatch.Frequency / 100));
+        frames.Mark(start + (Stopwatch.Frequency * 90));
+        frames.Mark(start + (Stopwatch.Frequency * 90) + (Stopwatch.Frequency / 100));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(frames.Count, Is.EqualTo(2));
+            Assert.That(frames.GapCount, Is.EqualTo(1));
             Assert.That(frames.SlowCount, Is.Zero);
             Assert.That(frames.PeakMs, Is.EqualTo(10).Within(1));
         });
