@@ -1,0 +1,321 @@
+﻿using ModelContextProtocol;
+using SpaceSnoop.Core.Export;
+using System.Diagnostics;
+using System.IO;
+
+namespace SpaceSnoop.Wpf.Mcp;
+
+internal sealed class McpScanTools(
+    IScanAutomation scan,
+    ScanPreferences scanPreferences,
+    DiskSpaceCalculator calculator,
+    McpPreferences preferences,
+    ToastNotifier notifier,
+    McpNavigator navigator,
+    McpStateReader state,
+    ILogger logger)
+{
+    public async Task<string> ScanAsync(string path, int depth, int entryLimit, bool show, CancellationToken cancellationToken)
+    {
+        path = path.Trim();
+        depth = McpGuards.ClampDepth(depth);
+        entryLimit = McpGuards.ClampEntryLimit(entryLimit);
+
+        logger.McpToolInvoked("scan_directory", $"«{path}», глубина {depth}, записей до {entryLimit}, показать в окне {show}");
+
+        McpGuards.ValidateScanPath(path);
+
+        if (show)
+        {
+            McpDispatch.Run(() =>
+            {
+                if (scan.IsScanning)
+                {
+                    logger.McpToolRejected("scan_directory", "страница занята операцией");
+                    throw new McpException("Страница «Сканирование» сейчас занята другой операцией.");
+                }
+            });
+        }
+
+        // Те же параметры обхода, что и у человека на странице «Сканирование».
+        var multithreaded = scanPreferences.UseMultithreading;
+        var parallelism = scanPreferences.MaxParallelism;
+
+        // Замер останавливается до сборки выгрузки: она обходит дерево ещё раз, и «время скана»
+        // в окне означало бы не то же, что «время скана» у агента.
+        var (tree, model, walk) = await Task.Run(() =>
+                {
+                    var directory = new DirectoryInfo(path);
+                    var started = Stopwatch.GetTimestamp();
+
+                    var root = multithreaded
+                        ? calculator.CalculateMultithreaded(directory, parallelism, cancellationToken)
+                        : calculator.Calculate(directory, cancellationToken);
+
+                    var elapsed = Stopwatch.GetElapsedTime(started);
+
+                    return (root, ScanExport.Build(root, directory.FullName, new(depth, multithreaded, parallelism), AppInfo.Version, entryLimit), elapsed);
+                },
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (show)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            McpDispatch.Run(() =>
+            {
+                if (scan.IsScanning)
+                {
+                    logger.McpToolRejected("scan_directory", "страница занялась операцией, пока шёл обход");
+                    throw new McpException("Страница «Сканирование» занялась другой операцией, пока шёл обход – результат не показан. Повторите с show=false, чтобы получить данные без окна.");
+                }
+
+                scan.ApplyScanResult(path, tree, walk);
+                scan.SelectPathForAutomation(tree.AbsolutePath);
+                navigator.DeferOrNavigate(SectionKey.Scan);
+                notifier.Notify($"Агент показал сканирование: {tree.AbsolutePath} · {tree.TotalSizeText}");
+            });
+        }
+
+        return ScanExport.ToJson(model);
+    }
+
+    public Task<string> GetCurrentScanAsync(int depth, int entryLimit, CancellationToken cancellationToken)
+    {
+        depth = McpGuards.ClampDepth(depth);
+        entryLimit = McpGuards.ClampEntryLimit(entryLimit);
+
+        logger.McpToolInvoked("get_current_scan", $"глубина {depth}, записей до {entryLimit}");
+
+        var build = McpDispatch.Run(() => scan.CaptureExportBuilder(depth, entryLimit));
+
+        if (build is null)
+        {
+            throw new McpException("На странице «Сканирование» результата ещё нет. Запустите open_scan с scan=true или scan_directory.");
+        }
+
+        return BuildScanJsonAsync(build, cancellationToken);
+    }
+
+    public async Task<string> OpenScanAsync(string? path, bool start, CancellationToken cancellationToken)
+    {
+        logger.McpToolInvoked("open_scan", $"«{path ?? "как есть"}», сканирование {start}");
+
+        var run = McpDispatch.Run(() => PrepareScanNavigation(path, start, cancellationToken));
+
+        if (run.Run is not null)
+        {
+            await run.Run.ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        return McpDispatch.Run(() => McpFormat.Serialize(new McpScanNavigation(navigator.CurrentSectionKey ?? SectionKey.Scan,
+            state.ReadScanState(),
+            McpFormat.DescribeDeferredNavigation(run.Deferred))));
+    }
+
+    public string MarkForDeletion(IReadOnlyList<string> paths, bool mark)
+    {
+        McpGuards.RequireMutations(preferences, logger, "mark_for_deletion");
+
+        logger.McpToolInvoked("mark_for_deletion", $"путей {paths.Count}, пометить {mark}");
+
+        if (paths.Count == 0)
+        {
+            throw new McpException("Список путей пуст.");
+        }
+
+        if (paths.Count > AppDefaults.McpEntryLimitMax)
+        {
+            throw new McpException($"За один вызов можно пометить не больше {AppDefaults.McpEntryLimitMax} путей.");
+        }
+
+        return McpDispatch.Run(() => MarkOnScanPage(paths, mark));
+    }
+
+    public async Task<string> ArchiveDirectoryAsync(string path, bool deleteOriginal, bool dryRun, CancellationToken cancellationToken)
+    {
+        path = path.Trim();
+
+        if (dryRun)
+        {
+            logger.McpToolInvoked("archive_directory", $"«{path}», план");
+
+            return McpDispatch.Run(() => BuildArchivePlan(path, deleteOriginal));
+        }
+
+        McpGuards.RequireMutations(preferences, logger, "archive_directory");
+
+        var (prepared, run) = McpDispatch.Run(() => PrepareArchiveRun(path, deleteOriginal, cancellationToken));
+
+        var outcome = await run.ConfigureAwait(false);
+
+        return McpDispatch.Run(() =>
+        {
+            if (outcome.ArchivePath is null)
+            {
+                throw new McpException($"Архив не создан: {outcome.StatusText}");
+            }
+
+            return McpFormat.Serialize(new McpArchiveResult(prepared.SourcePath,
+                outcome.ArchivePath,
+                prepared.Files.Count,
+                outcome.OriginalDeleted,
+                outcome.StatusText,
+                state.ReadScanState()));
+        });
+    }
+
+    private static async Task<string> BuildScanJsonAsync(Func<ScanExportModel> build, CancellationToken cancellationToken)
+    {
+        var model = await Task.Run(build, cancellationToken).ConfigureAwait(false);
+
+        return ScanExport.ToJson(model);
+    }
+
+    private (Task? Run, bool Deferred) PrepareScanNavigation(string? path, bool start, CancellationToken cancellationToken)
+    {
+        if (scan.IsScanning)
+        {
+            logger.McpToolRejected("open_scan", "страница занята операцией");
+            throw new McpException("Страница «Сканирование» сейчас занята другой операцией.");
+        }
+
+        var explicitPath = !string.IsNullOrWhiteSpace(path);
+        var target = explicitPath ? path!.Trim() : scan.SelectedDrive.Trim();
+
+        if (start || explicitPath)
+        {
+            McpGuards.ValidateScanPath(target);
+        }
+
+        if (target.Length > 0)
+        {
+            scan.SelectPathForAutomation(target);
+        }
+
+        var deferred = navigator.DeferOrNavigate(SectionKey.Scan);
+
+        notifier.Notify((start, deferred) switch
+        {
+            (true, _) => $"Агент запустил сканирование: {target}",
+            (false, true) => "Агент подготовил страницу «Сканирование»",
+            _ => "Агент открыл страницу «Сканирование»",
+        });
+
+        return (start ? scan.ScanFromAutomationAsync(target, cancellationToken) : null, deferred);
+    }
+
+    private string MarkOnScanPage(IReadOnlyList<string> paths, bool mark)
+    {
+        if (!scan.HasResult)
+        {
+            throw new McpException("На странице «Сканирование» результата ещё нет. Запустите open_scan с scan=true.");
+        }
+
+        if (scan.IsScanning)
+        {
+            logger.McpToolRejected("mark_for_deletion", "страница занята операцией");
+            throw new McpException("Страница «Сканирование» сейчас занята другой операцией.");
+        }
+
+        var (targets, missing, rejected) = CollectMarkTargets(paths, mark);
+        var changed = scan.MarkForAutomation(targets, mark);
+
+        if (changed > 0)
+        {
+            logger.McpMutationRequested("mark_for_deletion", $"{(mark ? "помечено" : "снято")} {changed}, всего помечено {scan.MarkedCount}");
+
+            notifier.Notify(mark
+                    ? $"Агент пометил на удаление: {changed} · всего {SizeFormatter.Format(scan.MarkedBytes())}"
+                    : $"Агент снял пометку удаления: {changed}",
+                StatusSeverity.Warning);
+        }
+
+        return McpFormat.Serialize(new McpMarkResult(changed,
+            missing,
+            rejected,
+            rejected.Count == 0 ? null : "Корень открытого сканирования пометить целиком нельзя – выберите подкаталоги.",
+            scan.MarkedCount,
+            SizeFormatter.Format(scan.MarkedBytes()),
+            state.ReadScanState()));
+    }
+
+    private (List<SpaceBase> Targets, List<string> Missing, List<string> Rejected) CollectMarkTargets(IReadOnlyList<string> paths, bool mark)
+    {
+        List<SpaceBase> targets = [];
+        List<string> missing = [];
+        List<string> rejected = [];
+
+        foreach (var path in paths.Select(static path => path.Trim()).Where(static path => path.Length > 0))
+        {
+            if (scan.FindForAutomation(path) is not { } space)
+            {
+                missing.Add(path);
+            }
+            else if (mark && scan.IsScanRoot(space))
+            {
+                rejected.Add(path);
+            }
+            else
+            {
+                targets.Add(space);
+            }
+        }
+
+        return (targets, missing, rejected);
+    }
+
+    private string BuildArchivePlan(string path, bool deleteOriginal)
+    {
+        var (_, request) = PrepareArchive(path, deleteOriginal);
+
+        return McpFormat.Serialize(new McpArchivePlan(request.SourcePath,
+            request.TargetPath,
+            request.Files.Count,
+            request.TotalBytes,
+            SizeFormatter.Format(request.TotalBytes),
+            request.DeleteOriginal));
+    }
+
+    private (ArchiveRequest Request, Task<ArchiveOutcome> Run) PrepareArchiveRun(string path, bool deleteOriginal, CancellationToken cancellationToken)
+    {
+        if (scan.IsScanning)
+        {
+            logger.McpToolRejected("archive_directory", "страница занята операцией");
+            throw new McpException("Страница «Сканирование» сейчас занята другой операцией.");
+        }
+
+        var (dir, request) = PrepareArchive(path, deleteOriginal);
+        logger.McpMutationRequested("archive_directory", $"«{request.SourcePath}» → «{request.TargetPath}», файлов {request.Files.Count}, оригинал в корзину {request.DeleteOriginal}");
+        notifier.Notify($"Агент упаковывает в архив: {request.SourcePath}", StatusSeverity.Warning);
+
+        return (request, scan.ArchiveFromAutomationAsync(dir, request, cancellationToken));
+    }
+
+    private (DirectorySpace Dir, ArchiveRequest Request) PrepareArchive(string path, bool deleteOriginal)
+    {
+        if (path.Length == 0)
+        {
+            throw new McpException("Путь к каталогу должен быть задан.");
+        }
+
+        if (scan.FindForAutomation(path) is not { } space)
+        {
+            throw new McpException($"Каталог «{path}» не найден в открытом сканировании. Упаковывается только то, что уже отсканировано: откройте дерево через open_scan с scan=true.");
+        }
+
+        if (space is not DirectorySpace dir)
+        {
+            throw new McpException($"«{path}» – файл, а упаковать можно только каталог.");
+        }
+
+        if (scan.IsScanRoot(space) || dir.Parent is not DirectorySpace)
+        {
+            throw new McpException($"«{path}» – корень сканирования, архив некуда положить. Выберите подкаталог.");
+        }
+
+        return (dir, scan.CreateArchiveRequest(dir, deleteOriginal));
+    }
+}

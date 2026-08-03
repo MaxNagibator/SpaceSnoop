@@ -15,14 +15,14 @@ public sealed class SpaceSnoopTools
     [Description("Текущее состояние запущенного SpaceSnoop: версия, права, открытая страница, параметры страницы «Синхронизация» и счётчики последнего сравнения.")]
     public static string GetAppState(McpBridge bridge)
     {
-        return bridge.GetState();
+        return bridge.Insight.GetState();
     }
 
     [McpServerTool(Name = "list_profiles")]
     [Description("Профили синхронизации из расписания: пути, направление, победитель, зеркало, исключения, периодичность и признак недоступности.")]
     public static string ListProfiles(McpBridge bridge)
     {
-        return bridge.ListProfiles();
+        return bridge.Insight.ListProfiles();
     }
 
     [McpServerTool(Name = "get_performance")]
@@ -32,14 +32,14 @@ public sealed class SpaceSnoopTools
         [Description("За сколько секунд вернуть историю замеров: 0 – без истории, потолок 300 секунд (столько хранится)")] int historySeconds = 0,
         [Description("Сколько точек истории вернуть максимум, потолок 240. Если замеров за окно больше, они сворачиваются в бакеты, и в каждом остаётся самый худший по задержке – окно возвращается целиком, просадка не теряется. Свёрнутые считаются в folded")] int historyPoints = AppDefaults.PerformanceHistoryPointsDefault)
     {
-        return bridge.GetPerformance(historySeconds, historyPoints);
+        return bridge.Insight.GetPerformance(historySeconds, historyPoints);
     }
 
     [McpServerTool(Name = "list_drives")]
     [Description("Диски машины: буква, метка, файловая система, сколько всего, занято и свободно. Отвечает мгновенно – с этого дешевле начинать разговор о нехватке места, чем со сканирования.")]
     public static string ListDrives(McpBridge bridge)
     {
-        return bridge.ListDrives();
+        return bridge.Insight.ListDrives();
     }
 
     [McpServerTool(Name = "get_current_scan")]
@@ -50,7 +50,7 @@ public sealed class SpaceSnoopTools
         [Description("Сколько записей выгружать в каждом списке (крупнейшие по размеру)")] int entryLimit = AppDefaults.McpEntryLimitDefault,
         CancellationToken cancellationToken = default)
     {
-        return bridge.GetCurrentScanAsync(depth, entryLimit, cancellationToken);
+        return bridge.Scan.GetCurrentScanAsync(depth, entryLimit, cancellationToken);
     }
 
     [McpServerTool(Name = "open_scan")]
@@ -61,7 +61,7 @@ public sealed class SpaceSnoopTools
         [Description("Запустить сканирование сразу после открытия страницы")] bool scan = true,
         CancellationToken cancellationToken = default)
     {
-        return bridge.OpenScanAsync(path, scan, cancellationToken);
+        return bridge.Scan.OpenScanAsync(path, scan, cancellationToken);
     }
 
     [McpServerTool(Name = "capture_view")]
@@ -72,7 +72,7 @@ public sealed class SpaceSnoopTools
         [Description("Имя элемента (x:Name) внутри окна; не задано – снимается всё окно")] string? element = null,
         [Description("Масштаб кадра: 1 – логический размер окна, 2 – вдвое подробнее и вчетверо тяжелее")] double scale = AppDefaults.ViewCaptureScaleDefault)
     {
-        return bridge.CaptureView(section, element, scale);
+        return bridge.Capture.CaptureView(section, element, scale);
     }
 
     [McpServerTool(Name = "docker_usage")]
@@ -83,7 +83,7 @@ public sealed class SpaceSnoopTools
         [Description("Сколько объектов выгружать (крупнейшие по размеру)")] int entryLimit = AppDefaults.McpEntryLimitDefault,
         CancellationToken cancellationToken = default)
     {
-        return bridge.GetDockerUsageAsync(includeObjects, entryLimit, cancellationToken);
+        return bridge.Insight.GetDockerUsageAsync(includeObjects, entryLimit, cancellationToken);
     }
 
     [McpServerTool(Name = "scan_directory")]
@@ -96,7 +96,7 @@ public sealed class SpaceSnoopTools
         [Description("Показать результат в окне: дерево заменит открытое на странице «Сканирование»")] bool show = false,
         CancellationToken cancellationToken = default)
     {
-        return bridge.ScanAsync(path, depth, entryLimit, show, cancellationToken);
+        return bridge.Scan.ScanAsync(path, depth, entryLimit, show, cancellationToken);
     }
 
     [McpServerTool(Name = "compare_directories")]
@@ -112,7 +112,7 @@ public sealed class SpaceSnoopTools
         [Description("Сколько различий выгружать (крупнейшие по размеру)")] int entryLimit = AppDefaults.McpEntryLimitDefault,
         CancellationToken cancellationToken = default)
     {
-        return bridge.CompareAsync(left, right, mode, winner, mirror, exclusions, entryLimit, cancellationToken);
+        return bridge.Sync.CompareAsync(left, right, mode, winner, mirror, exclusions, entryLimit, cancellationToken);
     }
 
     [McpServerTool(Name = "get_current_comparison")]
@@ -122,7 +122,7 @@ public sealed class SpaceSnoopTools
         [Description("Сколько различий выгружать (крупнейшие по размеру)")] int entryLimit = AppDefaults.McpEntryLimitDefault,
         CancellationToken cancellationToken = default)
     {
-        return bridge.GetCurrentComparisonAsync(entryLimit, cancellationToken);
+        return bridge.Sync.GetCurrentComparisonAsync(entryLimit, cancellationToken);
     }
 
     [McpServerTool(Name = "sync_current")]
@@ -133,7 +133,7 @@ public sealed class SpaceSnoopTools
         [Description("Сколько крупнейших путей включать в план")] int entryLimit = SyncPlanExport.DefaultEntryLimit,
         CancellationToken cancellationToken = default)
     {
-        return bridge.SyncCurrentAsync(dryRun, entryLimit, cancellationToken);
+        return bridge.Sync.SyncCurrentAsync(dryRun, entryLimit, cancellationToken);
     }
 
     [McpServerTool(Name = "archive_directory")]
@@ -145,7 +145,7 @@ public sealed class SpaceSnoopTools
         [Description("true – только показать план, ничего не упаковывать")] bool dryRun = true,
         CancellationToken cancellationToken = default)
     {
-        return bridge.ArchiveDirectoryAsync(path, deleteOriginal, dryRun, cancellationToken);
+        return bridge.Scan.ArchiveDirectoryAsync(path, deleteOriginal, dryRun, cancellationToken);
     }
 
     [McpServerTool(Name = "mark_for_deletion")]
@@ -155,7 +155,7 @@ public sealed class SpaceSnoopTools
         [Description("Пути к каталогам и файлам внутри дерева, открытого на странице «Сканирование»")] string[] paths,
         [Description("true – пометить, false – снять пометку вместе со вложенными")] bool mark = true)
     {
-        return bridge.MarkForDeletion(paths, mark);
+        return bridge.Scan.MarkForDeletion(paths, mark);
     }
 
     [McpServerTool(Name = "open_sync")]
@@ -171,6 +171,6 @@ public sealed class SpaceSnoopTools
         [Description("Запустить сравнение сразу после открытия страницы")] bool compare = true,
         CancellationToken cancellationToken = default)
     {
-        return bridge.OpenSyncAsync(left, right, mode, winner, mirror, exclusions, compare, cancellationToken);
+        return bridge.Sync.OpenSyncAsync(left, right, mode, winner, mirror, exclusions, compare, cancellationToken);
     }
 }

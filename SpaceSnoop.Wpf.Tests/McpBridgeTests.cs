@@ -41,13 +41,13 @@ public class McpBridgeTests
     [TestCase(int.MaxValue, AppDefaults.McpEntryLimitMax)]
     public void Лимит_записей_от_агента_зажимается_в_диапазон(int requested, int expected)
     {
-        Assert.That(McpBridge.ClampEntryLimit(requested), Is.EqualTo(expected));
+        Assert.That(McpGuards.ClampEntryLimit(requested), Is.EqualTo(expected));
     }
 
     [Test]
     public void Дефолтный_лимит_экспорта_проходит_кламп_без_изменений()
     {
-        Assert.That(McpBridge.ClampEntryLimit(ComparisonExport.DefaultEntryLimit), Is.EqualTo(ComparisonExport.DefaultEntryLimit));
+        Assert.That(McpGuards.ClampEntryLimit(ComparisonExport.DefaultEntryLimit), Is.EqualTo(ComparisonExport.DefaultEntryLimit));
     }
 
     [TestCase(0, ScanExport.MinDepth)]
@@ -56,13 +56,13 @@ public class McpBridgeTests
     [TestCase(int.MaxValue, ScanExport.MaxDepth)]
     public void Глубина_скана_от_агента_зажимается_в_диапазон(int requested, int expected)
     {
-        Assert.That(McpBridge.ClampDepth(requested), Is.EqualTo(expected));
+        Assert.That(McpGuards.ClampDepth(requested), Is.EqualTo(expected));
     }
 
     [Test]
     public void Дефолтная_глубина_скана_проходит_кламп_без_изменений()
     {
-        Assert.That(McpBridge.ClampDepth(ScanExport.DefaultDepth), Is.EqualTo(ScanExport.DefaultDepth));
+        Assert.That(McpGuards.ClampDepth(ScanExport.DefaultDepth), Is.EqualTo(ScanExport.DefaultDepth));
     }
 
     [TestCase(0, 1)]
@@ -71,13 +71,13 @@ public class McpBridgeTests
     [TestCase(int.MaxValue, AppDefaults.PerformanceHistoryPointsMax)]
     public void Число_точек_истории_зажимается_в_диапазон(int requested, int expected)
     {
-        Assert.That(McpBridge.ClampHistoryPoints(requested), Is.EqualTo(expected));
+        Assert.That(McpGuards.ClampHistoryPoints(requested), Is.EqualTo(expected));
     }
 
     [Test]
     public void До_первого_замера_окно_наблюдения_не_обещает_секунд()
     {
-        Assert.That(McpBridge.DescribeWindow(PerformanceSnapshot.Empty), Is.EqualTo("замеров ещё нет"));
+        Assert.That(McpFormat.DescribeWindow(PerformanceSnapshot.Empty), Is.EqualTo("замеров ещё нет"));
     }
 
     [Test]
@@ -85,13 +85,13 @@ public class McpBridgeTests
     {
         var snapshot = PerformanceSnapshot.Empty with { SampleCount = 20, ObservedSpanSeconds = 13.5 };
 
-        Assert.That(McpBridge.DescribeWindow(snapshot), Does.StartWith("последние 13").And.Contains("(20 замеров)"));
+        Assert.That(McpFormat.DescribeWindow(snapshot), Does.StartWith("последние 13").And.Contains("(20 замеров)"));
     }
 
     [Test]
     public void Снимок_без_истории_не_несёт_поля_history()
     {
-        var json = JsonDocument.Parse(McpBridge.Serialize(Performance(null))).RootElement;
+        var json = JsonDocument.Parse(McpFormat.Serialize(Performance(null))).RootElement;
 
         Assert.Multiple(() =>
         {
@@ -105,7 +105,7 @@ public class McpBridgeTests
     [Test]
     public void История_выходит_в_JSON_рядом_со_снимком()
     {
-        var json = JsonDocument.Parse(McpBridge.Serialize(Performance(McpBridge.DescribeHistory(History(), 60, 240)))).RootElement;
+        var json = JsonDocument.Parse(McpFormat.Serialize(Performance(McpFormat.DescribeHistory(History(), 60, 240)))).RootElement;
         var history = json.GetProperty("history");
         var timeline = history.GetProperty("timeline");
 
@@ -126,7 +126,7 @@ public class McpBridgeTests
     [Test]
     public void Стоимость_отрисовки_выходит_в_JSON_отдельными_полями()
     {
-        var json = JsonDocument.Parse(McpBridge.Serialize(Performance(null))).RootElement;
+        var json = JsonDocument.Parse(McpFormat.Serialize(Performance(null))).RootElement;
 
         Assert.Multiple(() =>
         {
@@ -140,7 +140,7 @@ public class McpBridgeTests
     [Test]
     public void Накопительные_и_оконные_счётчики_GC_названы_по_разному()
     {
-        var json = JsonDocument.Parse(McpBridge.Serialize(Performance(McpBridge.DescribeHistory(History(), 60, 240)))).RootElement;
+        var json = JsonDocument.Parse(McpFormat.Serialize(Performance(McpFormat.DescribeHistory(History(), 60, 240)))).RootElement;
 
         Assert.Multiple(() =>
         {
@@ -155,7 +155,7 @@ public class McpBridgeTests
     [TestCase(SyncVerifyState.Completed, "Completed", "до конца")]
     public void Итог_синхронизации_различает_три_исхода_проверки(SyncVerifyState state, string expected, string hint)
     {
-        var json = JsonDocument.Parse(McpBridge.Serialize(SyncResult(state, 0))).RootElement;
+        var json = JsonDocument.Parse(McpFormat.Serialize(SyncResult(state, 0))).RootElement;
 
         Assert.Multiple(() =>
         {
@@ -167,7 +167,7 @@ public class McpBridgeTests
     [Test]
     public void Пройденная_проверка_при_ошибках_не_обещает_сходимости()
     {
-        var json = JsonDocument.Parse(McpBridge.Serialize(SyncResult(SyncVerifyState.Completed, 3))).RootElement;
+        var json = JsonDocument.Parse(McpFormat.Serialize(SyncResult(SyncVerifyState.Completed, 3))).RootElement;
 
         Assert.Multiple(() =>
         {
@@ -182,7 +182,7 @@ public class McpBridgeTests
     [TestCase(int.MaxValue, AppDefaults.PerformanceHistorySecondsMax)]
     public void Окно_истории_зажимается_в_диапазон(int requested, int expected)
     {
-        Assert.That(McpBridge.ClampHistorySeconds(requested), Is.EqualTo(expected));
+        Assert.That(McpGuards.ClampHistorySeconds(requested), Is.EqualTo(expected));
     }
 
     [Test]
@@ -192,15 +192,15 @@ public class McpBridgeTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(McpBridge.SnapshotAge(fresh).TotalSeconds, Is.EqualTo(30).Within(1));
-            Assert.That(McpBridge.SnapshotAge(PerformanceSnapshot.Empty), Is.EqualTo(TimeSpan.Zero));
+            Assert.That(McpFormat.SnapshotAge(fresh).TotalSeconds, Is.EqualTo(30).Within(1));
+            Assert.That(McpFormat.SnapshotAge(PerformanceSnapshot.Empty), Is.EqualTo(TimeSpan.Zero));
         });
     }
 
     [Test]
     public void Возраст_и_задержка_точки_округляются_до_десятых()
     {
-        var history = McpBridge.DescribeHistory(History(), 60, 240);
+        var history = McpFormat.DescribeHistory(History(), 60, 240);
 
         Assert.Multiple(() =>
         {
@@ -213,14 +213,14 @@ public class McpBridgeTests
     [Test]
     public void Путь_скана_пропускается_для_существующего_каталога()
     {
-        Assert.DoesNotThrow(() => McpBridge.ValidateScanPath(_left));
+        Assert.DoesNotThrow(() => McpGuards.ValidateScanPath(_left));
     }
 
     [Test]
     public void Пустой_путь_скана_отбивается()
     {
         Assert.That(
-            Assert.Throws<McpException>(() => McpBridge.ValidateScanPath(string.Empty))?.Message,
+            Assert.Throws<McpException>(() => McpGuards.ValidateScanPath(string.Empty))?.Message,
             Does.Contain("должен быть задан"));
     }
 
@@ -230,14 +230,14 @@ public class McpBridgeTests
         var missing = Path.Combine(_root, "нет-такого");
 
         Assert.That(
-            Assert.Throws<McpException>(() => McpBridge.ValidateScanPath(missing))?.Message,
+            Assert.Throws<McpException>(() => McpGuards.ValidateScanPath(missing))?.Message,
             Does.Contain("не найден"));
     }
 
     [Test]
     public void Валидация_пропускает_разные_существующие_каталоги()
     {
-        Assert.DoesNotThrow(() => McpBridge.Validate(_left, _right, SyncMode.LeftToRight));
+        Assert.DoesNotThrow(() => McpGuards.Validate(_left, _right, SyncMode.LeftToRight));
     }
 
     [TestCase("", "C:\\")]
@@ -245,7 +245,7 @@ public class McpBridgeTests
     public void Пустой_путь_отбивается(string left, string right)
     {
         Assert.That(
-            Assert.Throws<McpException>(() => McpBridge.Validate(left, right, SyncMode.LeftToRight))?.Message,
+            Assert.Throws<McpException>(() => McpGuards.Validate(left, right, SyncMode.LeftToRight))?.Message,
             Does.Contain("должны быть заданы"));
     }
 
@@ -256,7 +256,7 @@ public class McpBridgeTests
         Directory.CreateDirectory(inner);
 
         Assert.That(
-            Assert.Throws<McpException>(() => McpBridge.Validate(_left, inner, SyncMode.LeftToRight))?.Message,
+            Assert.Throws<McpException>(() => McpGuards.Validate(_left, inner, SyncMode.LeftToRight))?.Message,
             Does.Contain("вложены"));
     }
 
@@ -266,7 +266,7 @@ public class McpBridgeTests
         var missing = Path.Combine(_root, "нет-такого");
 
         Assert.That(
-            Assert.Throws<McpException>(() => McpBridge.Validate(missing, _right, SyncMode.LeftToRight))?.Message,
+            Assert.Throws<McpException>(() => McpGuards.Validate(missing, _right, SyncMode.LeftToRight))?.Message,
             Does.Contain("источник недоступен"));
     }
 
@@ -287,7 +287,7 @@ public class McpBridgeTests
             2048,
             "2 КБ",
             state,
-            McpBridge.DescribeVerifyState(state, errorCount),
+            McpFormat.DescribeVerifyState(state, errorCount),
             errorCount,
             0,
             0,

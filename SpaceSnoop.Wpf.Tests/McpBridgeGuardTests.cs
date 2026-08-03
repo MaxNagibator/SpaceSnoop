@@ -68,7 +68,7 @@ public class McpBridgeGuardTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(Assert.Throws<McpException>(() => _bridge.MarkForDeletion([_root], true))?.Message, Does.Contain(MutationsBlocked));
+            Assert.That(Assert.Throws<McpException>(() => _bridge.Scan.MarkForDeletion([_root], true))?.Message, Does.Contain(MutationsBlocked));
             Assert.That(_scan.MarkCalls, Is.Zero);
         });
     }
@@ -80,7 +80,7 @@ public class McpBridgeGuardTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(Assert.Throws<McpException>(() => _bridge.MarkForDeletion([], true))?.Message, Does.Contain("пуст"));
+            Assert.That(Assert.Throws<McpException>(() => _bridge.Scan.MarkForDeletion([], true))?.Message, Does.Contain("пуст"));
             Assert.That(_scan.MarkCalls, Is.Zero);
         });
     }
@@ -93,7 +93,7 @@ public class McpBridgeGuardTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(Assert.Throws<McpException>(() => _bridge.MarkForDeletion(paths, true))?.Message, Does.Contain("не больше"));
+            Assert.That(Assert.Throws<McpException>(() => _bridge.Scan.MarkForDeletion(paths, true))?.Message, Does.Contain("не больше"));
             Assert.That(_scan.MarkCalls, Is.Zero);
         });
     }
@@ -105,7 +105,7 @@ public class McpBridgeGuardTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(Assert.ThrowsAsync<McpException>(() => _bridge.ArchiveDirectoryAsync(_root, false, false, CancellationToken.None))?.Message,
+            Assert.That(Assert.ThrowsAsync<McpException>(() => _bridge.Scan.ArchiveDirectoryAsync(_root, false, false, CancellationToken.None))?.Message,
                 Does.Contain(MutationsBlocked));
 
             Assert.That(_scan.ArchiveCalls, Is.Zero);
@@ -120,7 +120,7 @@ public class McpBridgeGuardTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(Assert.ThrowsAsync<McpException>(() => _bridge.SyncCurrentAsync(false, 20, CancellationToken.None))?.Message,
+            Assert.That(Assert.ThrowsAsync<McpException>(() => _bridge.Sync.SyncCurrentAsync(false, 20, CancellationToken.None))?.Message,
                 Does.Contain(MutationsBlocked));
 
             Assert.That(_sync.SyncCalls, Is.Zero);
@@ -139,7 +139,7 @@ public class McpBridgeGuardTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(Assert.ThrowsAsync<McpException>(() => _bridge.SyncCurrentAsync(false, 20, CancellationToken.None))?.Message, Does.Contain(expected));
+            Assert.That(Assert.ThrowsAsync<McpException>(() => _bridge.Sync.SyncCurrentAsync(false, 20, CancellationToken.None))?.Message, Does.Contain(expected));
             Assert.That(_sync.SyncCalls, Is.Zero);
         });
     }
@@ -147,7 +147,7 @@ public class McpBridgeGuardTests
     [Test]
     public void План_синхронизации_без_сравнения_отбивается()
     {
-        Assert.That(Assert.ThrowsAsync<McpException>(() => _bridge.SyncCurrentAsync(true, 20, CancellationToken.None))?.Message,
+        Assert.That(Assert.ThrowsAsync<McpException>(() => _bridge.Sync.SyncCurrentAsync(true, 20, CancellationToken.None))?.Message,
             Does.Contain("сравнение ещё не выполнялось"));
     }
 
@@ -158,7 +158,7 @@ public class McpBridgeGuardTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(Assert.ThrowsAsync<McpException>(() => _bridge.ScanAsync(_root, 2, 20, true, CancellationToken.None))?.Message,
+            Assert.That(Assert.ThrowsAsync<McpException>(() => _bridge.Scan.ScanAsync(_root, 2, 20, true, CancellationToken.None))?.Message,
                 Does.Contain("сейчас занята"));
 
             Assert.That(_scan.ApplyCalls, Is.Zero);
@@ -173,7 +173,7 @@ public class McpBridgeGuardTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(Assert.ThrowsAsync<McpException>(() => _bridge.ScanAsync(_root, 2, 20, true, CancellationToken.None))?.Message,
+            Assert.That(Assert.ThrowsAsync<McpException>(() => _bridge.Scan.ScanAsync(_root, 2, 20, true, CancellationToken.None))?.Message,
                 Does.Contain("пока шёл обход"));
 
             Assert.That(_scan.ApplyCalls, Is.Zero);
@@ -186,7 +186,7 @@ public class McpBridgeGuardTests
     {
         _scan.ScanningProbe = static () => true;
 
-        var json = await _bridge.ScanAsync(_root, 2, 20, false, CancellationToken.None);
+        var json = await _bridge.Scan.ScanAsync(_root, 2, 20, false, CancellationToken.None);
 
         Assert.Multiple(() =>
         {
