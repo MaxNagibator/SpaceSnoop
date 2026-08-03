@@ -11,8 +11,11 @@ public static class PerformanceChartLayout
 
     private const double GapFactor = 1.75;
     private const int DelayTickCount = 2;
+    private const int MemoryTickDivisions = 8;
 
     private static readonly long[] MemoryUnits = [1024L * 1024 * 1024, 1024L * 1024, 1024L, 1L];
+
+    private static readonly string[] MemoryUnitNames = ["ГБ", "МБ", "КБ", "байт"];
 
     public static PerformanceChartData Build(PerformanceHistory history)
     {
@@ -132,7 +135,7 @@ public static class PerformanceChartLayout
             }
         }
 
-        var step = NiceCeil((high - low) / 2);
+        var step = NiceCeil((high - low) / MemoryTickDivisions);
 
         if (step <= 0)
         {
@@ -147,10 +150,17 @@ public static class PerformanceChartLayout
 
         for (var value = low; value <= high + (step / 2); value += step)
         {
-            ticks.Add(new(1 - ((value - low) / range), SizeFormatter.Format((long)Math.Round(value * unit))));
+            ticks.Add(new(1 - ((value - low) / range), MemoryLabel(value, unit)));
         }
 
         return new(low * unit, high * unit, ticks);
+    }
+
+    private static string MemoryLabel(double value, long unit)
+    {
+        return value > 0
+            ? SizeFormatter.Format((long)Math.Round(value * unit))
+            : $"0 {MemoryUnitNames[Array.IndexOf(MemoryUnits, unit)]}";
     }
 
     private static long MemoryUnit(long maxBytes)

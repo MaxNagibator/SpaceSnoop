@@ -205,12 +205,8 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
         StartupText = PerformanceFormat.TileStartup(snapshot);
         StartupHint = PerformanceFormat.TileStartupHint(snapshot);
 
-        RenderText = snapshot.RenderCount == 0 ? "нет кадров" : $"{snapshot.RenderLastMs:N1} мс";
-
-        RenderHint = snapshot.RenderCount == 0
-            ? "карту диска с начала сбора ни разу не рисовали"
-            : $"пик {snapshot.RenderPeakMs:N1} мс · среднее {snapshot.RenderAverageMs:N1} мс · {Plural.Format(snapshot.RenderCount, "кадр", "кадра", "кадров")}";
-
+        RenderText = PerformanceFormat.TileRender(snapshot);
+        RenderHint = PerformanceFormat.TileRenderHint(snapshot);
         IsRenderSlow = snapshot.RenderPeakMs >= AppDefaults.PerformanceRenderSlowMs;
         WindowText = PerformanceFormat.TileWindow(snapshot);
         StaleText = PerformanceFormat.StaleWarning(snapshot, DateTime.UtcNow);

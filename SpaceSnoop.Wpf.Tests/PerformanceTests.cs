@@ -188,7 +188,7 @@ public class PerformanceTests
     {
         var operation = new PerformanceOperation("Синхронизация", 100, 2048, TimeSpan.FromSeconds(2));
 
-        Assert.That(PerformanceFormat.Rate(operation), Is.EqualTo($"50 файл/с · {SizeFormatter.Format(1024)}/с"));
+        Assert.That(PerformanceFormat.Rate(operation), Is.EqualTo($"50 файлов/с · {SizeFormatter.Format(1024)}/с"));
     }
 
     [Test]
@@ -225,7 +225,7 @@ public class PerformanceTests
         Assert.Multiple(() =>
         {
             Assert.That(text, Does.StartWith("Синхронизация · "));
-            Assert.That(text, Does.Contain("файл/с"));
+            Assert.That(text, Does.Contain("файлов/с"));
             Assert.That(text, Does.Contain("/с"));
             Assert.That(text, Does.Contain("осталось 0:20"));
         });
@@ -253,7 +253,7 @@ public class PerformanceTests
         var operation = new PerformanceOperation("Сканирование", 1000, 0, TimeSpan.FromSeconds(2));
         var snapshot = PerformanceSnapshot.Empty with { UiDelayMs = 3, ManagedBytes = 2048, Operation = operation };
 
-        Assert.That(PerformanceFormat.Summary(snapshot), Does.EndWith("Сканирование · 500 файл/с"));
+        Assert.That(PerformanceFormat.Summary(snapshot), Does.EndWith("Сканирование · 500 файлов/с"));
     }
 
     [Test]
@@ -367,7 +367,7 @@ public class PerformanceTests
 
         var text = SyncSessionViewModel.DescribeRate("Синхронизация", report, TimeSpan.FromSeconds(2));
 
-        Assert.That(text, Is.EqualTo($" Скорость: 5 файл/с · {SizeFormatter.Format(1024)}/с."));
+        Assert.That(text, Is.EqualTo($" Скорость: 5 файлов/с · {SizeFormatter.Format(1024)}/с."));
     }
 
     [Test]
@@ -450,6 +450,26 @@ public class PerformanceTests
             Assert.That(PerformanceFormat.TileCollections(snapshot), Is.EqualTo("22 / 10 / 5"));
             Assert.That(PerformanceFormat.TileCollectionsWindow(snapshot), Is.EqualTo("за последние 1:15: 3 / 1 / 0"));
             Assert.That(PerformanceFormat.TileCollectionsWindow(single), Does.Contain("мерить не по чему"));
+        });
+    }
+
+    [Test]
+    public void Плитка_отрисовки_ведёт_самым_долгим_кадром()
+    {
+        var snapshot = PerformanceSnapshot.Empty with
+        {
+            RenderLastMs = 4.2,
+            RenderPeakMs = 31.7,
+            RenderAverageMs = 9.4,
+            RenderCount = 60,
+        };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(PerformanceFormat.TileRender(snapshot), Is.EqualTo("31,7 мс"));
+            Assert.That(PerformanceFormat.TileRenderHint(snapshot), Is.EqualTo("последний 4,2 мс · среднее 9,4 мс · 60 кадров"));
+            Assert.That(PerformanceFormat.TileRender(PerformanceSnapshot.Empty), Is.EqualTo("кадров не было"));
+            Assert.That(PerformanceFormat.TileRenderHint(PerformanceSnapshot.Empty), Does.Contain("ни разу не рисовали"));
         });
     }
 

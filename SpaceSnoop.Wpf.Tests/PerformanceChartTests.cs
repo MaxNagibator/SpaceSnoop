@@ -116,6 +116,28 @@ public class PerformanceChartTests
     }
 
     [Test]
+    public void Шкала_памяти_не_растягивается_вдвое_ради_круглых_делений()
+    {
+        var data = PerformanceChartLayout.Build(History(
+            Point(1000, managed: (long)(21.9 * Megabyte)),
+            Point(500, managed: (long)(107.6 * Megabyte))));
+
+        var range = data.MemoryScale.Max - data.MemoryScale.Min;
+
+        Assert.That(data.MemoryMaxBytes - data.MemoryMinBytes, Is.GreaterThan(range * 0.7));
+    }
+
+    [Test]
+    public void Нулевое_деление_подписано_единицей_шкалы_а_не_байтами()
+    {
+        var data = PerformanceChartLayout.Build(History(
+            Point(1000, managed: 2 * Megabyte),
+            Point(500, managed: 40 * Megabyte)));
+
+        Assert.That(data.MemoryScale.Ticks[0].Label, Is.EqualTo("0 МБ"));
+    }
+
+    [Test]
     public void Неподвижная_память_рисуется_около_середины()
     {
         var data = PerformanceChartLayout.Build(History(

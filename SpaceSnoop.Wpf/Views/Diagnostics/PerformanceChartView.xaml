@@ -53,6 +53,16 @@
                        Margin="12,0,0,0"
                        Visibility="{Binding Data.HasData, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
 
+            <iconPacks:PackIconLucide DockPanel.Dock="Left"
+                                      Kind="{x:Static iconPacks:PackIconLucideKind.Info}"
+                                      Width="14"
+                                      Height="14"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,8,0"
+                                      Foreground="{DynamicResource Fg.Muted}"
+                                      ToolTip="{Binding ChartDescription}"
+                                      AutomationProperties.Name="Как читать график" />
+
             <StackPanel Orientation="Horizontal"
                         VerticalAlignment="Center"
                         Visibility="{Binding Data.HasData, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
@@ -118,8 +128,7 @@
                                                     BaselineBrush="{DynamicResource Border.Subtle}"
                                                     LabelBrush="{DynamicResource Fg.Muted}"
                                                     SurfaceBrush="{DynamicResource Bg.Surface}"
-                                                    TextBrush="{DynamicResource Fg.Primary}"
-                                                    ToolTip="{Binding ChartDescription}" />
+                                                    TextBrush="{DynamicResource Fg.Primary}" />
 
                 <TextBlock Text="Замеров пока нет – график появится через несколько секунд"
                            Style="{StaticResource TextBlock.Subtle}"

@@ -91,6 +91,18 @@ public static class PerformanceFormat
             : $"пик и среднее – по {Plural.Format(snapshot.SampleCount, "замеру", "замерам", "замерам")} за {snapshot.ObservedSpanSeconds:N1} с";
     }
 
+    public static string TileRender(PerformanceSnapshot snapshot)
+    {
+        return snapshot.RenderCount == 0 ? "кадров не было" : $"{snapshot.RenderPeakMs:N1} мс";
+    }
+
+    public static string TileRenderHint(PerformanceSnapshot snapshot)
+    {
+        return snapshot.RenderCount == 0
+            ? "карту диска с начала сбора ни разу не рисовали"
+            : $"последний {snapshot.RenderLastMs:N1} мс · среднее {snapshot.RenderAverageMs:N1} мс · {Plural.Format(snapshot.RenderCount, "кадр", "кадра", "кадров")}";
+    }
+
     public static string TileStartup(PerformanceSnapshot snapshot)
     {
         return snapshot.StartupSeconds > 0 ? $"{snapshot.StartupSeconds:N2} с" : "не измерялся";
@@ -272,7 +284,7 @@ public static class PerformanceFormat
 
         if (operation.ItemsPerSecond is { } items)
         {
-            parts.Add($"{items:N0} файл/с");
+            parts.Add($"{items:N0} {Plural.Word((long)items, "файл", "файла", "файлов")}/с");
         }
 
         if (operation.BytesPerSecond is { } bytes)
