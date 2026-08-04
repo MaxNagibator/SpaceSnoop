@@ -20,12 +20,10 @@ public sealed class ArchiveProgressDialogFactory(
     public ArchiveRequest CreateRequest(DirectorySpace dir, bool deleteOriginal, bool interactive)
     {
         var source = dir.AbsolutePath;
-        var files = new List<string>();
-        Collect(dir, files);
 
         return new(source,
             UniqueZipPath(source),
-            files,
+            dir.TotalFileCount,
             dir.TotalSize,
             deleteOriginal,
             operations.ArchiveCompression,
@@ -43,18 +41,5 @@ public sealed class ArchiveProgressDialogFactory(
         }
 
         return target;
-    }
-
-    private static void Collect(DirectorySpace dir, List<string> files)
-    {
-        foreach (var file in dir.Files)
-        {
-            files.Add(file.AbsolutePath);
-        }
-
-        foreach (var sub in dir.SubDirectories)
-        {
-            Collect(sub, files);
-        }
     }
 }

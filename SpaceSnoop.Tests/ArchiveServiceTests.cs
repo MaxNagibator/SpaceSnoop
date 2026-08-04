@@ -1,5 +1,7 @@
 ﻿using SpaceSnoop.Core;
 using System.IO.Compression;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text;
 
 namespace SpaceSnoop.Tests;
@@ -32,13 +34,14 @@ public class ArchiveServiceTests
     private string _zipPath = null!;
     private long _sizeAtCancel;
 
-    private List<string> SourceFiles()
+    private static ArchiveContent Content(params string[] files)
     {
-        return
-        [
-            Path.Combine(_sourceDir, "a.txt"),
-            Path.Combine(_sourceDir, "nested", "b.txt"),
-        ];
+        return new(files, [], [], 0);
+    }
+
+    private ArchiveContent SourceFiles()
+    {
+        return Content(Path.Combine(_sourceDir, "a.txt"), Path.Combine(_sourceDir, "nested", "b.txt"));
     }
 
     [Test]
@@ -130,7 +133,7 @@ public class ArchiveServiceTests
         var poller = Task.Run(() => CancelOnceArchiveGrows(cts));
 
         Assert.Throws<OperationCanceledException>(() =>
-            service.ZipFiles(_sourceDir, [bigFile], _zipPath, CompressionLevel.SmallestSize, null, cts.Token));
+            service.ZipFiles(_sourceDir, Content(bigFile), _zipPath, CompressionLevel.SmallestSize, null, cts.Token));
 
         poller.Wait();
 
@@ -162,7 +165,7 @@ public class ArchiveServiceTests
     public void Verify_CancelledBeforeStart_ThrowsEvenWithoutEntries()
     {
         var service = new ArchiveService();
-        var stats = service.ZipFiles(_sourceDir, [], _zipPath, CompressionLevel.Optimal, null, CancellationToken.None);
+        var stats = service.ZipFiles(_sourceDir, Content(), _zipPath, CompressionLevel.Optimal, null, CancellationToken.None);
 
         using var cts = new CancellationTokenSource();
         cts.Cancel();
@@ -178,7 +181,7 @@ public class ArchiveServiceTests
         var file = Path.Combine(_sourceDir, "a.txt");
         File.SetLastWriteTime(file, expected);
 
-        service.ZipFiles(_sourceDir, [file], _zipPath, CompressionLevel.Optimal, null, CancellationToken.None);
+        service.ZipFiles(_sourceDir, Content(file), _zipPath, CompressionLevel.Optimal, null, CancellationToken.None);
 
         using var zip = ZipFile.OpenRead(_zipPath);
         var entry = zip.GetEntry("a.txt");
@@ -186,6 +189,190 @@ public class ArchiveServiceTests
         Assert.That(entry, Is.Not.Null);
         Assert.That((entry.LastWriteTime.DateTime - expected).Duration(),
             Is.LessThanOrEqualTo(DirectoryComparer.FatTimestampTolerance));
+    }
+
+    [Test]
+    public void Collect_EmptyDirectorySurvivesRoundTrip()
+    {
+        var service = new ArchiveService();
+        var hollow = Path.Combine(_sourceDir, "hollow");
+        Directory.CreateDirectory(hollow);
+
+        var content = service.Collect(_sourceDir, CancellationToken.None);
+        var stats = service.ZipFiles(_sourceDir, content, _zipPath, CompressionLevel.Optimal, null, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(content.EmptyDirectories, Is.EqualTo(new[] { hollow }));
+            Assert.That(content.Files, Has.Count.EqualTo(2));
+            Assert.That(stats.Count, Is.EqualTo(3));
+            Assert.That(service.VerifyZip(_zipPath, stats).Ok, Is.True);
+            Assert.That(service.VerifyCoverage(_sourceDir, _zipPath, CancellationToken.None).Ok, Is.True);
+        }
+
+        using var zip = ZipFile.OpenRead(_zipPath);
+        Assert.That(zip.GetEntry("hollow/"), Is.Not.Null);
+    }
+
+    [TestCase(true, "late.txt")]
+    [TestCase(false, "late")]
+    public void VerifyCoverage_FailsWhenSourceGrewAfterCollect(bool file, string name)
+    {
+        var service = new ArchiveService();
+        var content = service.Collect(_sourceDir, CancellationToken.None);
+        service.ZipFiles(_sourceDir, content, _zipPath, CompressionLevel.Optimal, null, CancellationToken.None);
+
+        var path = Path.Combine(_sourceDir, "nested", name);
+
+        if (file)
+        {
+            File.WriteAllText(path, "late");
+        }
+        else
+        {
+            Directory.CreateDirectory(path);
+        }
+
+        var coverage = service.VerifyCoverage(_sourceDir, _zipPath, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(coverage.Ok, Is.False);
+            Assert.That(coverage.Detail, Does.Contain(name));
+        }
+    }
+
+    [Test]
+    public void VerifyCoverage_FailsWhenDirectoryCannotBeEnumerated()
+    {
+        var service = new ArchiveService();
+        var content = service.Collect(_sourceDir, CancellationToken.None);
+        service.ZipFiles(_sourceDir, content, _zipPath, CompressionLevel.Optimal, null, CancellationToken.None);
+
+        var locked = Path.Combine(_sourceDir, "locked");
+        Directory.CreateDirectory(locked);
+        DenyEnumeration(locked);
+
+        try
+        {
+            if (Readable(locked))
+            {
+                Assert.Ignore("Deny-ACE не действует на этот процесс (запуск от администратора) – ветку нечем воспроизвести.");
+            }
+
+            var blocked = service.Collect(_sourceDir, CancellationToken.None);
+            var coverage = service.VerifyCoverage(_sourceDir, _zipPath, CancellationToken.None);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(blocked.Unreadable, Is.EqualTo(new[] { locked }));
+                Assert.That(coverage.Ok, Is.False);
+                Assert.That(coverage.Detail, Does.Contain("locked"));
+            }
+        }
+        finally
+        {
+            AllowEnumeration(locked);
+        }
+    }
+
+    [Test]
+    public void VerifyCoverage_FailsWhenSourceFileChangedAfterPacking()
+    {
+        var service = new ArchiveService();
+        var content = service.Collect(_sourceDir, CancellationToken.None);
+        service.ZipFiles(_sourceDir, content, _zipPath, CompressionLevel.Optimal, null, CancellationToken.None);
+
+        var changed = content.Files[0];
+        File.WriteAllText(changed, "переписано другим процессом, длина другая");
+        File.SetLastWriteTime(changed, DateTime.Now.AddMinutes(5));
+
+        var coverage = service.VerifyCoverage(_sourceDir, _zipPath, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(coverage.Ok, Is.False);
+            Assert.That(coverage.Detail, Does.Contain(Path.GetFileName(changed)));
+        }
+    }
+
+    [Test]
+    public void VerifyZip_ContentCheckAcceptsDirectoryEntries()
+    {
+        var service = new ArchiveService();
+        Directory.CreateDirectory(Path.Combine(_sourceDir, "hollow"));
+
+        var content = service.Collect(_sourceDir, CancellationToken.None);
+        var stats = service.ZipFiles(_sourceDir, content, _zipPath, CompressionLevel.Optimal, null, CancellationToken.None);
+
+        Assert.That(service.VerifyZip(_zipPath, stats, true, null, CancellationToken.None).Ok, Is.True);
+    }
+
+    [Test]
+    public void VerifyCoverage_AcceptsDirectoryThatLostItsFilesAfterPacking()
+    {
+        var service = new ArchiveService();
+        var content = service.Collect(_sourceDir, CancellationToken.None);
+        service.ZipFiles(_sourceDir, content, _zipPath, CompressionLevel.Optimal, null, CancellationToken.None);
+
+        foreach (var file in Directory.GetFiles(Path.Combine(_sourceDir, "nested")))
+        {
+            File.Delete(file);
+        }
+
+        Assert.That(service.VerifyCoverage(_sourceDir, _zipPath, CancellationToken.None).Ok, Is.True);
+    }
+
+    private static bool Readable(string path)
+    {
+        try
+        {
+            new DirectoryInfo(path).GetFiles();
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    [Test]
+    public void VerifyCoverage_CancelledThrowsInsteadOfReportingVerdict()
+    {
+        var service = new ArchiveService();
+        var content = service.Collect(_sourceDir, CancellationToken.None);
+        service.ZipFiles(_sourceDir, content, _zipPath, CompressionLevel.Optimal, null, CancellationToken.None);
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => service.VerifyCoverage(_sourceDir, _zipPath, cts.Token));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.Exists(_zipPath), Is.True);
+            Assert.That(Directory.Exists(_sourceDir), Is.True);
+        }
+    }
+
+    private static void DenyEnumeration(string path)
+    {
+        var security = new DirectoryInfo(path).GetAccessControl();
+        security.AddAccessRule(new(WindowsIdentity.GetCurrent().User!,
+            FileSystemRights.ListDirectory | FileSystemRights.ReadData,
+            AccessControlType.Deny));
+
+        new DirectoryInfo(path).SetAccessControl(security);
+    }
+
+    private static void AllowEnumeration(string path)
+    {
+        var security = new DirectoryInfo(path).GetAccessControl();
+        security.RemoveAccessRuleAll(new(WindowsIdentity.GetCurrent().User!,
+            FileSystemRights.ListDirectory | FileSystemRights.ReadData,
+            AccessControlType.Deny));
+
+        new DirectoryInfo(path).SetAccessControl(security);
     }
 
     private void CorruptStoredContent(string marker)

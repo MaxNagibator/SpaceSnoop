@@ -5,7 +5,7 @@ namespace SpaceSnoop.Wpf.Bootstrap;
 public sealed record ArchiveRequest(
     string SourcePath,
     string TargetPath,
-    IReadOnlyList<string> Files,
+    int EstimatedFiles,
     long TotalBytes,
     bool DeleteOriginal,
     CompressionLevel Level,

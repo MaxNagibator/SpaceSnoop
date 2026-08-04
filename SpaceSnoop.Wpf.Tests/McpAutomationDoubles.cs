@@ -74,7 +74,7 @@ internal sealed class ScanAutomationDouble : IScanAutomation
 
     public ArchiveRequest CreateArchiveRequest(DirectorySpace dir, bool deleteOriginal)
     {
-        return new(dir.AbsolutePath, dir.AbsolutePath + ".zip", [], 0, deleteOriginal, CompressionLevel.Fastest, false);
+        return new(dir.AbsolutePath, dir.AbsolutePath + ".zip", 0, 0, deleteOriginal, CompressionLevel.Fastest, false);
     }
 
     public int MarkForAutomation(IReadOnlyList<SpaceBase> targets, bool mark)

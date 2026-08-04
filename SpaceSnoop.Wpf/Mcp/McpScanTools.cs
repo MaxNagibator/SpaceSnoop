@@ -165,7 +165,7 @@ internal sealed class McpScanTools(
 
             return McpFormat.Serialize(new McpArchiveResult(prepared.SourcePath,
                 outcome.ArchivePath,
-                prepared.Files.Count,
+                prepared.EstimatedFiles,
                 outcome.OriginalDeleted,
                 outcome.StatusText,
                 state.ReadScanState()));
@@ -278,7 +278,7 @@ internal sealed class McpScanTools(
 
         return McpFormat.Serialize(new McpArchivePlan(request.SourcePath,
             request.TargetPath,
-            request.Files.Count,
+            request.EstimatedFiles,
             request.TotalBytes,
             SizeFormatter.Format(request.TotalBytes),
             request.DeleteOriginal));
@@ -293,7 +293,7 @@ internal sealed class McpScanTools(
         }
 
         var (dir, request) = PrepareArchive(path, deleteOriginal);
-        logger.McpMutationRequested("archive_directory", $"«{request.SourcePath}» → «{request.TargetPath}», файлов {request.Files.Count}, оригинал в корзину {request.DeleteOriginal}");
+        logger.McpMutationRequested("archive_directory", $"«{request.SourcePath}» → «{request.TargetPath}», файлов ≈{request.EstimatedFiles}, оригинал в корзину {request.DeleteOriginal}");
         notifier.Notify($"Агент упаковывает в архив: {request.SourcePath}", StatusSeverity.Warning);
 
         return (request, scan.ArchiveFromAutomationAsync(dir, request, cancellationToken));

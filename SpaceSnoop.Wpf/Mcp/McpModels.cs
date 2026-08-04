@@ -88,7 +88,7 @@ internal sealed record McpPerformanceOperation(
 internal sealed record McpArchivePlan(
     string Path,
     string Target,
-    int Files,
+    int EstimatedFiles,
     long Bytes,
     string Size,
     bool DeleteOriginal);
@@ -96,7 +96,7 @@ internal sealed record McpArchivePlan(
 internal sealed record McpArchiveResult(
     string Path,
     string Target,
-    int Files,
+    int EstimatedFiles,
     bool OriginalDeleted,
     string Status,
     McpScanState Scan);

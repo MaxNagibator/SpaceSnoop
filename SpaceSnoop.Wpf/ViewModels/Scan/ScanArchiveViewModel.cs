@@ -44,11 +44,14 @@ internal sealed class ScanArchiveViewModel
         ArchiveRequest request,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var dialog = _archiveDialogFactory.Create(request);
+        var run = dialog.StartCommand.ExecuteAsync(null);
 
         using (cancellationToken.Register(dialog.RequestStop))
         {
-            await dialog.StartCommand.ExecuteAsync(null);
+            await run;
         }
 
         ApplyArchiveResult(dir, dialog);
