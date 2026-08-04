@@ -11,6 +11,7 @@ public sealed partial class ScanProgressViewModel : ObservableObject
     private readonly IUiTimer _progressTimer;
 
     private ScanProgress? _progress;
+    private PerformanceOperation? _reported;
     private Stopwatch? _scanStopwatch;
     private double? _progressFraction;
     private long? _estimatedTotalBytes;
@@ -116,7 +117,8 @@ public sealed partial class ScanProgressViewModel : ObservableObject
     {
         _progressTimer.Stop();
         _scanStopwatch?.Stop();
-        _performance.ReportOperation(null);
+        _performance.ClearOperation(_reported);
+        _reported = null;
 
         if (_progress is { } progress)
         {
@@ -204,7 +206,10 @@ public sealed partial class ScanProgressViewModel : ObservableObject
         ScanRemainingText = PerformanceFormat.Remaining(operation) ?? string.Empty;
         ScanHasRemaining = ScanRemainingText.Length > 0;
 
-        _performance.ReportOperation(operation);
+        if (_performance.TryReportOperation(operation, _reported))
+        {
+            _reported = operation;
+        }
 
         OnPropertyChanged(nameof(IsIndeterminate));
         OnPropertyChanged(nameof(ProgressValue));

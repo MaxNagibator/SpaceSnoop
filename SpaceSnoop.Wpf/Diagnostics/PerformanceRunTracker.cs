@@ -1,7 +1,11 @@
-﻿namespace SpaceSnoop.Wpf.Diagnostics;
+﻿using System.Windows.Threading;
+
+namespace SpaceSnoop.Wpf.Diagnostics;
 
 public sealed class PerformanceRunTracker
 {
+    private readonly Dispatcher _dispatcher = Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
+
     private PerformanceOperation? _last;
 
     public event EventHandler? Changed;
@@ -11,7 +15,7 @@ public sealed class PerformanceRunTracker
     public void Report(PerformanceOperation run)
     {
         Volatile.Write(ref _last, run);
-        Changed?.Invoke(this, EventArgs.Empty);
+        Notify();
     }
 
     public void Clear()
@@ -22,6 +26,17 @@ public sealed class PerformanceRunTracker
         }
 
         Volatile.Write(ref _last, null);
-        Changed?.Invoke(this, EventArgs.Empty);
+        Notify();
+    }
+
+    private void Notify()
+    {
+        if (_dispatcher.CheckAccess())
+        {
+            Changed?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        _dispatcher.BeginInvoke(() => Changed?.Invoke(this, EventArgs.Empty));
     }
 }

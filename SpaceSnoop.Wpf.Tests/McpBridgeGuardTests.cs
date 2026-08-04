@@ -46,6 +46,7 @@ public class McpBridgeGuardTests
             new DockerService(),
             new ToastNotifier(new(), new ShellPreferences(settings)),
             _monitor,
+            new PerformanceRunTracker(),
             new CompareDirectoriesUseCase(NullLogger<DirectoryComparer>.Instance),
             NullLogger<McpBridge>.Instance);
     }

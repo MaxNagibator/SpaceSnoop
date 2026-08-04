@@ -1,6 +1,5 @@
 ﻿using ModelContextProtocol;
 using SpaceSnoop.Core.Export;
-using System.Diagnostics;
 using System.IO;
 
 namespace SpaceSnoop.Wpf.Mcp;
@@ -13,6 +12,8 @@ internal sealed class McpScanTools(
     ToastNotifier notifier,
     McpNavigator navigator,
     McpStateReader state,
+    PerformanceMonitor performance,
+    PerformanceRunTracker runs,
     ILogger logger)
 {
     public async Task<string> ScanAsync(string path, int depth, int entryLimit, bool show, CancellationToken cancellationToken)
@@ -41,20 +42,24 @@ internal sealed class McpScanTools(
         var multithreaded = scanPreferences.UseMultithreading;
         var parallelism = scanPreferences.MaxParallelism;
 
+        var directory = new DirectoryInfo(path);
+
         // Замер останавливается до сборки выгрузки: она обходит дерево ещё раз, и «время скана»
         // в окне означало бы не то же, что «время скана» у агента.
-        var (tree, model, walk) = await Task.Run(() =>
+        var (tree, model, run) = await Task.Run(() =>
                 {
-                    var directory = new DirectoryInfo(path);
-                    var started = Stopwatch.GetTimestamp();
+                    using var probe = new BackgroundScanProbe(performance,
+                        runs,
+                        ScanProgressViewModel.EstimateTotalBytes(directory),
+                        multithreaded ? parallelism : 1);
 
                     var root = multithreaded
-                        ? calculator.CalculateMultithreaded(directory, parallelism, cancellationToken)
-                        : calculator.Calculate(directory, cancellationToken);
+                        ? calculator.CalculateMultithreaded(directory, parallelism, probe.Progress, cancellationToken)
+                        : calculator.Calculate(directory, probe.Progress, cancellationToken);
 
-                    var elapsed = Stopwatch.GetElapsedTime(started);
+                    var walked = probe.Finish();
 
-                    return (root, ScanExport.Build(root, directory.FullName, new(depth, multithreaded, parallelism), AppInfo.Version, entryLimit), elapsed);
+                    return (root, ScanExport.Build(root, directory.FullName, new(depth, multithreaded, parallelism), AppInfo.Version, entryLimit), walked);
                 },
                 cancellationToken)
             .ConfigureAwait(false);
@@ -71,7 +76,7 @@ internal sealed class McpScanTools(
                     throw new McpException("Страница «Сканирование» занялась другой операцией, пока шёл обход – результат не показан. Повторите с show=false, чтобы получить данные без окна.");
                 }
 
-                scan.ApplyScanResult(path, tree, walk);
+                scan.ApplyScanResult(path, tree, run.Elapsed, run.Traversal);
                 scan.SelectPathForAutomation(tree.AbsolutePath);
                 navigator.DeferOrNavigate(SectionKey.Scan);
                 notifier.Notify($"Агент показал сканирование: {tree.AbsolutePath} · {tree.TotalSizeText}");

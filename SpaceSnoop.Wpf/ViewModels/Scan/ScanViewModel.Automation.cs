@@ -51,9 +51,9 @@ public sealed partial class ScanViewModel : IScanAutomation
         SelectPathForAutomation(path);
     }
 
-    void IScanAutomation.ApplyScanResult(string path, DirectorySpace result, TimeSpan elapsed)
+    void IScanAutomation.ApplyScanResult(string path, DirectorySpace result, TimeSpan elapsed, PerformanceTraversal? traversal)
     {
-        ApplyScanResult(path, result, elapsed);
+        ApplyScanResult(path, result, elapsed, traversal);
     }
 
     Task IScanAutomation.ScanFromAutomationAsync(string path, CancellationToken cancellationToken)
@@ -97,7 +97,7 @@ public sealed partial class ScanViewModel : IScanAutomation
         return ScanAsync(path, cancellationToken);
     }
 
-    internal void ApplyScanResult(string path, DirectorySpace result, TimeSpan elapsed)
+    internal void ApplyScanResult(string path, DirectorySpace result, TimeSpan elapsed, PerformanceTraversal? traversal)
     {
         ScanTreeEditor.RemoveRoot(Roots, path);
 
@@ -108,7 +108,7 @@ public sealed partial class ScanViewModel : IScanAutomation
         Treemap.SetRoot(node);
 
         LastScanElapsed = elapsed;
-        _runs.Report(Summary.Apply(result, elapsed, Progress.Traversal));
+        _runs.Report(Summary.Apply(result, elapsed, traversal));
         HasResult = true;
         Marks.RecountMarked();
 

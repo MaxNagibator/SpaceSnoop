@@ -331,7 +331,7 @@ public class PerformanceHistoryTests
     {
         using var monitor = new PerformanceMonitor(NullLogger<PerformanceMonitor>.Instance);
 
-        monitor.ReportOperation(new("Сканирование", 10, 20, TimeSpan.FromSeconds(1)));
+        monitor.TryReportOperation(new("Сканирование", 10, 20, TimeSpan.FromSeconds(1)), null);
         monitor.Start();
         monitor.Stop();
 

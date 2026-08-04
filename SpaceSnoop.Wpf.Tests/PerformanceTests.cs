@@ -1,4 +1,5 @@
-﻿using SpaceSnoop.Core;
+﻿using Microsoft.Extensions.Logging.Abstractions;
+using SpaceSnoop.Core;
 using SpaceSnoop.Core.Domain;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Converters;
@@ -689,6 +690,125 @@ public class PerformanceTests
         });
     }
 
+    [Test]
+    public void Слот_операции_гасит_только_тот_кто_его_занял()
+    {
+        using var monitor = new PerformanceMonitor(NullLogger<PerformanceMonitor>.Instance);
+
+        var page = new PerformanceOperation("Сканирование", 10, 20, TimeSpan.FromSeconds(1));
+        var agent = new PerformanceOperation(BackgroundScanProbe.OperationName, 3, 4, TimeSpan.FromSeconds(1));
+
+        monitor.TryReportOperation(page, null);
+
+        var agentBlocked = monitor.TryReportOperation(agent, null);
+
+        monitor.ClearOperation(agent);
+
+        var stillBusy = !monitor.TryReportOperation(agent, null);
+
+        monitor.ClearOperation(page);
+
+        var freed = monitor.TryReportOperation(agent, null);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(agentBlocked, Is.False);
+            Assert.That(stillBusy, Is.True);
+            Assert.That(freed, Is.True);
+        });
+    }
+
+    [Test]
+    public void Зонд_агентского_скана_описывает_обход_и_остаток()
+    {
+        var snapshot = new ScanProgressSnapshot(1200, 7, 48_000, 6_000_000_000, 0, 0, @"C:\Sources");
+        var live = BackgroundScanProbe.Describe(snapshot, TimeSpan.FromSeconds(4), 12_000_000_000, 16);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(live.Name, Is.EqualTo("Сканирование (агент)"));
+            Assert.That(live.Items, Is.EqualTo(48_000));
+            Assert.That(live.Traversal, Is.EqualTo(new PerformanceTraversal(1200, 7, 16)));
+            Assert.That(live.Remaining(), Is.EqualTo(TimeSpan.FromSeconds(4)));
+            Assert.That(PerformanceFormat.TraversalDetail(live), Does.Contain("7 каталогов без доступа"));
+        });
+    }
+
+    [Test]
+    public void Итог_агентского_скана_доходит_до_плитки_и_освобождает_слот()
+    {
+        using var monitor = new PerformanceMonitor(NullLogger<PerformanceMonitor>.Instance);
+        var tracker = new PerformanceRunTracker();
+
+        PerformanceOperation run;
+        bool published, heldWhileWalking;
+
+        using (var probe = new BackgroundScanProbe(monitor, tracker, null, 8))
+        {
+            probe.Progress.EnterDirectory(@"C:\Sources");
+            probe.Progress.AddFiles(120, 4096);
+            probe.Progress.FailDirectory();
+
+            published = probe.Publish();
+            heldWhileWalking = !monitor.TryReportOperation(Page(), null);
+
+            run = probe.Finish();
+        }
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(published, Is.True);
+            Assert.That(heldWhileWalking, Is.True);
+            Assert.That(tracker.Last?.Name, Is.EqualTo("Сканирование (агент)"));
+            Assert.That(tracker.Last?.Items, Is.EqualTo(120));
+            Assert.That(run.Traversal, Is.EqualTo(new PerformanceTraversal(1, 1, 8)));
+            Assert.That(monitor.TryReportOperation(Page(), null), Is.True);
+        });
+    }
+
+    [Test]
+    public void Зонд_агентского_скана_не_вытесняет_операцию_окна()
+    {
+        using var monitor = new PerformanceMonitor(NullLogger<PerformanceMonitor>.Instance);
+        var tracker = new PerformanceRunTracker();
+        var page = Page();
+
+        monitor.TryReportOperation(page, null);
+
+        using var probe = new BackgroundScanProbe(monitor, tracker, null, 4);
+        probe.Progress.AddFiles(5, 500);
+
+        var published = probe.Publish();
+
+        probe.Finish();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(published, Is.False);
+            Assert.That(tracker.Last?.Name, Is.EqualTo("Сканирование (агент)"));
+            Assert.That(monitor.TryReportOperation(Page(), page), Is.True);
+        });
+    }
+
+    [Test]
+    public void Прерванный_обход_агента_не_попадает_в_плитку_и_освобождает_слот()
+    {
+        using var monitor = new PerformanceMonitor(NullLogger<PerformanceMonitor>.Instance);
+        var tracker = new PerformanceRunTracker();
+
+        using (var probe = new BackgroundScanProbe(monitor, tracker, null, 2))
+        {
+            probe.Progress.AddFiles(9, 900);
+            probe.Publish();
+        }
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(tracker.Last, Is.Null);
+            Assert.That(monitor.TryReportOperation(Page(), null), Is.True);
+        });
+    }
+
     [TestCase(1030d, 14d, 3)]
     [TestCase(1030d, 22.4d, 3)]
     [TestCase(590d, 14d, 2)]
@@ -801,5 +921,10 @@ public class PerformanceTests
             Assert.That(frames.SlowCount, Is.Zero);
             Assert.That(frames.PeakMs, Is.EqualTo(10).Within(1));
         });
+    }
+
+    private static PerformanceOperation Page()
+    {
+        return new("Сканирование", 1, 1, TimeSpan.FromSeconds(1));
     }
 }

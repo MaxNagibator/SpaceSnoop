@@ -124,9 +124,32 @@ public sealed class PerformanceMonitor(ILogger<PerformanceMonitor> logger) : IDi
         _startup = elapsed;
     }
 
-    public void ReportOperation(PerformanceOperation? operation)
+    public bool TryReportOperation(PerformanceOperation operation, PerformanceOperation? own)
     {
-        Volatile.Write(ref _operation, operation);
+        var current = Volatile.Read(ref _operation);
+
+        if (current is not null && !ReferenceEquals(current, own))
+        {
+            return false;
+        }
+
+        if (!ReferenceEquals(Interlocked.CompareExchange(ref _operation, operation, current), current))
+        {
+            return false;
+        }
+
+        SyncFrameProbe();
+
+        return true;
+    }
+
+    public void ClearOperation(PerformanceOperation? own)
+    {
+        if (own is null || !ReferenceEquals(Interlocked.CompareExchange(ref _operation, null, own), own))
+        {
+            return;
+        }
+
         SyncFrameProbe();
     }
 

@@ -119,6 +119,7 @@ public sealed partial class SyncSessionViewModel : ObservableObject
 
         var stopwatch = Stopwatch.StartNew();
         PerformanceOperation? measured = null;
+        PerformanceOperation? reported = null;
 
         var progress = new Progress<OperationProgress>(update =>
         {
@@ -162,7 +163,10 @@ public sealed partial class SyncSessionViewModel : ObservableObject
             ProgressRemainingText = PerformanceFormat.Remaining(current) ?? string.Empty;
             HasProgressRate = ProgressRateText.Length > 0 || ProgressRemainingText.Length > 0;
 
-            _performance.ReportOperation(current);
+            if (_performance.TryReportOperation(current, reported))
+            {
+                reported = current;
+            }
         });
 
         try
@@ -192,7 +196,7 @@ public sealed partial class SyncSessionViewModel : ObservableObject
             IsBusy = false;
             IsIndeterminate = true;
             ProgressValue = 0;
-            _performance.ReportOperation(null);
+            _performance.ClearOperation(reported);
             _cts?.Dispose();
             _cts = null;
         }

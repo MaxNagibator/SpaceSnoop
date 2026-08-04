@@ -15,12 +15,13 @@ public sealed class McpBridge
         DockerService docker,
         ToastNotifier notifier,
         PerformanceMonitor performance,
+        PerformanceRunTracker runs,
         CompareDirectoriesUseCase compare,
         ILogger<McpBridge> logger)
     {
         _state = new(scan, sync, _navigator);
 
-        Scan = new(scan, scanPreferences, calculator, preferences, notifier, _navigator, _state, logger);
+        Scan = new(scan, scanPreferences, calculator, preferences, notifier, _navigator, _state, performance, runs, logger);
         Sync = new(sync, compare, preferences, notifier, _navigator, _state, logger);
         Insight = new(settings, preferences, docker, performance, _navigator, _state, logger);
         Capture = new(_navigator, logger);
