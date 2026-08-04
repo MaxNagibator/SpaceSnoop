@@ -182,12 +182,4 @@ public class ArchiveServiceTests
         Random.Shared.NextBytes(data);
         File.WriteAllBytes(path, data);
     }
-
-    private sealed class InlineProgress(Action<OperationProgress> onReport) : IProgress<OperationProgress>
-    {
-        public void Report(OperationProgress value)
-        {
-            onReport(value);
-        }
-    }
 }

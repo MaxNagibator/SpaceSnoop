@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.VisualBasic.FileIO;
+using System.Diagnostics;
 using System.Security;
 
 namespace SpaceSnoop.Core;
@@ -9,7 +10,8 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
     public SyncReport Execute(ComparisonResult comparisonResult, CancellationToken cancel, IProgress<OperationProgress>? progress = null)
     {
         var report = new SyncReport();
-        ExecuteRecursive(comparisonResult.Root, comparisonResult.LeftPath, comparisonResult.RightPath, report, progress, cancel);
+        var tracker = new TransferTracker(progress, report);
+        ExecuteRecursive(comparisonResult.Root, comparisonResult.LeftPath, comparisonResult.RightPath, report, tracker, cancel);
         return report;
     }
 
@@ -100,13 +102,14 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         };
     }
 
-    private void CopyAtomic(string source, string destination)
+    private void CopyAtomic(string source, string destination, TransferTracker tracker, CancellationToken cancel)
     {
         var temp = destination + ".sstmp";
 
         try
         {
-            File.Copy(source, temp, true);
+            FileCopy.Copy(source, temp, tracker.Advance, cancel);
+            cancel.ThrowIfCancellationRequested();
             RecyclePrevious(destination);
             File.Move(temp, destination, true);
         }
@@ -149,7 +152,7 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         return file.Action is not (SyncAction.None or SyncAction.Skip);
     }
 
-    private void ExecuteFileAction(FileComparison file, string leftBase, string rightBase)
+    private void ExecuteFileAction(FileComparison file, string leftBase, string rightBase, TransferTracker tracker, CancellationToken cancel)
     {
         var leftPath = Path.Combine(leftBase, file.RelativePath);
         var rightPath = Path.Combine(rightBase, file.RelativePath);
@@ -159,13 +162,13 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
             case SyncAction.CopyToRight:
                 EnsureDirectoryExists(rightPath);
                 ClearReadOnly(rightPath);
-                CopyAtomic(leftPath, rightPath);
+                CopyAtomic(leftPath, rightPath, tracker, cancel);
                 break;
 
             case SyncAction.CopyToLeft:
                 EnsureDirectoryExists(leftPath);
                 ClearReadOnly(leftPath);
-                CopyAtomic(rightPath, leftPath);
+                CopyAtomic(rightPath, leftPath, tracker, cancel);
                 break;
 
             case SyncAction.DeleteLeft:
@@ -269,20 +272,20 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         string leftBase,
         string rightBase,
         SyncReport report,
-        IProgress<OperationProgress>? progress,
+        TransferTracker tracker,
         CancellationToken cancel)
     {
         cancel.ThrowIfCancellationRequested();
 
         if (dir.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
         {
-            ApplyDirectoryActionAndReport(dir, leftBase, rightBase, report, progress);
+            ApplyDirectoryActionAndReport(dir, leftBase, rightBase, report, tracker);
             return;
         }
 
         if (dir.Action is SyncAction.CopyToRight or SyncAction.CopyToLeft)
         {
-            ApplyDirectoryActionAndReport(dir, leftBase, rightBase, report, progress);
+            ApplyDirectoryActionAndReport(dir, leftBase, rightBase, report, tracker);
         }
 
         foreach (var file in dir.Files)
@@ -294,14 +297,15 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
                 continue;
             }
 
-            ApplyFileActionAndReport(file, leftBase, rightBase, report);
-
-            progress?.Report(new(report.SuccessCount + report.Errors.Count, file.RelativePath, report.CopiedBytes));
+            tracker.BeginFile(file.RelativePath);
+            ApplyFileActionAndReport(file, leftBase, rightBase, report, tracker, cancel);
+            tracker.EndFile();
+            tracker.Report(file.RelativePath);
         }
 
         foreach (var sub in dir.SubDirectories)
         {
-            ExecuteRecursive(sub, leftBase, rightBase, report, progress, cancel);
+            ExecuteRecursive(sub, leftBase, rightBase, report, tracker, cancel);
         }
     }
 
@@ -310,17 +314,23 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         string leftBase,
         string rightBase,
         SyncReport report,
-        IProgress<OperationProgress>? progress)
+        TransferTracker tracker)
     {
         ApplyDirectoryAction(dir, leftBase, rightBase, report);
-        progress?.Report(new(report.SuccessCount + report.Errors.Count, dir.RelativePath, report.CopiedBytes));
+        tracker.Report(dir.RelativePath);
     }
 
-    private void ApplyFileActionAndReport(FileComparison file, string leftBase, string rightBase, SyncReport report)
+    private void ApplyFileActionAndReport(
+        FileComparison file,
+        string leftBase,
+        string rightBase,
+        SyncReport report,
+        TransferTracker tracker,
+        CancellationToken cancel)
     {
         try
         {
-            ExecuteFileAction(file, leftBase, rightBase);
+            ExecuteFileAction(file, leftBase, rightBase, tracker, cancel);
 
             if (file.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
             {
@@ -334,10 +344,55 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
             report.AddApplied(file.Action, file.RelativePath, AppliedBytes(file));
             logger.SyncFileApplied(file.Action, file.RelativePath);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             report.Errors.Add(new(file.RelativePath, file.Action, ex.Message));
             logger.SyncFileFailed(ex, file.Action, file.RelativePath);
+        }
+    }
+
+    private sealed class TransferTracker(IProgress<OperationProgress>? progress, SyncReport report)
+    {
+        private static readonly TimeSpan ReportInterval = TimeSpan.FromMilliseconds(120);
+
+        private readonly Stopwatch _clock = Stopwatch.StartNew();
+
+        private long _appliedBytes;
+        private long _currentBytes;
+        private string _currentPath = string.Empty;
+        private TimeSpan? _lastReport;
+
+        public void BeginFile(string relativePath)
+        {
+            _currentPath = relativePath;
+            _currentBytes = 0;
+            _lastReport = null;
+        }
+
+        public void Advance(long transferredOfCurrentFile)
+        {
+            _currentBytes = transferredOfCurrentFile;
+
+            var now = _clock.Elapsed;
+
+            if (_lastReport is { } last && now - last < ReportInterval)
+            {
+                return;
+            }
+
+            _lastReport = now;
+            Report(_currentPath);
+        }
+
+        public void EndFile()
+        {
+            _appliedBytes += _currentBytes;
+            _currentBytes = 0;
+        }
+
+        public void Report(string relativePath)
+        {
+            progress?.Report(new(report.SuccessCount + report.Errors.Count, relativePath, _appliedBytes + _currentBytes));
         }
     }
 }

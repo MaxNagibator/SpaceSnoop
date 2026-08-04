@@ -49,10 +49,10 @@ public class SyncEngineTests
 
         using (Assert.EnterMultipleScope())
         {
+            Assert.That(report.Errors, Is.Empty);
             Assert.That(File.Exists(Path.Combine(_rightDir, "a.txt")), Is.True);
             Assert.That(File.ReadAllText(Path.Combine(_rightDir, "a.txt")), Is.EqualTo(content));
             Assert.That(report.SuccessCount, Is.EqualTo(1));
-            Assert.That(report.Errors, Is.Empty);
         }
     }
 
@@ -572,6 +572,128 @@ public class SyncEngineTests
             Assert.That(text, Does.Contain("CopyToRight «copy.txt» (1 КБ)"));
             Assert.That(text, Does.Contain("DeleteLeft «gone.txt»"));
             Assert.That(text, Does.Not.Contain("gone.txt» ("));
+        }
+    }
+
+    [Test]
+    public void CopyToRight_LargeFile_ReportsProgressWhileFileIsStillCopying()
+    {
+        var size = WriteLargeFile(Path.Combine(_leftDir, "big.bin"));
+        var result = OneCopyToRight("big.bin");
+        var reports = new List<long>();
+
+        new SyncEngine(NullLogger<SyncEngine>.Instance)
+            .Execute(result, CancellationToken.None, new InlineProgress(update => reports.Add(update.Bytes)));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(reports, Is.Ordered, "шкала байтов не должна уезжать назад");
+            Assert.That(reports, Has.Some.GreaterThan(0).And.Some.LessThan(size), "нет ни одного доклада внутри файла");
+            Assert.That(reports[^1], Is.EqualTo(size));
+        }
+    }
+
+    [Test]
+    public void CopyToRight_ErrorAfterSuccess_DoesNotMoveByteCounterBackwards()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "good.txt"), "данные");
+
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("good.txt", "good.txt") { Status = ComparisonStatus.LeftOnly, Action = SyncAction.CopyToRight });
+        root.Files.Add(new("gone.txt", "gone.txt") { Status = ComparisonStatus.LeftOnly, Action = SyncAction.CopyToRight });
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var reports = new List<long>();
+
+        var report = new SyncEngine(NullLogger<SyncEngine>.Instance)
+            .Execute(result, CancellationToken.None, new InlineProgress(update => reports.Add(update.Bytes)));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.Errors, Has.Count.EqualTo(1));
+            Assert.That(reports, Is.Ordered);
+            Assert.That(reports[^1], Is.GreaterThan(0));
+        }
+    }
+
+    [Test]
+    public void CopyToRight_CancelledInsideFile_LeavesNeitherDestinationNorTemp()
+    {
+        WriteLargeFile(Path.Combine(_leftDir, "big.bin"));
+
+        var result = OneCopyToRight("big.bin");
+        using var cts = new CancellationTokenSource();
+        var progress = new InlineProgress(update => CancelOncePartiallyCopied(update, cts));
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
+
+        Assert.Throws<OperationCanceledException>(() => engine.Execute(result, cts.Token, progress));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.Exists(Path.Combine(_rightDir, "big.bin")), Is.False);
+            Assert.That(File.Exists(Path.Combine(_rightDir, "big.bin.sstmp")), Is.False);
+        }
+    }
+
+    [Test]
+    public void CopyToRight_CancelledInsideFile_KeepsExistingDestinationOutOfRecycleBin()
+    {
+        WriteLargeFile(Path.Combine(_leftDir, "big.bin"));
+        var destination = Path.Combine(_rightDir, "big.bin");
+        File.WriteAllText(destination, "прежний приёмник");
+
+        var result = OneCopyToRight("big.bin");
+        using var cts = new CancellationTokenSource();
+        var progress = new InlineProgress(update => CancelOncePartiallyCopied(update, cts));
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance, true, true);
+
+        Assert.Throws<OperationCanceledException>(() => engine.Execute(result, cts.Token, progress));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.Exists(destination), Is.True);
+            Assert.That(File.ReadAllText(destination), Is.EqualTo("прежний приёмник"));
+        }
+    }
+
+    [Test]
+    public void CopyToRight_KeepsModificationTime_SoRepeatedCompareSeesIdenticalFiles()
+    {
+        var source = Path.Combine(_leftDir, "a.txt");
+        File.WriteAllText(source, "содержимое");
+        File.SetLastWriteTimeUtc(source, new(2021, 3, 4, 5, 6, 7, DateTimeKind.Utc));
+
+        new SyncEngine(NullLogger<SyncEngine>.Instance).Execute(OneCopyToRight("a.txt"), CancellationToken.None);
+
+        Assert.That(DirectoryComparer.FilesIdentical(new(source), new(Path.Combine(_rightDir, "a.txt"))), Is.True);
+    }
+
+    private ComparisonResult OneCopyToRight(string relativePath)
+    {
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new(relativePath, relativePath)
+        {
+            Status = ComparisonStatus.LeftOnly,
+            Action = SyncAction.CopyToRight,
+        });
+
+        return new(_leftDir, _rightDir, root);
+    }
+
+    private static long WriteLargeFile(string path)
+    {
+        var data = new byte[64 * 1024 * 1024];
+        Random.Shared.NextBytes(data);
+        File.WriteAllBytes(path, data);
+
+        return data.Length;
+    }
+
+    private static void CancelOncePartiallyCopied(OperationProgress update, CancellationTokenSource cts)
+    {
+        if (update.Bytes > 0)
+        {
+            cts.Cancel();
         }
     }
 }

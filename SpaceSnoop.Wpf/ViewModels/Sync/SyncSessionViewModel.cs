@@ -146,9 +146,6 @@ public sealed partial class SyncSessionViewModel : ObservableObject
             StatusCaption = head;
             ProgressDetail = head + tail;
 
-            // TODO: остаток стоит на одном большом файле – SyncEngine докладывает прогресс только после
-            // копирования файла целиком; заменить на потоковое копирование вместо File.Copy, если
-            // синхронизация крупных файлов станет обычным сценарием.
             var current = new PerformanceOperation(operation,
                 update.Completed,
                 update.Bytes,
