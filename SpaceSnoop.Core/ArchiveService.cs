@@ -48,6 +48,8 @@ public sealed class ArchiveService
                 written++;
                 progress?.Report(new(written, rel));
             }
+
+            token.ThrowIfCancellationRequested();
         }
         catch
         {
@@ -65,6 +67,8 @@ public sealed class ArchiveService
         IProgress<OperationProgress>? progress = null,
         CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
+
         using var zip = ZipFile.OpenRead(zipPath);
 
         if (zip.Entries.Count != expected.Count)

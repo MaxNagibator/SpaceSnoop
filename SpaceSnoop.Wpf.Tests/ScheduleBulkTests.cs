@@ -222,6 +222,56 @@ public class ScheduleBulkTests
     }
 
     [Test]
+    public async Task Отмена_выключения_оставляет_необработанные_профили_включёнными()
+    {
+        using var dirs = new TempProfileDirectories();
+        var settings = dirs.Seed();
+        var scheduler = new FakeScheduleRunner();
+        var vm = Create(settings, scheduler);
+
+        vm.Bulk.SelectAllCommand.Execute(null);
+        await vm.Bulk.EnableCommand.ExecuteAsync(null);
+
+        scheduler.OnCall = call =>
+        {
+            if (call == 4)
+            {
+                vm.Bulk.CancelRunCommand.Execute(null);
+            }
+        };
+
+        await vm.Bulk.DisableCommand.ExecuteAsync(null);
+
+        var stored = SyncProfileStore.Load(settings);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(vm.Profiles.Select(profile => profile.Enabled), Is.EqualTo(new[] { false, true, true }));
+            Assert.That(stored.Select(profile => profile.Enabled), Is.EqualTo(new[] { false, true, true }));
+        }
+    }
+
+    [Test]
+    public async Task Отказ_планировщика_не_меняет_состояние_профиля()
+    {
+        using var dirs = new TempProfileDirectories();
+        var settings = dirs.Seed();
+        var scheduler = new FakeScheduleRunner { Fails = _ => true };
+        var vm = Create(settings, scheduler);
+
+        vm.Bulk.SelectAllCommand.Execute(null);
+        await vm.Bulk.EnableCommand.ExecuteAsync(null);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(vm.Profiles.Select(profile => profile.Enabled), Is.All.False);
+            Assert.That(SyncProfileStore.Load(settings).Select(profile => profile.Enabled), Is.All.False);
+            Assert.That(vm.Bulk.Message, Is.EqualTo("Включено: 0 из 3"));
+            Assert.That(vm.Profiles[0].Message, Does.StartWith("Не удалось применить расписание"));
+        }
+    }
+
+    [Test]
     public async Task Пакетное_удаление_снимает_задачи_через_планировщик_и_убирает_профили()
     {
         var settings = Seed();

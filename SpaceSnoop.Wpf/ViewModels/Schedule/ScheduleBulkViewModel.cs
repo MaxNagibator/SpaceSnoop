@@ -236,11 +236,20 @@ public sealed partial class ScheduleBulkViewModel : ObservableObject
             return;
         }
 
-        var removed = await RemoveTasksAsync(targets);
+        var detached = new List<SyncProfileViewModel>();
 
-        for (var i = 0; i < removed.Applied; i++)
+        var removed = await RunBatchAsync(targets, async profile =>
         {
-            _owner.Profiles.Remove(targets[i]);
+            var taskName = profile.TaskName;
+            await Task.Run(() => _owner.Scheduler.Remove(taskName));
+            detached.Add(profile);
+
+            return true;
+        });
+
+        foreach (var profile in detached)
+        {
+            _owner.Profiles.Remove(profile);
         }
 
         _owner.Persist();
@@ -317,12 +326,26 @@ public sealed partial class ScheduleBulkViewModel : ObservableObject
             return;
         }
 
-        var prepared = Array.FindAll(targets, profile => profile.PrepareEnabled(value));
-        var run = await RewriteTasksAsync(prepared);
+        var valid = Array.FindAll(targets, profile => profile.ValidateEnable(value));
+
+        var run = await RunBatchAsync(valid, async profile =>
+        {
+            var request = profile.BuildScheduleRequest(value);
+            var outcome = await Task.Run(() => _owner.Scheduler.Apply(request));
+
+            if (outcome.Ok)
+            {
+                profile.CommitEnabled(value);
+            }
+
+            profile.ApplyScheduleOutcome(outcome);
+
+            return outcome.Ok;
+        });
 
         _owner.Persist();
 
-        var rest = prepared.Length < targets.Length ? " (остальные не прошли проверку, причина в карточке)" : string.Empty;
+        var rest = valid.Length < targets.Length ? " (остальные не прошли проверку, причина в карточке)" : string.Empty;
         var tail = run.Cancelled ? ", дальше отменено" : string.Empty;
 
         Message = value
@@ -340,22 +363,14 @@ public sealed partial class ScheduleBulkViewModel : ObservableObject
             var outcome = await Task.Run(() => _owner.Scheduler.Apply(request));
 
             profile.ApplyScheduleOutcome(outcome);
+
+            return outcome.Ok;
         });
     }
 
-    private Task<BatchRun> RemoveTasksAsync(SyncProfileViewModel[] targets)
+    private async Task<BatchRun> RunBatchAsync(SyncProfileViewModel[] targets, Func<SyncProfileViewModel, Task<bool>> step)
     {
-        return RunBatchAsync(targets, profile =>
-        {
-            var taskName = profile.TaskName;
-
-            return Task.Run(() => _owner.Scheduler.Remove(taskName));
-        });
-    }
-
-    private async Task<BatchRun> RunBatchAsync(SyncProfileViewModel[] targets, Func<SyncProfileViewModel, Task> step)
-    {
-        if (targets.Length == 0)
+        if (targets.Length == 0 || IsRunning)
         {
             return new(0, false);
         }
@@ -365,6 +380,7 @@ public sealed partial class ScheduleBulkViewModel : ObservableObject
         IsRunning = true;
 
         var applied = 0;
+        var cancelled = false;
 
         try
         {
@@ -372,11 +388,14 @@ public sealed partial class ScheduleBulkViewModel : ObservableObject
             {
                 if (token.IsCancellationRequested)
                 {
+                    cancelled = true;
                     break;
                 }
 
-                await step(profile);
-                applied++;
+                if (await step(profile))
+                {
+                    applied++;
+                }
             }
         }
         finally
@@ -386,7 +405,7 @@ public sealed partial class ScheduleBulkViewModel : ObservableObject
             _cts = null;
         }
 
-        return new(applied, applied < targets.Length);
+        return new(applied, cancelled);
     }
 
     private void ApplyToSelected(Action<SyncProfileViewModel> apply, string what)

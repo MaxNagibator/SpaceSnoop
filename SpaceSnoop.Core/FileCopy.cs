@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 
 namespace SpaceSnoop.Core;
@@ -25,12 +26,21 @@ internal static class FileCopy
     public static void Copy(string source, string destination, Action<long>? onTransferred, CancellationToken cancel)
     {
         var abort = 0;
+        ExceptionDispatchInfo? failure = null;
 
         CopyProgressRoutine routine = (_, transferred, _, _, _, reason, _, _, _) =>
         {
-            if (reason == CallbackChunkFinished)
+            if (reason == CallbackChunkFinished && onTransferred is not null)
             {
-                onTransferred?.Invoke(transferred);
+                try
+                {
+                    onTransferred(transferred);
+                }
+                catch (Exception exception)
+                {
+                    failure = ExceptionDispatchInfo.Capture(exception);
+                    return ProgressCancel;
+                }
             }
 
             return cancel.IsCancellationRequested ? ProgressCancel : ProgressContinue;
@@ -40,6 +50,8 @@ internal static class FileCopy
 
         GC.KeepAlive(routine);
 
+        failure?.Throw();
+
         if (copied)
         {
             return;
@@ -47,7 +59,7 @@ internal static class FileCopy
 
         var error = Marshal.GetLastWin32Error();
 
-        if (error == ErrorRequestAborted)
+        if (error == ErrorRequestAborted && cancel.IsCancellationRequested)
         {
             throw new OperationCanceledException(cancel);
         }

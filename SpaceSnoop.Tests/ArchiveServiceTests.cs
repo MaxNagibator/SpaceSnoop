@@ -30,6 +30,7 @@ public class ArchiveServiceTests
     private string _tempDir = null!;
     private string _sourceDir = null!;
     private string _zipPath = null!;
+    private long _sizeAtCancel;
 
     private List<string> SourceFiles()
     {
@@ -133,7 +134,40 @@ public class ArchiveServiceTests
 
         poller.Wait();
 
-        Assert.That(File.Exists(_zipPath), Is.False);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(_sizeAtCancel, Is.GreaterThan(0), "отмена пришла раньше, чем упаковка успела что-то записать");
+            Assert.That(File.Exists(_zipPath), Is.False);
+        }
+    }
+
+    [Test]
+    public void Verify_ContentCheckPassesOnIntactArchive()
+    {
+        var service = new ArchiveService();
+        var stats = service.ZipFiles(_sourceDir, SourceFiles(), _zipPath, CompressionLevel.Optimal, null, CancellationToken.None);
+        var verified = new List<string>();
+
+        var verify = service.VerifyZip(_zipPath, stats, true, new InlineProgress(update => verified.Add(update.Current)), CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(verify.Ok, Is.True);
+            Assert.That(verify.Detail, Is.Empty);
+            Assert.That(verified, Is.EqualTo(new[] { "a.txt", "nested/b.txt" }));
+        }
+    }
+
+    [Test]
+    public void Verify_CancelledBeforeStart_ThrowsEvenWithoutEntries()
+    {
+        var service = new ArchiveService();
+        var stats = service.ZipFiles(_sourceDir, [], _zipPath, CompressionLevel.Optimal, null, CancellationToken.None);
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => service.VerifyZip(_zipPath, stats, true, null, cts.Token));
     }
 
     [Test]
@@ -173,6 +207,7 @@ public class ArchiveServiceTests
         }
 
         Thread.Sleep(100);
+        _sizeAtCancel = File.Exists(_zipPath) ? new FileInfo(_zipPath).Length : 0;
         cts.Cancel();
     }
 

@@ -22,9 +22,9 @@ public sealed class ScheduleRunner : IScheduleRunner
                 return new(false, error, ScheduleStatus.Missing);
             }
         }
-        else if (SyncScheduler.Exists(request.TaskName))
+        else if (SyncScheduler.Exists(request.TaskName) && !SyncScheduler.Disable(request.TaskName, out var failure))
         {
-            SyncScheduler.Disable(request.TaskName, out _);
+            return new(false, failure, ScheduleStatus.Missing);
         }
 
         return new(true, string.Empty, SyncScheduler.Query(request.TaskName));

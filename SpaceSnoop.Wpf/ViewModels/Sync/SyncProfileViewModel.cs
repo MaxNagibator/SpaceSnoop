@@ -229,20 +229,33 @@ public sealed partial class SyncProfileViewModel : ObservableObject
 
     internal bool PrepareEnabled(bool value)
     {
-        if (value && !ValidateForScheduling(out var reason))
+        if (!ValidateEnable(value))
         {
-            Message = reason;
-            _suppress = true;
-            Enabled = false;
-            _suppress = false;
             return false;
         }
 
+        CommitEnabled(value);
+        return true;
+    }
+
+    internal bool ValidateEnable(bool value)
+    {
+        if (!value || ValidateForScheduling(out var reason))
+        {
+            return true;
+        }
+
+        Message = reason;
+        CommitEnabled(false);
+
+        return false;
+    }
+
+    internal void CommitEnabled(bool value)
+    {
         _suppress = true;
         Enabled = value;
         _suppress = false;
-
-        return true;
     }
 
     [RelayCommand]
@@ -365,18 +378,18 @@ public sealed partial class SyncProfileViewModel : ObservableObject
         ApplyScheduleOutcome(_parent.Scheduler.Apply(BuildScheduleRequest()));
     }
 
-    internal ScheduleRequest BuildScheduleRequest()
+    internal ScheduleRequest BuildScheduleRequest(bool? enabled = null)
     {
         TimeSpan.TryParse(Time, CultureInfo.InvariantCulture, out var time);
 
-        return new(Enabled, TaskName, ToModel().Interval, time, $"{AppInfo.SyncArgument} {Id}");
+        return new(enabled ?? Enabled, TaskName, ToModel().Interval, time, $"{AppInfo.SyncArgument} {Id}");
     }
 
     internal void ApplyScheduleOutcome(ScheduleOutcome outcome)
     {
         if (!outcome.Ok)
         {
-            Message = $"Не удалось создать задачу: {outcome.Error}";
+            Message = $"Не удалось применить расписание: {outcome.Error}";
             _parent.LogTaskFailed(DisplayName, outcome.Error);
             return;
         }

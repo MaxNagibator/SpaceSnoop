@@ -202,6 +202,8 @@ public sealed partial class ArchiveProgressDialogViewModel : ObservableObject, I
             throw new InvalidOperationException($"Архив не прошёл проверку ({detail}); оригинал не тронут.");
         }
 
+        token.ThrowIfCancellationRequested();
+
         var compressed = new FileInfo(_request.TargetPath).Length;
         var ratio = stats.Bytes > 0 ? (1 - (double)compressed / stats.Bytes) * 100 : 0;
         _resultSummary = $"{SizeFormatter.Format(compressed)} (было {SizeFormatter.Format(stats.Bytes)}, −{ratio:F0} %)";
@@ -216,6 +218,11 @@ public sealed partial class ArchiveProgressDialogViewModel : ObservableObject, I
 
     private void OnTick(OperationProgress update, bool verifying)
     {
+        if (IsFinished)
+        {
+            return;
+        }
+
         var total = verifying ? _verifyTotal : _total;
 
         StatusText = verifying ? "Проверка архива…" : "Упаковка…";
