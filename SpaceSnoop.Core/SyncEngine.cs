@@ -7,6 +7,8 @@ namespace SpaceSnoop.Core;
 
 public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = true, bool recycleOverwritten = false)
 {
+    private const string TempSuffix = ".sstmp";
+
     public SyncReport Execute(ComparisonResult comparisonResult, CancellationToken cancel, IProgress<OperationProgress>? progress = null)
     {
         var report = new SyncReport();
@@ -102,9 +104,23 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         };
     }
 
+    // TODO: имя занимается проверкой существования, между ней и копированием остаётся окно; апгрейд – эксклюзивное создание (FileMode.CreateNew) при первой жалобе на пропавший файл рядом с синхронизируемым
+    private static string ReserveTempPath(string destination)
+    {
+        var temp = destination + TempSuffix;
+        var index = 2;
+
+        while (File.Exists(temp) || Directory.Exists(temp))
+        {
+            temp = $"{destination}.{index++}{TempSuffix}";
+        }
+
+        return temp;
+    }
+
     private void CopyAtomic(string source, string destination, TransferTracker tracker, CancellationToken cancel)
     {
-        var temp = destination + ".sstmp";
+        var temp = ReserveTempPath(destination);
 
         try
         {
