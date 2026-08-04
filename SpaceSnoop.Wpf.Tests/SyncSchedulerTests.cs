@@ -129,16 +129,6 @@ public class SyncSchedulerTests
         Assert.That(ScheduleStatus.ParseEnabled(xml), Is.True);
     }
 
-    [TestCase("...: 5 успешно, 0 ошибок", false)]
-    [TestCase("...: 0 успешно, 0 ошибок", false)]
-    [TestCase("...: 5 успешно, 3 ошибок", true)]
-    [TestCase("...: 5 успешно, 20 ошибок", true)]
-    [TestCase("...: 5 успешно, 100 ошибок", true)]
-    public void Строка_истории_подсвечивается_только_при_реальных_ошибках(string line, bool hasErrors)
-    {
-        Assert.That(ScheduleViewModel.LineHasErrors(line), Is.EqualTo(hasErrors));
-    }
-
     [TestCase(@"C:\A", @"C:\B", false)]
     [TestCase(@"C:\A", @"C:\AB", false)]
     [TestCase(@"C:\A", @"C:\A", true)]

@@ -380,7 +380,7 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
             row.ApplySyncReport(report);
             row.ElapsedMs = (long)stopwatch.Elapsed.TotalMilliseconds;
             row.Error = null;
-            SyncLog.AppendSafe($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Обзор [{profile.Name}]: {report.SuccessCount} успешно, {report.Errors.Count} ошибок", report, _logger);
+            SyncLog.AppendSafe(SyncLogOrigin.Overview, profile.Name, report, _logger);
         }
         catch (OperationCanceledException) when (!token.IsCancellationRequested)
         {

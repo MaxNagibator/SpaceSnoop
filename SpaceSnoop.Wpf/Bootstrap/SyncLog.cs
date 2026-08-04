@@ -5,27 +5,76 @@ using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 namespace SpaceSnoop.Wpf.Bootstrap;
 
+public enum SyncLogOrigin
+{
+    None = 0,
+    Scheduled = 1,
+    Overview = 2,
+    Manual = 3,
+    Mcp = 4,
+}
+
 public static class SyncLog
 {
     public const string FileGlob = "sync-log*.txt";
 
+    private const string NoErrors = ", 0 ошибок";
+
     public static string FilePath => Path.Combine(AppStorage.DataDirectory, AppInfo.SyncLogFileName);
 
-    public static void Append(string header, SyncReport report)
-    {
-        Append(FilePath, header, report);
-    }
-
-    internal static void AppendSafe(string header, SyncReport report, ILogger logger)
+    internal static void AppendSafe(SyncLogOrigin origin, string? name, SyncReport report, ILogger logger)
     {
         try
         {
-            Append(header, report);
+            Append(FilePath, FormatHeader(origin, name, report, DateTime.Now), report);
         }
         catch (Exception exception)
         {
             logger.SyncLogWriteFailed(exception);
         }
+    }
+
+    internal static string FormatHeader(SyncLogOrigin origin, string? name, SyncReport report, DateTime timestamp)
+    {
+        var scope = string.IsNullOrEmpty(name) ? string.Empty : $" [{name}]";
+        return $"[{timestamp:yyyy-MM-dd HH:mm:ss}] {Marker(origin)}{scope}: {report.SuccessCount} успешно, {report.Errors.Count} ошибок";
+    }
+
+    internal static bool MatchesOrigin(string line, SyncLogOrigin origin)
+    {
+        if (Marker(origin) is not { Length: > 0 } marker || !line.StartsWith('['))
+        {
+            return false;
+        }
+
+        var start = line.IndexOf("] ", StringComparison.Ordinal);
+
+        if (start < 0)
+        {
+            return false;
+        }
+
+        var head = line.AsSpan(start + 2);
+
+        return head.StartsWith(marker, StringComparison.Ordinal)
+               && (origin != SyncLogOrigin.Manual || !head.StartsWith(Marker(SyncLogOrigin.Mcp), StringComparison.Ordinal));
+    }
+
+    internal static bool LineHasErrors(string line)
+    {
+        return !line.Contains(NoErrors, StringComparison.Ordinal);
+    }
+
+    private static string Marker(SyncLogOrigin origin)
+    {
+        return origin switch
+        {
+            SyncLogOrigin.Scheduled => "Автосинхронизация",
+            SyncLogOrigin.Overview => "Обзор",
+            SyncLogOrigin.Mcp => "Синхронизация (запуск агентом через MCP)",
+            SyncLogOrigin.Manual => "Синхронизация",
+            _ => string.Empty,
+        };
     }
 
     internal static void Append(string filePath, string header, SyncReport report)

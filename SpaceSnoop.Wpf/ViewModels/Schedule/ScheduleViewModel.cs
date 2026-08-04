@@ -129,11 +129,6 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
         _logger.ScheduleTaskFailed(name, error);
     }
 
-    internal static bool LineHasErrors(string line)
-    {
-        return !line.Contains(", 0 ошибок", StringComparison.Ordinal);
-    }
-
     private void OnSettingsChanged(object? sender, string key)
     {
         if (!_persisting && key == SettingsKeys.ScheduleProfiles)
@@ -218,13 +213,13 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
         History.Clear();
 
         var lines = SyncLog.ReadTail(
-            static line => line.StartsWith('[') && line.Contains("Автосинхронизация"),
+            static line => SyncLog.MatchesOrigin(line, SyncLogOrigin.Scheduled),
             40,
             _logger);
 
         foreach (var line in lines)
         {
-            History.Add(new(line, LineHasErrors(line)));
+            History.Add(new(line, SyncLog.LineHasErrors(line)));
         }
 
         OnPropertyChanged(nameof(HasHistory));

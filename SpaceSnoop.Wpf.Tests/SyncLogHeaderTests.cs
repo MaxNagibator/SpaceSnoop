@@ -1,0 +1,90 @@
+﻿using SpaceSnoop.Core;
+using SpaceSnoop.Core.Domain;
+using SpaceSnoop.Wpf.Bootstrap;
+
+namespace SpaceSnoop.Wpf.Tests;
+
+[TestFixture]
+public class SyncLogHeaderTests
+{
+    private static readonly DateTime Stamp = new(2026, 8, 4, 19, 32, 5);
+
+    [TestCase(SyncLogOrigin.Scheduled, "Ночной бэкап", "[2026-08-04 19:32:05] Автосинхронизация [Ночной бэкап]: 7 успешно, 0 ошибок")]
+    [TestCase(SyncLogOrigin.Overview, "Ночной бэкап", "[2026-08-04 19:32:05] Обзор [Ночной бэкап]: 7 успешно, 0 ошибок")]
+    [TestCase(SyncLogOrigin.Manual, null, "[2026-08-04 19:32:05] Синхронизация: 7 успешно, 0 ошибок")]
+    [TestCase(SyncLogOrigin.Mcp, null, "[2026-08-04 19:32:05] Синхронизация (запуск агентом через MCP): 7 успешно, 0 ошибок")]
+    public void Заголовок_сохраняет_прежний_формат_каждого_запуска(SyncLogOrigin origin, string? name, string expected)
+    {
+        var header = SyncLog.FormatHeader(origin, name, Report(7, 0), Stamp);
+
+        Assert.That(header, Is.EqualTo(expected));
+    }
+
+    [TestCase(SyncLogOrigin.Scheduled)]
+    [TestCase(SyncLogOrigin.Overview)]
+    [TestCase(SyncLogOrigin.Manual)]
+    [TestCase(SyncLogOrigin.Mcp)]
+    public void Записанный_запуск_узнаётся_читателем_по_своему_origin(SyncLogOrigin origin)
+    {
+        var header = SyncLog.FormatHeader(origin, "Профиль", Report(1, 0), Stamp);
+
+        Assert.That(SyncLog.MatchesOrigin(header, origin), Is.True);
+    }
+
+    [TestCase(SyncLogOrigin.Overview)]
+    [TestCase(SyncLogOrigin.Manual)]
+    [TestCase(SyncLogOrigin.Mcp)]
+    public void История_расписания_не_подхватывает_чужие_запуски(SyncLogOrigin origin)
+    {
+        var header = SyncLog.FormatHeader(origin, "Профиль", Report(1, 0), Stamp);
+
+        Assert.That(SyncLog.MatchesOrigin(header, SyncLogOrigin.Scheduled), Is.False);
+    }
+
+    [Test]
+    public void Ручной_запуск_и_запуск_агентом_не_путаются_между_собой()
+    {
+        var manual = SyncLog.FormatHeader(SyncLogOrigin.Manual, null, Report(1, 0), Stamp);
+        var mcp = SyncLog.FormatHeader(SyncLogOrigin.Mcp, null, Report(1, 0), Stamp);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(SyncLog.MatchesOrigin(mcp, SyncLogOrigin.Manual), Is.False);
+            Assert.That(SyncLog.MatchesOrigin(manual, SyncLogOrigin.Mcp), Is.False);
+        });
+    }
+
+    [TestCase(0, false)]
+    [TestCase(1, true)]
+    [TestCase(20, true)]
+    [TestCase(100, true)]
+    public void Записанный_заголовок_подсвечивается_ровно_при_реальных_ошибках(int errors, bool expected)
+    {
+        var header = SyncLog.FormatHeader(SyncLogOrigin.Scheduled, "Профиль", Report(5, errors), Stamp);
+
+        Assert.That(SyncLog.LineHasErrors(header), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void Строка_чужого_формата_не_считается_запуском()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(SyncLog.MatchesOrigin("Автосинхронизация [Профиль]: 1 успешно, 0 ошибок", SyncLogOrigin.Scheduled), Is.False);
+            Assert.That(SyncLog.MatchesOrigin("  файл.txt", SyncLogOrigin.Scheduled), Is.False);
+            Assert.That(SyncLog.MatchesOrigin(SyncLog.FormatHeader(SyncLogOrigin.Scheduled, "Профиль", Report(1, 0), Stamp), SyncLogOrigin.None), Is.False);
+        });
+    }
+
+    private static SyncReport Report(int success, int errors)
+    {
+        var report = new SyncReport { CopiedCount = success };
+
+        for (var i = 0; i < errors; i++)
+        {
+            report.Errors.Add(new($@"файл{i}.txt", SyncAction.CopyToRight, "нет доступа"));
+        }
+
+        return report;
+    }
+}

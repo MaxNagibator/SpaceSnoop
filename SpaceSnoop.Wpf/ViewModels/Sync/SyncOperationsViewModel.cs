@@ -392,8 +392,7 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
             _logger.SyncVerified(report.Applied.Count, report.Mismatches.Count);
         }
 
-        var origin = interactive ? string.Empty : " (запуск агентом через MCP)";
-        SyncLog.AppendSafe($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Синхронизация{origin}: {report.SuccessCount} успешно, {report.Errors.Count} ошибок", report, _logger);
+        SyncLog.AppendSafe(interactive ? SyncLogOrigin.Manual : SyncLogOrigin.Mcp, null, report, _logger);
 
         _lastReport = report;
         _outcomes = SyncOutcomes.Build(result, report.Errors, report.Mismatches);

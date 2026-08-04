@@ -156,14 +156,7 @@ internal sealed class HeadlessSync
 
     private static void WriteLog(string name, SyncReport report, ILogger logger)
     {
-        try
-        {
-            SyncLog.Append($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Автосинхронизация [{name}]: {report.SuccessCount} успешно, {report.Errors.Count} ошибок", report);
-        }
-        catch (Exception exception)
-        {
-            logger.SyncLogWriteFailed(exception);
-        }
+        SyncLog.AppendSafe(SyncLogOrigin.Scheduled, name, report, logger);
     }
 
     private sealed record RunOptions(
