@@ -12,12 +12,19 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
     private bool _migrated;
     private bool _persisting;
 
-    public ScheduleViewModel(ISettingsStore settings, IDialogService dialogs, IFilePicker filePicker, IShellLauncher shell, ILogger<ScheduleViewModel> logger)
+    public ScheduleViewModel(
+        ISettingsStore settings,
+        IDialogService dialogs,
+        IFilePicker filePicker,
+        IShellLauncher shell,
+        IScheduleRunner scheduler,
+        ILogger<ScheduleViewModel> logger)
     {
         Settings = settings;
         _dialogs = dialogs;
         FilePicker = filePicker;
         Shell = shell;
+        Scheduler = scheduler;
         _logger = logger;
 
         Bulk = new(this, dialogs, logger);
@@ -38,6 +45,8 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
     public IFilePicker FilePicker { get; }
 
     public IShellLauncher Shell { get; }
+
+    public IScheduleRunner Scheduler { get; }
 
     public ScheduleBulkViewModel Bulk { get; }
 

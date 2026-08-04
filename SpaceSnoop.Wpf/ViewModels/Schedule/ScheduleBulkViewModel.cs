@@ -27,6 +27,16 @@ public sealed partial class ScheduleBulkViewModel : ObservableObject
     [ObservableProperty]
     private string _message = string.Empty;
 
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CancelRunCommand))]
+    [NotifyCanExecuteChangedFor(nameof(EnableCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DisableCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ApplyScheduleCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DeleteCommand))]
+    private bool _isRunning;
+
+    private CancellationTokenSource? _cts;
+
     internal ScheduleBulkViewModel(ScheduleViewModel owner, IDialogService dialogs, ILogger logger)
     {
         _owner = owner;
@@ -108,16 +118,32 @@ public sealed partial class ScheduleBulkViewModel : ObservableObject
         SetMirror(false);
     }
 
-    [RelayCommand]
-    private void Enable()
+    private bool CanRun()
     {
-        SetEnabled(true);
+        return !IsRunning;
     }
 
-    [RelayCommand]
-    private void Disable()
+    [RelayCommand(CanExecute = nameof(CanRun))]
+    private Task EnableAsync()
     {
-        SetEnabled(false);
+        return SetEnabledAsync(true);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRun))]
+    private Task DisableAsync()
+    {
+        return SetEnabledAsync(false);
+    }
+
+    private bool CanCancelRun()
+    {
+        return IsRunning;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanCancelRun))]
+    private void CancelRun()
+    {
+        _cts?.Cancel();
     }
 
     [RelayCommand]
@@ -130,8 +156,8 @@ public sealed partial class ScheduleBulkViewModel : ObservableObject
             value.Length == 0 ? "исключения очищены" : $"исключения «{value}»");
     }
 
-    [RelayCommand]
-    private void ApplySchedule()
+    [RelayCommand(CanExecute = nameof(CanRun))]
+    private async Task ApplyScheduleAsync()
     {
         if (IntervalIndex < 0)
         {
@@ -149,7 +175,10 @@ public sealed partial class ScheduleBulkViewModel : ObservableObject
             return;
         }
 
-        ApplyToSelected(
+        var targets = SelectedProfiles();
+
+        var changed = ApplyTo(
+            targets,
             profile =>
             {
                 profile.SelectedIntervalIndex = interval;
@@ -159,11 +188,23 @@ public sealed partial class ScheduleBulkViewModel : ObservableObject
                     profile.Time = time;
                 }
             },
-            $"расписание «{Intervals[interval]}»",
-            reschedule: true);
+            $"расписание «{Intervals[interval]}»");
+
+        if (!changed)
+        {
+            return;
+        }
+
+        var scheduled = Array.FindAll(targets, profile => profile.Enabled);
+        var run = await RewriteTasksAsync(scheduled);
+
+        if (run.Cancelled)
+        {
+            Message += $"; задачи переписаны у {run.Applied} из {scheduled.Length}, дальше отменено";
+        }
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRun))]
     private async Task DeleteAsync()
     {
         var targets = SelectedProfiles();
@@ -195,15 +236,20 @@ public sealed partial class ScheduleBulkViewModel : ObservableObject
             return;
         }
 
-        foreach (var profile in targets)
+        var removed = await RemoveTasksAsync(targets);
+
+        for (var i = 0; i < removed.Applied; i++)
         {
-            SyncScheduler.Remove(profile.TaskName, out _);
-            _owner.Profiles.Remove(profile);
+            _owner.Profiles.Remove(targets[i]);
         }
 
         _owner.Persist();
-        Message = string.Empty;
-        _logger.ScheduleBulkRemoved(targets.Length);
+
+        Message = removed.Cancelled
+            ? $"Удалено профилей: {removed.Applied} из {targets.Length}, дальше отменено"
+            : string.Empty;
+
+        _logger.ScheduleBulkRemoved(removed.Applied);
     }
 
     private SyncProfileViewModel[] SelectedProfiles()
@@ -262,7 +308,7 @@ public sealed partial class ScheduleBulkViewModel : ObservableObject
         }
     }
 
-    private void SetEnabled(bool value)
+    private async Task SetEnabledAsync(bool value)
     {
         var targets = SelectedProfiles();
 
@@ -271,31 +317,89 @@ public sealed partial class ScheduleBulkViewModel : ObservableObject
             return;
         }
 
-        // TODO: задачи Планировщика переписываются синхронно на UI-потоке; при десятках профилей выносить в Task.Run с индикатором прогресса
-        var applied = targets.Count(profile => profile.ApplyEnabled(value));
+        var prepared = Array.FindAll(targets, profile => profile.PrepareEnabled(value));
+        var run = await RewriteTasksAsync(prepared);
 
         _owner.Persist();
 
-        var rest = applied < targets.Length ? " (остальные не прошли проверку, причина в карточке)" : string.Empty;
+        var rest = prepared.Length < targets.Length ? " (остальные не прошли проверку, причина в карточке)" : string.Empty;
+        var tail = run.Cancelled ? ", дальше отменено" : string.Empty;
 
         Message = value
-            ? $"Включено: {applied} из {targets.Length}{rest}"
-            : $"Выключено: {applied}";
+            ? $"Включено: {run.Applied} из {targets.Length}{rest}{tail}"
+            : $"Выключено: {run.Applied}{tail}";
 
-        _logger.ScheduleBulkApplied(value ? "включение" : "выключение", applied);
+        _logger.ScheduleBulkApplied(value ? "включение" : "выключение", run.Applied);
     }
 
-    private void ApplyToSelected(Action<SyncProfileViewModel> apply, string what, bool reschedule = false)
+    private Task<BatchRun> RewriteTasksAsync(SyncProfileViewModel[] targets)
     {
-        ApplyTo(SelectedProfiles(), apply, what, reschedule);
+        return RunBatchAsync(targets, async profile =>
+        {
+            var request = profile.BuildScheduleRequest();
+            var outcome = await Task.Run(() => _owner.Scheduler.Apply(request));
+
+            profile.ApplyScheduleOutcome(outcome);
+        });
     }
 
-    private void ApplyTo(SyncProfileViewModel[] targets, Action<SyncProfileViewModel> apply, string what, bool reschedule = false)
+    private Task<BatchRun> RemoveTasksAsync(SyncProfileViewModel[] targets)
+    {
+        return RunBatchAsync(targets, profile =>
+        {
+            var taskName = profile.TaskName;
+
+            return Task.Run(() => _owner.Scheduler.Remove(taskName));
+        });
+    }
+
+    private async Task<BatchRun> RunBatchAsync(SyncProfileViewModel[] targets, Func<SyncProfileViewModel, Task> step)
+    {
+        if (targets.Length == 0)
+        {
+            return new(0, false);
+        }
+
+        _cts = new();
+        var token = _cts.Token;
+        IsRunning = true;
+
+        var applied = 0;
+
+        try
+        {
+            foreach (var profile in targets)
+            {
+                if (token.IsCancellationRequested)
+                {
+                    break;
+                }
+
+                await step(profile);
+                applied++;
+            }
+        }
+        finally
+        {
+            IsRunning = false;
+            _cts.Dispose();
+            _cts = null;
+        }
+
+        return new(applied, applied < targets.Length);
+    }
+
+    private void ApplyToSelected(Action<SyncProfileViewModel> apply, string what)
+    {
+        ApplyTo(SelectedProfiles(), apply, what);
+    }
+
+    private bool ApplyTo(SyncProfileViewModel[] targets, Action<SyncProfileViewModel> apply, string what)
     {
         if (targets.Length == 0)
         {
             Message = "Ни один профиль не подходит для этого действия.";
-            return;
+            return false;
         }
 
         foreach (var profile in targets)
@@ -305,18 +409,11 @@ public sealed partial class ScheduleBulkViewModel : ObservableObject
 
         _owner.Persist();
 
-        if (reschedule)
-        {
-            foreach (var profile in targets)
-            {
-                if (profile.Enabled)
-                {
-                    profile.ApplySchedule();
-                }
-            }
-        }
-
         Message = $"Применено к {targets.Length}: {what}";
         _logger.ScheduleBulkApplied(what, targets.Length);
+
+        return true;
     }
+
+    private readonly record struct BatchRun(int Applied, bool Cancelled);
 }

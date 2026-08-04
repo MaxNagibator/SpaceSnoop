@@ -266,6 +266,26 @@
                 </Grid>
             </Grid>
 
+            <StackPanel Orientation="Horizontal"
+                        Margin="0,12,0,0"
+                        Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                <ProgressBar IsIndeterminate="True"
+                             Width="120"
+                             Height="4"
+                             VerticalAlignment="Center"
+                             Margin="0,0,10,0"
+                             AutomationProperties.Name="Идёт запись задач Планировщика" />
+                <TextBlock Text="Планировщик переписывает задачи…"
+                           VerticalAlignment="Center"
+                           Margin="0,0,10,0"
+                           AutomationProperties.LiveSetting="Polite"
+                           Style="{StaticResource Setting.Hint}" />
+                <Button Style="{StaticResource Button.Ghost}"
+                        Command="{Binding CancelRunCommand}"
+                        Content="Отменить"
+                        Padding="12,4" />
+            </StackPanel>
+
             <TextBlock Text="{Binding Message}"
                        TextWrapping="Wrap">
                 <TextBlock.Style>

@@ -145,7 +145,7 @@ public class PlatformGatewayTests
         SyncProfileStore.Save(settings, [new() { Id = "one", Name = "Один", Left = @"C:\A", Right = @"C:\B" }]);
 
         var shell = new FakeShellLauncher { Succeeds = succeeds };
-        var schedule = new ScheduleViewModel(settings, new NoopDialogs(), new FakeFilePicker(), shell, NullLogger<ScheduleViewModel>.Instance);
+        var schedule = new ScheduleViewModel(settings, new NoopDialogs(), new FakeFilePicker(), shell, new FakeScheduleRunner(), NullLogger<ScheduleViewModel>.Instance);
 
         var profile = schedule.Profiles[0];
         profile.RunNowCommand.Execute(null);

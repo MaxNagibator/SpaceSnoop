@@ -182,11 +182,6 @@ public sealed partial class SyncProfileViewModel : ObservableObject
         };
     }
 
-    public void RefreshStatus()
-    {
-        ApplyStatus(SyncScheduler.Query(TaskName));
-    }
-
     public void ApplyStatus(ScheduleStatus status)
     {
         IsScheduled = status.Exists;
@@ -223,6 +218,17 @@ public sealed partial class SyncProfileViewModel : ObservableObject
 
     internal bool ApplyEnabled(bool value)
     {
+        if (!PrepareEnabled(value))
+        {
+            return false;
+        }
+
+        ApplySchedule();
+        return true;
+    }
+
+    internal bool PrepareEnabled(bool value)
+    {
         if (value && !ValidateForScheduling(out var reason))
         {
             Message = reason;
@@ -236,7 +242,6 @@ public sealed partial class SyncProfileViewModel : ObservableObject
         Enabled = value;
         _suppress = false;
 
-        ApplySchedule();
         return true;
     }
 
@@ -357,31 +362,31 @@ public sealed partial class SyncProfileViewModel : ObservableObject
 
     internal void ApplySchedule()
     {
-        if (Enabled)
+        ApplyScheduleOutcome(_parent.Scheduler.Apply(BuildScheduleRequest()));
+    }
+
+    internal ScheduleRequest BuildScheduleRequest()
+    {
+        TimeSpan.TryParse(Time, CultureInfo.InvariantCulture, out var time);
+
+        return new(Enabled, TaskName, ToModel().Interval, time, $"{AppInfo.SyncArgument} {Id}");
+    }
+
+    internal void ApplyScheduleOutcome(ScheduleOutcome outcome)
+    {
+        if (!outcome.Ok)
         {
-            TimeSpan.TryParse(Time, CultureInfo.InvariantCulture, out var time);
-
-            if (!SyncScheduler.Create(TaskName, ToModel().Interval, time, $"{AppInfo.SyncArgument} {Id}", out var error))
-            {
-                Message = $"Не удалось создать задачу: {error}";
-                _parent.LogTaskFailed(DisplayName, error);
-                return;
-            }
-
-            Message = "Расписание сохранено.";
+            Message = $"Не удалось создать задачу: {outcome.Error}";
+            _parent.LogTaskFailed(DisplayName, outcome.Error);
+            return;
         }
-        else
-        {
-            if (SyncScheduler.Exists(TaskName))
-            {
-                SyncScheduler.Disable(TaskName, out _);
-            }
 
-            Message = "Профиль сохранён, автозапуск выключен.";
-        }
+        Message = Enabled
+            ? "Расписание сохранено."
+            : "Профиль сохранён, автозапуск выключен.";
 
         _parent.LogSaved(DisplayName, Enabled);
-        RefreshStatus();
+        ApplyStatus(outcome.Status);
     }
 
     private bool ValidateForScheduling(out string reason)

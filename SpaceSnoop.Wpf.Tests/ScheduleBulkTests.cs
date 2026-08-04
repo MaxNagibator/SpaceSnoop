@@ -113,7 +113,7 @@ public class ScheduleBulkTests
 
     [TestCase("25:00")]
     [TestCase("не время")]
-    public void Некорректное_время_не_меняет_расписание(string time)
+    public async Task Некорректное_время_не_меняет_расписание(string time)
     {
         var settings = Seed();
         var vm = Create(settings);
@@ -121,7 +121,7 @@ public class ScheduleBulkTests
         vm.Bulk.SelectAllCommand.Execute(null);
         vm.Bulk.IntervalIndex = 0;
         vm.Bulk.Time = time;
-        vm.Bulk.ApplyScheduleCommand.Execute(null);
+        await vm.Bulk.ApplyScheduleCommand.ExecuteAsync(null);
 
         using (Assert.EnterMultipleScope())
         {
@@ -131,7 +131,7 @@ public class ScheduleBulkTests
     }
 
     [Test]
-    public void Расписание_применяется_ко_всем_выбранным()
+    public async Task Расписание_применяется_ко_всем_выбранным()
     {
         var settings = Seed();
         var vm = Create(settings);
@@ -139,7 +139,7 @@ public class ScheduleBulkTests
         vm.Profiles[1].IsSelected = true;
         vm.Bulk.IntervalIndex = 1;
         vm.Bulk.Time = "07:30";
-        vm.Bulk.ApplyScheduleCommand.Execute(null);
+        await vm.Bulk.ApplyScheduleCommand.ExecuteAsync(null);
 
         var stored = SyncProfileStore.Load(settings);
 
@@ -170,6 +170,138 @@ public class ScheduleBulkTests
         }
     }
 
+    [Test]
+    public async Task Пакетное_включение_переписывает_задачи_и_снимает_признак_работы()
+    {
+        using var dirs = new TempProfileDirectories();
+        var settings = dirs.Seed();
+        var scheduler = new FakeScheduleRunner();
+        var vm = Create(settings, scheduler);
+        var seenRunning = false;
+
+        scheduler.OnCall = _ => seenRunning |= vm.Bulk.IsRunning;
+
+        vm.Bulk.SelectAllCommand.Execute(null);
+        await vm.Bulk.EnableCommand.ExecuteAsync(null);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(scheduler.Applied, Has.Count.EqualTo(3));
+            Assert.That(scheduler.Applied, Is.All.Matches<ScheduleRequest>(request => request.Enabled));
+            Assert.That(seenRunning, Is.True, "во время прогона признак «идёт» должен быть выставлен");
+            Assert.That(vm.Bulk.IsRunning, Is.False);
+            Assert.That(vm.Bulk.Message, Is.EqualTo("Включено: 3 из 3"));
+        }
+    }
+
+    [Test]
+    public async Task Отмена_останавливает_пакетное_включение_между_вызовами_планировщика()
+    {
+        using var dirs = new TempProfileDirectories();
+        var settings = dirs.Seed();
+        var scheduler = new FakeScheduleRunner();
+        var vm = Create(settings, scheduler);
+
+        scheduler.OnCall = call =>
+        {
+            if (call == 2)
+            {
+                vm.Bulk.CancelRunCommand.Execute(null);
+            }
+        };
+
+        vm.Bulk.SelectAllCommand.Execute(null);
+        await vm.Bulk.EnableCommand.ExecuteAsync(null);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(scheduler.Applied, Has.Count.EqualTo(2));
+            Assert.That(vm.Bulk.IsRunning, Is.False);
+            Assert.That(vm.Bulk.Message, Does.Contain("Включено: 2 из 3").And.Contains("дальше отменено"));
+        }
+    }
+
+    [Test]
+    public async Task Пакетное_удаление_снимает_задачи_через_планировщик_и_убирает_профили()
+    {
+        var settings = Seed();
+        var scheduler = new FakeScheduleRunner();
+        var vm = Create(settings, scheduler, true);
+
+        vm.Profiles[0].IsSelected = true;
+        vm.Profiles[2].IsSelected = true;
+        await vm.Bulk.DeleteCommand.ExecuteAsync(null);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(scheduler.Removed, Has.Count.EqualTo(2));
+            Assert.That(vm.Profiles.Select(profile => profile.Id), Is.EqualTo(new[] { "two" }));
+            Assert.That(SyncProfileStore.Load(settings), Has.Count.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public async Task Отмена_пакетного_удаления_оставляет_профили_чьи_задачи_ещё_не_сняты()
+    {
+        var settings = Seed();
+        var scheduler = new FakeScheduleRunner();
+        var vm = Create(settings, scheduler, true);
+
+        scheduler.OnCall = call =>
+        {
+            if (call == 1)
+            {
+                vm.Bulk.CancelRunCommand.Execute(null);
+            }
+        };
+
+        vm.Bulk.SelectAllCommand.Execute(null);
+        await vm.Bulk.DeleteCommand.ExecuteAsync(null);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(scheduler.Removed, Has.Count.EqualTo(1));
+            Assert.That(vm.Profiles, Has.Count.EqualTo(2));
+            Assert.That(vm.Bulk.Message, Does.Contain("Удалено профилей: 1 из 3"));
+        }
+    }
+
+    private sealed class TempProfileDirectories : IDisposable
+    {
+        private readonly string _root = Path.Combine(Path.GetTempPath(), $"SpaceSnoopSchedule_{Guid.NewGuid():N}");
+
+        public MemorySettings Seed()
+        {
+            var settings = new MemorySettings();
+
+            SyncProfileStore.Save(settings, Enumerable.Range(0, 3).Select(index => new SyncProfile
+            {
+                Id = $"p{index}",
+                Name = $"Профиль {index}",
+                Left = Create($"left{index}"),
+                Right = Create($"right{index}"),
+            }));
+
+            return settings;
+        }
+
+        public void Dispose()
+        {
+            if (Directory.Exists(_root))
+            {
+                Directory.Delete(_root, true);
+            }
+        }
+
+        private string Create(string name)
+        {
+            var path = Path.Combine(_root, name);
+            Directory.CreateDirectory(path);
+
+            return path;
+        }
+    }
+
     private static MemorySettings Seed()
     {
         var settings = new MemorySettings();
@@ -184,8 +316,14 @@ public class ScheduleBulkTests
         return settings;
     }
 
-    private static ScheduleViewModel Create(ISettingsStore settings)
+    private static ScheduleViewModel Create(ISettingsStore settings, IScheduleRunner? scheduler = null, bool confirmDialogs = false)
     {
-        return new(settings, new NoopDialogs(), new FakeFilePicker(), new FakeShellLauncher(), NullLogger<ScheduleViewModel>.Instance);
+        return new(
+            settings,
+            new NoopDialogs(confirmDialogs),
+            new FakeFilePicker(),
+            new FakeShellLauncher(),
+            scheduler ?? new FakeScheduleRunner(),
+            NullLogger<ScheduleViewModel>.Instance);
     }
 }

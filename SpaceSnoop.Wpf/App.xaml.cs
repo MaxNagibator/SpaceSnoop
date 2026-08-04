@@ -188,6 +188,7 @@ public partial class App : Application
         services.AddSingleton<SyncViewModel>();
         services.AddSingleton<ISyncAutomation>(static provider => provider.GetRequiredService<SyncViewModel>());
         services.AddSingleton<OverviewViewModel>();
+        services.AddSingleton<IScheduleRunner, ScheduleRunner>();
         services.AddSingleton<ScheduleViewModel>();
         services.AddSingleton<DockerViewModel>();
         services.AddSingleton<ChatViewModel>();
