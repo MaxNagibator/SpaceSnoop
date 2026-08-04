@@ -31,6 +31,8 @@ internal sealed record SyncRowsRequest
 
 internal static class SyncRowsProjector
 {
+    private static readonly char[] PathSeparators = ['/', '\\'];
+
     public static List<SyncNodeViewModel> Build(SyncRowsRequest request, ISyncRowHost host)
     {
         return request.FlatView
@@ -154,7 +156,7 @@ internal static class SyncRowsProjector
             return null;
         }
 
-        foreach (var segment in relativePath.Split('/', '\\'))
+        foreach (var segment in relativePath.Split(PathSeparators))
         {
             foreach (var folder in folders)
             {

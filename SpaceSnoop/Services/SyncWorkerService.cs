@@ -200,8 +200,9 @@ public sealed class SyncWorkerService : IDisposable
             {
                 throw;
             }
-            catch
+            catch (Exception exception)
             {
+                Debug.WriteLine($"Ошибка хеширования {file.RelativePath}: {exception.Message}");
             }
         }
 

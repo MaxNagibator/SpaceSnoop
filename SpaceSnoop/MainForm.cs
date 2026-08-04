@@ -42,7 +42,7 @@ public partial class MainForm : Form
         return true;
     }
 
-    protected override void OnFormClosing(FormClosingEventArgs args)
+    protected override void OnFormClosing(FormClosingEventArgs e)
     {
         PerformDelete();
 
@@ -50,7 +50,7 @@ public partial class MainForm : Form
         FinalizeSorting();
         FinalizeColorService();
 
-        base.OnFormClosing(args);
+        base.OnFormClosing(e);
     }
 
     private void OnFormLoaded(object sender, EventArgs args)

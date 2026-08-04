@@ -331,7 +331,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     [RelayCommand(CanExecute = nameof(CanStart))]
     private async Task StartAsync()
     {
-        await ScanAsync(SelectedDrive?.Trim() ?? string.Empty);
+        await ScanAsync(SelectedDrive?.Trim() ?? string.Empty, CancellationToken.None);
     }
 
     [RelayCommand(CanExecute = nameof(CanStart))]
@@ -349,7 +349,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         }
 
         SelectedDrive = path;
-        await ScanAsync(path);
+        await ScanAsync(path, CancellationToken.None);
     }
 
     private bool CanStop()

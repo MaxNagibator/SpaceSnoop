@@ -140,7 +140,7 @@ public static class AgentCli
         return string.IsNullOrWhiteSpace(comSpec) ? "cmd.exe" : comSpec;
     }
 
-    private static string Quote(string value)
+    internal static string Quote(string value)
     {
         if (value.Length > 0 && value.AsSpan().IndexOfAny(CmdSpecials) < 0)
         {
@@ -149,7 +149,8 @@ public static class AgentCli
 
         var builder = new StringBuilder("\"");
 
-        for (var index = 0; index < value.Length; index++)
+        var index = 0;
+        while (index < value.Length)
         {
             var slashes = 0;
 
@@ -173,6 +174,8 @@ public static class AgentCli
             {
                 builder.Append('\\', slashes).Append(value[index]);
             }
+
+            index++;
         }
 
         return builder.Append('"').ToString();

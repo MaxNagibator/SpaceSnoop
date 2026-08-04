@@ -92,8 +92,9 @@ public class BindingSmokeTests
                 Directory.Delete(_fixture.Root, true);
             }
         }
-        catch (IOException)
+        catch (IOException exception)
         {
+            TestContext.Out.WriteLine($"Не удалось удалить каталог галереи {_fixture.Root}: {exception.Message}");
         }
     }
 

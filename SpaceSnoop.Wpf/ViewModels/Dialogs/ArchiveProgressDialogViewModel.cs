@@ -110,6 +110,7 @@ public sealed partial class ArchiveProgressDialogViewModel : ObservableObject, I
         }
         catch (OperationCanceledException)
         {
+            _cancelled = true;
         }
     }
 

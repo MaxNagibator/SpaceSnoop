@@ -393,7 +393,7 @@ public sealed class DockerCompactTests
     private sealed record Call(string FileName, string Arguments, DockerProcessOptions Options, CancellationToken Cancel);
 
     private sealed class FakeFileSystem(
-        string path,
+        string expectedPath,
         IReadOnlyList<DockerFileMetrics> measurements,
         Exception? afterMetricsException = null,
         IReadOnlyList<bool>? availability = null) : IDockerFileSystem
@@ -402,20 +402,20 @@ public sealed class DockerCompactTests
         private readonly Queue<bool> _availability = new(availability ?? []);
         private int _metricsRead;
 
-        public bool FileExists(string candidate)
+        public bool FileExists(string path)
         {
-            return string.Equals(candidate, path, StringComparison.OrdinalIgnoreCase);
+            return string.Equals(path, expectedPath, StringComparison.OrdinalIgnoreCase);
         }
 
-        public bool IsAvailable(string candidate)
+        public bool IsAvailable(string path)
         {
-            Assert.That(candidate, Is.EqualTo(path));
-            return _availability.Count > 0 ? _availability.Dequeue() : FileExists(candidate);
+            Assert.That(path, Is.EqualTo(expectedPath));
+            return _availability.Count > 0 ? _availability.Dequeue() : FileExists(path);
         }
 
-        public DockerFileMetrics GetMetrics(string candidate)
+        public DockerFileMetrics GetMetrics(string path)
         {
-            Assert.That(candidate, Is.EqualTo(path));
+            Assert.That(path, Is.EqualTo(expectedPath));
             if (++_metricsRead == 2 && afterMetricsException is not null)
             {
                 throw afterMetricsException;

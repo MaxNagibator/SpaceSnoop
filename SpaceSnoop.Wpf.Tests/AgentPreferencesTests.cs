@@ -25,8 +25,9 @@ public class AgentPreferencesTests
         {
             Directory.Delete(_directory, recursive: true);
         }
-        catch (IOException)
+        catch (IOException exception)
         {
+            TestContext.Out.WriteLine($"Не удалось удалить каталог настроек {_directory}: {exception.Message}");
         }
     }
 

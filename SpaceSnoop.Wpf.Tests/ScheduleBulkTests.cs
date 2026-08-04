@@ -174,7 +174,7 @@ public class ScheduleBulkTests
     public async Task Пакетное_включение_переписывает_задачи_и_снимает_признак_работы()
     {
         using var dirs = new TempProfileDirectories();
-        var settings = dirs.Seed();
+        var settings = dirs.SeedProfiles();
         var scheduler = new FakeScheduleRunner();
         var vm = Create(settings, scheduler);
         var seenRunning = false;
@@ -198,7 +198,7 @@ public class ScheduleBulkTests
     public async Task Отмена_останавливает_пакетное_включение_между_вызовами_планировщика()
     {
         using var dirs = new TempProfileDirectories();
-        var settings = dirs.Seed();
+        var settings = dirs.SeedProfiles();
         var scheduler = new FakeScheduleRunner();
         var vm = Create(settings, scheduler);
 
@@ -225,7 +225,7 @@ public class ScheduleBulkTests
     public async Task Отмена_выключения_оставляет_необработанные_профили_включёнными()
     {
         using var dirs = new TempProfileDirectories();
-        var settings = dirs.Seed();
+        var settings = dirs.SeedProfiles();
         var scheduler = new FakeScheduleRunner();
         var vm = Create(settings, scheduler);
 
@@ -255,7 +255,7 @@ public class ScheduleBulkTests
     public async Task Отказ_планировщика_не_меняет_состояние_профиля()
     {
         using var dirs = new TempProfileDirectories();
-        var settings = dirs.Seed();
+        var settings = dirs.SeedProfiles();
         var scheduler = new FakeScheduleRunner { Fails = _ => true };
         var vm = Create(settings, scheduler);
 
@@ -320,7 +320,7 @@ public class ScheduleBulkTests
     {
         private readonly string _root = Path.Combine(Path.GetTempPath(), $"SpaceSnoopSchedule_{Guid.NewGuid():N}");
 
-        public MemorySettings Seed()
+        public MemorySettings SeedProfiles()
         {
             var settings = new MemorySettings();
 
@@ -328,8 +328,8 @@ public class ScheduleBulkTests
             {
                 Id = $"p{index}",
                 Name = $"Профиль {index}",
-                Left = Create($"left{index}"),
-                Right = Create($"right{index}"),
+                Left = CreateDirectory($"left{index}"),
+                Right = CreateDirectory($"right{index}"),
             }));
 
             return settings;
@@ -343,7 +343,7 @@ public class ScheduleBulkTests
             }
         }
 
-        private string Create(string name)
+        private string CreateDirectory(string name)
         {
             var path = Path.Combine(_root, name);
             Directory.CreateDirectory(path);

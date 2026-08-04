@@ -241,7 +241,7 @@ public sealed partial class ScheduleBulkViewModel : ObservableObject
         var removed = await RunBatchAsync(targets, async profile =>
         {
             var taskName = profile.TaskName;
-            await Task.Run(() => _owner.Scheduler.Remove(taskName));
+            await Task.Run(() => _owner.Scheduler.Remove(taskName), CancellationToken.None);
             detached.Add(profile);
 
             return true;
@@ -331,7 +331,7 @@ public sealed partial class ScheduleBulkViewModel : ObservableObject
         var run = await RunBatchAsync(valid, async profile =>
         {
             var request = profile.BuildScheduleRequest(value);
-            var outcome = await Task.Run(() => _owner.Scheduler.Apply(request));
+            var outcome = await Task.Run(() => _owner.Scheduler.Apply(request), CancellationToken.None);
 
             if (outcome.Ok)
             {
@@ -360,7 +360,7 @@ public sealed partial class ScheduleBulkViewModel : ObservableObject
         return RunBatchAsync(targets, async profile =>
         {
             var request = profile.BuildScheduleRequest();
-            var outcome = await Task.Run(() => _owner.Scheduler.Apply(request));
+            var outcome = await Task.Run(() => _owner.Scheduler.Apply(request), CancellationToken.None);
 
             profile.ApplyScheduleOutcome(outcome);
 

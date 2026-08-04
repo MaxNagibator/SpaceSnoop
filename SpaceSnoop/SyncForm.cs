@@ -1,4 +1,5 @@
 ﻿using SpaceSnoop.Services;
+using System.Diagnostics;
 
 namespace SpaceSnoop;
 
@@ -409,8 +410,9 @@ public partial class SyncForm : Form
                 _showAbsentAsEmptyCheckBox.Checked = showAbsentAsEmpty;
             }
         }
-        catch
+        catch (Exception exception)
         {
+            Debug.WriteLine($"Ошибка загрузки настроек синхронизации: {exception.Message}");
         }
     }
 
@@ -431,8 +433,9 @@ public partial class SyncForm : Form
 
             File.WriteAllLines(SettingsFile, lines);
         }
-        catch
+        catch (Exception exception)
         {
+            Debug.WriteLine($"Ошибка сохранения настроек синхронизации: {exception.Message}");
         }
     }
 }

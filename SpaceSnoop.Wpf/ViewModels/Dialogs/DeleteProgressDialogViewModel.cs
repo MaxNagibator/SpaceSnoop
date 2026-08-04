@@ -99,6 +99,7 @@ public sealed partial class DeleteProgressDialogViewModel : ObservableObject, ID
         }
         catch (OperationCanceledException)
         {
+            _cancelled = true;
         }
     }
 
