@@ -1,51 +1,22 @@
-﻿using KeepShell.Services.Modal;
+﻿using KeepShell.ViewModels;
 using Microsoft.VisualBasic.FileIO;
 using System.Collections.ObjectModel;
 using System.IO;
 
 namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
 
-public sealed partial class DeleteProgressDialogViewModel : ObservableObject, IDialogViewModel, ICancelableDialog
+public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewModelBase
 {
     private readonly bool _permanent;
     private readonly long _totalBytes;
     private readonly ILogger _logger;
 
-    private CancellationTokenSource? _cts;
     private long _freedBytes;
     private int _deleted;
     private int _failed;
-    private bool _cancelled;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsIdle))]
-    [NotifyCanExecuteChangedFor(nameof(StartCommand))]
-    [NotifyCanExecuteChangedFor(nameof(CancelRunCommand))]
-    [NotifyCanExecuteChangedFor(nameof(CloseCommand))]
-    private bool _isRunning;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsIdle))]
-    [NotifyCanExecuteChangedFor(nameof(StartCommand))]
-    private bool _isFinished;
-
-    [ObservableProperty]
-    private double _progressValue;
-
-    [ObservableProperty]
-    private string _currentPath = string.Empty;
-
-    [ObservableProperty]
-    private string _countText;
 
     [ObservableProperty]
     private string _freedText;
-
-    [ObservableProperty]
-    private string _statusText = string.Empty;
-
-    [ObservableProperty]
-    private bool _hasErrors;
 
     public DeleteProgressDialogViewModel(IReadOnlyList<SpaceBase> items, bool permanent, ILogger logger)
     {
@@ -56,120 +27,64 @@ public sealed partial class DeleteProgressDialogViewModel : ObservableObject, ID
 
         ActionVerb = permanent ? "удалены безвозвратно" : "перемещены в корзину";
         IntroText = $"Будут {ActionVerb}: {Plural.Format(Items.Count, "объект", "объекта", "объектов")} · {SizeFormatter.Format(_totalBytes)}";
-        _countText = $"0 / {Items.Count}";
+        CountText = $"0 / {Items.Count}";
         _freedText = SizeFormatter.Format(0);
     }
-
-    public event EventHandler<bool>? RequestClose;
 
     public ObservableCollection<DeleteRowViewModel> Items { get; }
 
     public IReadOnlyList<SpaceBase> DeletedItems { get; private set; } = [];
 
-    public string Title => "Удаление";
+    public override string Title => "Удаление";
 
     public string ActionVerb { get; }
 
     public string IntroText { get; }
 
-    public bool IsIdle => !IsRunning && !IsFinished;
+    protected override string RunningStatus => "Удаление…";
 
-    public bool CanCancel => !IsRunning;
+    protected override bool CloseResult => _deleted > 0;
 
-    public void RequestStop()
+    protected override bool HasFailedItems => _failed > 0;
+
+    protected override async Task ExecuteAsync(CancellationToken token)
     {
-        _cts?.Cancel();
-    }
-
-    public async Task StopAsync()
-    {
-        if (_cts is { } cts)
-        {
-            await cts.CancelAsync();
-        }
-
-        if (StartCommand.ExecutionTask is not { } run)
-        {
-            return;
-        }
-
-        try
-        {
-            await run;
-        }
-        catch (OperationCanceledException)
-        {
-            _cancelled = true;
-        }
-    }
-
-    private bool CanStart()
-    {
-        return IsIdle && Items.Count > 0;
-    }
-
-    [RelayCommand(CanExecute = nameof(CanStart))]
-    private async Task StartAsync()
-    {
-        _cts = new();
-        var token = _cts.Token;
-        IsRunning = true;
-        StatusText = "Удаление…";
-
-        _logger.DeletionStarted(Items.Count, SizeFormatter.Format(_totalBytes), _permanent);
-
         var progress = new Progress<DeleteTick>(OnTick);
-        List<SpaceBase>? deletedItems = null;
 
-        try
-        {
-            deletedItems = await Task.Run(() => RunDeletion(progress, token), token);
-        }
-        catch (OperationCanceledException)
-        {
-            _cancelled = true;
-        }
-        catch (Exception exception)
-        {
-            _logger.DeleteItemFailed(exception, CurrentPath);
-            StatusText = $"Ошибка: {exception.Message}";
-        }
-        finally
-        {
-            IsRunning = false;
-            IsFinished = true;
-            HasErrors = _failed > 0;
-            StatusText = BuildSummary();
-            DeletedItems = deletedItems ?? [];
-
-            _logger.DeletionFinished(_cancelled, _deleted, _failed, SizeFormatter.Format(_freedBytes));
-
-            _cts?.Dispose();
-            _cts = null;
-        }
+        DeletedItems = await Task.Run(() => RunDeletion(progress, token), token);
     }
 
-    private bool CanCancelRun()
+    protected override void OnStarting()
     {
-        return IsRunning;
+        _logger.DeletionStarted(Items.Count, SizeFormatter.Format(_totalBytes), _permanent);
     }
 
-    [RelayCommand(CanExecute = nameof(CanCancelRun))]
-    private void CancelRun()
+    protected override void OnFinished()
     {
-        StatusText = "Отмена…";
-        _cts?.Cancel();
+        if (Failure is { } failure)
+        {
+            _logger.DeleteItemFailed(failure, CurrentPath);
+        }
+
+        _logger.DeletionFinished(Cancelled, _deleted, _failed, SizeFormatter.Format(_freedBytes));
     }
 
-    private bool CanClose()
+    protected override bool CanStart()
     {
-        return !IsRunning;
+        return base.CanStart() && Items.Count > 0;
     }
 
-    [RelayCommand(CanExecute = nameof(CanClose))]
-    private void Close()
+    protected override string BuildSummary()
     {
-        RequestClose?.Invoke(this, _deleted > 0);
+        if (Failure is { } failure)
+        {
+            return $"Ошибка: {failure.Message}";
+        }
+
+        var verb = _permanent ? "Удалено безвозвратно" : "Перемещено в корзину";
+        var head = Cancelled ? "Отменено." : "Готово.";
+        var errors = _failed > 0 ? $" Ошибок: {_failed}." : string.Empty;
+        return $"{head} {verb}: {_deleted} из {Items.Count}. Освобождено: {SizeFormatter.Format(_freedBytes)}.{errors}";
     }
 
     private void OnTick(DeleteTick tick)
@@ -292,14 +207,6 @@ public sealed partial class DeleteProgressDialogViewModel : ObservableObject, ID
         {
             FileSystem.DeleteFile(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
         }
-    }
-
-    private string BuildSummary()
-    {
-        var verb = _permanent ? "Удалено безвозвратно" : "Перемещено в корзину";
-        var head = _cancelled ? "Отменено." : "Готово.";
-        var errors = _failed > 0 ? $" Ошибок: {_failed}." : string.Empty;
-        return $"{head} {verb}: {_deleted} из {Items.Count}. Освобождено: {SizeFormatter.Format(_freedBytes)}.{errors}";
     }
 
     private readonly record struct DeleteTick(

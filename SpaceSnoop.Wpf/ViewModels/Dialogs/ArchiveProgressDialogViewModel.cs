@@ -1,52 +1,21 @@
-﻿using KeepShell.Services.Modal;
+﻿using KeepShell.ViewModels;
 using System.IO;
 
 namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
 
-public sealed partial class ArchiveProgressDialogViewModel : ObservableObject, IDialogViewModel, ICancelableDialog
+public sealed partial class ArchiveProgressDialogViewModel : OperationDialogViewModelBase
 {
     private readonly ArchiveRequest _request;
     private readonly ArchiveService _service;
     private readonly ILogger _logger;
     private readonly int _total;
 
-    private CancellationTokenSource? _cts;
-    private bool _cancelled;
     private bool _packed;
-    private bool _failed;
     private int _verifyTotal;
-    private string _error = string.Empty;
     private string _resultSummary = string.Empty;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsIdle))]
-    [NotifyCanExecuteChangedFor(nameof(StartCommand))]
-    [NotifyCanExecuteChangedFor(nameof(CancelRunCommand))]
-    [NotifyCanExecuteChangedFor(nameof(CloseCommand))]
-    private bool _isRunning;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsIdle))]
-    [NotifyCanExecuteChangedFor(nameof(StartCommand))]
-    private bool _isFinished;
-
-    [ObservableProperty]
-    private double _progressValue;
-
-    [ObservableProperty]
-    private string _currentPath = string.Empty;
-
-    [ObservableProperty]
-    private string _countText = string.Empty;
-
-    [ObservableProperty]
     private string _countLabel = "Упаковано файлов";
-
-    [ObservableProperty]
-    private string _statusText = string.Empty;
-
-    [ObservableProperty]
-    private bool _hasErrors;
 
     public ArchiveProgressDialogViewModel(ArchiveRequest request, ArchiveService service, ILogger logger)
     {
@@ -63,9 +32,7 @@ public sealed partial class ArchiveProgressDialogViewModel : ObservableObject, I
             : "Оригинал останется на месте.";
     }
 
-    public event EventHandler<bool>? RequestClose;
-
-    public string Title => "Упаковка в архив";
+    public override string Title => "Упаковка в архив";
 
     public string ActionText => "Упаковать";
 
@@ -81,110 +48,59 @@ public sealed partial class ArchiveProgressDialogViewModel : ObservableObject, I
 
     public string? CreatedArchivePath { get; private set; }
 
-    public bool IsIdle => !IsRunning && !IsFinished;
-
     public bool IsIndeterminate => _total == 0;
 
-    public bool CanCancel => !IsRunning;
+    protected override string RunningStatus => "Упаковка…";
 
-    public void RequestStop()
+    protected override bool CloseResult => OriginalDeleted;
+
+    protected override async Task ExecuteAsync(CancellationToken token)
     {
-        _cts?.Cancel();
-    }
-
-    public async Task StopAsync()
-    {
-        if (_cts is { } cts)
-        {
-            await cts.CancelAsync();
-        }
-
-        if (StartCommand.ExecutionTask is not { } run)
-        {
-            return;
-        }
-
-        try
-        {
-            await run;
-        }
-        catch (OperationCanceledException)
-        {
-            _cancelled = true;
-        }
-    }
-
-    private bool CanStart()
-    {
-        return IsIdle;
-    }
-
-    [RelayCommand(CanExecute = nameof(CanStart))]
-    private async Task StartAsync()
-    {
-        _cts = new();
-        var token = _cts.Token;
-        IsRunning = true;
-        StatusText = "Упаковка…";
-
-        _logger.ArchiveStarted(_request.SourcePath);
-
         var packProgress = new Progress<OperationProgress>(update => OnTick(update, false));
         var verifyProgress = new Progress<OperationProgress>(update => OnTick(update, true));
 
-        try
+        await Task.Run(() => ExecuteZip(packProgress, verifyProgress, token), token);
+    }
+
+    protected override void OnStarting()
+    {
+        _logger.ArchiveStarted(_request.SourcePath);
+    }
+
+    protected override void OnFinished()
+    {
+        if (Cancelled)
         {
-            await Task.Run(() => ExecuteZip(packProgress, verifyProgress, token), token);
-        }
-        catch (OperationCanceledException)
-        {
-            _cancelled = true;
             _logger.ArchiveCancelled(_request.SourcePath);
+            return;
         }
-        catch (Exception exception)
+
+        if (Failure is { } failure)
         {
-            _failed = true;
-            _error = exception.Message;
-            _logger.ArchiveFailed(exception, _request.SourcePath);
+            _logger.ArchiveFailed(failure, _request.SourcePath);
+            return;
         }
-        finally
+
+        _logger.ArchiveFinished(_request.SourcePath, _resultSummary);
+    }
+
+    protected override string BuildSummary()
+    {
+        if (Cancelled)
         {
-            IsRunning = false;
-            IsFinished = true;
-            HasErrors = _failed;
-            StatusText = BuildSummary();
-
-            if (!_failed && !_cancelled)
-            {
-                _logger.ArchiveFinished(_request.SourcePath, _resultSummary);
-            }
-
-            _cts?.Dispose();
-            _cts = null;
+            return _packed
+                ? $"Отменено на проверке: архив {TargetName} создан, но не проверен. Оригинал не тронут."
+                : "Отменено.";
         }
-    }
 
-    private bool CanCancelRun()
-    {
-        return IsRunning;
-    }
+        if (Failure is { } failure)
+        {
+            return $"Ошибка: {failure.Message}";
+        }
 
-    [RelayCommand(CanExecute = nameof(CanCancelRun))]
-    private void CancelRun()
-    {
-        StatusText = "Отмена…";
-        _cts?.Cancel();
-    }
-
-    private bool CanClose()
-    {
-        return !IsRunning;
-    }
-
-    [RelayCommand(CanExecute = nameof(CanClose))]
-    private void Close()
-    {
-        RequestClose?.Invoke(this, OriginalDeleted);
+        return OriginalDeleted
+            ? $"Готово. Архив {_resultSummary}. Оригинал → в корзину."
+            : $"Готово. Архив {_resultSummary}.";
     }
 
     private void ExecuteZip(IProgress<OperationProgress> packProgress, IProgress<OperationProgress> verifyProgress, CancellationToken token)
@@ -231,24 +147,5 @@ public sealed partial class ArchiveProgressDialogViewModel : ObservableObject, I
         CurrentPath = update.Current;
         CountText = total > 0 ? $"{update.Completed} / {total}" : update.Completed.ToString("N0");
         ProgressValue = total > 0 ? Math.Clamp((double)update.Completed / total, 0d, 1d) : 0d;
-    }
-
-    private string BuildSummary()
-    {
-        if (_cancelled)
-        {
-            return _packed
-                ? $"Отменено на проверке: архив {TargetName} создан, но не проверен. Оригинал не тронут."
-                : "Отменено.";
-        }
-
-        if (_failed)
-        {
-            return $"Ошибка: {_error}";
-        }
-
-        return OriginalDeleted
-            ? $"Готово. Архив {_resultSummary}. Оригинал → в корзину."
-            : $"Готово. Архив {_resultSummary}.";
     }
 }
