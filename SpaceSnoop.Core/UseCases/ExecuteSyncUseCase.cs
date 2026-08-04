@@ -6,7 +6,8 @@ public sealed record ExecuteSyncRequest(
     ComparisonResult Comparison,
     SyncConflictPolicy ConflictPolicy = SyncConflictPolicy.None,
     SyncDeleteUi DeleteUi = SyncDeleteUi.Interactive,
-    bool VerifyAfterSync = false);
+    bool VerifyAfterSync = false,
+    bool RecycleOverwritten = false);
 
 public sealed class ExecuteSyncUseCase(ILogger<SyncEngine> logger)
 {
@@ -19,7 +20,7 @@ public sealed class ExecuteSyncUseCase(ILogger<SyncEngine> logger)
             comparison.ResolveAllConflicts(SyncAction.Skip);
         }
 
-        var engine = new SyncEngine(logger, request.DeleteUi != SyncDeleteUi.Silent);
+        var engine = new SyncEngine(logger, request.DeleteUi != SyncDeleteUi.Silent, request.RecycleOverwritten);
         var report = engine.Execute(comparison, cancel, progress);
 
         if (request.VerifyAfterSync)

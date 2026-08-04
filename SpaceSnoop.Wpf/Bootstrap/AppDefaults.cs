@@ -39,6 +39,7 @@ public static class AppDefaults
 
     public const bool SyncPathSuggestDefault = true;
     public const string SyncGroupFoldersDefault = ".git,bin,obj";
+    public const bool SyncRecycleOverwrittenDefault = true;
 
     public const long SyncLogFileSizeLimitBytes = 5_000_000;
     public const int SyncLogRetainedFileCount = 5;

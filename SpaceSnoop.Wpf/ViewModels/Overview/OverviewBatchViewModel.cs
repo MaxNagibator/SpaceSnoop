@@ -7,6 +7,7 @@ namespace SpaceSnoop.Wpf.ViewModels.Overview;
 
 public sealed partial class OverviewBatchViewModel : ObservableObject
 {
+    private readonly ISettingsStore _settings;
     private readonly IDialogService _dialogs;
     private readonly ToastNotifier _notifier;
     private readonly ILogger _logger;
@@ -37,6 +38,7 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
     private double _progressMax;
 
     internal OverviewBatchViewModel(
+        ISettingsStore settings,
         IDialogService dialogs,
         ToastNotifier notifier,
         ILogger logger,
@@ -44,6 +46,7 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
         ExecuteSyncUseCase sync,
         OverviewRowsViewModel rows)
     {
+        _settings = settings;
         _dialogs = dialogs;
         _notifier = notifier;
         _logger = logger;
@@ -364,11 +367,12 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
         try
         {
             var request = BuildCompareRequest(profile);
+            var recycleOverwritten = _settings.GetBool(SettingsKeys.SyncRecycleOverwritten, AppDefaults.SyncRecycleOverwrittenDefault);
 
             var report = await Task.Run(() =>
                 {
                     var result = _compare.Execute(request, rowCts.Token);
-                    return _sync.Execute(new(result, SyncConflictPolicy.SkipUnresolved, SyncDeleteUi.Silent), rowCts.Token);
+                    return _sync.Execute(new(result, SyncConflictPolicy.SkipUnresolved, SyncDeleteUi.Silent, false, recycleOverwritten), rowCts.Token);
                 },
                 rowCts.Token);
 

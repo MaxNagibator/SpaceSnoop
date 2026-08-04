@@ -365,8 +365,9 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
         _logger.SyncStarted(_setup.CurrentMode);
 
         var verify = _setup.Verify;
+        var recycleOverwritten = _settings.GetBool(SettingsKeys.SyncRecycleOverwritten, AppDefaults.SyncRecycleOverwrittenDefault);
 
-        var request = new ExecuteSyncRequest(result, SyncConflictPolicy.None, SyncDeleteUi.Interactive, verify);
+        var request = new ExecuteSyncRequest(result, SyncConflictPolicy.None, SyncDeleteUi.Interactive, verify, recycleOverwritten);
 
         var report = await _session.RunAsync("Синхронизация:",
             (token, progress) => _sync.Execute(request, token, progress),

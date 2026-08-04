@@ -60,6 +60,7 @@ public static class SettingsKeys
     public const string SyncGitFolders = "wpf.sync.git_folders";
     public const string SyncGitHistoryCount = "wpf.sync.git_history_count";
     public const string SyncGroupFolders = "wpf.sync.group_folders";
+    public const string SyncRecycleOverwritten = "wpf.sync.recycle_overwritten";
 
     public const string OverviewSort = "wpf.overview.sort";
     public const string OverviewSortDesc = "wpf.overview.sort_desc";

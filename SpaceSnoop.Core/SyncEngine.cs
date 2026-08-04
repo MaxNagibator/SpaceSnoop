@@ -4,7 +4,7 @@ using System.Security;
 
 namespace SpaceSnoop.Core;
 
-public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = true)
+public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = true, bool recycleOverwritten = false)
 {
     public SyncReport Execute(ComparisonResult comparisonResult, CancellationToken cancel, IProgress<OperationProgress>? progress = null)
     {
@@ -100,13 +100,14 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         };
     }
 
-    private static void CopyAtomic(string source, string destination)
+    private void CopyAtomic(string source, string destination)
     {
         var temp = destination + ".sstmp";
 
         try
         {
             File.Copy(source, temp, true);
+            RecyclePrevious(destination);
             File.Move(temp, destination, true);
         }
         finally
@@ -185,6 +186,16 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
 
                 break;
         }
+    }
+
+    private void RecyclePrevious(string destination)
+    {
+        if (!recycleOverwritten || !File.Exists(destination))
+        {
+            return;
+        }
+
+        RecycleFile(destination);
     }
 
     private void RecycleFile(string path)

@@ -26,6 +26,17 @@
             <TextBlock Style="{StaticResource Setting.CheckHint}"
                        Text="Подсказывает существующие каталоги при вводе пути; перебор – стрелками ↑/↓." />
 
+            <CheckBox Content="Затираемый файл – в корзину"
+                      IsChecked="{Binding Operations.RecycleOverwritten, Mode=TwoWay}"
+                      VerticalAlignment="Center"
+                      Margin="0,16,0,0" />
+            <TextBlock Style="{StaticResource Setting.CheckHint}"
+                       Text="Перед перезаписью прежняя версия файла на приёмнике уходит в корзину – её можно вернуть." />
+            <Expander Style="{StaticResource Setting.CheckDetails}">
+                <TextBlock Style="{StaticResource Setting.Hint}"
+                           Text="Выключено – перезапись необратима, прежний файл пропадает без следа. Включено – каждая перезапись добавляет файл в корзину, и на больших прогонах она заметно растёт; место освободится после её очистки." />
+            </Expander>
+
             <Grid Margin="0,16,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />

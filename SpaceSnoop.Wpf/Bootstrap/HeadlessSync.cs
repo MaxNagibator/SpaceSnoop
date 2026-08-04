@@ -43,7 +43,8 @@ internal sealed class HeadlessSync
             var result = compare.Execute(new(options.Left, options.Right, options.Exclusions, options.Mode, options.Winner, options.Mirror), CancellationToken.None);
 
             var sync = new ExecuteSyncUseCase(NullLogger<SyncEngine>.Instance);
-            var report = sync.Execute(new(result, SyncConflictPolicy.SkipUnresolved, SyncDeleteUi.Silent), CancellationToken.None);
+            var recycleOverwritten = settings.GetBool(SettingsKeys.SyncRecycleOverwritten, AppDefaults.SyncRecycleOverwrittenDefault);
+            var report = sync.Execute(new(result, SyncConflictPolicy.SkipUnresolved, SyncDeleteUi.Silent, false, recycleOverwritten), CancellationToken.None);
 
             stopwatch.Stop();
             WriteLog(options.Name, report, logger);

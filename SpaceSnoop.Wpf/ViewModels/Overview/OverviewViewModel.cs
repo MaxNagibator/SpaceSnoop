@@ -15,7 +15,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
 
         Rows = new(settings, () => IsBusy, () => _suppressReload, ReloadRows);
 
-        Batch = new(dialogs, notifier, logger, compare, sync, Rows);
+        Batch = new(settings, dialogs, notifier, logger, compare, sync, Rows);
         Batch.PropertyChanged += OnBatchPropertyChanged;
 
         ReloadRows();
