@@ -12,7 +12,9 @@ public sealed partial class ArchiveProgressDialogViewModel : ObservableObject, I
 
     private CancellationTokenSource? _cts;
     private bool _cancelled;
+    private bool _packed;
     private bool _failed;
+    private int _verifyTotal;
     private string _error = string.Empty;
     private string _resultSummary = string.Empty;
 
@@ -38,6 +40,9 @@ public sealed partial class ArchiveProgressDialogViewModel : ObservableObject, I
     private string _countText = string.Empty;
 
     [ObservableProperty]
+    private string _countLabel = "Упаковано файлов";
+
+    [ObservableProperty]
     private string _statusText = string.Empty;
 
     [ObservableProperty]
@@ -54,7 +59,7 @@ public sealed partial class ArchiveProgressDialogViewModel : ObservableObject, I
         SourceSize = $"{SizeFormatter.Format(request.TotalBytes)} · {_total:N0} файлов";
         TargetName = Path.GetFileName(request.TargetPath);
         FateText = request.DeleteOriginal
-            ? "После проверки архива оригинал отправится в корзину."
+            ? "Архив будет прочитан целиком с проверкой контрольных сумм, и только потом оригинал отправится в корзину."
             : "Оригинал останется на месте.";
     }
 
@@ -119,15 +124,16 @@ public sealed partial class ArchiveProgressDialogViewModel : ObservableObject, I
         _cts = new();
         var token = _cts.Token;
         IsRunning = true;
-        StatusText = $"{ActionText}…";
+        StatusText = "Упаковка…";
 
         _logger.ArchiveStarted(_request.SourcePath);
 
-        var progress = new Progress<OperationProgress>(OnTick);
+        var packProgress = new Progress<OperationProgress>(update => OnTick(update, false));
+        var verifyProgress = new Progress<OperationProgress>(update => OnTick(update, true));
 
         try
         {
-            await Task.Run(() => ExecuteZip(progress, token), token);
+            await Task.Run(() => ExecuteZip(packProgress, verifyProgress, token), token);
         }
         catch (OperationCanceledException)
         {
@@ -180,11 +186,14 @@ public sealed partial class ArchiveProgressDialogViewModel : ObservableObject, I
         RequestClose?.Invoke(this, OriginalDeleted);
     }
 
-    private void ExecuteZip(IProgress<OperationProgress> progress, CancellationToken token)
+    private void ExecuteZip(IProgress<OperationProgress> packProgress, IProgress<OperationProgress> verifyProgress, CancellationToken token)
     {
-        var stats = _service.ZipFiles(_request.SourcePath, _request.Files, _request.TargetPath, _request.Level, progress, token);
+        var stats = _service.ZipFiles(_request.SourcePath, _request.Files, _request.TargetPath, _request.Level, packProgress, token);
 
-        var (ok, detail) = _service.VerifyZip(_request.TargetPath, stats);
+        _packed = true;
+        _verifyTotal = stats.Count;
+
+        var (ok, detail) = _service.VerifyZip(_request.TargetPath, stats, _request.DeleteOriginal, verifyProgress, token);
 
         if (!ok)
         {
@@ -205,18 +214,24 @@ public sealed partial class ArchiveProgressDialogViewModel : ObservableObject, I
         }
     }
 
-    private void OnTick(OperationProgress update)
+    private void OnTick(OperationProgress update, bool verifying)
     {
+        var total = verifying ? _verifyTotal : _total;
+
+        StatusText = verifying ? "Проверка архива…" : "Упаковка…";
+        CountLabel = verifying ? "Проверено файлов" : "Упаковано файлов";
         CurrentPath = update.Current;
-        CountText = _total > 0 ? $"{update.Completed} / {_total}" : update.Completed.ToString("N0");
-        ProgressValue = _total > 0 ? Math.Clamp((double)update.Completed / _total, 0d, 1d) : 0d;
+        CountText = total > 0 ? $"{update.Completed} / {total}" : update.Completed.ToString("N0");
+        ProgressValue = total > 0 ? Math.Clamp((double)update.Completed / total, 0d, 1d) : 0d;
     }
 
     private string BuildSummary()
     {
         if (_cancelled)
         {
-            return "Отменено.";
+            return _packed
+                ? $"Отменено на проверке: архив {TargetName} создан, но не проверен. Оригинал не тронут."
+                : "Отменено.";
         }
 
         if (_failed)
