@@ -1,0 +1,133 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Scan.ScanInspectorRail"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Scan"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:ScanInspectorViewModel}"
+             d:DesignHeight="640"
+             d:DesignWidth="48">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/SpaceSnoop.Wpf;component/Views/Scan/ScanInspectorResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <StackPanel HorizontalAlignment="Center"
+                Margin="0,10,0,0">
+        <Button Style="{StaticResource Button.Ghost}"
+                Command="{Binding ToggleInspectorCollapsedCommand}"
+                Padding="6,6"
+                ToolTip="Развернуть панель деталей"
+                AutomationProperties.Name="Развернуть панель деталей">
+            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.PanelRightOpen}"
+                                      Width="16"
+                                      Height="16" />
+        </Button>
+
+        <TextBlock Text="Детали"
+                   Style="{StaticResource Caption}"
+                   Margin="0,12,0,0"
+                   HorizontalAlignment="Center">
+            <TextBlock.LayoutTransform>
+                <RotateTransform Angle="90" />
+            </TextBlock.LayoutTransform>
+        </TextBlock>
+
+        <TextBlock Text="{Binding TotalSizeText}"
+                   Style="{StaticResource Value}"
+                   Foreground="{DynamicResource Accent.Primary}"
+                   Margin="0,14,0,0"
+                   HorizontalAlignment="Center"
+                   Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock.LayoutTransform>
+                <RotateTransform Angle="90" />
+            </TextBlock.LayoutTransform>
+        </TextBlock>
+
+        <StackPanel Margin="0,16,0,0"
+                    Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}}">
+            <Border Style="{StaticResource RailSeparator}"
+                    Margin="0,0,0,8" />
+
+            <Button Style="{StaticResource RailAction}"
+                    Command="{Binding Node.OpenInExplorerCommand}"
+                    ToolTip="Открыть в проводнике"
+                    AutomationProperties.Name="Открыть в проводнике">
+                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ExternalLink}"
+                                          Width="16"
+                                          Height="16"
+                                          Foreground="{DynamicResource State.Info}" />
+            </Button>
+
+            <Button Style="{StaticResource RailAction}"
+                    Command="{Binding Node.MarkDeletedCommand}"
+                    ToolTip="Пометить на удаление"
+                    AutomationProperties.Name="Пометить на удаление"
+                    Visibility="{Binding Node.IsMarkedDeleted, Converter={StaticResource InverseBoolToVisibility}}">
+                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                          Width="16"
+                                          Height="16"
+                                          Foreground="{DynamicResource State.Error}" />
+            </Button>
+
+            <Button Style="{StaticResource RailAction}"
+                    Command="{Binding Node.UnmarkDeletedCommand}"
+                    ToolTip="Снять пометку на удаление"
+                    AutomationProperties.Name="Снять пометку на удаление"
+                    Visibility="{Binding Node.IsMarkedDeleted, Converter={StaticResource BoolToVisibility}}">
+                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.RotateCcw}"
+                                          Width="16"
+                                          Height="16"
+                                          Foreground="{DynamicResource State.Success}" />
+            </Button>
+
+            <Button Style="{StaticResource RailAction}"
+                    Command="{Binding Node.MarkContentsDeletedCommand}"
+                    ToolTip="Пометить содержимое (папка останется)"
+                    AutomationProperties.Name="Пометить содержимое"
+                    Visibility="{Binding IsDirectory, Converter={StaticResource BoolToVisibility}}">
+                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderX}"
+                                          Width="16"
+                                          Height="16"
+                                          Foreground="{DynamicResource State.Error}" />
+            </Button>
+
+            <Button Style="{StaticResource RailAction}"
+                    Command="{Binding Node.UnmarkContentsCommand}"
+                    ToolTip="Снять пометку с содержимого"
+                    AutomationProperties.Name="Снять пометку с содержимого"
+                    Visibility="{Binding IsDirectory, Converter={StaticResource BoolToVisibility}}">
+                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.RotateCcw}"
+                                          Width="16"
+                                          Height="16"
+                                          Foreground="{DynamicResource State.Success}" />
+            </Button>
+
+            <Border Style="{StaticResource RailSeparator}" />
+
+            <Button Style="{StaticResource RailAction}"
+                    Command="{Binding CopyPathCommand}"
+                    ToolTip="Копировать путь"
+                    AutomationProperties.Name="Копировать путь">
+                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Copy}"
+                                          Width="16"
+                                          Height="16" />
+            </Button>
+
+            <Button Style="{StaticResource RailAction}"
+                    Command="{Binding CopyDetailsCommand}"
+                    ToolTip="Копировать детали"
+                    AutomationProperties.Name="Копировать детали">
+                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Clipboard}"
+                                          Width="16"
+                                          Height="16" />
+            </Button>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

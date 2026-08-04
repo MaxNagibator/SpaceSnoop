@@ -1,0 +1,380 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:behaviors="clr-namespace:SpaceSnoop.Wpf.Views.Behaviors"
+                    xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks">
+
+    <Style x:Key="NodeName"
+           TargetType="TextBlock">
+        <Setter Property="VerticalAlignment"
+                Value="Center" />
+        <Setter Property="TextTrimming"
+                Value="CharacterEllipsis" />
+        <Setter Property="Foreground"
+                Value="{DynamicResource Fg.Primary}" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsDirectory}"
+                         Value="True">
+                <Setter Property="FontWeight"
+                        Value="SemiBold" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Status}"
+                         Value="Conflict">
+                <Setter Property="Foreground"
+                        Value="{DynamicResource State.Error}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Status}"
+                         Value="Identical">
+                <Setter Property="Foreground"
+                        Value="{DynamicResource Fg.Muted}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="NodeNameLeft"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource NodeName}">
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding LeftAbsent}"
+                         Value="True">
+                <Setter Property="Foreground"
+                        Value="{DynamicResource Fg.Muted}" />
+                <Setter Property="TextDecorations"
+                        Value="Strikethrough" />
+                <Setter Property="FontWeight"
+                        Value="Normal" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="NodeNameRight"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource NodeName}">
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding RightAbsent}"
+                         Value="True">
+                <Setter Property="Foreground"
+                        Value="{DynamicResource Fg.Muted}" />
+                <Setter Property="TextDecorations"
+                        Value="Strikethrough" />
+                <Setter Property="FontWeight"
+                        Value="Normal" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="ChevronToggle"
+           TargetType="Button">
+        <Setter Property="Background"
+                Value="Transparent" />
+        <Setter Property="BorderThickness"
+                Value="1" />
+        <Setter Property="BorderBrush"
+                Value="Transparent" />
+        <Setter Property="Padding"
+                Value="0" />
+        <Setter Property="Width"
+                Value="14" />
+        <Setter Property="Height"
+                Value="14" />
+        <Setter Property="Cursor"
+                Value="Hand" />
+        <Setter Property="VerticalAlignment"
+                Value="Center" />
+        <Setter Property="FocusVisualStyle"
+                Value="{x:Null}" />
+        <Setter Property="AutomationProperties.Name"
+                Value="Развернуть или свернуть каталог" />
+        <Setter Property="Foreground"
+                Value="{DynamicResource Fg.Muted}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="ChevronBd"
+                            Background="Transparent"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{DynamicResource Radius.S}">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver"
+                                 Value="True">
+                            <Setter Property="Foreground"
+                                    Value="{DynamicResource Fg.Primary}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused"
+                                 Value="True">
+                            <Setter TargetName="ChevronBd"
+                                    Property="BorderBrush"
+                                    Value="{DynamicResource Accent.Primary}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="DiffRow"
+           TargetType="ListBoxItem">
+        <Setter Property="Background"
+                Value="Transparent" />
+        <Setter Property="BorderBrush"
+                Value="{DynamicResource Border.Subtle}" />
+        <Setter Property="BorderThickness"
+                Value="0,0,0,1" />
+        <Setter Property="Padding"
+                Value="6,1" />
+        <Setter Property="MinHeight"
+                Value="26" />
+        <Setter Property="HorizontalContentAlignment"
+                Value="Stretch" />
+        <Setter Property="VerticalContentAlignment"
+                Value="Center" />
+        <Setter Property="FocusVisualStyle"
+                Value="{x:Null}" />
+        <Setter Property="ContextMenu"
+                Value="{StaticResource SyncNodeMenu}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Grid>
+                        <Border x:Name="RowBd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Stretch"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <Border x:Name="OutcomeBar"
+                                Width="4"
+                                HorizontalAlignment="Left"
+                                Background="Transparent"
+                                IsHitTestVisible="False" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver"
+                                 Value="True">
+                            <Setter TargetName="RowBd"
+                                    Property="Background"
+                                    Value="{DynamicResource Bg.SurfaceAlt}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused"
+                                 Value="True">
+                            <Setter TargetName="RowBd"
+                                    Property="BorderBrush"
+                                    Value="{DynamicResource Accent.Primary}" />
+                            <Setter TargetName="RowBd"
+                                    Property="BorderThickness"
+                                    Value="0,1,0,1" />
+                        </Trigger>
+                        <DataTrigger Binding="{Binding Outcome}"
+                                     Value="Applied">
+                            <Setter TargetName="OutcomeBar"
+                                    Property="Background"
+                                    Value="{DynamicResource State.Success}" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding Outcome}"
+                                     Value="Mismatch">
+                            <Setter TargetName="OutcomeBar"
+                                    Property="Background"
+                                    Value="{DynamicResource State.Warning}" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding Outcome}"
+                                     Value="Failed">
+                            <Setter TargetName="OutcomeBar"
+                                    Property="Background"
+                                    Value="{DynamicResource State.Error}" />
+                        </DataTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsDirectory}"
+                         Value="True">
+                <Setter Property="Background"
+                        Value="{DynamicResource Bg.SurfaceMute}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding IsGroupHeader}"
+                         Value="True">
+                <Setter Property="Background"
+                        Value="{DynamicResource Bg.SurfaceMute}" />
+                <Setter Property="ContextMenu"
+                        Value="{x:Null}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="ActionPill"
+           TargetType="Button">
+        <Setter Property="Background"
+                Value="Transparent" />
+        <Setter Property="BorderThickness"
+                Value="1" />
+        <Setter Property="BorderBrush"
+                Value="{DynamicResource Border.Default}" />
+        <Setter Property="Cursor"
+                Value="Hand" />
+        <Setter Property="Width"
+                Value="34" />
+        <Setter Property="Height"
+                Value="24" />
+        <Setter Property="Padding"
+                Value="0" />
+        <Setter Property="FocusVisualStyle"
+                Value="{x:Null}" />
+        <Setter Property="Foreground"
+                Value="{DynamicResource Fg.Muted}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{DynamicResource Radius.Pill}"
+                            Padding="{TemplateBinding Padding}"
+                            RenderTransformOrigin="0.5,0.5">
+                        <Border.RenderTransform>
+                            <ScaleTransform ScaleX="1"
+                                            ScaleY="1" />
+                        </Border.RenderTransform>
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver"
+                                 Value="True">
+                            <Setter TargetName="Bd"
+                                    Property="Background"
+                                    Value="{DynamicResource Bg.SurfaceMute}" />
+                            <Setter TargetName="Bd"
+                                    Property="BorderBrush"
+                                    Value="{DynamicResource Border.Strong}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused"
+                                 Value="True">
+                            <Setter TargetName="Bd"
+                                    Property="BorderBrush"
+                                    Value="{DynamicResource Accent.Primary}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled"
+                                 Value="False">
+                            <Setter TargetName="Bd"
+                                    Property="BorderBrush"
+                                    Value="Transparent" />
+                        </Trigger>
+                        <EventTrigger RoutedEvent="Button.Click">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="Bd"
+                                                     Storyboard.TargetProperty="(RenderTransform).(ScaleTransform.ScaleX)"
+                                                     From="0.7"
+                                                     To="1"
+                                                     Duration="0:0:0.2">
+                                        <DoubleAnimation.EasingFunction>
+                                            <BackEase EasingMode="EaseOut"
+                                                      Amplitude="0.5" />
+                                        </DoubleAnimation.EasingFunction>
+                                    </DoubleAnimation>
+                                    <DoubleAnimation Storyboard.TargetName="Bd"
+                                                     Storyboard.TargetProperty="(RenderTransform).(ScaleTransform.ScaleY)"
+                                                     From="0.7"
+                                                     To="1"
+                                                     Duration="0:0:0.2">
+                                        <DoubleAnimation.EasingFunction>
+                                            <BackEase EasingMode="EaseOut"
+                                                      Amplitude="0.5" />
+                                        </DoubleAnimation.EasingFunction>
+                                    </DoubleAnimation>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Action}"
+                         Value="CopyToRight">
+                <Setter Property="Foreground"
+                        Value="{DynamicResource Sync.LeftOnly}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Action}"
+                         Value="CopyToLeft">
+                <Setter Property="Foreground"
+                        Value="{DynamicResource State.Info}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Action}"
+                         Value="DeleteLeft">
+                <Setter Property="Foreground"
+                        Value="{DynamicResource State.Error}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Action}"
+                         Value="DeleteRight">
+                <Setter Property="Foreground"
+                        Value="{DynamicResource State.Error}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Action}"
+                         Value="None">
+                <Setter Property="Foreground"
+                        Value="{DynamicResource State.Warning}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="SideSize"
+           TargetType="TextBlock">
+        <Setter Property="FontFamily"
+                Value="{DynamicResource Font.Mono}" />
+        <Setter Property="FontSize"
+                Value="{DynamicResource Font.Size.Caption}" />
+        <Setter Property="Foreground"
+                Value="{DynamicResource Fg.Secondary}" />
+        <Setter Property="VerticalAlignment"
+                Value="Center" />
+        <Setter Property="TextAlignment"
+                Value="Right" />
+        <Setter Property="MinWidth"
+                Value="56" />
+    </Style>
+
+    <Style x:Key="SideModified"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource SideSize}">
+        <Setter Property="Foreground"
+                Value="{DynamicResource Fg.Muted}" />
+        <Setter Property="MinWidth"
+                Value="0" />
+    </Style>
+
+    <Style x:Key="SideModifiedLeft"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource SideModified}">
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding LeftIsNewer}"
+                         Value="True">
+                <Setter Property="Foreground"
+                        Value="{DynamicResource Accent.Primary}" />
+                <Setter Property="FontWeight"
+                        Value="SemiBold" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="SideModifiedRight"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource SideModified}">
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding RightIsNewer}"
+                         Value="True">
+                <Setter Property="Foreground"
+                        Value="{DynamicResource Accent.Primary}" />
+                <Setter Property="FontWeight"
+                        Value="SemiBold" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+</ResourceDictionary>

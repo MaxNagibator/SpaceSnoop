@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.ViewModels;
 using SpaceSnoop.Wpf.ViewModels.Scan;
+using SpaceSnoop.Wpf.ViewModels.Sync;
 using SpaceSnoop.Wpf.Views;
 using System.Diagnostics;
 using System.Runtime.ExceptionServices;
@@ -144,6 +145,42 @@ public class BindingSmokeTests
         {
             Assert.That(content.DataContext, Is.InstanceOf<ScanViewModel>(), "Всплывающая панель не унаследовала контекст страницы.");
             Assert.That(intensity?.Status, Is.EqualTo(BindingStatus.Active), "Ползунок подсветки не привязался к странице.");
+            Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
+        });
+    }
+
+    [Test]
+    public void Всплывающая_панель_синхронизации_не_теряет_биндинги()
+    {
+        Assert.That(_shell.TryNavigate(SectionKey.Sync), Is.True, "Страница «Синхронизация» не открылась.");
+
+        Settle();
+
+        var toggle = ViewCapture.Find(_window, "MoreToggle") as ToggleButton;
+        Assert.That(toggle, Is.Not.Null, "В тулбаре синхронизации нет кнопки «Ещё».");
+
+        _sink.Clear();
+        toggle.IsChecked = true;
+        Settle();
+
+        var popup = toggle.FindName("MorePopup") as Popup;
+        Assert.That(popup?.Child, Is.Not.Null, "Всплывающая панель «Ещё» не построила содержимое.");
+
+        var content = (FrameworkElement)popup.Child;
+        content.UpdateLayout();
+        Settle();
+
+        var mirror = (ToggleButton)toggle.FindName("MirrorButton");
+        var checkedBinding = BindingOperations.GetBindingExpression(mirror, ToggleButton.IsCheckedProperty);
+        var enabledBinding = BindingOperations.GetBindingExpression(mirror, UIElement.IsEnabledProperty);
+
+        toggle.IsChecked = false;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(content.DataContext, Is.InstanceOf<SyncViewModel>(), "Всплывающая панель не унаследовала контекст страницы.");
+            Assert.That(checkedBinding?.Status, Is.EqualTo(BindingStatus.Active), "Тумблер зеркала не привязался к настройке.");
+            Assert.That(enabledBinding?.Status, Is.EqualTo(BindingStatus.Active), "Доступность тумблера зеркала не привязалась к странице.");
             Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
         });
     }

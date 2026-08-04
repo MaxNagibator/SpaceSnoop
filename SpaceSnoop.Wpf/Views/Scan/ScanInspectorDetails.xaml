@@ -1,0 +1,387 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Scan.ScanInspectorDetails"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Scan"
+             xmlns:scan="clr-namespace:SpaceSnoop.Wpf.Views.Scan"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:ScanInspectorViewModel}"
+             d:DesignHeight="640"
+             d:DesignWidth="340">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/SpaceSnoop.Wpf;component/Views/Scan/ScanInspectorResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <StackPanel Orientation="Horizontal">
+            <iconPacks:PackIconLucide Style="{StaticResource NodeIcon}"
+                                      Width="16"
+                                      Height="16"
+                                      Margin="0,0,8,0" />
+            <TextBlock Text="{Binding Title}"
+                       Style="{StaticResource TextBlock.Heading}"
+                       TextTrimming="CharacterEllipsis"
+                       VerticalAlignment="Center"
+                       ToolTip="{Binding Title}" />
+        </StackPanel>
+
+        <Border Margin="0,8,0,0"
+                Padding="8,2"
+                HorizontalAlignment="Left"
+                Background="{DynamicResource Accent.Soft}"
+                CornerRadius="{DynamicResource Radius.Pill}">
+            <TextBlock Text="{Binding KindText}"
+                       FontSize="{DynamicResource Font.Size.Caption}"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource Accent.Primary}" />
+        </Border>
+
+        <TextBlock Text="{Binding Path}"
+                   Margin="0,10,0,0"
+                   TextWrapping="Wrap"
+                   FontFamily="{DynamicResource Font.Mono}"
+                   FontSize="{DynamicResource Font.Size.XS}"
+                   Foreground="{DynamicResource Fg.Secondary}"
+                   ToolTip="{Binding Path}">
+            <TextBlock.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Копировать путь"
+                              Command="{Binding PlacementTarget.DataContext.CopyPathCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                </ContextMenu>
+            </TextBlock.ContextMenu>
+        </TextBlock>
+
+        <Border Margin="0,14,0,0">
+            <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="Объём"
+                               Style="{StaticResource Caption}" />
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding TotalSizeText}"
+                               FontSize="{DynamicResource Font.Size.L}"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource Accent.Primary}" />
+                </Grid>
+                <Grid Margin="0,8,0,0"
+                      Visibility="{Binding HasOwnSize, Converter={StaticResource BoolToVisibility}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="Свои файлы"
+                               Style="{StaticResource Caption}"
+                               ToolTip="Файлы непосредственно в каталоге, без подкаталогов" />
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding OwnSizeText}"
+                               Style="{StaticResource Value}" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Border Margin="0,12,0,0"
+                Visibility="{Binding HasShares, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+                <Grid Margin="0,2"
+                      ToolTip="{Binding DriveShareHint}"
+                      Visibility="{Binding ShowDriveShare, Converter={StaticResource BoolToVisibility}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="132" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="От диска"
+                               Style="{StaticResource Caption}" />
+                    <Border x:Name="DriveBarTrack"
+                            Grid.Column="2"
+                            Height="10"
+                            Background="{DynamicResource Bg.SurfaceMute}"
+                            CornerRadius="{DynamicResource Radius.S}"
+                            VerticalAlignment="Center">
+                        <Rectangle HorizontalAlignment="Left"
+                                   Height="10"
+                                   RadiusX="4"
+                                   RadiusY="4">
+                            <Rectangle.Width>
+                                <MultiBinding Converter="{StaticResource FractionToWidth}">
+                                    <Binding Path="DriveShare" />
+                                    <Binding Path="ActualWidth"
+                                             ElementName="DriveBarTrack" />
+                                </MultiBinding>
+                            </Rectangle.Width>
+                            <Rectangle.Fill>
+                                <MultiBinding Converter="{StaticResource HeatBrush}">
+                                    <Binding Path="DriveShare" />
+                                    <Binding Path="Intensity" />
+                                </MultiBinding>
+                            </Rectangle.Fill>
+                        </Rectangle>
+                    </Border>
+                    <TextBlock Grid.Column="3"
+                               Text="{Binding DriveShareText}"
+                               Style="{StaticResource Value}"
+                               MinWidth="42"
+                               Margin="8,0,0,0"
+                               TextAlignment="Right" />
+                </Grid>
+                <Grid Margin="0,2"
+                      Visibility="{Binding ShowParentShare, Converter={StaticResource BoolToVisibility}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="132" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="От родителя"
+                               Style="{StaticResource Caption}" />
+                    <Border x:Name="ParentBarTrack"
+                            Grid.Column="2"
+                            Height="10"
+                            Background="{DynamicResource Bg.SurfaceMute}"
+                            CornerRadius="{DynamicResource Radius.S}"
+                            VerticalAlignment="Center">
+                        <Rectangle HorizontalAlignment="Left"
+                                   Height="10"
+                                   RadiusX="4"
+                                   RadiusY="4">
+                            <Rectangle.Width>
+                                <MultiBinding Converter="{StaticResource FractionToWidth}">
+                                    <Binding Path="ShareOfParent" />
+                                    <Binding Path="ActualWidth"
+                                             ElementName="ParentBarTrack" />
+                                </MultiBinding>
+                            </Rectangle.Width>
+                            <Rectangle.Fill>
+                                <MultiBinding Converter="{StaticResource HeatBrush}">
+                                    <Binding Path="ShareOfParent" />
+                                    <Binding Path="Intensity" />
+                                </MultiBinding>
+                            </Rectangle.Fill>
+                        </Rectangle>
+                    </Border>
+                    <TextBlock Grid.Column="3"
+                               Text="{Binding ShareOfParentText}"
+                               Style="{StaticResource Value}"
+                               MinWidth="42"
+                               Margin="8,0,0,0"
+                               TextAlignment="Right" />
+                </Grid>
+                <Grid Margin="0,6,0,2"
+                      Visibility="{Binding ShowRootShare, Converter={StaticResource BoolToVisibility}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="132" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="От корня"
+                               Style="{StaticResource Caption}" />
+                    <Border x:Name="RootBarTrack"
+                            Grid.Column="2"
+                            Height="10"
+                            Background="{DynamicResource Bg.SurfaceMute}"
+                            CornerRadius="{DynamicResource Radius.S}"
+                            VerticalAlignment="Center">
+                        <Rectangle HorizontalAlignment="Left"
+                                   Height="10"
+                                   RadiusX="4"
+                                   RadiusY="4">
+                            <Rectangle.Width>
+                                <MultiBinding Converter="{StaticResource FractionToWidth}">
+                                    <Binding Path="ShareOfRoot" />
+                                    <Binding Path="ActualWidth"
+                                             ElementName="RootBarTrack" />
+                                </MultiBinding>
+                            </Rectangle.Width>
+                            <Rectangle.Fill>
+                                <MultiBinding Converter="{StaticResource HeatBrush}">
+                                    <Binding Path="ShareOfRoot" />
+                                    <Binding Path="Intensity" />
+                                </MultiBinding>
+                            </Rectangle.Fill>
+                        </Rectangle>
+                    </Border>
+                    <TextBlock Grid.Column="3"
+                               Text="{Binding ShareOfRootText}"
+                               Style="{StaticResource Value}"
+                               MinWidth="42"
+                               Margin="8,0,0,0"
+                               TextAlignment="Right" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Border Margin="0,12,0,0"
+                Visibility="{Binding IsDirectory, Converter={StaticResource BoolToVisibility}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0"
+                            Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Files}"
+                                              Width="14"
+                                              Height="14"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,7,0"
+                                              Foreground="{DynamicResource Fg.Muted}" />
+                    <StackPanel>
+                        <TextBlock Text="Файлов"
+                                   Style="{StaticResource Caption}" />
+                        <TextBlock Text="{Binding FileCountText}"
+                                   Style="{StaticResource Value}" />
+                    </StackPanel>
+                </StackPanel>
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Folder}"
+                                              Width="14"
+                                              Height="14"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,7,0"
+                                              Foreground="{DynamicResource Fg.Muted}" />
+                    <StackPanel>
+                        <TextBlock Text="Каталогов"
+                                   Style="{StaticResource Caption}" />
+                        <TextBlock Text="{Binding DirCountText}"
+                                   Style="{StaticResource Value}" />
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Border Margin="0,12,0,0">
+            <StackPanel>
+                <Grid Margin="0,2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="Создан"
+                               Style="{StaticResource Caption}" />
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding CreationDateText}"
+                               Style="{StaticResource Value}"
+                               TextAlignment="Right" />
+                </Grid>
+                <Grid Margin="0,6,0,2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="Доступ"
+                               Style="{StaticResource Caption}"
+                               ToolTip="Время последнего доступа" />
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding LastAccessText}"
+                               Style="{StaticResource Value}"
+                               TextAlignment="Right" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <StackPanel Margin="0,16,0,0"
+                    Visibility="{Binding HasTopChildren, Converter={StaticResource BoolToVisibility}}">
+            <Border BorderBrush="{DynamicResource Border.Subtle}"
+                    BorderThickness="0,1,0,0"
+                    Margin="0,0,0,12" />
+            <StackPanel Orientation="Horizontal">
+                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Flame}"
+                                          Width="13"
+                                          Height="13"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,7,0"
+                                          Foreground="{DynamicResource Accent.Primary}" />
+                <TextBlock Text="Крупнейшее"
+                           Style="{StaticResource SectionTitle}" />
+            </StackPanel>
+
+            <ItemsControl ItemsSource="{Binding TopChildren}"
+                          Margin="0,8,0,0">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="0,3"
+                              ToolTip="{Binding ShareText}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="64" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border x:Name="ChildBarTrack"
+                                    Grid.Column="0"
+                                    Height="10"
+                                    Background="{DynamicResource Bg.SurfaceMute}"
+                                    CornerRadius="{DynamicResource Radius.S}"
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,8,0">
+                                <Rectangle HorizontalAlignment="Left"
+                                           Height="10"
+                                           RadiusX="4"
+                                           RadiusY="4">
+                                    <Rectangle.Width>
+                                        <MultiBinding Converter="{StaticResource FractionToWidth}">
+                                            <Binding Path="Fraction" />
+                                            <Binding Path="ActualWidth"
+                                                     ElementName="ChildBarTrack" />
+                                        </MultiBinding>
+                                    </Rectangle.Width>
+                                    <Rectangle.Fill>
+                                        <MultiBinding Converter="{StaticResource HeatBrush}">
+                                            <Binding Path="Fraction" />
+                                            <Binding Path="DataContext.Intensity"
+                                                     RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                                        </MultiBinding>
+                                    </Rectangle.Fill>
+                                </Rectangle>
+                            </Border>
+
+                            <iconPacks:PackIconLucide Grid.Column="1"
+                                                      Style="{StaticResource NodeIcon}"
+                                                      Margin="0,0,6,0" />
+                            <TextBlock Grid.Column="2"
+                                       Text="{Binding Name}"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTip="{Binding Name}" />
+                            <TextBlock Grid.Column="3"
+                                       Text="{Binding SizeText}"
+                                       Margin="8,0,0,0"
+                                       VerticalAlignment="Center"
+                                       FontFamily="{DynamicResource Font.Mono}"
+                                       FontSize="{DynamicResource Font.Size.Caption}"
+                                       Foreground="{DynamicResource Fg.Primary}" />
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock Text="{Binding MoreChildrenText}"
+                       Style="{StaticResource TextBlock.Subtle}"
+                       Margin="0,4,0,0"
+                       Visibility="{Binding HasMoreChildren, Converter={StaticResource BoolToVisibility}}" />
+        </StackPanel>
+
+        <scan:ScanInspectorActions />
+    </StackPanel>
+</UserControl>

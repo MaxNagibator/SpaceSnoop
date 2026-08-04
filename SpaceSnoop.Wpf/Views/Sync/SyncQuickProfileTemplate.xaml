@@ -1,0 +1,155 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Sync"
+                    xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks">
+
+    <DataTemplate x:Key="SyncQuickProfileTemplate"
+                  DataType="{x:Type vm:SyncQuickProfileItem}">
+        <Grid MinWidth="190">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0"
+                       Text="{Binding Name}"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       Margin="0,0,12,0"
+                       Visibility="{Binding CanConfirmRename, Converter={StaticResource InverseBoolToVisibility}}" />
+
+            <TextBox Grid.Column="0"
+                     Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}"
+                     Style="{StaticResource TextBox.Toolbar}"
+                     MinWidth="128"
+                     Margin="0,0,8,0"
+                     ToolTip="Имя профиля"
+                     AutomationProperties.Name="Имя профиля"
+                     Visibility="{Binding CanConfirmRename, Converter={StaticResource BoolToVisibility}}" />
+
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal">
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Setter Property="Visibility"
+                                Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger
+                                Binding="{Binding IsVisible, RelativeSource={RelativeSource AncestorType=ComboBoxItem}, FallbackValue=False}"
+                                Value="True">
+                                <Setter Property="Visibility"
+                                        Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+
+                <StackPanel Orientation="Horizontal"
+                            Visibility="{Binding CanShowActions, Converter={StaticResource BoolToVisibility}}">
+                    <Button Style="{StaticResource Button.Ghost}"
+                            Command="{Binding RequestUpdateCommand}"
+                            Padding="6,3"
+                            MinHeight="24"
+                            ToolTip="Обновить профиль текущими параметрами"
+                            AutomationProperties.Name="Обновить профиль текущими параметрами">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Save}"
+                                                  Width="13"
+                                                  Height="13" />
+                    </Button>
+                    <Button Style="{StaticResource Button.Ghost}"
+                            Command="{Binding RequestRenameCommand}"
+                            Padding="6,3"
+                            MinHeight="24"
+                            ToolTip="Переименовать профиль"
+                            AutomationProperties.Name="Переименовать профиль">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Pencil}"
+                                                  Width="13"
+                                                  Height="13" />
+                    </Button>
+                    <Button Style="{StaticResource Button.Ghost}"
+                            Command="{Binding RequestDeleteCommand}"
+                            Padding="6,3"
+                            MinHeight="24"
+                            ToolTip="Удалить профиль"
+                            AutomationProperties.Name="Удалить профиль">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                                  Width="13"
+                                                  Height="13" />
+                    </Button>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal"
+                            Visibility="{Binding CanConfirmUpdate, Converter={StaticResource BoolToVisibility}}">
+                    <Button Style="{StaticResource Button.Ghost}"
+                            Command="{Binding ConfirmUpdateCommand}"
+                            Padding="6,3"
+                            MinHeight="24"
+                            ToolTip="Подтвердить обновление"
+                            AutomationProperties.Name="Подтвердить обновление">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Check}"
+                                                  Width="13"
+                                                  Height="13" />
+                    </Button>
+                    <Button Style="{StaticResource Button.Ghost}"
+                            Command="{Binding CancelUpdateCommand}"
+                            Padding="6,3"
+                            MinHeight="24"
+                            ToolTip="Отменить обновление"
+                            AutomationProperties.Name="Отменить обновление">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.X}"
+                                                  Width="13"
+                                                  Height="13" />
+                    </Button>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal"
+                            Visibility="{Binding CanConfirmRename, Converter={StaticResource BoolToVisibility}}">
+                    <Button Style="{StaticResource Button.Ghost}"
+                            Command="{Binding ConfirmRenameCommand}"
+                            Padding="6,3"
+                            MinHeight="24"
+                            ToolTip="Сохранить имя"
+                            AutomationProperties.Name="Сохранить имя">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Check}"
+                                                  Width="13"
+                                                  Height="13" />
+                    </Button>
+                    <Button Style="{StaticResource Button.Ghost}"
+                            Command="{Binding CancelRenameCommand}"
+                            Padding="6,3"
+                            MinHeight="24"
+                            ToolTip="Отменить переименование"
+                            AutomationProperties.Name="Отменить переименование">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.X}"
+                                                  Width="13"
+                                                  Height="13" />
+                    </Button>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal"
+                            Visibility="{Binding CanConfirmDelete, Converter={StaticResource BoolToVisibility}}">
+                    <Button Style="{StaticResource Button.Ghost}"
+                            Command="{Binding ConfirmDeleteCommand}"
+                            Padding="6,3"
+                            MinHeight="24"
+                            ToolTip="Подтвердить удаление"
+                            AutomationProperties.Name="Подтвердить удаление">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Check}"
+                                                  Width="13"
+                                                  Height="13" />
+                    </Button>
+                    <Button Style="{StaticResource Button.Ghost}"
+                            Command="{Binding CancelDeleteCommand}"
+                            Padding="6,3"
+                            MinHeight="24"
+                            ToolTip="Отменить удаление"
+                            AutomationProperties.Name="Отменить удаление">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.X}"
+                                                  Width="13"
+                                                  Height="13" />
+                    </Button>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+    </DataTemplate>
+</ResourceDictionary>

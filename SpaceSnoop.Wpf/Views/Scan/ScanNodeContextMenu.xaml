@@ -1,0 +1,128 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:agent="clr-namespace:SpaceSnoop.Wpf.Agent"
+                    xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks">
+
+    <ContextMenu x:Key="ScanNodeMenu">
+        <ContextMenu.Resources>
+            <Style x:Key="MenuGlyph"
+                   TargetType="iconPacks:PackIconLucide">
+                <Setter Property="Width"
+                        Value="14" />
+                <Setter Property="Height"
+                        Value="14" />
+                <Setter Property="VerticalAlignment"
+                        Value="Center" />
+                <Setter Property="Margin"
+                        Value="0,0,9,0" />
+            </Style>
+        </ContextMenu.Resources>
+
+        <MenuItem
+            Command="{Binding PlacementTarget.DataContext.OpenInExplorerCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+            <MenuItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.ExternalLink}"
+                                              Foreground="{DynamicResource State.Info}" />
+                    <TextBlock Text="Открыть в проводнике"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </MenuItem.Header>
+        </MenuItem>
+
+        <MenuItem
+            Command="{Binding PlacementTarget.DataContext.AskAgentCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            ToolTip="Открыть чат с готовым вопросом об этом узле"
+            Visibility="{Binding PlacementTarget.DataContext.CanAskAgent, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+            <MenuItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.MessageCircle}"
+                                              Foreground="{DynamicResource State.Info}" />
+                    <TextBlock Text="{x:Static agent:AgentPersona.AskHeader}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </MenuItem.Header>
+        </MenuItem>
+
+        <Separator />
+
+        <MenuItem
+            Command="{Binding PlacementTarget.DataContext.MarkDeletedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            ToolTip="Пометить узел и всё вложенное на удаление"
+            Visibility="{Binding PlacementTarget.DataContext.IsMarkedDeleted, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource InverseBoolToVisibility}}">
+            <MenuItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                              Foreground="{DynamicResource State.Error}" />
+                    <TextBlock Text="Пометить на удаление"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </MenuItem.Header>
+        </MenuItem>
+        <MenuItem
+            Command="{Binding PlacementTarget.DataContext.UnmarkDeletedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            ToolTip="Снять пометку с узла и всего вложенного"
+            Visibility="{Binding PlacementTarget.DataContext.IsMarkedDeleted, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+            <MenuItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.RotateCcw}"
+                                              Foreground="{DynamicResource State.Success}" />
+                    <TextBlock Text="Снять пометку на удаление"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </MenuItem.Header>
+        </MenuItem>
+
+        <Separator
+            Visibility="{Binding PlacementTarget.DataContext.IsDirectory, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}" />
+        <MenuItem
+            Command="{Binding PlacementTarget.DataContext.MarkContentsDeletedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            ToolTip="Пометить на удаление всё вложенное; сама папка останется"
+            Visibility="{Binding PlacementTarget.DataContext.CanMarkContentsDeleted, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+            <MenuItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.FolderX}"
+                                              Foreground="{DynamicResource State.Error}" />
+                    <TextBlock Text="Пометить содержимое на удаление"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </MenuItem.Header>
+        </MenuItem>
+        <MenuItem
+            Command="{Binding PlacementTarget.DataContext.UnmarkContentsCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            ToolTip="Снять пометку со всего содержимого папки"
+            Visibility="{Binding PlacementTarget.DataContext.CanUnmarkContents, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+            <MenuItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.RotateCcw}"
+                                              Foreground="{DynamicResource State.Success}" />
+                    <TextBlock Text="Снять пометку с содержимого"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </MenuItem.Header>
+        </MenuItem>
+
+        <Separator
+            Visibility="{Binding PlacementTarget.DataContext.IsDirectory, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}" />
+        <MenuItem
+            Command="{Binding PlacementTarget.DataContext.ArchiveToZipCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            ToolTip="Упаковать папку в .zip; после проверки архива оригинал можно убрать в корзину (см. Настройки)"
+            Visibility="{Binding PlacementTarget.DataContext.IsDirectory, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+            <MenuItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.Package}"
+                                              Foreground="{DynamicResource State.Info}" />
+                    <TextBlock Text="Упаковать в архив (.zip)"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </MenuItem.Header>
+        </MenuItem>
+    </ContextMenu>
+</ResourceDictionary>

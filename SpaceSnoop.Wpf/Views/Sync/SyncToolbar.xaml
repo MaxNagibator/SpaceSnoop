@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Sync"
              xmlns:views="clr-namespace:SpaceSnoop.Wpf.Views"
-             xmlns:behaviors="clr-namespace:SpaceSnoop.Wpf.Views.Behaviors"
+             xmlns:sync="clr-namespace:SpaceSnoop.Wpf.Views.Sync"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -12,252 +12,103 @@
              d:DesignWidth="1040">
 
     <UserControl.Resources>
-        <Style x:Key="EndpointChip"
-               TargetType="Border">
-            <Setter Property="Width"
-                    Value="22" />
-            <Setter Property="Height"
-                    Value="22" />
-            <Setter Property="CornerRadius"
-                    Value="11" />
-            <Setter Property="BorderThickness"
-                    Value="1" />
-            <Setter Property="VerticalAlignment"
-                    Value="Center" />
-            <Setter Property="HorizontalAlignment"
-                    Value="Center" />
-        </Style>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/SpaceSnoop.Wpf;component/Views/Sync/SyncQuickProfileTemplate.xaml" />
+            </ResourceDictionary.MergedDictionaries>
 
-        <Style x:Key="MirrorToggle"
-               TargetType="ToggleButton"
-               BasedOn="{StaticResource ToggleButton.Toolbar}">
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding Setup.MirrorDeletes}"
-                             Value="True">
-                    <Setter Property="Background"
-                            Value="{DynamicResource State.ErrorSoft}" />
-                    <Setter Property="BorderBrush"
-                            Value="{DynamicResource State.Error}" />
-                    <Setter Property="Foreground"
-                            Value="{DynamicResource State.Error}" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
+            <Style x:Key="MirrorToggle"
+                   TargetType="ToggleButton"
+                   BasedOn="{StaticResource ToggleButton.Toolbar}">
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding Setup.MirrorDeletes}"
+                                 Value="True">
+                        <Setter Property="Background"
+                                Value="{DynamicResource State.ErrorSoft}" />
+                        <Setter Property="BorderBrush"
+                                Value="{DynamicResource State.Error}" />
+                        <Setter Property="Foreground"
+                                Value="{DynamicResource State.Error}" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
 
-        <Storyboard x:Key="LabelShow">
-            <DoubleAnimation Storyboard.TargetProperty="(FrameworkElement.LayoutTransform).(ScaleTransform.ScaleX)"
-                             To="1"
-                             Duration="0:0:0.18" />
-            <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                             To="1"
-                             Duration="0:0:0.18" />
-        </Storyboard>
+            <Storyboard x:Key="LabelShow">
+                <DoubleAnimation Storyboard.TargetProperty="(FrameworkElement.LayoutTransform).(ScaleTransform.ScaleX)"
+                                 To="1"
+                                 Duration="0:0:0.18" />
+                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                 To="1"
+                                 Duration="0:0:0.18" />
+            </Storyboard>
 
-        <Storyboard x:Key="LabelHide">
-            <DoubleAnimation Storyboard.TargetProperty="(FrameworkElement.LayoutTransform).(ScaleTransform.ScaleX)"
-                             To="0"
-                             Duration="0:0:0.18" />
-            <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                             To="0"
-                             Duration="0:0:0.18" />
-        </Storyboard>
+            <Storyboard x:Key="LabelHide">
+                <DoubleAnimation Storyboard.TargetProperty="(FrameworkElement.LayoutTransform).(ScaleTransform.ScaleX)"
+                                 To="0"
+                                 Duration="0:0:0.18" />
+                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                 To="0"
+                                 Duration="0:0:0.18" />
+            </Storyboard>
 
-        <Style x:Key="SyncDeleteMark"
-               TargetType="iconPacks:PackIconLucide">
-            <Setter Property="Width"
-                    Value="13" />
-            <Setter Property="Height"
-                    Value="13" />
-            <Setter Property="VerticalAlignment"
-                    Value="Center" />
-            <Setter Property="Margin"
-                    Value="8,0,0,0" />
-            <Setter Property="Visibility"
-                    Value="Collapsed" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding Ledger.SyncIsDestructive}"
-                             Value="True">
-                    <Setter Property="Visibility"
-                            Value="Visible" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
+            <Style x:Key="SyncDeleteMark"
+                   TargetType="iconPacks:PackIconLucide">
+                <Setter Property="Width"
+                        Value="13" />
+                <Setter Property="Height"
+                        Value="13" />
+                <Setter Property="VerticalAlignment"
+                        Value="Center" />
+                <Setter Property="Margin"
+                        Value="8,0,0,0" />
+                <Setter Property="Visibility"
+                        Value="Collapsed" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding Ledger.SyncIsDestructive}"
+                                 Value="True">
+                        <Setter Property="Visibility"
+                                Value="Visible" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
 
-        <Style x:Key="CompareLabel"
-               TargetType="TextBlock">
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding Ledger.SyncIsPrimary}"
-                             Value="True">
-                    <DataTrigger.EnterActions>
-                        <BeginStoryboard Storyboard="{StaticResource LabelHide}" />
-                    </DataTrigger.EnterActions>
-                    <DataTrigger.ExitActions>
-                        <BeginStoryboard Storyboard="{StaticResource LabelShow}" />
-                    </DataTrigger.ExitActions>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
+            <Style x:Key="CompareLabel"
+                   TargetType="TextBlock">
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding Ledger.SyncIsPrimary}"
+                                 Value="True">
+                        <DataTrigger.EnterActions>
+                            <BeginStoryboard Storyboard="{StaticResource LabelHide}" />
+                        </DataTrigger.EnterActions>
+                        <DataTrigger.ExitActions>
+                            <BeginStoryboard Storyboard="{StaticResource LabelShow}" />
+                        </DataTrigger.ExitActions>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
 
-        <Style x:Key="SyncLabel"
-               TargetType="TextBlock">
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding Ledger.SyncIsPrimary}"
-                             Value="True">
-                    <DataTrigger.EnterActions>
-                        <BeginStoryboard Storyboard="{StaticResource LabelShow}" />
-                    </DataTrigger.EnterActions>
-                    <DataTrigger.ExitActions>
-                        <BeginStoryboard Storyboard="{StaticResource LabelHide}" />
-                    </DataTrigger.ExitActions>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
+            <Style x:Key="SyncLabel"
+                   TargetType="TextBlock">
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding Ledger.SyncIsPrimary}"
+                                 Value="True">
+                        <DataTrigger.EnterActions>
+                            <BeginStoryboard Storyboard="{StaticResource LabelShow}" />
+                        </DataTrigger.EnterActions>
+                        <DataTrigger.ExitActions>
+                            <BeginStoryboard Storyboard="{StaticResource LabelHide}" />
+                        </DataTrigger.ExitActions>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </ResourceDictionary>
     </UserControl.Resources>
 
     <Border Style="{StaticResource Card.Inset}"
             Padding="14,12"
             Margin="0,0,0,10">
         <StackPanel>
-            <views:StretchWrapPanel ItemWidth="400">
-                <DockPanel views:StretchWrapPanel.Stretch="True"
-                           VerticalAlignment="Center"
-                           Margin="0,0,12,8">
-                    <Border DockPanel.Dock="Left"
-                            Style="{StaticResource EndpointChip}"
-                            Margin="0,0,8,0"
-                            Background="{DynamicResource Accent.Soft}"
-                            BorderBrush="{DynamicResource Sync.LeftOnly}"
-                            ToolTip="Левая сторона">
-                        <TextBlock Text="Л"
-                                   FontWeight="Bold"
-                                   FontSize="{DynamicResource Font.Size.XS}"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource Sync.LeftOnly}" />
-                    </Border>
-                    <Button DockPanel.Dock="Right"
-                            Style="{StaticResource Button.Secondary}"
-                            Command="{Binding Setup.BrowseLeftCommand}"
-                            Padding="9,0"
-                            MinWidth="0"
-                            Margin="6,0,0,0"
-                            VerticalAlignment="Center"
-                            ToolTip="Обзор"
-                            AutomationProperties.Name="Обзор каталога слева">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderOpen}"
-                                                  Width="15"
-                                                  Height="15" />
-                    </Button>
-                    <Grid VerticalAlignment="Center">
-                        <TextBox Text="{Binding Setup.LeftPath, UpdateSourceTrigger=PropertyChanged}"
-                                 behaviors:PathSuggest.Enabled="{Binding Setup.Preferences.SyncPathSuggest}"
-                                 Style="{StaticResource TextBox.Toolbar}"
-                                 ToolTip="Каталог слева" />
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
-                                                  Width="14"
-                                                  Height="14"
-                                                  HorizontalAlignment="Right"
-                                                  VerticalAlignment="Center"
-                                                  Margin="0,0,10,0"
-                                                  IsHitTestVisible="False"
-                                                  Foreground="{DynamicResource State.Error}"
-                                                  ToolTip="Каталог не найден"
-                                                  Visibility="{Binding Setup.LeftPathInvalid, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
-                    </Grid>
-                </DockPanel>
-
-                <Button views:StretchWrapPanel.Standalone="True"
-                        VerticalAlignment="Center"
-                        HorizontalAlignment="Center"
-                        Cursor="Hand"
-                        Margin="0,0,12,8"
-                        Command="{Binding Setup.CycleModeCommand}"
-                        ToolTip="{Binding Setup.DirectionHint}"
-                        AutomationProperties.Name="{Binding Setup.DirectionHint}">
-                    <Button.InputBindings>
-                        <MouseBinding MouseAction="RightClick"
-                                      Command="{Binding Setup.SwapPathsCommand}" />
-                    </Button.InputBindings>
-                    <Button.Template>
-                        <ControlTemplate TargetType="Button">
-                            <Border x:Name="Circle"
-                                    Width="22"
-                                    Height="22"
-                                    CornerRadius="11"
-                                    BorderThickness="1"
-                                    Background="{DynamicResource Accent.Soft}"
-                                    BorderBrush="{DynamicResource Accent.Primary}">
-                                <iconPacks:PackIconLucide x:Name="Arrow"
-                                                          Kind="{Binding Setup.DirectionIconKind}"
-                                                          Width="13"
-                                                          Height="13"
-                                                          HorizontalAlignment="Center"
-                                                          VerticalAlignment="Center"
-                                                          Foreground="{DynamicResource Accent.Primary}" />
-                            </Border>
-                            <ControlTemplate.Triggers>
-                                <Trigger Property="IsMouseOver"
-                                         Value="True">
-                                    <Setter TargetName="Circle"
-                                            Property="Background"
-                                            Value="{DynamicResource Accent.Primary}" />
-                                    <Setter TargetName="Arrow"
-                                            Property="Foreground"
-                                            Value="{DynamicResource Accent.Soft}" />
-                                </Trigger>
-                            </ControlTemplate.Triggers>
-                        </ControlTemplate>
-                    </Button.Template>
-                </Button>
-
-                <DockPanel views:StretchWrapPanel.Stretch="True"
-                           VerticalAlignment="Center"
-                           Margin="0,0,0,8">
-                    <Border DockPanel.Dock="Right"
-                            Style="{StaticResource EndpointChip}"
-                            Margin="8,0,0,0"
-                            Background="{DynamicResource State.InfoSoft}"
-                            BorderBrush="{DynamicResource State.Info}"
-                            ToolTip="Правая сторона">
-                        <TextBlock Text="П"
-                                   FontWeight="Bold"
-                                   FontSize="{DynamicResource Font.Size.XS}"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource State.Info}" />
-                    </Border>
-                    <Button DockPanel.Dock="Left"
-                            Style="{StaticResource Button.Secondary}"
-                            Command="{Binding Setup.BrowseRightCommand}"
-                            Padding="9,0"
-                            MinWidth="0"
-                            Margin="0,0,6,0"
-                            VerticalAlignment="Center"
-                            ToolTip="Обзор"
-                            AutomationProperties.Name="Обзор каталога справа">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderOpen}"
-                                                  Width="15"
-                                                  Height="15" />
-                    </Button>
-                    <Grid VerticalAlignment="Center">
-                        <TextBox Text="{Binding Setup.RightPath, UpdateSourceTrigger=PropertyChanged}"
-                                 behaviors:PathSuggest.Enabled="{Binding Setup.Preferences.SyncPathSuggest}"
-                                 Style="{StaticResource TextBox.Toolbar}"
-                                 ToolTip="Каталог справа" />
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
-                                                  Width="14"
-                                                  Height="14"
-                                                  HorizontalAlignment="Right"
-                                                  VerticalAlignment="Center"
-                                                  Margin="0,0,10,0"
-                                                  IsHitTestVisible="False"
-                                                  Foreground="{DynamicResource State.Error}"
-                                                  ToolTip="Каталог не найден"
-                                                  Visibility="{Binding Setup.RightPathInvalid, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
-                    </Grid>
-                </DockPanel>
-            </views:StretchWrapPanel>
+            <sync:SyncEndpointsRow />
 
             <views:StretchWrapPanel Margin="0,12,0,0"
                                     ItemWidth="240">
@@ -427,173 +278,15 @@
                                   Grid.Column="1"
                                   SelectedItem="{Binding Setup.Profiles.SelectedProfile}"
                                   Style="{StaticResource ComboBox.Toolbar}"
+                                  ItemTemplate="{StaticResource SyncQuickProfileTemplate}"
                                   VerticalAlignment="Center"
-                                  ToolTip="Профиль синхронизации">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate DataType="{x:Type vm:SyncQuickProfileItem}">
-                                    <Grid MinWidth="190">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-
-                                        <TextBlock Grid.Column="0"
-                                                   Text="{Binding Name}"
-                                                   VerticalAlignment="Center"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   Margin="0,0,12,0"
-                                                   Visibility="{Binding CanConfirmRename, Converter={StaticResource InverseBoolToVisibility}}" />
-
-                                        <TextBox Grid.Column="0"
-                                                 Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}"
-                                                 Style="{StaticResource TextBox.Toolbar}"
-                                                 MinWidth="128"
-                                                 Margin="0,0,8,0"
-                                                 ToolTip="Имя профиля"
-                                                 AutomationProperties.Name="Имя профиля"
-                                                 Visibility="{Binding CanConfirmRename, Converter={StaticResource BoolToVisibility}}" />
-
-                                        <StackPanel Grid.Column="1"
-                                                    Orientation="Horizontal">
-                                            <StackPanel.Style>
-                                                <Style TargetType="StackPanel">
-                                                    <Setter Property="Visibility"
-                                                            Value="Collapsed" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger
-                                                            Binding="{Binding IsVisible, RelativeSource={RelativeSource AncestorType=ComboBoxItem}, FallbackValue=False}"
-                                                            Value="True">
-                                                            <Setter Property="Visibility"
-                                                                    Value="Visible" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </StackPanel.Style>
-
-                                            <StackPanel Orientation="Horizontal"
-                                                        Visibility="{Binding CanShowActions, Converter={StaticResource BoolToVisibility}}">
-                                                <Button Style="{StaticResource Button.Ghost}"
-                                                        Command="{Binding RequestUpdateCommand}"
-                                                        Padding="6,3"
-                                                        MinHeight="24"
-                                                        ToolTip="Обновить профиль текущими параметрами"
-                                                        AutomationProperties.Name="Обновить профиль текущими параметрами">
-                                                    <iconPacks:PackIconLucide
-                                                        Kind="{x:Static iconPacks:PackIconLucideKind.Save}"
-                                                        Width="13"
-                                                        Height="13" />
-                                                </Button>
-                                                <Button Style="{StaticResource Button.Ghost}"
-                                                        Command="{Binding RequestRenameCommand}"
-                                                        Padding="6,3"
-                                                        MinHeight="24"
-                                                        ToolTip="Переименовать профиль"
-                                                        AutomationProperties.Name="Переименовать профиль">
-                                                    <iconPacks:PackIconLucide
-                                                        Kind="{x:Static iconPacks:PackIconLucideKind.Pencil}"
-                                                        Width="13"
-                                                        Height="13" />
-                                                </Button>
-                                                <Button Style="{StaticResource Button.Ghost}"
-                                                        Command="{Binding RequestDeleteCommand}"
-                                                        Padding="6,3"
-                                                        MinHeight="24"
-                                                        ToolTip="Удалить профиль"
-                                                        AutomationProperties.Name="Удалить профиль">
-                                                    <iconPacks:PackIconLucide
-                                                        Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
-                                                        Width="13"
-                                                        Height="13" />
-                                                </Button>
-                                            </StackPanel>
-
-                                            <StackPanel Orientation="Horizontal"
-                                                        Visibility="{Binding CanConfirmUpdate, Converter={StaticResource BoolToVisibility}}">
-                                                <Button Style="{StaticResource Button.Ghost}"
-                                                        Command="{Binding ConfirmUpdateCommand}"
-                                                        Padding="6,3"
-                                                        MinHeight="24"
-                                                        ToolTip="Подтвердить обновление"
-                                                        AutomationProperties.Name="Подтвердить обновление">
-                                                    <iconPacks:PackIconLucide
-                                                        Kind="{x:Static iconPacks:PackIconLucideKind.Check}"
-                                                        Width="13"
-                                                        Height="13" />
-                                                </Button>
-                                                <Button Style="{StaticResource Button.Ghost}"
-                                                        Command="{Binding CancelUpdateCommand}"
-                                                        Padding="6,3"
-                                                        MinHeight="24"
-                                                        ToolTip="Отменить обновление"
-                                                        AutomationProperties.Name="Отменить обновление">
-                                                    <iconPacks:PackIconLucide
-                                                        Kind="{x:Static iconPacks:PackIconLucideKind.X}"
-                                                        Width="13"
-                                                        Height="13" />
-                                                </Button>
-                                            </StackPanel>
-
-                                            <StackPanel Orientation="Horizontal"
-                                                        Visibility="{Binding CanConfirmRename, Converter={StaticResource BoolToVisibility}}">
-                                                <Button Style="{StaticResource Button.Ghost}"
-                                                        Command="{Binding ConfirmRenameCommand}"
-                                                        Padding="6,3"
-                                                        MinHeight="24"
-                                                        ToolTip="Сохранить имя"
-                                                        AutomationProperties.Name="Сохранить имя">
-                                                    <iconPacks:PackIconLucide
-                                                        Kind="{x:Static iconPacks:PackIconLucideKind.Check}"
-                                                        Width="13"
-                                                        Height="13" />
-                                                </Button>
-                                                <Button Style="{StaticResource Button.Ghost}"
-                                                        Command="{Binding CancelRenameCommand}"
-                                                        Padding="6,3"
-                                                        MinHeight="24"
-                                                        ToolTip="Отменить переименование"
-                                                        AutomationProperties.Name="Отменить переименование">
-                                                    <iconPacks:PackIconLucide
-                                                        Kind="{x:Static iconPacks:PackIconLucideKind.X}"
-                                                        Width="13"
-                                                        Height="13" />
-                                                </Button>
-                                            </StackPanel>
-
-                                            <StackPanel Orientation="Horizontal"
-                                                        Visibility="{Binding CanConfirmDelete, Converter={StaticResource BoolToVisibility}}">
-                                                <Button Style="{StaticResource Button.Ghost}"
-                                                        Command="{Binding ConfirmDeleteCommand}"
-                                                        Padding="6,3"
-                                                        MinHeight="24"
-                                                        ToolTip="Подтвердить удаление"
-                                                        AutomationProperties.Name="Подтвердить удаление">
-                                                    <iconPacks:PackIconLucide
-                                                        Kind="{x:Static iconPacks:PackIconLucideKind.Check}"
-                                                        Width="13"
-                                                        Height="13" />
-                                                </Button>
-                                                <Button Style="{StaticResource Button.Ghost}"
-                                                        Command="{Binding CancelDeleteCommand}"
-                                                        Padding="6,3"
-                                                        MinHeight="24"
-                                                        ToolTip="Отменить удаление"
-                                                        AutomationProperties.Name="Отменить удаление">
-                                                    <iconPacks:PackIconLucide
-                                                        Kind="{x:Static iconPacks:PackIconLucideKind.X}"
-                                                        Width="13"
-                                                        Height="13" />
-                                                </Button>
-                                            </StackPanel>
-                                        </StackPanel>
-                                    </Grid>
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
+                                  ToolTip="Профиль синхронизации" />
                     </Grid>
                 </Grid>
             </views:StretchWrapPanel>
 
-            <Popup PlacementTarget="{Binding ElementName=MoreToggle}"
+            <Popup x:Name="MorePopup"
+                   PlacementTarget="{Binding ElementName=MoreToggle}"
                    Placement="Bottom"
                    IsOpen="{Binding IsChecked, ElementName=MoreToggle, Mode=TwoWay}"
                    StaysOpen="False"
@@ -627,7 +320,8 @@
                                      ToolTip="{Binding Setup.WinnerHint}"
                                      AutomationProperties.Name="Победитель в двустороннем режиме" />
                         </StackPanel>
-                        <ToggleButton Style="{StaticResource MirrorToggle}"
+                        <ToggleButton x:Name="MirrorButton"
+                                      Style="{StaticResource MirrorToggle}"
                                       IsChecked="{Binding Setup.Mirror}"
                                       IsEnabled="{Binding Setup.MirrorApplicable}"
                                       MinWidth="0"
