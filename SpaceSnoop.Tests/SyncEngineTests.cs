@@ -484,6 +484,23 @@ public class SyncEngineTests
     }
 
     [Test]
+    public void Verify_SourceGoneAfterCopy_ReportsMismatch()
+    {
+        File.WriteAllText(Path.Combine(_rightDir, "a.txt"), "data");
+
+        var report = new SyncReport();
+        report.Applied.Add(new(SyncAction.CopyToRight, "a.txt", 4));
+
+        new SyncEngine(NullLogger<SyncEngine>.Instance).Verify(report, _leftDir, _rightDir, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.Mismatches, Has.Count.EqualTo(1));
+            Assert.That(report.Mismatches[0].RelativePath, Is.EqualTo("a.txt"));
+        }
+    }
+
+    [Test]
     public void Verify_DeletedFileStillPresent_ReportsMismatch()
     {
         File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "still here");

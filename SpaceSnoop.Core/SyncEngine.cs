@@ -61,9 +61,14 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
 
             var sourceFile = new FileInfo(source);
 
-            return sourceFile.Exists && !DirectoryComparer.FilesIdentical(sourceFile, destinationFile)
-                ? "содержимое расходится после копирования"
-                : null;
+            if (!sourceFile.Exists)
+            {
+                return "источник исчез после копирования";
+            }
+
+            return DirectoryComparer.FilesIdentical(sourceFile, destinationFile)
+                ? null
+                : "содержимое расходится после копирования";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SecurityException)
         {
