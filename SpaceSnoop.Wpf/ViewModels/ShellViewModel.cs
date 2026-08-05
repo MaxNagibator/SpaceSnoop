@@ -26,6 +26,8 @@ public sealed partial class ShellViewModel : ShellViewModelBase
 
     private readonly IApplicationLifetime _lifetime;
 
+    private readonly CleanupPageViewModel _cleanup;
+
     [ObservableProperty]
     private bool _isTarkovBootPlaying;
 
@@ -35,7 +37,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         SyncViewModel sync,
         OverviewViewModel overview,
         ScheduleViewModel schedule,
-        DockerViewModel docker,
+        CleanupPageViewModel cleanup,
         ChatViewModel chat,
         LogsViewModel logs,
         PerformanceViewModel performance,
@@ -51,6 +53,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         : base(modal)
     {
         _lifetime = lifetime;
+        _cleanup = cleanup;
         Toasts = toasts;
         Hud = hud;
         Theme = theme;
@@ -63,7 +66,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         var syncItem = new NavigationItem("Синхронизация", PackIconLucideKind.FolderSync, sync);
         var overviewItem = new NavigationItem("Обзор", PackIconLucideKind.LayoutGrid, overview);
         var scheduleItem = new NavigationItem("Расписание", PackIconLucideKind.CalendarClock, schedule);
-        var dockerItem = new NavigationItem("Docker", PackIconLucideKind.Container, docker);
+        var cleanupItem = new NavigationItem("Очистка", PackIconLucideKind.Trash2, cleanup);
         var logsItem = new NavigationItem("Логи", PackIconLucideKind.ScrollText, logs);
         var performanceItem = new NavigationItem("Диагностика", PackIconLucideKind.Gauge, performance);
         var aboutItem = new NavigationItem("О программе", PackIconLucideKind.Info, about);
@@ -75,7 +78,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         Sections.Add(syncItem);
         Sections.Add(overviewItem);
         Sections.Add(scheduleItem);
-        Sections.Add(dockerItem);
+        Sections.Add(cleanupItem);
         Sections.Add(logsItem);
         Sections.Add(performanceItem);
         Sections.Add(aboutItem);
@@ -86,7 +89,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
             [SectionKey.Sync] = syncItem,
             [SectionKey.Overview] = overviewItem,
             [SectionKey.Schedule] = scheduleItem,
-            [SectionKey.Docker] = dockerItem,
+            [SectionKey.Cleanup] = cleanupItem,
             [SectionKey.Chat] = _chatItem,
             [SectionKey.Logs] = logsItem,
             [SectionKey.Performance] = performanceItem,
@@ -142,7 +145,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
 
     public bool TryNavigate(string sectionKey)
     {
-        if (!_sectionByKey.TryGetValue(sectionKey, out var item))
+        if (!_sectionByKey.TryGetValue(ResolveAlias(sectionKey), out var item))
         {
             return false;
         }
@@ -277,7 +280,19 @@ public sealed partial class ShellViewModel : ShellViewModelBase
 
     private NavigationItem? FindSectionByKey(string key)
     {
-        return _sectionByKey.GetValueOrDefault(key);
+        return _sectionByKey.GetValueOrDefault(ResolveAlias(key));
+    }
+
+    private string ResolveAlias(string key)
+    {
+        if (!string.Equals(key, SectionKey.Docker, StringComparison.OrdinalIgnoreCase))
+        {
+            return key;
+        }
+
+        _cleanup.ActivateDocker();
+
+        return SectionKey.Cleanup;
     }
 
     private NavigationItem? FindSectionByLastPage(string? lastPage)
@@ -287,7 +302,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
             return null;
         }
 
-        if (_sectionByKey.TryGetValue(lastPage, out var item))
+        if (_sectionByKey.TryGetValue(ResolveAlias(lastPage), out var item))
         {
             return item;
         }

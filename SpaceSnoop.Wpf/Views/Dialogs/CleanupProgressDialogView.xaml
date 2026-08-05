@@ -1,0 +1,176 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Dialogs.CleanupProgressDialogView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Dialogs"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:CleanupProgressDialogViewModel}"
+             d:DesignHeight="300"
+             d:DesignWidth="640"
+             Width="{DynamicResource Dialog.Width.Medium}"
+             MinHeight="200"
+             AutomationProperties.Name="{Binding Title}">
+
+    <Grid Margin="22">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0"
+                    Orientation="Horizontal">
+            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                      Width="20"
+                                      Height="20"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,10,0"
+                                      Foreground="{DynamicResource Accent.Primary}" />
+            <TextBlock Text="{Binding Title}"
+                       Style="{StaticResource DialogTitle}"
+                       VerticalAlignment="Center" />
+        </StackPanel>
+
+        <Grid Grid.Row="1"
+              Margin="0,14,0,0">
+            <Border Style="{StaticResource Card.Inset}"
+                    Padding="14"
+                    Visibility="{Binding IsIdle, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <iconPacks:PackIconLucide Grid.Column="0"
+                                                  Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                                  Width="15"
+                                                  Height="15"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,9,0"
+                                                  Foreground="{DynamicResource Fg.Muted}" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding TargetName}"
+                                   AutomationProperties.Name="Что очищается"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   FontWeight="Medium"
+                                   Foreground="{DynamicResource Fg.Primary}" />
+                        <TextBlock Grid.Column="2"
+                                   Text="{Binding PlanText}"
+                                   VerticalAlignment="Center"
+                                   Margin="12,0,0,0"
+                                   FontSize="{DynamicResource Font.Size.S}"
+                                   Foreground="{DynamicResource Fg.Muted}" />
+                    </Grid>
+
+                    <TextBlock Text="{Binding FateText}"
+                               Margin="0,12,0,0"
+                               TextWrapping="Wrap"
+                               Style="{StaticResource TextBlock.Subtle}" />
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="{Binding StatusText}"
+                       Style="{StaticResource TextBlock.Subtle}"
+                       TextWrapping="Wrap"
+                       AutomationProperties.LiveSetting="Polite"
+                       Visibility="{Binding IsIdle, Converter={StaticResource InverseBoolToVisibility}}" />
+        </Grid>
+
+        <StackPanel Grid.Row="2"
+                    Margin="0,16,0,0"
+                    Visibility="{Binding IsIdle, Converter={StaticResource InverseBoolToVisibility}, FallbackValue=Collapsed}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ProgressBar Grid.Column="0"
+                             Height="8"
+                             VerticalAlignment="Center"
+                             Minimum="0"
+                             Maximum="1"
+                             IsIndeterminate="{Binding IsIndeterminate}"
+                             AutomationProperties.Name="Ход очистки"
+                             Value="{Binding ProgressValue, Mode=OneWay}" />
+                <TextBlock Grid.Column="1"
+                           Text="{Binding CountText}"
+                           AutomationProperties.Name="Удалено"
+                           AutomationProperties.LiveSetting="Polite"
+                           Margin="12,0,0,0"
+                           VerticalAlignment="Center"
+                           FontSize="{DynamicResource Font.Size.S}"
+                           FontWeight="Medium"
+                           Foreground="{DynamicResource Accent.Primary}" />
+            </Grid>
+
+            <TextBlock Text="{Binding CurrentPath}"
+                       AutomationProperties.Name="Текущий файл"
+                       Margin="0,8,0,0"
+                       TextTrimming="CharacterEllipsis"
+                       FontFamily="{DynamicResource Font.Mono}"
+                       FontSize="{DynamicResource Font.Size.S}"
+                       Foreground="{DynamicResource Fg.Muted}"
+                       ToolTip="{Binding CurrentPath}"
+                       Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+        </StackPanel>
+
+        <Grid Grid.Row="3"
+              Margin="0,20,0,0">
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Visibility="{Binding IsIdle, Converter={StaticResource BoolToVisibility}}">
+                <Button Style="{StaticResource Button.Secondary}"
+                        Command="{Binding CloseCommand}"
+                        Content="Отмена"
+                        MinWidth="96"
+                        MinHeight="{DynamicResource Control.Height.Default}"
+                        Padding="14,6"
+                        Margin="0,0,8,0"
+                        IsCancel="True" />
+                <Button Style="{StaticResource Button.Destructive}"
+                        Command="{Binding StartCommand}"
+                        MinHeight="{DynamicResource Control.Height.Default}"
+                        Padding="16,6"
+                        IsDefault="True">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                                  Width="14"
+                                                  Height="14"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,6,0" />
+                        <TextBlock Text="{Binding ActionText}" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                <Button Style="{StaticResource Button.Secondary}"
+                        Command="{Binding CancelRunCommand}"
+                        Content="Отменить"
+                        MinWidth="96"
+                        MinHeight="{DynamicResource Control.Height.Default}"
+                        Padding="14,6" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Visibility="{Binding IsFinished, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                <Button Style="{StaticResource Button.Secondary}"
+                        Command="{Binding CloseCommand}"
+                        Content="Закрыть"
+                        MinWidth="96"
+                        MinHeight="{DynamicResource Control.Height.Default}"
+                        Padding="16,6"
+                        IsDefault="True" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

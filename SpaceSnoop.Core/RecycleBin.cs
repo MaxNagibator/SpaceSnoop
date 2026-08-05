@@ -2,6 +2,8 @@
 
 namespace SpaceSnoop.Core;
 
+internal readonly record struct RecycleBinContent(bool Ok, long Bytes, long Items);
+
 internal static class RecycleBin
 {
     private const uint FO_DELETE = 0x0003;
@@ -9,6 +11,9 @@ internal static class RecycleBin
     private const ushort FOF_NOCONFIRMATION = 0x0010;
     private const ushort FOF_ALLOWUNDO = 0x0040;
     private const ushort FOF_NOERRORUI = 0x0400;
+    private const uint SHERB_NOCONFIRMATION = 0x0001;
+    private const uint SHERB_NOPROGRESSUI = 0x0002;
+    private const uint SHERB_NOSOUND = 0x0004;
 
     public static void DeleteSilent(string path)
     {
@@ -27,8 +32,39 @@ internal static class RecycleBin
         }
     }
 
+    public static RecycleBinContent Query()
+    {
+        var info = new ShQueryRbInfo { cbSize = Marshal.SizeOf<ShQueryRbInfo>() };
+
+        return SHQueryRecycleBin(null, ref info) == 0 ? new(true, info.i64Size, info.i64NumItems) : new(false, 0, 0);
+    }
+
+    public static void Empty()
+    {
+        var result = SHEmptyRecycleBin(IntPtr.Zero, null, SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND);
+
+        if (result != 0)
+        {
+            throw new IOException($"Не удалось очистить корзину (код {result}).");
+        }
+    }
+
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
     private static extern int SHFileOperation(ref ShFileOpStruct lpFileOp);
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern int SHQueryRecycleBin(string? pszRootPath, ref ShQueryRbInfo pSHQueryRBInfo);
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern int SHEmptyRecycleBin(IntPtr hwnd, string? pszRootPath, uint dwFlags);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ShQueryRbInfo
+    {
+        public int cbSize;
+        public long i64Size;
+        public long i64NumItems;
+    }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct ShFileOpStruct

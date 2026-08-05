@@ -1,0 +1,70 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Cleanup.CleanupToolbar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Cleanup"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:CleanupViewModel}">
+
+    <Border Style="{StaticResource Card}"
+            Margin="0,0,0,10">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="0"
+                    Style="{StaticResource Button.Secondary}"
+                    Command="{Binding RefreshCommand}"
+                    IsEnabled="{Binding IsIdle}"
+                    MinHeight="{DynamicResource Control.Height.Default}"
+                    Padding="12,6"
+                    Margin="0,0,8,0"
+                    ToolTip="{Binding RefreshTooltip}">
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.RefreshCw}"
+                                              Width="14"
+                                              Height="14"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,6,0" />
+                    <TextBlock Text="Замерить" />
+                </StackPanel>
+            </Button>
+
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center">
+                <Button Style="{StaticResource Button.Ghost}"
+                        Command="{Binding SelectAllCommand}"
+                        Content="Выбрать всё"
+                        Padding="10,6" />
+                <Button Style="{StaticResource Button.Ghost}"
+                        Command="{Binding ClearSelectionCommand}"
+                        Content="Снять"
+                        Padding="10,6"
+                        Margin="4,0,0,0" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="3"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center">
+                <TextBlock Text="Не трогать файлы моложе, ч"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0"
+                           Style="{StaticResource TextBlock.Subtle}" />
+                <TextBox Text="{Binding MinAgeHours, UpdateSourceTrigger=LostFocus}"
+                         Width="64"
+                         MinHeight="{DynamicResource Control.Height.Default}"
+                         VerticalContentAlignment="Center"
+                         TextAlignment="Right"
+                         AutomationProperties.Name="Минимальный возраст файла в часах"
+                         ToolTip="Файлы, изменённые позже, очистка не трогает – их может держать работающая программа" />
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

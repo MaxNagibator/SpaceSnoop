@@ -1,0 +1,151 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Cleanup.CleanupTargetList"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Cleanup"
+             xmlns:conv="clr-namespace:SpaceSnoop.Wpf.Converters"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:CleanupViewModel}">
+    <UserControl.Resources>
+        <conv:FractionToWidthConverter x:Key="FractionToWidth" />
+    </UserControl.Resources>
+
+    <Border Style="{StaticResource Card}">
+        <StackPanel>
+            <TextBlock Text="Что можно освободить"
+                       Style="{StaticResource SectionTitle}"
+                       Margin="0,0,0,10" />
+
+            <ItemsControl ItemsSource="{Binding Targets}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:CleanupTargetViewModel}">
+                        <Border Padding="0,10"
+                                BorderBrush="{DynamicResource Border.Subtle}"
+                                BorderThickness="0,1,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="140" />
+                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <CheckBox Grid.Column="0"
+                                          IsChecked="{Binding IsSelected}"
+                                          IsEnabled="{Binding IsAvailable}"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,10,0"
+                                          AutomationProperties.Name="{Binding Name}" />
+
+                                <iconPacks:PackIconLucide Grid.Column="1"
+                                                          Kind="{Binding IconKind}"
+                                                          Width="16"
+                                                          Height="16"
+                                                          VerticalAlignment="Center"
+                                                          Margin="0,0,12,0"
+                                                          Foreground="{DynamicResource Fg.Muted}" />
+
+                                <StackPanel Grid.Column="2"
+                                            VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Name}"
+                                               Foreground="{DynamicResource Fg.Primary}"
+                                               FontWeight="Medium"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Description}"
+                                               Style="{StaticResource TextBlock.Subtle}"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding Path}" />
+                                    <TextBlock Text="{Binding AvailabilityText}"
+                                               Margin="0,2,0,0"
+                                               FontSize="{DynamicResource Font.Size.S}"
+                                               Foreground="{DynamicResource State.Warning}"
+                                               Visibility="{Binding HasAvailabilityIssue, Converter={StaticResource BoolToVisibility}}" />
+                                    <TextBlock Text="{Binding UnreadableText}"
+                                               Margin="0,2,0,0"
+                                               TextTrimming="CharacterEllipsis"
+                                               FontSize="{DynamicResource Font.Size.S}"
+                                               Foreground="{DynamicResource State.Warning}"
+                                               Visibility="{Binding HasUnreadable, Converter={StaticResource BoolToVisibility}}" />
+                                </StackPanel>
+
+                                <Border x:Name="ShareTrack"
+                                        Grid.Column="3"
+                                        Height="8"
+                                        Margin="16,0"
+                                        Background="{DynamicResource Bg.SurfaceMute}"
+                                        CornerRadius="{DynamicResource Radius.S}"
+                                        VerticalAlignment="Center"
+                                        ToolTip="Доля от всего найденного">
+                                    <Rectangle HorizontalAlignment="Left"
+                                               Height="8"
+                                               RadiusX="4"
+                                               RadiusY="4"
+                                               Fill="{DynamicResource Accent.Primary}">
+                                        <Rectangle.Width>
+                                            <MultiBinding Converter="{StaticResource FractionToWidth}">
+                                                <Binding Path="Share" />
+                                                <Binding Path="ActualWidth"
+                                                         ElementName="ShareTrack" />
+                                            </MultiBinding>
+                                        </Rectangle.Width>
+                                    </Rectangle>
+                                </Border>
+
+                                <StackPanel Grid.Column="4"
+                                            VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding SizeText}"
+                                               Style="{StaticResource TextBlock.Mono}"
+                                               TextAlignment="Right"
+                                               Foreground="{DynamicResource Fg.Primary}" />
+                                    <TextBlock Text="{Binding FilesText}"
+                                               Style="{StaticResource Caption}"
+                                               TextAlignment="Right"
+                                               HorizontalAlignment="Right" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="5"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center"
+                                            Margin="12,0,0,0">
+                                    <Button Style="{StaticResource Button.Icon}"
+                                            Command="{Binding DataContext.MeasureOneCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            AutomationProperties.Name="Замерить заново"
+                                            ToolTip="Замерить заново">
+                                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.RefreshCw}"
+                                                                  Width="15"
+                                                                  Height="15" />
+                                    </Button>
+                                    <Button Style="{StaticResource Button.Icon}"
+                                            Command="{Binding DataContext.OpenFolderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            IsEnabled="{Binding HasPath}"
+                                            AutomationProperties.Name="Открыть папку"
+                                            ToolTip="Открыть папку">
+                                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderOpen}"
+                                                                  Width="15"
+                                                                  Height="15" />
+                                    </Button>
+                                    <Button Style="{StaticResource Button.Icon}"
+                                            Command="{Binding DataContext.CleanOneCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            IsEnabled="{Binding CanClean}"
+                                            AutomationProperties.Name="Очистить"
+                                            ToolTip="Очистить безвозвратно">
+                                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                                                  Width="15"
+                                                                  Height="15" />
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </Border>
+</UserControl>

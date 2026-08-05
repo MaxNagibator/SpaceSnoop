@@ -18,9 +18,9 @@ internal sealed class McpCaptureTools(McpNavigator navigator, ILogger logger)
 
         if (section is { Length: > 0 })
         {
-            if (!SectionKey.All.Contains(section, StringComparer.OrdinalIgnoreCase))
+            if (!SectionKey.IsNavigable(section))
             {
-                throw new McpException($"Неизвестная страница «{section}». Доступны: {string.Join(", ", SectionKey.All)}.");
+                throw new McpException($"Неизвестная страница «{section}». Доступны: {string.Join(", ", SectionKey.Navigable)}.");
             }
 
             deferred = McpDispatch.Run(() => navigator.DeferOrNavigate(section));

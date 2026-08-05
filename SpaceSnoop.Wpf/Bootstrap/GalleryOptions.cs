@@ -137,7 +137,7 @@ public sealed record GalleryOptions(
 
         foreach (var page in requested)
         {
-            var match = AllPages.FirstOrDefault(known => string.Equals(known, page, StringComparison.OrdinalIgnoreCase));
+            var match = SectionKey.Match(page);
 
             if (match is null)
             {

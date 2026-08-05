@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using SpaceSnoop.Core.Cleanup;
 
 namespace SpaceSnoop.Core;
 
@@ -24,4 +25,19 @@ internal static partial class CoreLog
 
     [LoggerMessage(EventId = 1216, Level = LogLevel.Warning, Message = "Синхронизация: {Action} «{RelativePath}» отклонено, обход стороны неполон")]
     public static partial void SyncDeleteBlocked(this ILogger logger, SyncAction action, string relativePath);
+
+    [LoggerMessage(EventId = 1240, Level = LogLevel.Information, Message = "Очистка: начата цель «{TargetId}»")]
+    public static partial void CleanupStarted(this ILogger logger, string targetId);
+
+    [LoggerMessage(EventId = 1241, Level = LogLevel.Information, Message = "Очистка: цель «{TargetId}» – удалено {Deleted}, освобождено {FreedBytes} Б")]
+    public static partial void CleanupFinished(this ILogger logger, string targetId, int deleted, long freedBytes);
+
+    [LoggerMessage(EventId = 1242, Level = LogLevel.Warning, Message = "Очистка: не удалось удалить «{Path}»")]
+    public static partial void CleanupFileFailed(this ILogger logger, Exception exception, string path);
+
+    [LoggerMessage(EventId = 1243, Level = LogLevel.Warning, Message = "Очистка: каталог пропущен «{Path}»")]
+    public static partial void CleanupDirectorySkipped(this ILogger logger, Exception exception, string path);
+
+    [LoggerMessage(EventId = 1244, Level = LogLevel.Warning, Message = "Очистка: цель «{TargetId}» недоступна ({Availability})")]
+    public static partial void CleanupTargetUnavailable(this ILogger logger, string targetId, CleanupAvailability availability);
 }

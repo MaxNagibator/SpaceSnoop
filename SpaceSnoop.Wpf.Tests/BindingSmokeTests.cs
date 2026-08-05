@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.ViewModels;
+using SpaceSnoop.Wpf.ViewModels.Cleanup;
 using SpaceSnoop.Wpf.ViewModels.Scan;
 using SpaceSnoop.Wpf.ViewModels.Sync;
 using SpaceSnoop.Wpf.Views;
@@ -113,6 +114,24 @@ public class BindingSmokeTests
         Settle();
 
         Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
+    }
+
+    [Test]
+    public void Алиас_docker_открывает_Очистку_на_секции_Docker()
+    {
+        Assert.That(_shell.TryNavigate(SectionKey.Cleanup), Is.True, "Страница «Очистка» не открылась.");
+        _services.GetRequiredService<CleanupPageViewModel>().IsDockerActive = false;
+
+        Assert.That(_shell.TryNavigate(SectionKey.Docker), Is.True, "Алиас «docker» не открыл страницу.");
+
+        Settle();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(_shell.CurrentSectionKey, Is.EqualTo(SectionKey.Cleanup));
+            Assert.That(_services.GetRequiredService<CleanupPageViewModel>().IsDockerActive, Is.True);
+            Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
+        }
     }
 
     [Test]

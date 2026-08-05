@@ -392,4 +392,19 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 2301, Level = LogLevel.Warning, Message = "Подписчик на замер производительности бросил исключение")]
     public static partial void PerformanceListenerFailed(this ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 2400, Level = LogLevel.Information, Message = "Очистка: запуск, целей {Targets}, ожидается {PlannedBytes} Б")]
+    public static partial void CleanupRunStarted(this ILogger logger, int targets, long plannedBytes);
+
+    [LoggerMessage(EventId = 2401, Level = LogLevel.Information, Message = "Очистка: удалено {Deleted}, освобождено {FreedBytes} Б, пропущено {Skipped}")]
+    public static partial void CleanupRunFinished(this ILogger logger, int deleted, long freedBytes, int skipped);
+
+    [LoggerMessage(EventId = 2402, Level = LogLevel.Error, Message = "Очистка: прервана ошибкой")]
+    public static partial void CleanupRunFailed(this ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 2403, Level = LogLevel.Information, Message = "Очистка: отменена, удалено {Deleted}, освобождено {FreedBytes} Б")]
+    public static partial void CleanupRunCancelled(this ILogger logger, int deleted, long freedBytes);
+
+    [LoggerMessage(EventId = 2404, Level = LogLevel.Warning, Message = "Очистка: не удалось замерить цель «{TargetId}»")]
+    public static partial void CleanupMeasureFailed(this ILogger logger, Exception exception, string targetId);
 }

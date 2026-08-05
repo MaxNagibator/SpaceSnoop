@@ -1,0 +1,76 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.CleanupView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Cleanup"
+             xmlns:cleanup="clr-namespace:SpaceSnoop.Wpf.Views.Cleanup"
+             xmlns:views="clr-namespace:SpaceSnoop.Wpf.Views"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:CleanupPageViewModel}"
+             d:DesignHeight="760"
+             d:DesignWidth="900">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Background="{DynamicResource Bg.SurfaceAlt}"
+                CornerRadius="{DynamicResource Radius.M}"
+                Padding="2"
+                HorizontalAlignment="Left"
+                Margin="0,0,0,12">
+            <StackPanel Orientation="Horizontal">
+            <RadioButton Style="{StaticResource RadioButton.Segment}"
+                         IsChecked="{Binding IsWindowsActive, Mode=OneWay}"
+                         Command="{Binding ShowWindowsCommand}"
+                         GroupName="CleanupSection"
+                         AutomationProperties.Name="Очистка Windows">
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                              Width="14"
+                                              Height="14"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,6,0" />
+                    <TextBlock Text="Windows" />
+                </StackPanel>
+            </RadioButton>
+            <RadioButton Style="{StaticResource RadioButton.Segment}"
+                         IsChecked="{Binding IsDockerActive, Mode=OneWay}"
+                         Command="{Binding ShowDockerCommand}"
+                         GroupName="CleanupSection"
+                         AutomationProperties.Name="Очистка Docker">
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Container}"
+                                              Width="14"
+                                              Height="14"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,6,0" />
+                    <TextBlock Text="Docker" />
+                </StackPanel>
+            </RadioButton>
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="1">
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Padding="0,0,12,0"
+                          DataContext="{Binding Windows}"
+                          Visibility="{Binding DataContext.IsWindowsActive, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <cleanup:CleanupToolbar />
+                    <cleanup:CleanupSummaryStrip />
+                    <cleanup:CleanupTargetList />
+                </StackPanel>
+            </ScrollViewer>
+
+            <views:DockerView DataContext="{Binding Docker}"
+                              Visibility="{Binding DataContext.IsDockerActive, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}" />
+        </Grid>
+    </Grid>
+</UserControl>

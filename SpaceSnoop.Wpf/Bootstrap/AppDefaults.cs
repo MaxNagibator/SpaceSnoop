@@ -24,6 +24,10 @@ public static class AppDefaults
     public const bool ArchiveDeleteOriginalDefault = true;
     public const CompressionLevel ArchiveCompressionDefault = CompressionLevel.Optimal;
 
+    public const int CleanupMinAgeHoursDefault = 24;
+    public const int CleanupMinAgeHoursMin = 1;
+    public const int CleanupMinAgeHoursMax = 720;
+
     public const bool WarnIfNotAdminDefault = true;
     public const StartupPage StartupPageDefault = StartupPage.Scan;
 

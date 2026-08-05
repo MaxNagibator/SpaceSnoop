@@ -153,6 +153,7 @@ public partial class App : Application
         services.AddSingleton<DiskSpaceCalculator>();
         services.AddSingleton<DockerService>();
         services.AddSingleton<ArchiveService>();
+        services.AddSingleton<CleanupService>();
         services.AddSingleton<CompareDirectoriesUseCase>();
         services.AddSingleton<ExecuteSyncUseCase>();
 
@@ -182,6 +183,7 @@ public partial class App : Application
         services.AddSingleton<ScanNodeFactory>();
         services.AddSingleton<DeleteProgressDialogFactory>();
         services.AddSingleton<ArchiveProgressDialogFactory>();
+        services.AddSingleton<CleanupProgressDialogFactory>();
 
         services.AddSingleton<ScanViewModel>();
         services.AddSingleton<IScanAutomation>(static provider => provider.GetRequiredService<ScanViewModel>());
@@ -191,6 +193,8 @@ public partial class App : Application
         services.AddSingleton<IScheduleRunner, ScheduleRunner>();
         services.AddSingleton<ScheduleViewModel>();
         services.AddSingleton<DockerViewModel>();
+        services.AddSingleton<CleanupViewModel>();
+        services.AddSingleton<CleanupPageViewModel>();
         services.AddSingleton<ChatViewModel>();
         services.AddTransient<PerformanceChartViewModel>();
         services.AddSingleton<ILogsPanel>(static provider => provider.GetRequiredService<PerformanceChartViewModel>());

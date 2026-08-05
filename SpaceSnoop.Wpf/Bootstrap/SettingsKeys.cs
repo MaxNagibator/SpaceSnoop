@@ -39,6 +39,9 @@ public static class SettingsKeys
     public const string ArchiveDeleteOriginal = "wpf.archive.delete_original";
     public const string ArchiveCompression = "wpf.archive.compression";
 
+    public const string CleanupMinAgeHours = "wpf.cleanup.min_age_hours";
+    public const string CleanupSelected = "wpf.cleanup.selected";
+
     public const string SyncLeft = "wpf.sync.left";
     public const string SyncRight = "wpf.sync.right";
     public const string SyncExclusions = "wpf.sync.exclusions";
