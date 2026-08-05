@@ -53,10 +53,16 @@
             <StackPanel Grid.Column="3"
                         Orientation="Horizontal"
                         VerticalAlignment="Center">
-                <TextBlock Text="Не трогать файлы моложе, ч"
+                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ShieldAlert}"
+                                          Width="15"
+                                          Height="15"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,8,0"
+                                          Foreground="{DynamicResource Fg.Secondary}" />
+                <TextBlock Text="Не трогать файлы моложе"
                            VerticalAlignment="Center"
                            Margin="0,0,8,0"
-                           Style="{StaticResource TextBlock.Subtle}" />
+                           Foreground="{DynamicResource Fg.Primary}" />
                 <TextBox Text="{Binding MinAgeHours, UpdateSourceTrigger=LostFocus}"
                          Width="64"
                          MinHeight="{DynamicResource Control.Height.Default}"
@@ -64,6 +70,10 @@
                          TextAlignment="Right"
                          AutomationProperties.Name="Минимальный возраст файла в часах"
                          ToolTip="Файлы, изменённые позже, очистка не трогает – их может держать работающая программа" />
+                <TextBlock Text="ч"
+                           VerticalAlignment="Center"
+                           Margin="6,0,0,0"
+                           Style="{StaticResource Caption}" />
             </StackPanel>
         </Grid>
     </Border>

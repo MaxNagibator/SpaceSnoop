@@ -20,25 +20,24 @@
 
             <StackPanel Grid.Column="0"
                         Margin="0,0,28,0">
-                <TextBlock Text="НАЙДЕНО"
+                <TextBlock Text="Найдено"
                            Style="{StaticResource Caption}" />
                 <TextBlock Text="{Binding TotalText}"
-                           Style="{StaticResource TextBlock.Mono}"
-                           FontSize="{DynamicResource Font.Size.L}"
-                           Foreground="{DynamicResource Fg.Primary}" />
+                           Style="{StaticResource StatValue}"
+                           FontSize="{DynamicResource Font.Size.L}" />
             </StackPanel>
 
             <StackPanel Grid.Column="1">
-                <TextBlock Text="ВЫБРАНО"
+                <TextBlock Text="Выбрано"
                            Style="{StaticResource Caption}" />
                 <TextBlock Text="{Binding SelectedText}"
-                           Style="{StaticResource TextBlock.Mono}"
+                           Style="{StaticResource StatValue}"
                            FontSize="{DynamicResource Font.Size.L}"
                            Foreground="{DynamicResource Accent.Primary}" />
             </StackPanel>
 
             <Button Grid.Column="3"
-                    Style="{StaticResource Button.Destructive}"
+                    Style="{StaticResource Button.Base}"
                     Command="{Binding CleanSelectedCommand}"
                     VerticalAlignment="Center"
                     MinHeight="{DynamicResource Control.Height.Default}"
@@ -49,7 +48,8 @@
                                               Width="14"
                                               Height="14"
                                               VerticalAlignment="Center"
-                                              Margin="0,0,6,0" />
+                                              Margin="0,0,6,0"
+                                              Foreground="{DynamicResource State.Error}" />
                     <TextBlock Text="Очистить выбранное" />
                 </StackPanel>
             </Button>

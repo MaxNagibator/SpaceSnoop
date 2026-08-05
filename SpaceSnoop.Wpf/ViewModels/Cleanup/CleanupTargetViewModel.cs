@@ -28,9 +28,14 @@ public sealed partial class CleanupTargetViewModel : ObservableObject
     private CleanupAvailability _availability;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowNumbers))]
+    [NotifyPropertyChangedFor(nameof(ShowPending))]
+    [NotifyPropertyChangedFor(nameof(PendingText))]
     private bool _isMeasuring;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowNumbers))]
+    [NotifyPropertyChangedFor(nameof(ShowPending))]
     private bool _isMeasured;
 
     [ObservableProperty]
@@ -62,6 +67,12 @@ public sealed partial class CleanupTargetViewModel : ObservableObject
     public bool HasContent => Files > 0;
 
     public bool CanClean => IsAvailable && HasContent;
+
+    public bool ShowNumbers => IsMeasured && !IsMeasuring;
+
+    public bool ShowPending => !ShowNumbers;
+
+    public string PendingText => IsMeasuring ? "замеряю…" : "не замерено";
 
     public bool HasUnreadable => Unreadable > 0;
 

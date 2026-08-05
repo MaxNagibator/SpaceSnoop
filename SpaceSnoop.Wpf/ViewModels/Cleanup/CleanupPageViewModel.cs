@@ -1,4 +1,5 @@
 ﻿using KeepShell.Services;
+using MahApps.Metro.IconPacks;
 using System.ComponentModel;
 using System.Windows.Input;
 
@@ -21,6 +22,18 @@ public sealed partial class CleanupPageViewModel : ObservableObject, IPageHeader
     public CleanupViewModel Windows { get; }
 
     public DockerViewModel Docker { get; }
+
+    public IReadOnlyList<SegmentOption> Sections { get; } =
+    [
+        new(PackIconLucideKind.Trash2, "Windows", "Временные файлы, кэши и корзина"),
+        new(PackIconLucideKind.Container, "Docker", "Образы, контейнеры, тома и кэш сборки"),
+    ];
+
+    public int SelectedSectionIndex
+    {
+        get => IsDockerActive ? 1 : 0;
+        set => IsDockerActive = value == 1;
+    }
 
     public bool IsWindowsActive => !IsDockerActive;
 
@@ -63,6 +76,7 @@ public sealed partial class CleanupPageViewModel : ObservableObject, IPageHeader
     async partial void OnIsDockerActiveChanged(bool value)
     {
         OnPropertyChanged(nameof(IsWindowsActive));
+        OnPropertyChanged(nameof(SelectedSectionIndex));
         NotifyProxied();
 
         await EnsureLoadedAsync();
@@ -94,17 +108,5 @@ public sealed partial class CleanupPageViewModel : ObservableObject, IPageHeader
     private Task RefreshAsync()
     {
         return IsDockerActive ? Docker.RefreshCommand.ExecuteAsync(null) : Windows.RefreshCommand.ExecuteAsync(null);
-    }
-
-    [RelayCommand]
-    private void ShowWindows()
-    {
-        IsDockerActive = false;
-    }
-
-    [RelayCommand]
-    private void ShowDocker()
-    {
-        IsDockerActive = true;
     }
 }

@@ -4,7 +4,6 @@
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Cleanup"
              xmlns:cleanup="clr-namespace:SpaceSnoop.Wpf.Views.Cleanup"
              xmlns:views="clr-namespace:SpaceSnoop.Wpf.Views"
-             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
@@ -18,43 +17,13 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0"
-                Background="{DynamicResource Bg.SurfaceAlt}"
-                CornerRadius="{DynamicResource Radius.M}"
-                Padding="2"
-                HorizontalAlignment="Left"
-                Margin="0,0,0,12">
-            <StackPanel Orientation="Horizontal">
-            <RadioButton Style="{StaticResource RadioButton.Segment}"
-                         IsChecked="{Binding IsWindowsActive, Mode=OneWay}"
-                         Command="{Binding ShowWindowsCommand}"
-                         GroupName="CleanupSection"
-                         AutomationProperties.Name="Очистка Windows">
-                <StackPanel Orientation="Horizontal">
-                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
-                                              Width="14"
-                                              Height="14"
-                                              VerticalAlignment="Center"
-                                              Margin="0,0,6,0" />
-                    <TextBlock Text="Windows" />
-                </StackPanel>
-            </RadioButton>
-            <RadioButton Style="{StaticResource RadioButton.Segment}"
-                         IsChecked="{Binding IsDockerActive, Mode=OneWay}"
-                         Command="{Binding ShowDockerCommand}"
-                         GroupName="CleanupSection"
-                         AutomationProperties.Name="Очистка Docker">
-                <StackPanel Orientation="Horizontal">
-                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Container}"
-                                              Width="14"
-                                              Height="14"
-                                              VerticalAlignment="Center"
-                                              Margin="0,0,6,0" />
-                    <TextBlock Text="Docker" />
-                </StackPanel>
-            </RadioButton>
-            </StackPanel>
-        </Border>
+        <ListBox Grid.Row="0"
+                 Style="{StaticResource ListBox.Segmented}"
+                 ItemsSource="{Binding Sections}"
+                 SelectedIndex="{Binding SelectedSectionIndex}"
+                 HorizontalAlignment="Left"
+                 Margin="0,0,0,12"
+                 AutomationProperties.Name="Раздел очистки" />
 
         <Grid Grid.Row="1">
             <ScrollViewer VerticalScrollBarVisibility="Auto"
@@ -62,7 +31,7 @@
                           Padding="0,0,12,0"
                           DataContext="{Binding Windows}"
                           Visibility="{Binding DataContext.IsWindowsActive, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}">
-                <StackPanel>
+                <StackPanel RequestBringIntoView="SuppressAutoScroll">
                     <cleanup:CleanupToolbar />
                     <cleanup:CleanupSummaryStrip />
                     <cleanup:CleanupTargetList />
