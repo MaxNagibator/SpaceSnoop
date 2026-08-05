@@ -89,6 +89,9 @@
         </MenuItem>
         <MenuItem
             Command="{Binding PlacementTarget.DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            IsEnabled="{Binding PlacementTarget.DataContext.DeleteAllowed, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            ToolTip="{Binding PlacementTarget.DataContext.DeleteHint, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            ToolTipService.ShowOnDisabled="True"
             Visibility="{Binding PlacementTarget.DataContext.CanDeleteFile, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
             <MenuItem.Header>
                 <StackPanel Orientation="Horizontal">
@@ -143,6 +146,9 @@
         </MenuItem>
         <MenuItem
             Command="{Binding PlacementTarget.DataContext.DirDeleteCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            IsEnabled="{Binding PlacementTarget.DataContext.DeleteAllowed, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            ToolTip="{Binding PlacementTarget.DataContext.DeleteHint, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            ToolTipService.ShowOnDisabled="True"
             Visibility="{Binding PlacementTarget.DataContext.CanDirDelete, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
             <MenuItem.Header>
                 <StackPanel Orientation="Horizontal">

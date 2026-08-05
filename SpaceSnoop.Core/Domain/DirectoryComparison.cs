@@ -11,6 +11,8 @@ public class DirectoryComparison(string name, string relativePath)
     public bool LeftIncomplete { get; set; }
     public bool RightIncomplete { get; set; }
     public bool IsIncomplete => LeftIncomplete || RightIncomplete;
+    public bool DeleteLeftBlocked { get; set; }
+    public bool DeleteRightBlocked { get; set; }
     public List<FileComparison> Files { get; } = [];
     public List<DirectoryComparison> SubDirectories { get; } = [];
 }

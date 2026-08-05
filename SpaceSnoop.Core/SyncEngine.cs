@@ -13,7 +13,7 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
     {
         var report = new SyncReport();
         var tracker = new TransferTracker(progress, report);
-        ExecuteRecursive(comparisonResult.Root, comparisonResult.LeftPath, comparisonResult.RightPath, report, tracker, cancel);
+        ExecuteRecursive(comparisonResult.Root, comparisonResult.LeftPath, comparisonResult.RightPath, report, tracker, cancel, DeleteGate.Open);
         return report;
     }
 
@@ -168,6 +168,43 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         return file.Action is not (SyncAction.None or SyncAction.Skip);
     }
 
+    private bool Reject(SyncAction action, string relativePath, SyncReport report, bool alreadyReported)
+    {
+        if (alreadyReported)
+        {
+            return true;
+        }
+
+        report.Errors.Add(new(relativePath, action, "удаление отклонено: сторона-источник обойдена не полностью; остальные отказы в этой ветке не перечисляются"));
+        logger.SyncDeleteBlocked(action, relativePath);
+
+        return true;
+    }
+
+    private readonly record struct DeleteGate(bool Left, bool Right, bool Reported)
+    {
+        public static DeleteGate Open { get; } = new(false, false, false);
+
+        public DeleteGate Inherit(DirectoryComparison dir)
+        {
+            return this with
+            {
+                Left = Left || dir.RightIncomplete || dir.DeleteLeftBlocked,
+                Right = Right || dir.LeftIncomplete || dir.DeleteRightBlocked,
+            };
+        }
+
+        public bool Blocks(SyncAction action, bool leftBlocked = false, bool rightBlocked = false)
+        {
+            return action switch
+            {
+                SyncAction.DeleteLeft => Left || leftBlocked,
+                SyncAction.DeleteRight => Right || rightBlocked,
+                _ => false,
+            };
+        }
+    }
+
     private void ExecuteFileAction(FileComparison file, string leftBase, string rightBase, TransferTracker tracker, CancellationToken cancel)
     {
         var leftPath = Path.Combine(leftBase, file.RelativePath);
@@ -297,17 +334,26 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         string rightBase,
         SyncReport report,
         TransferTracker tracker,
-        CancellationToken cancel)
+        CancellationToken cancel,
+        DeleteGate gate)
     {
         cancel.ThrowIfCancellationRequested();
 
+        gate = gate.Inherit(dir);
+
         if (dir.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
         {
-            ApplyDirectoryActionAndReport(dir, leftBase, rightBase, report, tracker);
-            return;
+            if (gate.Blocks(dir.Action))
+            {
+                gate = gate with { Reported = Reject(dir.Action, dir.RelativePath, report, gate.Reported) };
+            }
+            else
+            {
+                ApplyDirectoryActionAndReport(dir, leftBase, rightBase, report, tracker);
+                return;
+            }
         }
-
-        if (dir.Action is SyncAction.CopyToRight or SyncAction.CopyToLeft)
+        else if (dir.Action is SyncAction.CopyToRight or SyncAction.CopyToLeft)
         {
             ApplyDirectoryActionAndReport(dir, leftBase, rightBase, report, tracker);
         }
@@ -321,6 +367,12 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
                 continue;
             }
 
+            if (gate.Blocks(file.Action, file.DeleteLeftBlocked, file.DeleteRightBlocked))
+            {
+                gate = gate with { Reported = Reject(file.Action, file.RelativePath, report, gate.Reported) };
+                continue;
+            }
+
             tracker.BeginFile(file.RelativePath);
             ApplyFileActionAndReport(file, leftBase, rightBase, report, tracker, cancel);
             tracker.EndFile();
@@ -329,7 +381,7 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
 
         foreach (var sub in dir.SubDirectories)
         {
-            ExecuteRecursive(sub, leftBase, rightBase, report, tracker, cancel);
+            ExecuteRecursive(sub, leftBase, rightBase, report, tracker, cancel, gate);
         }
     }
 

@@ -171,6 +171,12 @@ public sealed partial class SyncNodeViewModel : ObservableObject
 
     public string DirDeleteHeader => Status == ComparisonStatus.RightOnly ? "Удалить всё справа (в корзину)" : "Удалить всё слева (в корзину)";
 
+    public bool DeleteAllowed => !DeleteBlocked(Status == ComparisonStatus.RightOnly ? SyncAction.DeleteRight : SyncAction.DeleteLeft);
+
+    public string DeleteHint => DeleteAllowed
+        ? string.Empty
+        : "Удаление недоступно: противоположную сторону обошли не полностью, и «нет файла» здесь неотличимо от «не увидели»";
+
     public string ActionHint
     {
         get
@@ -296,7 +302,7 @@ public sealed partial class SyncNodeViewModel : ObservableObject
             return;
         }
 
-        SetAction(SyncActionCycles.Next(SyncActionCycles.ForFile(Status), _file!.Action));
+        SetAction(SyncActionCycles.Next(SyncActionCycles.ForFile(Status, DeleteAllowed), _file!.Action));
     }
 
     private void CycleDirectoryAction()
@@ -368,16 +374,30 @@ public sealed partial class SyncNodeViewModel : ObservableObject
 
     private void ApplyToSubtree(SyncAction action)
     {
+        if (DeleteBlocked(action))
+        {
+            return;
+        }
+
         if (_dir is not null)
         {
             _owner.ApplyToSubtree(_dir, action);
         }
     }
 
-    // TODO: ручное назначение удаления не знает о неполном обходе – запрет из ApplyMode здесь обходится, дороже всего у DirDelete (одно нажатие на поддерево). Поднимать, когда строка получит признак неполного предка от SyncRowsProjector либо когда придёт первый отчёт о потере файла этим путём.
+    private bool DeleteBlocked(SyncAction action)
+    {
+        return action switch
+        {
+            SyncAction.DeleteLeft => _file?.DeleteLeftBlocked ?? _dir?.DeleteLeftBlocked ?? false,
+            SyncAction.DeleteRight => _file?.DeleteRightBlocked ?? _dir?.DeleteRightBlocked ?? false,
+            _ => false,
+        };
+    }
+
     private void SetAction(SyncAction action)
     {
-        if (_file is null || Status == ComparisonStatus.Identical)
+        if (_file is null || Status == ComparisonStatus.Identical || DeleteBlocked(action))
         {
             return;
         }

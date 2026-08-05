@@ -229,14 +229,14 @@ public sealed partial class SyncRowsViewModel : ObservableObject, ISyncRowHost
 
     private static void ApplyActionRecursive(DirectoryComparison dir, SyncAction action)
     {
-        if (dir.Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly)
+        if (dir.Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly && !DeleteBlocked(action, dir.DeleteLeftBlocked, dir.DeleteRightBlocked))
         {
             dir.Action = DirActionFor(dir, action);
         }
 
         foreach (var file in dir.Files)
         {
-            if (file.Status != ComparisonStatus.Identical)
+            if (file.Status != ComparisonStatus.Identical && !DeleteBlocked(action, file.DeleteLeftBlocked, file.DeleteRightBlocked))
             {
                 file.Action = action;
             }
@@ -246,6 +246,16 @@ public sealed partial class SyncRowsViewModel : ObservableObject, ISyncRowHost
         {
             ApplyActionRecursive(sub, action);
         }
+    }
+
+    private static bool DeleteBlocked(SyncAction action, bool leftBlocked, bool rightBlocked)
+    {
+        return action switch
+        {
+            SyncAction.DeleteLeft => leftBlocked,
+            SyncAction.DeleteRight => rightBlocked,
+            _ => false,
+        };
     }
 
     private static SyncAction DirActionFor(DirectoryComparison dir, SyncAction requested)

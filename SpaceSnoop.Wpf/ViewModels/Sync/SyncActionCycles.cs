@@ -4,6 +4,8 @@ internal static class SyncActionCycles
 {
     private static readonly SyncAction[] LeftOnlyActions = [SyncAction.CopyToRight, SyncAction.Skip, SyncAction.DeleteLeft];
     private static readonly SyncAction[] RightOnlyActions = [SyncAction.CopyToLeft, SyncAction.Skip, SyncAction.DeleteRight];
+    private static readonly SyncAction[] LeftOnlyActionsNoDelete = [SyncAction.CopyToRight, SyncAction.Skip];
+    private static readonly SyncAction[] RightOnlyActionsNoDelete = [SyncAction.CopyToLeft, SyncAction.Skip];
     private static readonly SyncAction[] BothSidesActions = [SyncAction.CopyToRight, SyncAction.CopyToLeft, SyncAction.Skip];
 
     private static readonly SyncAction[] OneSidedLeftCycle = [SyncAction.CopyToRight, SyncAction.Skip];
@@ -16,12 +18,12 @@ internal static class SyncActionCycles
         SyncAction.Skip,
     ];
 
-    internal static SyncAction[] ForFile(ComparisonStatus status)
+    internal static SyncAction[] ForFile(ComparisonStatus status, bool deleteAllowed = true)
     {
         return status switch
         {
-            ComparisonStatus.LeftOnly => LeftOnlyActions,
-            ComparisonStatus.RightOnly => RightOnlyActions,
+            ComparisonStatus.LeftOnly => deleteAllowed ? LeftOnlyActions : LeftOnlyActionsNoDelete,
+            ComparisonStatus.RightOnly => deleteAllowed ? RightOnlyActions : RightOnlyActionsNoDelete,
             _ => BothSidesActions,
         };
     }

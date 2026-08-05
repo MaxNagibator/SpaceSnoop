@@ -204,6 +204,8 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
     private static void ApplyModeRecursive(DirectoryComparison dir, SyncMode mode, bool mirror, SyncWinner winner, DeleteBlocks blocks)
     {
         blocks = blocks.Add(dir);
+        dir.DeleteLeftBlocked = blocks.Left;
+        dir.DeleteRightBlocked = blocks.Right;
 
         foreach (var file in dir.Files)
         {
@@ -218,6 +220,9 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
 
     private static void ApplyFileMode(FileComparison file, SyncMode mode, bool mirror, SyncWinner winner, DeleteBlocks blocks)
     {
+        file.DeleteLeftBlocked = blocks.Left;
+        file.DeleteRightBlocked = blocks.Right;
+
         if (file.TypeConflict != FileTypeConflict.None)
         {
             file.Status = ComparisonStatus.Conflict;

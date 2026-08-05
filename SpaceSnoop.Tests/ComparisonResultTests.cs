@@ -408,6 +408,51 @@ public class ComparisonResultTests
     }
 
     [Test]
+    public void ApplyMode_MarksDeleteBlockedOnNodesAndInheritsDown()
+    {
+        var root = new DirectoryComparison("root", "");
+        var blind = new DirectoryComparison("blind", "blind") { Status = ComparisonStatus.Modified, LeftIncomplete = true };
+        blind.Files.Add(new("orphan.txt", "blind\\orphan.txt") { Status = ComparisonStatus.RightOnly, RightSize = 20 });
+
+        var deeper = new DirectoryComparison("deeper", "blind\\deeper") { Status = ComparisonStatus.RightOnly };
+        deeper.Files.Add(new("deep.txt", "blind\\deeper\\deep.txt") { Status = ComparisonStatus.RightOnly, RightSize = 40 });
+        blind.SubDirectories.Add(deeper);
+        root.SubDirectories.Add(blind);
+
+        var result = new ComparisonResult("C:\\Left", "C:\\Right", root);
+        result.ApplyMode(SyncMode.LeftToRight, true);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(root.DeleteRightBlocked, Is.False);
+            Assert.That(blind.DeleteRightBlocked, Is.True);
+            Assert.That(blind.Files[0].DeleteRightBlocked, Is.True);
+            Assert.That(deeper.DeleteRightBlocked, Is.True, "запрет наследуется вглубь");
+            Assert.That(deeper.Files[0].DeleteRightBlocked, Is.True);
+            Assert.That(deeper.Files[0].DeleteLeftBlocked, Is.False, "запрещена только сторона, чей обход неполон");
+        }
+    }
+
+    [Test]
+    public void ApplyMode_TypeConflictFile_StillGetsDeleteBlockedFlags()
+    {
+        var blind = new DirectoryComparison("blind", "blind") { Status = ComparisonStatus.Modified, LeftIncomplete = true };
+        blind.Files.Add(new("config", "blind\\config") { Status = ComparisonStatus.Conflict, TypeConflict = FileTypeConflict.RightFileLeftDirectory });
+
+        var root = new DirectoryComparison("root", "");
+        root.SubDirectories.Add(blind);
+
+        var result = new ComparisonResult("C:\\Left", "C:\\Right", root);
+        result.ApplyMode(SyncMode.LeftToRight, true);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(blind.Files[0].DeleteRightBlocked, Is.True, "ранний выход по конфликту типов не должен терять запрет");
+            Assert.That(blind.Files[0].Action, Is.EqualTo(SyncAction.None));
+        }
+    }
+
+    [Test]
     public void ApplyMode_IncompleteRightSide_PlansNoDeletesOnLeft()
     {
         var root = new DirectoryComparison("root", "") { RightIncomplete = true };

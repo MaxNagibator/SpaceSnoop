@@ -358,6 +358,106 @@ public class SyncEngineTests
     }
 
     [Test]
+    public void DeleteLeft_BlockedByIncompleteSide_KeepsFileAndReportsError()
+    {
+        var filePath = Path.Combine(_leftDir, "remove.txt");
+        File.WriteAllText(filePath, "delete me");
+
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("remove.txt", "remove.txt")
+        {
+            Status = ComparisonStatus.LeftOnly,
+            Action = SyncAction.DeleteLeft,
+            DeleteLeftBlocked = true,
+        });
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
+        var report = engine.Execute(result, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.Exists(filePath), Is.True);
+            Assert.That(report.SuccessCount, Is.Zero);
+            Assert.That(report.Errors, Has.Count.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public void DeleteRight_BlockedDirectory_KeepsSubtreeAndReportsError()
+    {
+        var dirPath = Path.Combine(_rightDir, "extra");
+        Directory.CreateDirectory(dirPath);
+        File.WriteAllText(Path.Combine(dirPath, "inner.txt"), "keep me");
+
+        var root = new DirectoryComparison("root", "");
+        root.SubDirectories.Add(new("extra", "extra")
+        {
+            Status = ComparisonStatus.RightOnly,
+            Action = SyncAction.DeleteRight,
+            DeleteRightBlocked = true,
+        });
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
+        var report = engine.Execute(result, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(Directory.Exists(dirPath), Is.True);
+            Assert.That(report.SuccessCount, Is.Zero);
+            Assert.That(report.Errors, Has.Count.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public void DeleteRight_IncompleteLeftSideWithoutApplyMode_KeepsFilesAndReportsOnce()
+    {
+        var dirPath = Path.Combine(_rightDir, "extra");
+        Directory.CreateDirectory(dirPath);
+        File.WriteAllText(Path.Combine(dirPath, "one.txt"), "keep me");
+        File.WriteAllText(Path.Combine(dirPath, "two.txt"), "keep me too");
+
+        var blind = new DirectoryComparison("extra", "extra") { Status = ComparisonStatus.Modified, LeftIncomplete = true };
+        blind.Files.Add(new("one.txt", "extra\\one.txt") { Status = ComparisonStatus.RightOnly, Action = SyncAction.DeleteRight });
+        blind.Files.Add(new("two.txt", "extra\\two.txt") { Status = ComparisonStatus.RightOnly, Action = SyncAction.DeleteRight });
+
+        var root = new DirectoryComparison("root", "");
+        root.SubDirectories.Add(blind);
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
+        var report = engine.Execute(result, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.Exists(Path.Combine(dirPath, "one.txt")), Is.True, "движок обязан отклонять удаление и без ApplyMode");
+            Assert.That(File.Exists(Path.Combine(dirPath, "two.txt")), Is.True);
+            Assert.That(report.SuccessCount, Is.Zero);
+            Assert.That(report.Errors, Has.Count.EqualTo(1), "отказ по ветке докладывается один раз");
+        }
+    }
+
+    [Test]
+    public void CopyToLeft_UnderIncompleteRightSide_StillRuns()
+    {
+        File.WriteAllText(Path.Combine(_rightDir, "new.txt"), "copy me");
+
+        var root = new DirectoryComparison("root", "") { RightIncomplete = true };
+        root.Files.Add(new("new.txt", "new.txt") { Status = ComparisonStatus.RightOnly, Action = SyncAction.CopyToLeft });
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
+        var report = engine.Execute(result, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.Exists(Path.Combine(_leftDir, "new.txt")), Is.True, "запрет касается только удалений");
+            Assert.That(report.Errors, Is.Empty);
+        }
+    }
+
+    [Test]
     public void DeleteLeft_RemovesReadOnlyFile()
     {
         var filePath = Path.Combine(_leftDir, "remove.txt");

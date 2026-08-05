@@ -21,4 +21,7 @@ internal static partial class CoreLog
 
     [LoggerMessage(EventId = 1215, Level = LogLevel.Debug, Message = "Сравнение: пропущена ссылка (reparse point) «{Path}»")]
     public static partial void CompareReparsePointSkipped(this ILogger logger, string path);
+
+    [LoggerMessage(EventId = 1216, Level = LogLevel.Warning, Message = "Синхронизация: {Action} «{RelativePath}» отклонено, обход стороны неполон")]
+    public static partial void SyncDeleteBlocked(this ILogger logger, SyncAction action, string relativePath);
 }
