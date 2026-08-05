@@ -1,5 +1,17 @@
 ﻿<Project>
   <PropertyGroup>
     <Version>2.8.35</Version>
+    <WarningsAsErrors>$(WarningsAsErrors);S1048;S1206;S1244;S1656;S1751;S1764;S1848;S1862</WarningsAsErrors>
+    <WarningsAsErrors>$(WarningsAsErrors);S2068;S2114;S2115;S2123;S2183;S2184;S2190;S2201</WarningsAsErrors>
+    <WarningsAsErrors>$(WarningsAsErrors);S2225;S2251;S2252;S2275;S2328;S2345;S2445;S2551</WarningsAsErrors>
+    <WarningsAsErrors>$(WarningsAsErrors);S2612;S2674;S2688;S2755;S2757;S2761;S2857;S2930</WarningsAsErrors>
+    <WarningsAsErrors>$(WarningsAsErrors);S2934;S2955;S2995;S2996;S2997;S3005;S3168;S3172</WarningsAsErrors>
+    <WarningsAsErrors>$(WarningsAsErrors);S3244;S3249;S3263;S3343;S3346;S3363;S3397;S3449</WarningsAsErrors>
+    <WarningsAsErrors>$(WarningsAsErrors);S3453;S3456;S3464;S3466;S3598;S3603;S3610;S3869</WarningsAsErrors>
+    <WarningsAsErrors>$(WarningsAsErrors);S3887;S3889;S3903;S3923;S3926;S3927;S3981;S3984</WarningsAsErrors>
+    <WarningsAsErrors>$(WarningsAsErrors);S4143;S4159;S4210;S4211;S4260;S4275;S4277;S4423</WarningsAsErrors>
+    <WarningsAsErrors>$(WarningsAsErrors);S4426;S4428;S4433;S4583;S4586;S4830;S5344;S5445</WarningsAsErrors>
+    <WarningsAsErrors>$(WarningsAsErrors);S5542;S5547;S5659;S5856;S6377;S6418;S6674;S6677</WarningsAsErrors>
+    <WarningsAsErrors>$(WarningsAsErrors);S6797;S6798;S6800;S6930;S7039;S8949</WarningsAsErrors>
   </PropertyGroup>
 </Project>
