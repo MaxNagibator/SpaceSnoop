@@ -1,0 +1,77 @@
+﻿{
+  "tool": "SpaceSnoop",
+  "schema": 1,
+  "version": "{version}",
+  "generatedAt": "{time}",
+  "path": "{root}",
+  "options": {
+    "depth": 2,
+    "multithreaded": false,
+    "parallelism": 1
+  },
+  "totals": {
+    "bytes": 5850,
+    "files": 4,
+    "directories": 4,
+    "errors": 0
+  },
+  "directories": [
+    {
+      "path": "big",
+      "depth": 1,
+      "totalBytes": 5700,
+      "ownBytes": 5000,
+      "fileCount": 2,
+      "directoryCount": 1,
+      "error": false
+    },
+    {
+      "path": "big\\deep",
+      "depth": 2,
+      "totalBytes": 700,
+      "ownBytes": 700,
+      "fileCount": 1,
+      "directoryCount": 0,
+      "error": false
+    },
+    {
+      "path": "данные",
+      "depth": 1,
+      "totalBytes": 50,
+      "ownBytes": 50,
+      "fileCount": 1,
+      "directoryCount": 0,
+      "error": false
+    },
+    {
+      "path": "empty",
+      "depth": 1,
+      "totalBytes": 0,
+      "ownBytes": 0,
+      "fileCount": 0,
+      "directoryCount": 0,
+      "error": false
+    }
+  ],
+  "files": [
+    {
+      "path": "big\\big.bin",
+      "bytes": 5000
+    },
+    {
+      "path": "big\\deep\\deep.bin",
+      "bytes": 700
+    },
+    {
+      "path": "a.txt",
+      "bytes": 100
+    },
+    {
+      "path": "данные\\s.txt",
+      "bytes": 50
+    }
+  ],
+  "errorPaths": [],
+  "omittedDirectories": 0,
+  "omittedFiles": 0
+}

@@ -1,10 +1,13 @@
-﻿using SpaceSnoop.Core;
+﻿using System.Globalization;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using SpaceSnoop.Core;
 using SpaceSnoop.Core.Export;
 
 namespace SpaceSnoop.Tests;
 
 [TestFixture]
-public class ScanExportTests
+public partial class ScanExportTests
 {
     private static readonly ScanExportOptions Options = new(ScanExport.DefaultDepth, false, 1);
 
@@ -43,6 +46,28 @@ public class ScanExportTests
     }
 
     [Test]
+    public Task ToJson_MatchesContractSnapshot()
+    {
+        return Verify(Scrub(ScanExport.ToJson(Build(Options))), "json");
+    }
+
+    [Test]
+    public void ToJson_WritesGeneratedAtWithLocalOffset()
+    {
+        var stamp = JsonDocument.Parse(ScanExport.ToJson(Build(Options))).RootElement
+            .GetProperty("generatedAt")
+            .GetString();
+
+        var parsed = DateTimeOffset.TryParse(stamp, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var value);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(parsed, Is.True, stamp);
+            Assert.That(value.Offset, Is.EqualTo(DateTimeOffset.Now.Offset));
+        }
+    }
+
+    [Test]
     public void Build_CountsWholeTreeRegardlessOfDepth()
     {
         var model = Build(Options with { Depth = 1 });
@@ -68,44 +93,6 @@ public class ScanExportTests
     }
 
     [Test]
-    public void Build_OrdersDirectoriesBySizeAndSeparatesOwnBytes()
-    {
-        var model = Build(Options);
-        var big = model.Directories[0];
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(model.Directories.Select(x => x.TotalBytes), Is.Ordered.Descending);
-            Assert.That(big.Path, Is.EqualTo("big"));
-            Assert.That(big.TotalBytes, Is.EqualTo(5700));
-            Assert.That(big.OwnBytes, Is.EqualTo(5000));
-            Assert.That(big.FileCount, Is.EqualTo(2));
-            Assert.That(big.DirectoryCount, Is.EqualTo(1));
-            Assert.That(big.Error, Is.False);
-        }
-    }
-
-    [Test]
-    public void Build_KeepsLargestFilesWithRelativePaths()
-    {
-        var model = Build(Options);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(model.Files.Select(x => x.Path), Is.EqualTo(new[]
-            {
-                Path.Combine("big", "big.bin"),
-                Path.Combine("big", "deep", "deep.bin"),
-                "a.txt",
-                Path.Combine("данные", "s.txt"),
-            }));
-
-            Assert.That(model.Files[0].Bytes, Is.EqualTo(5000));
-            Assert.That(model.OmittedFiles, Is.Zero);
-        }
-    }
-
-    [Test]
     public void Build_TruncatesToLargestAndReportsOmitted()
     {
         var model = Build(Options, 2);
@@ -126,27 +113,30 @@ public class ScanExportTests
         Assert.That(Build(Options with { Depth = requested }).Options.Depth, Is.EqualTo(expected));
     }
 
-    [Test]
-    public void ToJson_KeepsCyrillicAndSeparatorsReadable()
-    {
-        var json = ScanExport.ToJson(Build(Options));
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(json, Does.Contain("данные"));
-            Assert.That(json, Does.Not.Contain("\\u04"));
-        }
-    }
-
     private static void Write(string path, int size)
     {
         File.WriteAllBytes(path, new byte[size]);
     }
 
+    private string Scrub(string json)
+    {
+        return GeneratedAt().Replace(json, "\"generatedAt\": \"{time}\"")
+            .Replace(JsonEncode(_root), "{root}", StringComparison.Ordinal)
+            .Replace(_root, "{root}", StringComparison.Ordinal);
+    }
+
+    private static string JsonEncode(string path)
+    {
+        return path.Replace("\\", "\\\\", StringComparison.Ordinal);
+    }
+
+    [GeneratedRegex("\"generatedAt\": *\"[^\"]*\"")]
+    private static partial Regex GeneratedAt();
+
     private ScanExportModel Build(ScanExportOptions options, int entryLimit = ScanExport.DefaultEntryLimit)
     {
         var root = new DiskSpaceCalculator().Calculate(new(_root), CancellationToken.None);
 
-        return ScanExport.Build(root, _root, options, "1.0.0", entryLimit);
+        return ScanExport.Build(root, _root, options, "{version}", entryLimit);
     }
 }
