@@ -125,6 +125,8 @@ internal sealed class SyncAutomationDouble : ISyncAutomation
 
     public bool HasComparison { get; set; }
 
+    public IReadOnlyList<string> IncompleteDirectories { get; set; } = [];
+
     public bool HasPendingConflicts { get; set; }
 
     public int IdenticalCount { get; set; }

@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.Logging.Abstractions;
 using SpaceSnoop.Core;
 using SpaceSnoop.Core.Domain;
+using System.Security.AccessControl;
+using System.Security.Principal;
 
 namespace SpaceSnoop.Tests;
 
@@ -222,6 +224,96 @@ public class DirectoryComparerTests
         {
             return false;
         }
+    }
+
+    [Test]
+    public void MissingLeftRoot_MarksIncompleteAndBlocksMirrorDeletes()
+    {
+        File.WriteAllText(Path.Combine(_rightDir, "orphan.txt"), "payload");
+        Directory.Delete(_leftDir, true);
+
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
+        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
+        result.ApplyMode(SyncMode.LeftToRight, true);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Root.LeftIncomplete, Is.True);
+            Assert.That(result.Root.Files.Single().Action, Is.EqualTo(SyncAction.Skip));
+            Assert.That(result.CountPlannedActions().Deletes, Is.EqualTo(0));
+            Assert.That(result.IncompleteDirectories(), Is.Not.Empty);
+        }
+    }
+
+    [Test]
+    public void UnreadableLeftDirectory_MarksIncompleteAndBlocksMirrorDeletes()
+    {
+        var leftLocked = Path.Combine(_leftDir, "locked");
+        var rightLocked = Path.Combine(_rightDir, "locked");
+        Directory.CreateDirectory(leftLocked);
+        Directory.CreateDirectory(rightLocked);
+        File.WriteAllText(Path.Combine(leftLocked, "a.txt"), "hello");
+        File.WriteAllText(Path.Combine(rightLocked, "a.txt"), "hello");
+        File.WriteAllText(Path.Combine(rightLocked, "orphan.txt"), "payload");
+        DenyEnumeration(leftLocked);
+
+        try
+        {
+            if (Readable(leftLocked))
+            {
+                Assert.Ignore("Deny-ACE не действует на этот процесс (запуск от администратора) – ветку нечем воспроизвести.");
+            }
+
+            var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
+            var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
+            result.ApplyMode(SyncMode.LeftToRight, true);
+
+            var locked = result.Root.SubDirectories.Single(x => x.Name == "locked");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(locked.LeftIncomplete, Is.True);
+                Assert.That(locked.Files.Select(x => x.Action), Is.All.EqualTo(SyncAction.Skip));
+                Assert.That(result.CountPlannedActions().Deletes, Is.EqualTo(0));
+            }
+        }
+        finally
+        {
+            AllowEnumeration(leftLocked);
+        }
+    }
+
+    private static bool Readable(string path)
+    {
+        try
+        {
+            Directory.EnumerateFileSystemEntries(path).Any();
+            return true;
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            return false;
+        }
+    }
+
+    private static void DenyEnumeration(string path)
+    {
+        var security = new DirectoryInfo(path).GetAccessControl();
+        security.AddAccessRule(new(WindowsIdentity.GetCurrent().User!,
+            FileSystemRights.ListDirectory | FileSystemRights.ReadData,
+            AccessControlType.Deny));
+
+        new DirectoryInfo(path).SetAccessControl(security);
+    }
+
+    private static void AllowEnumeration(string path)
+    {
+        var security = new DirectoryInfo(path).GetAccessControl();
+        security.RemoveAccessRuleAll(new(WindowsIdentity.GetCurrent().User!,
+            FileSystemRights.ListDirectory | FileSystemRights.ReadData,
+            AccessControlType.Deny));
+
+        new DirectoryInfo(path).SetAccessControl(security);
     }
 
     [Test]

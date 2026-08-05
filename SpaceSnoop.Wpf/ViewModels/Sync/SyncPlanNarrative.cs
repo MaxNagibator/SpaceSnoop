@@ -170,6 +170,20 @@ internal static class SyncPlanNarrative
             : null;
     }
 
+    internal static string? DescribeIncomplete(ComparisonResult result)
+    {
+        var paths = result.IncompleteDirectories();
+
+        if (paths.Count == 0)
+        {
+            return null;
+        }
+
+        var tail = paths.Count > 1 ? $" и ещё {Plural.Format(paths.Count - 1, "каталог", "каталога", "каталогов")}" : string.Empty;
+
+        return $"Сравнение неполное: не удалось прочитать «{paths[0]}»{tail}. Удаления в этих ветках отключены – содержимое могло быть не увидено, а не отсутствовать.";
+    }
+
     internal static List<PlanReceiver> BuildReceivers(ComparisonResult? result, PlannedActions planned)
     {
         if (result is null)

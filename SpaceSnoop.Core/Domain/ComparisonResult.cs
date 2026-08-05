@@ -34,7 +34,15 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
 
     public void ApplyMode(SyncMode mode, bool mirror = false, SyncWinner winner = SyncWinner.Newest)
     {
-        ApplyModeRecursive(Root, mode, mirror, winner);
+        ApplyModeRecursive(Root, mode, mirror, winner, DeleteBlocks.None);
+    }
+
+    public IReadOnlyList<string> IncompleteDirectories()
+    {
+        var paths = new List<string>();
+        CollectIncomplete(Root, paths);
+
+        return paths;
     }
 
     public bool HasUnresolvedConflicts()
@@ -175,39 +183,59 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
         }
     }
 
-    private static void ApplyModeRecursive(DirectoryComparison dir, SyncMode mode, bool mirror, SyncWinner winner)
+    private static void CollectIncomplete(DirectoryComparison dir, List<string> paths)
     {
-        foreach (var file in dir.Files)
+        if (dir.IsIncomplete)
         {
-            ApplyFileMode(file, mode, mirror, winner);
+            paths.Add(string.IsNullOrEmpty(dir.RelativePath) ? dir.Name : dir.RelativePath);
         }
 
         foreach (var sub in dir.SubDirectories)
         {
-            ApplyDirectoryMode(sub, mode, mirror, winner);
+            CollectIncomplete(sub, paths);
         }
     }
 
-    private static void ApplyFileMode(FileComparison file, SyncMode mode, bool mirror, SyncWinner winner)
+    private static void ApplyModeRecursive(DirectoryComparison dir, SyncMode mode, bool mirror, SyncWinner winner, DeleteBlocks blocks)
+    {
+        blocks = blocks.Add(dir);
+
+        foreach (var file in dir.Files)
+        {
+            ApplyFileMode(file, mode, mirror, winner, blocks);
+        }
+
+        foreach (var sub in dir.SubDirectories)
+        {
+            ApplyDirectoryMode(sub, mode, mirror, winner, blocks);
+        }
+    }
+
+    private static void ApplyFileMode(FileComparison file, SyncMode mode, bool mirror, SyncWinner winner, DeleteBlocks blocks)
     {
         if (file.Status == ComparisonStatus.Conflict)
         {
             file.Status = ComparisonStatus.Modified;
         }
 
-        file.Action = mode switch
+        var action = mode switch
         {
             SyncMode.LeftToRight => ApplyLeftToRight(file, mirror),
             SyncMode.RightToLeft => ApplyRightToLeft(file, mirror),
             SyncMode.Bidirectional => ApplyBidirectional(file, mirror, winner),
             _ => SyncAction.Skip,
         };
+
+        file.Action = blocks.Allows(action) ? action : SyncAction.Skip;
     }
 
-    private static void ApplyDirectoryMode(DirectoryComparison dir, SyncMode mode, bool mirror, SyncWinner winner)
+    private static void ApplyDirectoryMode(DirectoryComparison dir, SyncMode mode, bool mirror, SyncWinner winner, DeleteBlocks blocks)
     {
-        dir.Action = ApplyDirMode(dir, mode, mirror, winner);
-        ApplyModeRecursive(dir, mode, mirror, winner);
+        blocks = blocks.Add(dir);
+
+        var action = ApplyDirMode(dir, mode, mirror, winner);
+        dir.Action = blocks.Allows(action) ? action : SyncAction.Skip;
+        ApplyModeRecursive(dir, mode, mirror, winner, blocks);
     }
 
     private static SyncAction ApplyDirMode(DirectoryComparison dir, SyncMode mode, bool mirror, SyncWinner winner)
@@ -305,6 +333,26 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
     {
         return dir.Files.Any(x => x.Status == ComparisonStatus.Conflict && x.Action == SyncAction.None)
                || dir.SubDirectories.Any(HasUnresolvedConflictsRecursive);
+    }
+
+    private readonly record struct DeleteBlocks(bool Left, bool Right)
+    {
+        public static DeleteBlocks None { get; } = new(false, false);
+
+        public DeleteBlocks Add(DirectoryComparison dir)
+        {
+            return new(Left || dir.RightIncomplete, Right || dir.LeftIncomplete);
+        }
+
+        public bool Allows(SyncAction action)
+        {
+            return action switch
+            {
+                SyncAction.DeleteLeft => !Left,
+                SyncAction.DeleteRight => !Right,
+                _ => true,
+            };
+        }
     }
 
     private sealed class PlanTally

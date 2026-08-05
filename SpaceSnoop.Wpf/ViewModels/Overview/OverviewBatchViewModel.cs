@@ -188,7 +188,7 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
             lines.AddRange(SyncPlanNarrative.BuildPlanLines(planned, null, []));
         }
 
-        if (!await ConfirmSyncAsync("Синхронизация профиля", lines, planned))
+        if (!await ConfirmSyncAsync("Синхронизация профиля", lines, planned, DescribeIncomplete([row])))
         {
             return;
         }
@@ -258,7 +258,7 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
             lines.AddRange(SyncPlanNarrative.BuildPlanLines(planned, null, []));
         }
 
-        if (!await ConfirmSyncAsync("Синхронизация всех профилей", lines, planned))
+        if (!await ConfirmSyncAsync("Синхронизация всех профилей", lines, planned, DescribeIncomplete(targets)))
         {
             return;
         }
@@ -369,12 +369,20 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
             var request = BuildCompareRequest(profile);
             var recycleOverwritten = _settings.GetBool(SettingsKeys.SyncRecycleOverwritten, AppDefaults.SyncRecycleOverwrittenDefault);
 
-            var report = await Task.Run(() =>
+            var run = await Task.Run(() =>
                 {
                     var result = _compare.Execute(request, rowCts.Token);
-                    return _sync.Execute(new(result, SyncConflictPolicy.SkipUnresolved, SyncDeleteUi.Silent, false, recycleOverwritten), rowCts.Token);
+                    var applied = _sync.Execute(new(result, SyncConflictPolicy.SkipUnresolved, SyncDeleteUi.Silent, false, recycleOverwritten), rowCts.Token);
+                    return (Report: applied, Unreadable: result.IncompleteDirectories());
                 },
                 rowCts.Token);
+
+            var report = run.Report;
+
+            if (run.Unreadable.Count > 0)
+            {
+                _logger.CompareIncomplete(run.Unreadable.Count, run.Unreadable[0]);
+            }
 
             stopwatch.Stop();
             row.ApplySyncReport(report);
@@ -416,7 +424,24 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
         _logger.OverviewRowSkipped(row.Name);
     }
 
-    private async Task<bool> ConfirmSyncAsync(string title, IReadOnlyList<ConfirmLine> lines, PlannedActions? planned)
+    private static string? DescribeIncomplete(IEnumerable<OverviewRowViewModel> rows)
+    {
+        var affected = rows
+            .Where(static row => row.Comparison?.IncompleteDirectories().Count > 0)
+            .Select(static row => row.Name)
+            .ToList();
+
+        if (affected.Count == 0)
+        {
+            return null;
+        }
+
+        var tail = affected.Count > 1 ? $" и ещё {Plural.Format(affected.Count - 1, "профиль", "профиля", "профилей")}" : string.Empty;
+
+        return $"Сравнение неполное у профиля «{affected[0]}»{tail}. Удаления в непрочитанных ветках отключены.";
+    }
+
+    private async Task<bool> ConfirmSyncAsync(string title, IReadOnlyList<ConfirmLine> lines, PlannedActions? planned, string? warning = null)
     {
         var destructive = planned is null || planned.Deletes + planned.DirDeletes > 0;
 
@@ -430,6 +455,7 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
             ])
         {
             Summary = planned is null ? null : SyncPlanNarrative.DescribePlanVolume(planned),
+            Warning = warning,
         };
 
         return await _dialogs.ShowAsync(confirm);

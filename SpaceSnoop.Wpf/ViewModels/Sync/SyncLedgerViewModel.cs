@@ -194,8 +194,18 @@ public sealed class SyncLedgerViewModel : ObservableObject
         return new($"Синхронизация {direction.Text}", direction.IconKind, lines, choices)
         {
             Summary = SyncPlanNarrative.DescribePlanVolume(planned),
-            Warning = deletes > 0 ? SyncPlanNarrative.DescribeDeletionRecency(current) : null,
+            Warning = BuildSyncWarning(current, deletes),
         };
+    }
+
+    private static string? BuildSyncWarning(ComparisonResult current, int deletes)
+    {
+        var incomplete = SyncPlanNarrative.DescribeIncomplete(current);
+        var recency = deletes > 0 ? SyncPlanNarrative.DescribeDeletionRecency(current) : null;
+
+        return string.Join(' ', new[] { incomplete, recency }.OfType<string>()) is { Length: > 0 } warning
+            ? warning
+            : null;
     }
 
     private string BuildSyncCommandHint()

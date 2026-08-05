@@ -26,6 +26,7 @@ public sealed record SyncPlanExportModel
     public string DeleteSize { get; init; } = string.Empty;
     public IReadOnlyList<SyncPlanEntry> Largest { get; init; } = [];
     public int OmittedEntries { get; init; }
+    public ComparisonIncomplete? Incomplete { get; init; }
 }
 
 public static class SyncPlanExport
@@ -62,6 +63,7 @@ public static class SyncPlanExport
             DeleteSize = SizeFormatter.Format(actions.DeleteBytes),
             Largest = largest,
             OmittedEntries = Math.Max(0, planned.Count - largest.Count),
+            Incomplete = ComparisonExport.DescribeIncomplete(result),
         };
     }
 

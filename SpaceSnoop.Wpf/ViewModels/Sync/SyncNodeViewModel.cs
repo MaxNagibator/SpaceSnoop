@@ -374,6 +374,7 @@ public sealed partial class SyncNodeViewModel : ObservableObject
         }
     }
 
+    // TODO: ручное назначение удаления не знает о неполном обходе – запрет из ApplyMode здесь обходится, дороже всего у DirDelete (одно нажатие на поддерево). Поднимать, когда строка получит признак неполного предка от SyncRowsProjector либо когда придёт первый отчёт о потере файла этим путём.
     private void SetAction(SyncAction action)
     {
         if (_file is null || Status == ComparisonStatus.Identical)

@@ -42,6 +42,11 @@ internal sealed class HeadlessSync
             var compare = new CompareDirectoriesUseCase(NullLogger<DirectoryComparer>.Instance);
             var result = compare.Execute(new(options.Left, options.Right, options.Exclusions, options.Mode, options.Winner, options.Mirror), CancellationToken.None);
 
+            if (result.IncompleteDirectories() is { Count: > 0 } unreadable)
+            {
+                logger.CompareIncomplete(unreadable.Count, unreadable[0]);
+            }
+
             var sync = new ExecuteSyncUseCase(NullLogger<SyncEngine>.Instance);
             var recycleOverwritten = settings.GetBool(SettingsKeys.SyncRecycleOverwritten, AppDefaults.SyncRecycleOverwrittenDefault);
             var report = sync.Execute(new(result, SyncConflictPolicy.SkipUnresolved, SyncDeleteUi.Silent, false, recycleOverwritten), CancellationToken.None);

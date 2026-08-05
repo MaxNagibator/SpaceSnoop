@@ -116,6 +116,10 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1221, Level = LogLevel.Error, Message = "Не удалось выгрузить сравнение в «{Path}»")]
     public static partial void ComparisonExportFailed(this ILogger logger, Exception exception, string path);
 
+    [LoggerMessage(EventId = 1222, Level = LogLevel.Warning,
+        Message = "Сравнение неполное: каталогов не прочитано {Count}, первый – «{First}»; удаления в этих ветках отключены")]
+    public static partial void CompareIncomplete(this ILogger logger, int count, string first);
+
     [LoggerMessage(EventId = 1250, Level = LogLevel.Information, Message = "Профиль расписания сохранён: «{Name}» (активно: {Enabled})")]
     public static partial void ScheduleProfileSaved(this ILogger logger, string name, bool enabled);
 

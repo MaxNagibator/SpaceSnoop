@@ -87,8 +87,11 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         DirectoryInfo? rightDir,
         string relativePath)
     {
-        var leftFiles = GetFilteredFiles(leftDir);
-        var rightFiles = GetFilteredFiles(rightDir);
+        var leftFiles = GetFilteredFiles(leftDir, out var leftIncomplete);
+        var rightFiles = GetFilteredFiles(rightDir, out var rightIncomplete);
+
+        comparison.LeftIncomplete |= leftIncomplete;
+        comparison.RightIncomplete |= rightIncomplete;
 
         var allNames = new HashSet<string>(leftFiles.Keys, StringComparer.OrdinalIgnoreCase);
         allNames.UnionWith(rightFiles.Keys);
@@ -140,8 +143,11 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         ref int processed,
         CancellationToken cancel)
     {
-        var leftDirs = GetFilteredDirectories(leftDir);
-        var rightDirs = GetFilteredDirectories(rightDir);
+        var leftDirs = GetFilteredDirectories(leftDir, out var leftIncomplete);
+        var rightDirs = GetFilteredDirectories(rightDir, out var rightIncomplete);
+
+        comparison.LeftIncomplete |= leftIncomplete;
+        comparison.RightIncomplete |= rightIncomplete;
 
         var allNames = new HashSet<string>(leftDirs.Keys, StringComparer.OrdinalIgnoreCase);
         allNames.UnionWith(rightDirs.Keys);
@@ -160,13 +166,15 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         }
     }
 
-    private Dictionary<string, FileInfo> GetFilteredFiles(DirectoryInfo? dir)
+    private Dictionary<string, FileInfo> GetFilteredFiles(DirectoryInfo? dir, out bool incomplete)
     {
         if (dir is not { Exists: true })
         {
+            incomplete = dir is not null;
             return new(StringComparer.OrdinalIgnoreCase);
         }
 
+        incomplete = false;
         var result = new Dictionary<string, FileInfo>(StringComparer.OrdinalIgnoreCase);
 
         try
@@ -184,19 +192,22 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or SecurityException or IOException)
         {
+            incomplete = true;
             logger.CompareDirectorySkipped(ex, dir.FullName);
         }
 
         return result;
     }
 
-    private Dictionary<string, DirectoryInfo> GetFilteredDirectories(DirectoryInfo? dir)
+    private Dictionary<string, DirectoryInfo> GetFilteredDirectories(DirectoryInfo? dir, out bool incomplete)
     {
         if (dir is not { Exists: true })
         {
+            incomplete = dir is not null;
             return new(StringComparer.OrdinalIgnoreCase);
         }
 
+        incomplete = false;
         var result = new Dictionary<string, DirectoryInfo>(StringComparer.OrdinalIgnoreCase);
 
         try
@@ -214,6 +225,7 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or SecurityException or IOException)
         {
+            incomplete = true;
             logger.CompareDirectorySkipped(ex, dir.FullName);
         }
 

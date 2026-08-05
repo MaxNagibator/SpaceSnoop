@@ -238,7 +238,15 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
         _outcomes = [];
         _hashesCompared = false;
         RaiseComparisonChanged(SyncComparisonChange.Reloaded);
-        Report($"Сравнение завершено за {stopwatch.Elapsed.TotalSeconds:F2} с");
+        var unreadable = _result.IncompleteDirectories();
+        var incomplete = SyncPlanNarrative.DescribeIncomplete(_result);
+        Report($"Сравнение завершено за {stopwatch.Elapsed.TotalSeconds:F2} с{(incomplete is null ? string.Empty : $". {incomplete}")}");
+
+        if (incomplete is not null)
+        {
+            _logger.CompareIncomplete(unreadable.Count, unreadable[0]);
+            _notifier.Notify(incomplete, StatusSeverity.Warning);
+        }
 
         _logger.CompareFinished(_ledger.Total, (long)stopwatch.Elapsed.TotalMilliseconds);
         RaiseProfileRun(_result, null, (long)stopwatch.Elapsed.TotalMilliseconds);

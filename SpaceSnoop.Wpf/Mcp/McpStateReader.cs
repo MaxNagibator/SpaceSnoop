@@ -1,4 +1,6 @@
-﻿namespace SpaceSnoop.Wpf.Mcp;
+﻿using SpaceSnoop.Core.Export;
+
+namespace SpaceSnoop.Wpf.Mcp;
 
 internal sealed class McpStateReader(IScanAutomation scan, ISyncAutomation sync, McpNavigator navigator)
 {
@@ -33,7 +35,8 @@ internal sealed class McpStateReader(IScanAutomation scan, ISyncAutomation sync,
                 ["RightOnly"] = sync.RightOnlyCount,
                 ["Modified"] = sync.ModifiedCount,
                 ["Conflict"] = sync.ConflictCount,
-            });
+            },
+            [.. sync.IncompleteDirectories.Take(ComparisonExport.IncompletePathLimit)]);
     }
 
     public string DescribeContext()

@@ -20,6 +20,8 @@ public interface ISyncAutomation
 
     bool HasComparison { get; }
 
+    IReadOnlyList<string> IncompleteDirectories { get; }
+
     bool HasPendingConflicts { get; }
 
     int IdenticalCount { get; }

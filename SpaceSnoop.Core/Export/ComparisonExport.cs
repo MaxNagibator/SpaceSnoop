@@ -35,6 +35,8 @@ public sealed record ComparisonExportTotals(
     IReadOnlyDictionary<string, int> Directories,
     PlannedActions Planned);
 
+public sealed record ComparisonIncomplete(int Count, IReadOnlyList<string> Paths, int OmittedPaths);
+
 public sealed record ComparisonExportGit(GitRepoState? Left, GitRepoState? Right, string Verdict);
 
 public sealed record ComparisonExportSync(
@@ -56,6 +58,7 @@ public sealed record ComparisonExportModel
     public IReadOnlyList<ComparisonExportDirectory> Directories { get; init; } = [];
     public IReadOnlyList<ComparisonExportEntry> Entries { get; init; } = [];
     public int OmittedEntries { get; init; }
+    public ComparisonIncomplete? Incomplete { get; init; }
     public ComparisonExportGit? Git { get; init; }
     public ComparisonExportSync? LastSync { get; init; }
 }
@@ -63,6 +66,8 @@ public sealed record ComparisonExportModel
 public static class ComparisonExport
 {
     public const int DefaultEntryLimit = 2000;
+
+    public const int IncompletePathLimit = 20;
 
     private const string RootDirectoryName = ".";
 
@@ -97,7 +102,22 @@ public static class ComparisonExport
             Directories = BuildDirectories(result.Root),
             Entries = entries,
             OmittedEntries = omitted,
+            Incomplete = DescribeIncomplete(result),
         };
+    }
+
+    public static ComparisonIncomplete? DescribeIncomplete(ComparisonResult result, int pathLimit = IncompletePathLimit)
+    {
+        var paths = result.IncompleteDirectories();
+
+        if (paths.Count == 0)
+        {
+            return null;
+        }
+
+        var shown = paths.Take(pathLimit).ToList();
+
+        return new(paths.Count, shown, paths.Count - shown.Count);
     }
 
     public static string ToJson(ComparisonExportModel model)
