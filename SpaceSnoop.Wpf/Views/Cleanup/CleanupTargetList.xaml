@@ -114,7 +114,7 @@
                                         CornerRadius="{DynamicResource Radius.S}"
                                         VerticalAlignment="Center"
                                         Visibility="{Binding ShowNumbers, Converter={StaticResource BoolToVisibility}}"
-                                        ToolTip="Доля от всего найденного">
+                                        ToolTip="Доля от того, что можно очистить">
                                     <Rectangle HorizontalAlignment="Left"
                                                Height="8"
                                                RadiusX="4"

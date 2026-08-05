@@ -13,6 +13,7 @@ public sealed class McpBridge
         ScanPreferences scanPreferences,
         DiskSpaceCalculator calculator,
         DockerService docker,
+        CleanupService cleanup,
         ToastNotifier notifier,
         PerformanceMonitor performance,
         PerformanceRunTracker runs,
@@ -24,6 +25,7 @@ public sealed class McpBridge
         Scan = new(scan, scanPreferences, calculator, preferences, notifier, _navigator, _state, performance, runs, logger);
         Sync = new(sync, compare, preferences, notifier, _navigator, _state, logger);
         Insight = new(settings, preferences, docker, performance, _navigator, _state, logger);
+        Cleanup = new(settings, cleanup, logger);
         Capture = new(_navigator, logger);
     }
 
@@ -44,6 +46,8 @@ public sealed class McpBridge
     internal McpSyncTools Sync { get; }
 
     internal McpInsightTools Insight { get; }
+
+    internal McpCleanupTools Cleanup { get; }
 
     internal McpCaptureTools Capture { get; }
 

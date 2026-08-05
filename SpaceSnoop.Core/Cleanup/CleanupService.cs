@@ -36,16 +36,16 @@ public sealed class CleanupService(ILogger<CleanupService>? logger = null)
 
     public CleanupMeasurement Measure(CleanupTarget target, CancellationToken token)
     {
-        var availability = Availability(target);
+        token.ThrowIfCancellationRequested();
+
+        var availability = Availability(target, out var content);
 
         if (target.Kind == CleanupTargetKind.RecycleBin)
         {
-            var content = RecycleBin.Query();
-
             return new(content.Bytes, (int)Math.Min(content.Items, int.MaxValue), [], availability);
         }
 
-        if (availability != CleanupAvailability.Available)
+        if (availability is not (CleanupAvailability.Available or CleanupAvailability.Unsupported))
         {
             return new(0, 0, [], availability);
         }
@@ -65,7 +65,7 @@ public sealed class CleanupService(ILogger<CleanupService>? logger = null)
 
     public CleanupReport Clean(CleanupTarget target, IProgress<OperationProgress>? progress, CancellationToken token)
     {
-        var availability = Availability(target);
+        var availability = Availability(target, out var content);
 
         if (availability != CleanupAvailability.Available)
         {
@@ -77,7 +77,7 @@ public sealed class CleanupService(ILogger<CleanupService>? logger = null)
         _logger.CleanupStarted(target.Id);
 
         var report = target.Kind == CleanupTargetKind.RecycleBin
-            ? EmptyRecycleBin(progress, token)
+            ? EmptyRecycleBin(content, progress, token)
             : CleanDirectory(target, progress, token);
 
         _logger.CleanupFinished(target.Id, report.Deleted, report.FreedBytes);
@@ -85,21 +85,20 @@ public sealed class CleanupService(ILogger<CleanupService>? logger = null)
         return report;
     }
 
-    private static CleanupAvailability Availability(CleanupTarget target)
+    private static CleanupAvailability Availability(CleanupTarget target, out RecycleBinContent content)
     {
+        content = default;
+
         if (target.Kind == CleanupTargetKind.RecycleBin)
         {
-            return RecycleBin.Query().Ok ? CleanupAvailability.Available : CleanupAvailability.Failed;
+            content = RecycleBin.Query();
+
+            return content.Ok ? CleanupAvailability.Available : CleanupAvailability.Failed;
         }
 
         if (!Directory.Exists(target.Path))
         {
             return CleanupAvailability.Missing;
-        }
-
-        if (!target.Supported)
-        {
-            return CleanupAvailability.Unsupported;
         }
 
         if (!IsSafeRoot(target.Path))
@@ -121,22 +120,12 @@ public sealed class CleanupService(ILogger<CleanupService>? logger = null)
             return CleanupAvailability.Missing;
         }
 
-        return CleanupAvailability.Available;
+        return target.Supported ? CleanupAvailability.Available : CleanupAvailability.Unsupported;
     }
 
     private static string Describe(CleanupTarget target, CleanupAvailability availability)
     {
-        var reason = availability switch
-        {
-            CleanupAvailability.Missing => "каталога нет",
-            CleanupAvailability.NeedsAdmin => "нужны права администратора",
-            CleanupAvailability.Unsupported => "очистка не поддерживается",
-            CleanupAvailability.Unsafe => "путь ведёт в корень тома или наружу по ссылке",
-            CleanupAvailability.Failed => "не удалось опросить",
-            _ => "цель недоступна",
-        };
-
-        return $"«{target.Name}»: {reason}";
+        return $"«{target.Name}»: {CleanupText.Availability(availability)}";
     }
 
     private static bool IsSafeRoot(string path)
@@ -203,8 +192,10 @@ public sealed class CleanupService(ILogger<CleanupService>? logger = null)
 
             try
             {
-                foreach (var file in directory.GetFiles(target.SearchPattern))
+                foreach (var file in directory.EnumerateFiles(target.SearchPattern))
                 {
+                    token.ThrowIfCancellationRequested();
+
                     if (IsReparsePoint(file) || IsFresh(file, now, target.MinimumAge))
                     {
                         continue;
@@ -231,21 +222,18 @@ public sealed class CleanupService(ILogger<CleanupService>? logger = null)
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException)
             {
-                _logger.CleanupDirectorySkipped(exception, directory.FullName);
+                if (unreadable.Count < MaxReportedErrors)
+                {
+                    _logger.CleanupDirectorySkipped(exception, directory.FullName);
+                }
+
                 unreadable.Add(directory.FullName);
             }
         }
     }
 
-    private CleanupReport EmptyRecycleBin(IProgress<OperationProgress>? progress, CancellationToken token)
+    private CleanupReport EmptyRecycleBin(RecycleBinContent content, IProgress<OperationProgress>? progress, CancellationToken token)
     {
-        var content = RecycleBin.Query();
-
-        if (!content.Ok)
-        {
-            return new(0, 0, 1, ["Корзина: не удалось опросить"]);
-        }
-
         var items = (int)Math.Min(content.Items, int.MaxValue);
 
         if (items == 0)
@@ -378,6 +366,8 @@ public sealed class CleanupService(ILogger<CleanupService>? logger = null)
     {
         directories.Sort(static (left, right) => right.Length.CompareTo(left.Length));
 
+        var reported = 0;
+
         foreach (var directory in directories)
         {
             try
@@ -386,7 +376,10 @@ public sealed class CleanupService(ILogger<CleanupService>? logger = null)
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException)
             {
-                _logger.CleanupDirectorySkipped(exception, directory);
+                if (reported++ < MaxReportedErrors)
+                {
+                    _logger.CleanupDirectorySkipped(exception, directory);
+                }
             }
         }
     }

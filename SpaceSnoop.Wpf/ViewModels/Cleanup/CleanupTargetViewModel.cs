@@ -86,15 +86,7 @@ public sealed partial class CleanupTargetViewModel : ObservableObject
         ? $"{Files:N0} объектов"
         : $"{Files:N0} файлов";
 
-    public string AvailabilityText => Availability switch
-    {
-        CleanupAvailability.Missing => "каталога нет",
-        CleanupAvailability.NeedsAdmin => "нужны права администратора",
-        CleanupAvailability.Unsupported => "удаляется штатным средством Windows",
-        CleanupAvailability.Unsafe => "путь ведёт в корень тома или наружу по ссылке – очистка запрещена",
-        CleanupAvailability.Failed => "не удалось опросить",
-        _ => string.Empty,
-    };
+    public string AvailabilityText => HasAvailabilityIssue ? CleanupText.Availability(Availability) : string.Empty;
 
     public void Apply(CleanupMeasurement measurement)
     {

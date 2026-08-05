@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging.Abstractions;
 using ModelContextProtocol;
 using SpaceSnoop.Core;
+using SpaceSnoop.Core.Cleanup;
 using SpaceSnoop.Core.Docker;
 using SpaceSnoop.Core.UseCases;
 using SpaceSnoop.Wpf.Bootstrap;
@@ -44,6 +45,7 @@ public class McpBridgeGuardTests
             new ScanPreferences(settings),
             new DiskSpaceCalculator(),
             new DockerService(),
+            new CleanupService(),
             new ToastNotifier(new(), new ShellPreferences(settings)),
             _monitor,
             new PerformanceRunTracker(),
@@ -194,6 +196,39 @@ public class McpBridgeGuardTests
             Assert.That(json, Does.Contain("файл.txt"));
             Assert.That(_scan.ApplyCalls, Is.Zero);
         });
+    }
+
+    [Test]
+    public void Замер_неизвестной_корзины_называет_доступные()
+    {
+        var exception = Assert.ThrowsAsync<McpException>(() => _bridge.Cleanup.ScanAsync(["ЧужаяКорзина"], CancellationToken.None));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("ЧужаяКорзина"));
+            Assert.That(exception.Message, Does.Contain("TempFiles"));
+        });
+    }
+
+    [Test]
+    public async Task Замер_корзины_отдаёт_доступность_и_порог_возраста()
+    {
+        var json = await _bridge.Cleanup.ScanAsync(["RecycleBin"], CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(json, Does.Contain("\"minimumAgeHours\": 24"));
+            Assert.That(json, Does.Contain("RecycleBin"));
+            Assert.That(json, Does.Contain("\"availabilityHint\""));
+        });
+    }
+
+    [Test]
+    public void Пустой_список_корзин_не_считается_запросом_всех()
+    {
+        var exception = Assert.ThrowsAsync<McpException>(() => _bridge.Cleanup.ScanAsync([" "], CancellationToken.None));
+
+        Assert.That(exception!.Message, Does.Contain("TempFiles"));
     }
 
     private void AllowMutations(bool allowed)

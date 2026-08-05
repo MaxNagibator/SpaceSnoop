@@ -110,6 +110,31 @@ internal sealed record McpMarkResult(
     string MarkedSize,
     McpScanState Scan);
 
+internal sealed record McpCleanupReport(
+    int MinimumAgeHours,
+    long TotalBytes,
+    string TotalSize,
+    int TotalFiles,
+    long ReclaimableBytes,
+    string ReclaimableSize,
+    IReadOnlyList<McpCleanupTarget> Targets);
+
+internal sealed record McpCleanupTarget(
+    string Id,
+    string Name,
+    string Description,
+    CleanupTargetKind Kind,
+    string Path,
+    CleanupAvailability Availability,
+    string AvailabilityHint,
+    bool Cleanable,
+    long Bytes,
+    string Size,
+    int Files,
+    IReadOnlyList<string> Unreadable,
+    int OmittedUnreadable,
+    string? Error);
+
 internal sealed record McpDrive(
     string Path,
     string Label,

@@ -211,7 +211,10 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
 
         foreach (var row in Targets)
         {
-            total += row.SizeBytes;
+            if (row.IsAvailable)
+            {
+                total += row.SizeBytes;
+            }
 
             if (!row.IsSelected || !row.IsAvailable)
             {
@@ -230,7 +233,7 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
 
         foreach (var row in Targets)
         {
-            row.Share = total > 0 ? (double)row.SizeBytes / total : 0;
+            row.Share = total > 0 && row.IsAvailable ? (double)row.SizeBytes / total : 0;
         }
     }
 

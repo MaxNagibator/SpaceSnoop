@@ -21,6 +21,7 @@ public static class AgentPrompt
         "compare_directories",
         "get_current_comparison",
         "docker_usage",
+        "cleanup_scan",
         "open_scan",
         "open_sync",
         "capture_view",
@@ -79,6 +80,7 @@ public static class AgentPrompt
             "compare_directories" => "сравнение каталогов",
             "get_current_comparison" => "открытое сравнение",
             "docker_usage" => "занятое Docker место",
+            "cleanup_scan" => "замер системных корзин",
             "open_scan" => "страница «Сканирование»",
             "open_sync" => "страница «Синхронизация»",
             "capture_view" => "снимок окна",
@@ -149,6 +151,11 @@ public static class AgentPrompt
                                   Место, съеденное Docker, снаружи выглядит одним огромным файлом-диском – если виновник он,
                                   посмотри docker_usage и назови, сколько там возвращается. Чистить Docker сам ты не можешь: это
                                   делает человек на странице «Docker», и удаление там идёт мимо корзины.
+
+                                  Системные корзины Windows – временные файлы, кэши обновлений и эскизов, Prefetch, дампы, корзина –
+                                  замеряет cleanup_scan; без аргументов он обходит все цели и на машине с Windows.old идёт долго,
+                                  поэтому называй нужные targets. Чистить их сам ты не можешь: очистка удаляет безвозвратно,
+                                  мимо корзины, и запускает её человек на странице «Очистка».
 
                                   Нашёл виновника – покажи его человеку в окне: scan_directory с show=true кладёт посчитанное дерево
                                   на страницу «Сканирование», open_scan открывает её на нужном каталоге. Это дешевле пересказа путей

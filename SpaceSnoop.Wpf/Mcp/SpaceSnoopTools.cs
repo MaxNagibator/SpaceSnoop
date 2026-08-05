@@ -86,6 +86,16 @@ public sealed class SpaceSnoopTools
         return bridge.Insight.GetDockerUsageAsync(includeObjects, entryLimit, cancellationToken);
     }
 
+    [McpServerTool(Name = "cleanup_scan")]
+    [Description("Замеряет системные корзины Windows со страницы «Очистка»: временные файлы, кэш обновлений и эскизов, Prefetch, дампы, корзина. Только чтение – ничего не удаляет; запускает очистку человек кнопкой на странице. Два итога отвечают на разные вопросы и складывать их не надо: total* – сколько всего лежит в замеренных целях, reclaimable* – сколько из этого вернёт очистка. Расходятся они на целях, которые очистить нельзя (нужны права администратора, каталога нет, Windows.old удаляется штатным средством Windows); причину называет availabilityHint каждой цели, а cleanable отвечает, попала ли она в reclaimable*. К каталогам применяется порог возраста файла из настроек – файлы моложе него не считаются и не удаляются, потому что их может держать живой процесс; к корзине порог не применяется, она считается целиком. Замер без targets обходит все цели и на машине с Windows.old идёт долго. Очистка удаляет безвозвратно, мимо корзины, – в отличие от сканирования и синхронизации.")]
+    public static Task<string> CleanupScanAsync(
+        McpBridge bridge,
+        [Description("Идентификаторы целей (TempFiles, SystemTemp, WindowsUpdate, Prefetch, Thumbnails, RecycleBin, ErrorReports, OldWindowsInstallation); не заданы – замеряются все")] string[]? targets = null,
+        CancellationToken cancellationToken = default)
+    {
+        return bridge.Cleanup.ScanAsync(targets, cancellationToken);
+    }
+
     [McpServerTool(Name = "scan_directory")]
     [Description("Сканирует каталог или диск и возвращает распределение занятого места: крупнейшие подкаталоги до заданной глубины и крупнейшие файлы всего дерева. Только чтение – ничего не удаляет. При show=true результат попадает в дерево страницы «Сканирование», и после этого по нему работают mark_for_deletion и archive_directory; без show это отдельный расчёт, окно о нём не знает.")]
     public static Task<string> ScanDirectoryAsync(

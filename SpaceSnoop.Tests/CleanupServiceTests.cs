@@ -128,6 +128,19 @@ public class CleanupServiceTests
     }
 
     [Test]
+    public void Measure_UnsupportedTargetStillSized()
+    {
+        var measurement = new CleanupService().Measure(Target(supported: false), CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(measurement.Availability, Is.EqualTo(CleanupAvailability.Unsupported));
+            Assert.That(measurement.Files, Is.EqualTo(2));
+            Assert.That(measurement.Bytes, Is.EqualTo(16));
+        }
+    }
+
+    [Test]
     public void Measure_MissingDirectoryReportedInsteadOfThrowing()
     {
         Directory.Delete(_targetDir, true);
