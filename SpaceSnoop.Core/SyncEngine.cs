@@ -176,15 +176,11 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         switch (file.Action)
         {
             case SyncAction.CopyToRight:
-                EnsureDirectoryExists(rightPath);
-                ClearReadOnly(rightPath);
-                CopyAtomic(leftPath, rightPath, tracker, cancel);
+                CopyFile(leftPath, rightPath, tracker, cancel);
                 break;
 
             case SyncAction.CopyToLeft:
-                EnsureDirectoryExists(leftPath);
-                ClearReadOnly(leftPath);
-                CopyAtomic(rightPath, leftPath, tracker, cancel);
+                CopyFile(rightPath, leftPath, tracker, cancel);
                 break;
 
             case SyncAction.DeleteLeft:
@@ -205,6 +201,18 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
 
                 break;
         }
+    }
+
+    private void CopyFile(string source, string destination, TransferTracker tracker, CancellationToken cancel)
+    {
+        if (Directory.Exists(destination))
+        {
+            throw new IOException($"Приёмник занят каталогом с тем же именем: {destination}");
+        }
+
+        EnsureDirectoryExists(destination);
+        ClearReadOnly(destination);
+        CopyAtomic(source, destination, tracker, cancel);
     }
 
     private void RecyclePrevious(string destination)

@@ -57,6 +57,36 @@ public class SyncEngineTests
     }
 
     [Test]
+    public void CopyToRight_DestinationTakenByDirectory_ReportsErrorAndKeepsDirectory()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "config"), "payload");
+        var occupied = Path.Combine(_rightDir, "config");
+        Directory.CreateDirectory(occupied);
+        File.WriteAllText(Path.Combine(occupied, "inner.txt"), "inner");
+
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("config", "config")
+        {
+            Status = ComparisonStatus.Conflict,
+            TypeConflict = FileTypeConflict.LeftFileRightDirectory,
+            Action = SyncAction.CopyToRight,
+        });
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
+        var report = engine.Execute(result, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.Errors, Has.Count.EqualTo(1));
+            Assert.That(report.SuccessCount, Is.EqualTo(0));
+            Assert.That(Directory.Exists(occupied), Is.True);
+            Assert.That(File.ReadAllText(Path.Combine(occupied, "inner.txt")), Is.EqualTo("inner"));
+            Assert.That(Directory.EnumerateFiles(_rightDir, "*.sstmp"), Is.Empty);
+        }
+    }
+
+    [Test]
     public void CopyToLeft_CopiesFileFromRightToLeft()
     {
         const string Content = "hello world";

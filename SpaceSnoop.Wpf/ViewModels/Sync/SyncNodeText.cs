@@ -6,6 +6,13 @@ internal static class SyncNodeText
 {
     internal static string DescribeDiff(FileComparison file)
     {
+        if (file.TypeConflict != FileTypeConflict.None)
+        {
+            return file.TypeConflict == FileTypeConflict.LeftFileRightDirectory
+                ? "слева файл, справа каталог"
+                : "слева каталог, справа файл";
+        }
+
         if (file.Status != ComparisonStatus.Modified)
         {
             return string.Empty;

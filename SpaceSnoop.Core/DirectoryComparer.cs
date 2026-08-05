@@ -71,8 +71,18 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
             RightModified = rightDir is { Exists: true } ? rightDir.LastWriteTime : null,
         };
 
-        CompareFiles(comparison, leftDir, rightDir, relativePath);
-        CompareSubDirectories(comparison, leftDir, rightDir, relativePath, progress, ref processed, cancel);
+        var leftFiles = GetFilteredFiles(leftDir, out var leftFilesIncomplete);
+        var rightFiles = GetFilteredFiles(rightDir, out var rightFilesIncomplete);
+        var leftDirs = GetFilteredDirectories(leftDir, out var leftDirsIncomplete);
+        var rightDirs = GetFilteredDirectories(rightDir, out var rightDirsIncomplete);
+
+        comparison.LeftIncomplete = leftFilesIncomplete || leftDirsIncomplete;
+        comparison.RightIncomplete = rightFilesIncomplete || rightDirsIncomplete;
+
+        var typeConflicts = CollectTypeConflicts(leftFiles, rightFiles, leftDirs, rightDirs);
+
+        CompareFiles(comparison, leftFiles, rightFiles, typeConflicts, relativePath);
+        CompareSubDirectories(comparison, leftDirs, rightDirs, typeConflicts, relativePath, progress, ref processed, cancel);
 
         comparison.Status = DetermineDirectoryStatus(comparison, leftDir, rightDir);
 
@@ -81,18 +91,34 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         return comparison;
     }
 
-    private void CompareFiles(
+    private static Dictionary<string, FileTypeConflict> CollectTypeConflicts(
+        Dictionary<string, FileInfo> leftFiles,
+        Dictionary<string, FileInfo> rightFiles,
+        Dictionary<string, DirectoryInfo> leftDirs,
+        Dictionary<string, DirectoryInfo> rightDirs)
+    {
+        var conflicts = new Dictionary<string, FileTypeConflict>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var name in leftFiles.Keys.Where(rightDirs.ContainsKey))
+        {
+            conflicts[name] = FileTypeConflict.LeftFileRightDirectory;
+        }
+
+        foreach (var name in rightFiles.Keys.Where(leftDirs.ContainsKey))
+        {
+            conflicts[name] = FileTypeConflict.RightFileLeftDirectory;
+        }
+
+        return conflicts;
+    }
+
+    private static void CompareFiles(
         DirectoryComparison comparison,
-        DirectoryInfo? leftDir,
-        DirectoryInfo? rightDir,
+        Dictionary<string, FileInfo> leftFiles,
+        Dictionary<string, FileInfo> rightFiles,
+        Dictionary<string, FileTypeConflict> typeConflicts,
         string relativePath)
     {
-        var leftFiles = GetFilteredFiles(leftDir, out var leftIncomplete);
-        var rightFiles = GetFilteredFiles(rightDir, out var rightIncomplete);
-
-        comparison.LeftIncomplete |= leftIncomplete;
-        comparison.RightIncomplete |= rightIncomplete;
-
         var allNames = new HashSet<string>(leftFiles.Keys, StringComparer.OrdinalIgnoreCase);
         allNames.UnionWith(rightFiles.Keys);
 
@@ -105,6 +131,27 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
             var fileComparison = new FileComparison(fileName, fileRelativePath);
             var hasLeft = leftFiles.TryGetValue(fileName, out var leftFile);
             var hasRight = rightFiles.TryGetValue(fileName, out var rightFile);
+
+            if (typeConflicts.TryGetValue(fileName, out var typeConflict))
+            {
+                fileComparison.TypeConflict = typeConflict;
+                fileComparison.Status = ComparisonStatus.Conflict;
+
+                if (hasLeft)
+                {
+                    fileComparison.LeftSize = leftFile!.Length;
+                    fileComparison.LeftModified = leftFile.LastWriteTime;
+                }
+
+                if (hasRight)
+                {
+                    fileComparison.RightSize = rightFile!.Length;
+                    fileComparison.RightModified = rightFile.LastWriteTime;
+                }
+
+                comparison.Files.Add(fileComparison);
+                continue;
+            }
 
             if (hasLeft && hasRight)
             {
@@ -136,21 +183,17 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
 
     private void CompareSubDirectories(
         DirectoryComparison comparison,
-        DirectoryInfo? leftDir,
-        DirectoryInfo? rightDir,
+        Dictionary<string, DirectoryInfo> leftDirs,
+        Dictionary<string, DirectoryInfo> rightDirs,
+        Dictionary<string, FileTypeConflict> typeConflicts,
         string relativePath,
         IProgress<OperationProgress>? progress,
         ref int processed,
         CancellationToken cancel)
     {
-        var leftDirs = GetFilteredDirectories(leftDir, out var leftIncomplete);
-        var rightDirs = GetFilteredDirectories(rightDir, out var rightIncomplete);
-
-        comparison.LeftIncomplete |= leftIncomplete;
-        comparison.RightIncomplete |= rightIncomplete;
-
         var allNames = new HashSet<string>(leftDirs.Keys, StringComparer.OrdinalIgnoreCase);
         allNames.UnionWith(rightDirs.Keys);
+        allNames.ExceptWith(typeConflicts.Keys);
 
         foreach (var dirName in allNames.Order(StringComparer.OrdinalIgnoreCase))
         {

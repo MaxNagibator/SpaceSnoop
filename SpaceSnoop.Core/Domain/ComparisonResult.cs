@@ -152,6 +152,11 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
                 continue;
             }
 
+            if (file.TypeConflict != FileTypeConflict.None && action != SyncAction.Skip)
+            {
+                continue;
+            }
+
             file.Action = action;
             count++;
         }
@@ -213,6 +218,13 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
 
     private static void ApplyFileMode(FileComparison file, SyncMode mode, bool mirror, SyncWinner winner, DeleteBlocks blocks)
     {
+        if (file.TypeConflict != FileTypeConflict.None)
+        {
+            file.Status = ComparisonStatus.Conflict;
+            file.Action = SyncAction.None;
+            return;
+        }
+
         if (file.Status == ComparisonStatus.Conflict)
         {
             file.Status = ComparisonStatus.Modified;

@@ -22,6 +22,7 @@ public sealed record ComparisonExportEntry
     public long? RightSize { get; init; }
     public DateTime? LeftModified { get; init; }
     public DateTime? RightModified { get; init; }
+    public FileTypeConflict TypeConflict { get; init; }
     public bool? SizeDiffers { get; init; }
     public double? TimeDeltaSeconds { get; init; }
     public string? LeftHash { get; init; }
@@ -155,7 +156,8 @@ public static class ComparisonExport
 
     private static ComparisonExportEntry FromFile(FileComparison file)
     {
-        var compared = file.Status is ComparisonStatus.Modified or ComparisonStatus.Conflict;
+        var compared = file.TypeConflict == FileTypeConflict.None
+                       && file.Status is ComparisonStatus.Modified or ComparisonStatus.Conflict;
 
         double? delta = compared && file is { LeftModified: { } left, RightModified: { } right }
             ? Math.Round((left - right).TotalSeconds, 1)
@@ -167,6 +169,7 @@ public static class ComparisonExport
             Kind = ComparisonEntryKind.File,
             Status = file.Status,
             Action = file.Action,
+            TypeConflict = file.TypeConflict,
             LeftSize = file.LeftSize,
             RightSize = file.RightSize,
             LeftModified = file.LeftModified,
