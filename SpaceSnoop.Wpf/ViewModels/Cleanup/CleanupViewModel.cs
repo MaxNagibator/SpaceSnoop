@@ -7,11 +7,12 @@ using System.Windows.Input;
 
 namespace SpaceSnoop.Wpf.ViewModels.Cleanup;
 
-public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IPageRefresh, IPageStatus
+public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IPageRefresh, IPageStatus, ICleanupAutomation
 {
     private readonly CleanupService _service;
     private readonly CleanupProgressDialogFactory _dialogFactory;
     private readonly IDialogService _dialogs;
+    private readonly ModalHostViewModel _modals;
     private readonly IShellLauncher _shell;
     private readonly ISettingsStore _settings;
     private readonly ToastNotifier _notifier;
@@ -58,6 +59,7 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
         CleanupService service,
         CleanupProgressDialogFactory dialogFactory,
         IDialogService dialogs,
+        ModalHostViewModel modals,
         IShellLauncher shell,
         ISettingsStore settings,
         ToastNotifier notifier,
@@ -66,6 +68,7 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
         _service = service;
         _dialogFactory = dialogFactory;
         _dialogs = dialogs;
+        _modals = modals;
         _shell = shell;
         _settings = settings;
         _notifier = notifier;
@@ -394,19 +397,37 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
 
         var bytes = rows.Sum(static x => x.SizeBytes);
         var files = rows.Sum(static x => x.Files);
+        var confirm = BuildConfirm(rows, bytes, files, null);
 
-        if (!await ConfirmAsync(rows, bytes, files))
+        if (!await _dialogs.ShowAsync(confirm))
         {
             return;
         }
 
-        var dialog = _dialogFactory.Create(new([.. rows.Select(static x => x.Model)], bytes, files));
+        await RunConfirmedAsync(rows, bytes, files, CancellationToken.None, false);
+    }
+
+    private async Task<CleanupProgressDialogViewModel> RunConfirmedAsync(
+        IReadOnlyList<CleanupTargetViewModel> rows,
+        long bytes,
+        int files,
+        CancellationToken cancellationToken,
+        bool automated)
+    {
+        var dialog = _dialogFactory.Create(new([.. rows.Select(static x => x.Model)], bytes, files, cancellationToken));
 
         IsBusy = true;
 
         try
         {
-            await _dialogs.ShowAsync(dialog);
+            if (automated)
+            {
+                await RunDialogForAutomationAsync(dialog);
+            }
+            else
+            {
+                await _dialogs.ShowAsync(dialog);
+            }
         }
         finally
         {
@@ -416,27 +437,38 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
 
         _notifier.Notify(
             dialog.StatusText,
-            dialog.HasErrors || dialog.FreedBytes == 0 ? StatusSeverity.Warning : StatusSeverity.Success);
+            dialog.HasErrors || dialog.WasCancelled || dialog.FreedBytes == 0 ? StatusSeverity.Warning : StatusSeverity.Success);
         StatusText = dialog.StatusText;
 
         foreach (var row in rows)
         {
             await MeasureOneAsync(row);
         }
+
+        return dialog;
     }
 
-    private async Task<bool> ConfirmAsync(IReadOnlyList<CleanupTargetViewModel> rows, long bytes, int files)
+    private ConfirmDialogViewModel BuildConfirm(
+        IReadOnlyList<CleanupTargetViewModel> rows,
+        long bytes,
+        int files,
+        string? requestedBy)
     {
-        List<ConfirmLine> lines =
-        [
-            new ConfirmTextLine($"Будет очищено корзин: {rows.Count:N0}."),
-            new ConfirmMetricLine("Файлов", $"{files:N0}", SizeFormatter.Format(bytes)),
-        ];
+        List<ConfirmLine> lines = [];
+
+        if (requestedBy is not null)
+        {
+            lines.Add(new ConfirmTextLine(requestedBy, ConfirmTextTone.Strong));
+            lines.Add(new ConfirmGapLine());
+        }
+
+        lines.Add(new ConfirmTextLine($"Будет очищено корзин: {rows.Count:N0}."));
+        lines.Add(new ConfirmMetricLine("Файлов", $"{files:N0}", SizeFormatter.Format(bytes)));
 
         lines.AddRange(rows.Select(static row =>
             new ConfirmMetricLine(row.Name, row.FilesText, row.SizeText, ConfirmMetricTone.Sub)));
 
-        var confirm = new ConfirmDialogViewModel(
+        return new ConfirmDialogViewModel(
             "Очистка диска",
             PackIconLucideKind.Trash2,
             lines,
@@ -447,7 +479,5 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
         {
             Warning = "Файлы удаляются безвозвратно, мимо корзины – восстановить их нельзя.",
         };
-
-        return await _dialogs.ShowAsync(confirm);
     }
 }

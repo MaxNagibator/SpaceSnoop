@@ -3,7 +3,15 @@ using SpaceSnoop.Core.Cleanup;
 
 namespace SpaceSnoop.Wpf.Mcp;
 
-internal sealed class McpCleanupTools(ISettingsStore settings, CleanupService cleanup, ILogger logger)
+internal sealed class McpCleanupTools(
+    ISettingsStore settings,
+    CleanupService cleanup,
+    Func<TimeSpan, IReadOnlyList<CleanupTarget>> catalogSource,
+    McpPreferences preferences,
+    ICleanupAutomation automation,
+    McpNavigator navigator,
+    ToastNotifier notifier,
+    ILogger logger)
 {
     public async Task<string> ScanAsync(string[]? targets, CancellationToken cancellationToken)
     {
@@ -11,20 +19,10 @@ internal sealed class McpCleanupTools(ISettingsStore settings, CleanupService cl
 
         logger.McpToolInvoked("cleanup_scan", wanted.Count == 0 ? "все цели" : string.Join(", ", wanted));
 
-        var minAgeHours = Math.Clamp(settings.GetInt(SettingsKeys.CleanupMinAgeHours, AppDefaults.CleanupMinAgeHoursDefault),
-            AppDefaults.CleanupMinAgeHoursMin,
-            AppDefaults.CleanupMinAgeHoursMax);
-
-        var catalog = CleanupCatalog.BuildDefault(TimeSpan.FromHours(minAgeHours));
+        var minAgeHours = MinAgeHours();
+        var catalog = catalogSource(TimeSpan.FromHours(minAgeHours));
         var selected = Select(catalog, wanted, targets is not null);
-
-        List<McpCleanupTarget> measured = [];
-
-        foreach (var target in selected)
-        {
-            measured.Add(await MeasureAsync(target, cancellationToken).ConfigureAwait(false));
-        }
-
+        var measured = await MeasureAllAsync(selected, cancellationToken).ConfigureAwait(false);
         var reclaimable = measured.Where(static item => item.Cleanable).ToList();
 
         return McpFormat.Serialize(new McpCleanupReport(minAgeHours,
@@ -34,6 +32,128 @@ internal sealed class McpCleanupTools(ISettingsStore settings, CleanupService cl
             reclaimable.Sum(static item => item.Bytes),
             SizeFormatter.Format(reclaimable.Sum(static item => item.Bytes)),
             measured));
+    }
+
+    public async Task<string> RunAsync(string[]? targets, bool dryRun, CancellationToken cancellationToken)
+    {
+        var wanted = Normalize(targets);
+
+        logger.McpToolInvoked("cleanup_run", $"{string.Join(", ", wanted)}, {(dryRun ? "план" : "запуск")}");
+
+        var minAgeHours = MinAgeHours();
+        var catalog = catalogSource(TimeSpan.FromHours(minAgeHours));
+
+        if (wanted.Count == 0)
+        {
+            throw new McpException($"Ни одна цель очистки не названа. Доступны: {Ids(catalog)}.");
+        }
+
+        var selected = Select(catalog, wanted, true);
+
+        if (!dryRun)
+        {
+            McpGuards.RequireMutations(preferences, logger, "cleanup_run");
+            McpDispatch.Run(EnsureIdle);
+        }
+
+        var measured = await MeasureAllAsync(selected, cancellationToken).ConfigureAwait(false);
+        var ready = measured.Where(static item => item.Cleanable).ToList();
+        var plannedBytes = ready.Sum(static item => item.Bytes);
+        var plannedFiles = ready.Sum(static item => item.Files);
+
+        if (dryRun)
+        {
+            return McpFormat.Serialize(new McpCleanupRun(true,
+                CleanupConsent.None,
+                ready.Count == 0
+                    ? "Очищать нечего: названные корзины пусты или недоступны."
+                    : "План очистки. Запуск требует dryRun=false и подтверждения человеком в окне приложения.",
+                minAgeHours,
+                plannedBytes,
+                SizeFormatter.Format(plannedBytes),
+                plannedFiles,
+                0,
+                SizeFormatter.Format(0),
+                0,
+                0,
+                false,
+                measured));
+        }
+
+        if (ready.Count == 0)
+        {
+            throw new McpException("Очищать нечего: названные корзины пусты или недоступны.");
+        }
+
+        List<string> ids = [.. ready.Select(static item => item.Id)];
+        var outcome = await McpDispatch.Run(() => StartRun(ids, cancellationToken)).ConfigureAwait(false);
+
+        if (outcome.Consent is CleanupConsent.Declined or CleanupConsent.TimedOut or CleanupConsent.Busy)
+        {
+            logger.McpToolRejected("cleanup_run", outcome.StatusText);
+
+            throw new McpException(outcome.StatusText);
+        }
+
+        return McpFormat.Serialize(new McpCleanupRun(false,
+            outcome.Consent,
+            outcome.StatusText,
+            minAgeHours,
+            plannedBytes,
+            SizeFormatter.Format(plannedBytes),
+            plannedFiles,
+            outcome.FreedBytes,
+            SizeFormatter.Format(outcome.FreedBytes),
+            outcome.Deleted,
+            outcome.Skipped,
+            outcome.Cancelled,
+            measured));
+    }
+
+    private void EnsureIdle()
+    {
+        if (automation.IsBusy)
+        {
+            logger.McpToolRejected("cleanup_run", "страница занята операцией");
+
+            throw new McpException("Страница «Очистка» сейчас занята другой операцией.");
+        }
+
+        if (automation.IsModalBusy)
+        {
+            logger.McpToolRejected("cleanup_run", "окно занято диалогом");
+
+            throw new McpException("В окне приложения открыт другой диалог – подтверждение показать нельзя.");
+        }
+    }
+
+    private Task<CleanupOutcome> StartRun(IReadOnlyList<string> ids, CancellationToken cancellationToken)
+    {
+        EnsureIdle();
+
+        navigator.DeferOrNavigate(SectionKey.Cleanup);
+        notifier.Notify("Агент просит подтвердить очистку", StatusSeverity.Warning);
+
+        return automation.CleanFromAutomationAsync(ids, cancellationToken);
+    }
+
+    private int MinAgeHours()
+    {
+        return Math.Clamp(settings.GetInt(SettingsKeys.CleanupMinAgeHours, AppDefaults.CleanupMinAgeHoursDefault),
+            AppDefaults.CleanupMinAgeHoursMin,
+            AppDefaults.CleanupMinAgeHoursMax);
+    }
+
+    private async Task<List<McpCleanupTarget>> MeasureAllAsync(List<CleanupTarget> selected, CancellationToken cancellationToken)
+    {
+        List<McpCleanupTarget> measured = [];
+
+        foreach (var target in selected)
+        {
+            measured.Add(await MeasureAsync(target, cancellationToken).ConfigureAwait(false));
+        }
+
+        return measured;
     }
 
     private static List<string> Normalize(string[]? targets)

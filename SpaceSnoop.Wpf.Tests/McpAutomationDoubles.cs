@@ -107,6 +107,27 @@ internal sealed class ScanAutomationDouble : IScanAutomation
     }
 }
 
+internal sealed class CleanupAutomationDouble : ICleanupAutomation
+{
+    public bool IsBusy { get; set; }
+
+    public bool IsModalBusy { get; set; }
+
+    public CleanupOutcome Outcome { get; set; } = new(CleanupConsent.Granted, 1024, 3, 0, false, "Готово");
+
+    public int CleanCalls { get; private set; }
+
+    public IReadOnlyList<string> LastIds { get; private set; } = [];
+
+    public Task<CleanupOutcome> CleanFromAutomationAsync(IReadOnlyList<string> targetIds, CancellationToken cancellationToken)
+    {
+        CleanCalls++;
+        LastIds = targetIds;
+
+        return Task.FromResult(Outcome);
+    }
+}
+
 internal sealed class SyncAutomationDouble : ISyncAutomation
 {
     public string LeftPath { get; set; } = string.Empty;

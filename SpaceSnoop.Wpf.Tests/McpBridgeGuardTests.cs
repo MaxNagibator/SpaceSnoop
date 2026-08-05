@@ -17,11 +17,13 @@ namespace SpaceSnoop.Wpf.Tests;
 public class McpBridgeGuardTests
 {
     private const string MutationsBlocked = "Изменяющие операции запрещены";
+    private const string RunnableTargetId = "TempFiles";
 
     private string _root = string.Empty;
     private McpPreferences _preferences = null!;
     private ScanAutomationDouble _scan = null!;
     private SyncAutomationDouble _sync = null!;
+    private CleanupAutomationDouble _cleanup = null!;
     private PerformanceMonitor _monitor = null!;
     private McpBridge _bridge = null!;
 
@@ -36,6 +38,7 @@ public class McpBridgeGuardTests
         _preferences = new(settings);
         _scan = new();
         _sync = new();
+        _cleanup = new();
         _monitor = new(NullLogger<PerformanceMonitor>.Instance);
 
         _bridge = new(settings,
@@ -46,6 +49,7 @@ public class McpBridgeGuardTests
             new DiskSpaceCalculator(),
             new DockerService(),
             new CleanupService(),
+            _cleanup,
             new ToastNotifier(new(), new ShellPreferences(settings)),
             _monitor,
             new PerformanceRunTracker(),
@@ -229,6 +233,125 @@ public class McpBridgeGuardTests
         var exception = Assert.ThrowsAsync<McpException>(() => _bridge.Cleanup.ScanAsync([" "], CancellationToken.None));
 
         Assert.That(exception!.Message, Does.Contain("TempFiles"));
+    }
+
+    [Test]
+    public void Очистка_без_разрешения_не_доходит_до_страницы()
+    {
+        AllowMutations(false);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(Assert.ThrowsAsync<McpException>(() => _bridge.Cleanup.RunAsync(["Prefetch"], false, CancellationToken.None))?.Message,
+                Does.Contain(MutationsBlocked));
+
+            Assert.That(_cleanup.CleanCalls, Is.Zero);
+        });
+    }
+
+    [TestCase(true, false, "занята другой операцией")]
+    [TestCase(false, true, "другой диалог")]
+    public void Занятое_окно_отбивает_очистку_до_замера(bool pageBusy, bool modalBusy, string expected)
+    {
+        AllowMutations(true);
+        _cleanup.IsBusy = pageBusy;
+        _cleanup.IsModalBusy = modalBusy;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(Assert.ThrowsAsync<McpException>(() => _bridge.Cleanup.RunAsync(["Prefetch"], false, CancellationToken.None))?.Message,
+                Does.Contain(expected));
+
+            Assert.That(_cleanup.CleanCalls, Is.Zero);
+        });
+    }
+
+    [Test]
+    public void Очистка_без_целей_называет_доступные()
+    {
+        AllowMutations(true);
+
+        Assert.That(Assert.ThrowsAsync<McpException>(() => _bridge.Cleanup.RunAsync([], false, CancellationToken.None))?.Message,
+            Does.Contain("TempFiles"));
+    }
+
+    [Test]
+    public async Task План_очистки_ничего_не_запускает()
+    {
+        AllowMutations(true);
+
+        var json = await _bridge.Cleanup.RunAsync(["Prefetch"], true, CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(json, Does.Contain("\"dryRun\": true"));
+            Assert.That(json, Does.Contain("Prefetch"));
+            Assert.That(_cleanup.CleanCalls, Is.Zero);
+        });
+    }
+
+    [TestCase(CleanupConsent.Declined, "отказал")]
+    [TestCase(CleanupConsent.TimedOut, "не ответил")]
+    public void Неподтверждённая_очистка_возвращает_ошибку_а_не_отчёт(CleanupConsent consent, string expected)
+    {
+        var tools = ToolsOverRunnableTarget();
+        _cleanup.Outcome = new(consent, 0, 0, 0, false, consent == CleanupConsent.Declined
+            ? "Человек отказал в очистке."
+            : "Человек не ответил на подтверждение вовремя.");
+
+        Assert.That(Assert.ThrowsAsync<McpException>(() => tools.RunAsync([RunnableTargetId], false, CancellationToken.None))?.Message,
+            Does.Contain(expected));
+    }
+
+    [Test]
+    public async Task Подтверждённая_очистка_отчитывается_освобождённым()
+    {
+        var tools = ToolsOverRunnableTarget();
+
+        var json = await tools.RunAsync([RunnableTargetId], false, CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(_cleanup.CleanCalls, Is.EqualTo(1));
+            Assert.That(_cleanup.LastIds, Is.EquivalentTo(new[] { RunnableTargetId }));
+            Assert.That(json, Does.Contain("\"freedBytes\": 1024"));
+            Assert.That(json, Does.Contain("\"consent\": \"Granted\""));
+        });
+    }
+
+    private McpCleanupTools ToolsOverRunnableTarget()
+    {
+        var temp = Path.Combine(_root, "temp");
+        Directory.CreateDirectory(temp);
+
+        var file = Path.Combine(temp, "старый.tmp");
+        File.WriteAllText(file, "мусор");
+        File.SetCreationTimeUtc(file, DateTime.UtcNow.AddDays(-2));
+        File.SetLastWriteTimeUtc(file, DateTime.UtcNow.AddDays(-2));
+
+        AllowMutations(true);
+
+        var settings = new MemorySettings();
+
+        return new(settings,
+            new CleanupService(),
+            age =>
+            [
+                new()
+                {
+                    Id = RunnableTargetId,
+                    Name = "Временные файлы",
+                    Description = "Каталог теста",
+                    Kind = CleanupTargetKind.Directory,
+                    Path = temp,
+                    MinimumAge = age,
+                },
+            ],
+            _preferences,
+            _cleanup,
+            new McpNavigator(),
+            new ToastNotifier(new(), new ShellPreferences(settings)),
+            NullLogger<McpBridge>.Instance);
     }
 
     private void AllowMutations(bool allowed)

@@ -194,6 +194,7 @@ public partial class App : Application
         services.AddSingleton<ScheduleViewModel>();
         services.AddSingleton<DockerViewModel>();
         services.AddSingleton<CleanupViewModel>();
+        services.AddSingleton<ICleanupAutomation>(static provider => provider.GetRequiredService<CleanupViewModel>());
         services.AddSingleton<CleanupPageViewModel>();
         services.AddSingleton<ChatViewModel>();
         services.AddTransient<PerformanceChartViewModel>();

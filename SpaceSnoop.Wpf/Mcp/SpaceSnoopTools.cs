@@ -96,6 +96,17 @@ public sealed class SpaceSnoopTools
         return bridge.Cleanup.ScanAsync(targets, cancellationToken);
     }
 
+    [McpServerTool(Name = "cleanup_run")]
+    [Description("Очищает названные системные корзины Windows. Удаление безвозвратное, мимо корзины, поэтому запуск проходит через живое подтверждение: приложение показывает человеку модальное окно со списком целей и объёмом и ждёт ответа не дольше двух минут. Отказ, молчание и занятое окно возвращают ошибку, а не пустой отчёт. dryRun=true (по умолчанию) ничего не удаляет – замеряет цели и отдаёт план. Цели, которые очистить нельзя, из плана и из запуска выпадают; причину называет availabilityHint в cleanup_scan. К каталогам применяется порог возраста файла из настроек, к корзине он не применяется – она чистится целиком.")]
+    public static Task<string> CleanupRunAsync(
+        McpBridge bridge,
+        [Description("Идентификаторы целей (TempFiles, SystemTemp, WindowsUpdate, Prefetch, Thumbnails, RecycleBin, ErrorReports); хотя бы одна обязательна")] string[] targets,
+        [Description("Только план: замерить и показать, что удалилось бы, ничего не удаляя")] bool dryRun = true,
+        CancellationToken cancellationToken = default)
+    {
+        return bridge.Cleanup.RunAsync(targets, dryRun, cancellationToken);
+    }
+
     [McpServerTool(Name = "scan_directory")]
     [Description("Сканирует каталог или диск и возвращает распределение занятого места: крупнейшие подкаталоги до заданной глубины и крупнейшие файлы всего дерева. Только чтение – ничего не удаляет. При show=true результат попадает в дерево страницы «Сканирование», и после этого по нему работают mark_for_deletion и archive_directory; без show это отдельный расчёт, окно о нём не знает.")]
     public static Task<string> ScanDirectoryAsync(

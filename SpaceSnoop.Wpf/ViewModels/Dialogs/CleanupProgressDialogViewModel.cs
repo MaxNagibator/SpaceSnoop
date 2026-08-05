@@ -3,7 +3,11 @@ using SpaceSnoop.Core.Cleanup;
 
 namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
 
-public readonly record struct CleanupRequest(IReadOnlyList<CleanupTarget> Targets, long EstimatedBytes, int EstimatedFiles);
+public readonly record struct CleanupRequest(
+    IReadOnlyList<CleanupTarget> Targets,
+    long EstimatedBytes,
+    int EstimatedFiles,
+    CancellationToken External = default);
 
 public sealed partial class CleanupProgressDialogViewModel : OperationDialogViewModelBase
 {
@@ -42,6 +46,14 @@ public sealed partial class CleanupProgressDialogViewModel : OperationDialogView
 
     public long FreedBytes => _freed;
 
+    public int Deleted => _deleted;
+
+    public int Skipped => _skipped;
+
+    public string FirstError => _firstError;
+
+    public bool WasCancelled => Cancelled;
+
     public bool IsIndeterminate => _request.EstimatedFiles == 0;
 
     protected override string RunningStatus => "Очистка…";
@@ -50,9 +62,11 @@ public sealed partial class CleanupProgressDialogViewModel : OperationDialogView
 
     protected override bool HasFailedItems => _skipped > 0 || _firstError.Length > 0;
 
-    protected override Task ExecuteAsync(CancellationToken token)
+    protected override async Task ExecuteAsync(CancellationToken token)
     {
-        return Task.Run(() => Execute(token), token);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, _request.External);
+
+        await Task.Run(() => Execute(linked.Token), linked.Token);
     }
 
     protected override void OnStarting()

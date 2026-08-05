@@ -119,6 +119,21 @@ internal sealed record McpCleanupReport(
     string ReclaimableSize,
     IReadOnlyList<McpCleanupTarget> Targets);
 
+internal sealed record McpCleanupRun(
+    bool DryRun,
+    CleanupConsent Consent,
+    string Status,
+    int MinimumAgeHours,
+    long PlannedBytes,
+    string PlannedSize,
+    int PlannedFiles,
+    long FreedBytes,
+    string FreedSize,
+    int Deleted,
+    int Skipped,
+    bool Cancelled,
+    IReadOnlyList<McpCleanupTarget> Targets);
+
 internal sealed record McpCleanupTarget(
     string Id,
     string Name,

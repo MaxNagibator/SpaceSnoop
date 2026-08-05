@@ -407,4 +407,10 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 2404, Level = LogLevel.Warning, Message = "Очистка: не удалось замерить цель «{TargetId}»")]
     public static partial void CleanupMeasureFailed(this ILogger logger, Exception exception, string targetId);
+
+    [LoggerMessage(EventId = 2405, Level = LogLevel.Information, Message = "Очистка: агент запросил подтверждение, целей {Targets}, ожидается {PlannedBytes} Б")]
+    public static partial void CleanupRunRequested(this ILogger logger, int targets, long plannedBytes);
+
+    [LoggerMessage(EventId = 2406, Level = LogLevel.Warning, Message = "Очистка: запрос агента не подтверждён ({Consent})")]
+    public static partial void CleanupRunDeclined(this ILogger logger, string consent);
 }

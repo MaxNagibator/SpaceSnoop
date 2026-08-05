@@ -61,6 +61,7 @@ public static class AppDefaults
     public const int McpEntryLimitMax = 10_000;
     public const int McpEntryLimitDefault = 100;
     public const int McpDispatchTimeoutSeconds = 30;
+    public const int McpConfirmTimeoutSeconds = 120;
     public const int McpShutdownTimeoutSeconds = 3;
 
     public const int ViewCaptureLimit = 20;

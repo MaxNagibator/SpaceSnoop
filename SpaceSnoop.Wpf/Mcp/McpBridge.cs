@@ -14,6 +14,7 @@ public sealed class McpBridge
         DiskSpaceCalculator calculator,
         DockerService docker,
         CleanupService cleanup,
+        ICleanupAutomation cleanupAutomation,
         ToastNotifier notifier,
         PerformanceMonitor performance,
         PerformanceRunTracker runs,
@@ -25,7 +26,7 @@ public sealed class McpBridge
         Scan = new(scan, scanPreferences, calculator, preferences, notifier, _navigator, _state, performance, runs, logger);
         Sync = new(sync, compare, preferences, notifier, _navigator, _state, logger);
         Insight = new(settings, preferences, docker, performance, _navigator, _state, logger);
-        Cleanup = new(settings, cleanup, logger);
+        Cleanup = new(settings, cleanup, static age => CleanupCatalog.BuildDefault(age), preferences, cleanupAutomation, _navigator, notifier, logger);
         Capture = new(_navigator, logger);
     }
 

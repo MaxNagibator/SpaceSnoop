@@ -9,7 +9,7 @@ namespace SpaceSnoop.Wpf.Tests;
 [TestFixture]
 public class AgentToolPolicyTests
 {
-    private static readonly string[] MutatingTools = ["sync_current", "archive_directory", "mark_for_deletion"];
+    private static readonly string[] MutatingTools = ["sync_current", "archive_directory", "mark_for_deletion", "cleanup_run"];
 
     [Test]
     public void Без_разрешения_мутаций_изменяющие_инструменты_запрещены()
