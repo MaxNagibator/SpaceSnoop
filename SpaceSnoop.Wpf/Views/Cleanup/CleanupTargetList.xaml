@@ -31,7 +31,7 @@
         <Style x:Key="Cleanup.SecondaryActions"
                TargetType="StackPanel">
             <Setter Property="Opacity"
-                    Value="0" />
+                    Value="0.55" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Border}}"
                              Value="True">
