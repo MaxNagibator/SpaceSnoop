@@ -70,13 +70,25 @@ public sealed partial class DockerCompactViewModel : ObservableObject
         _owner.IsBusy = true;
         _owner.StatusText = "Сжимаю образ диска Docker…";
         var dockerStopped = false;
+        var settled = 0;
         try
         {
             _logger.DockerCompactStarted();
             var uiContext = SynchronizationContext.Current;
 
+            void Settle(string text)
+            {
+                Volatile.Write(ref settled, 1);
+                _owner.StatusText = text;
+            }
+
             void AnnounceCompacting()
             {
+                if (Volatile.Read(ref settled) != 0)
+                {
+                    return;
+                }
+
                 _owner.StatusText = "Сжимаю образ disk\\docker_data.vhdx… Отмена недоступна после запуска diskpart.";
                 _owner.NotifyCancelChanged();
             }
@@ -108,9 +120,10 @@ public sealed partial class DockerCompactViewModel : ObservableObject
             {
                 if (!await ConfirmWslShutdownFallbackAsync(result))
                 {
-                    _owner.StatusText = result.DockerStopped
+                    Settle(result.DockerStopped
                         ? "Сжатие отменено. Docker остановлен – запустите его заново."
-                        : "Сжатие отменено.";
+                        : "Сжатие отменено.");
+
                     return;
                 }
 
@@ -130,9 +143,11 @@ public sealed partial class DockerCompactViewModel : ObservableObject
             if (result.Status == DockerCompactStatus.Canceled)
             {
                 _logger.DockerCompactCancelled();
-                _owner.StatusText = result.DockerStopped
+
+                Settle(result.DockerStopped
                     ? "Сжатие отменено. Docker остановлен – запустите его заново."
-                    : "Сжатие отменено.";
+                    : "Сжатие отменено.");
+
                 return;
             }
 
@@ -141,20 +156,24 @@ public sealed partial class DockerCompactViewModel : ObservableObject
                 var failure = new InvalidOperationException(result.Summary);
                 _logger.DockerCompactFailed(failure);
                 _dialogs.Error("Сжатие диска Docker", result.ToDisplayText());
-                _owner.StatusText = result.DockerStopped
+
+                Settle(result.DockerStopped
                     ? "Сжатие не выполнено. Docker остановлен – запустите его заново."
-                    : "Сжатие не выполнено.";
+                    : "Сжатие не выполнено.");
+
                 return;
             }
 
             _logger.DockerCompactFinished(result.Summary);
             _dialogs.Info("Сжатие диска Docker", result.ToDisplayText());
-            _owner.StatusText = "Готово. Запустите Docker заново.";
+            Settle("Готово. Запустите Docker заново.");
             _owner.ForgetSnapshot();
         }
         catch (OperationCanceledException)
         {
             _logger.DockerCompactCancelled();
+            Volatile.Write(ref settled, 1);
+
             _owner.StatusText = dockerStopped
                 ? "Сжатие отменено. Docker остановлен – запустите его заново."
                 : "Сжатие отменено.";
@@ -163,6 +182,8 @@ public sealed partial class DockerCompactViewModel : ObservableObject
         {
             _logger.DockerCompactFailed(ex);
             _dialogs.Error("Сжатие диска Docker", ex.Message);
+            Volatile.Write(ref settled, 1);
+
             _owner.StatusText = dockerStopped
                 ? "Сжатие не выполнено. Docker остановлен – запустите его заново."
                 : "Сжатие не выполнено.";

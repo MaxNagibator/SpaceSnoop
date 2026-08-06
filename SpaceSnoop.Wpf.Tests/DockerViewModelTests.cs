@@ -23,6 +23,28 @@ public sealed class DockerViewModelTests
     }
 
     [Test]
+    public async Task Запоздавший_доклад_о_стадии_не_перетирает_итог()
+    {
+        var vm = CreateViewModel(diskpart: Success("DiskPart successfully compacted the virtual disk file."));
+        var context = new DeferringSynchronizationContext();
+        var previous = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(context);
+
+        try
+        {
+            await vm.Compact.RunCommand.ExecuteAsync(null);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previous);
+        }
+
+        context.RunPending();
+
+        Assert.That(vm.StatusText, Is.EqualTo("Готово. Запустите Docker заново."));
+    }
+
+    [Test]
     public async Task Провал_diskpart_оставляет_статус_об_остановленном_Docker()
     {
         var vm = CreateViewModel(diskpart: new(1, string.Empty, "DiskPart error: compact failed"));
@@ -71,6 +93,27 @@ public sealed class DockerViewModelTests
     private static DockerProcessResult Success(string output = "")
     {
         return new(0, output, string.Empty);
+    }
+
+    private sealed class DeferringSynchronizationContext : SynchronizationContext
+    {
+        private readonly List<(SendOrPostCallback Callback, object? State)> _pending = [];
+
+        public override void Post(SendOrPostCallback callback, object? state)
+        {
+            _pending.Add((callback, state));
+        }
+
+        public void RunPending()
+        {
+            var pending = _pending.ToArray();
+            _pending.Clear();
+
+            foreach (var (callback, state) in pending)
+            {
+                callback(state);
+            }
+        }
     }
 
     private sealed class StaticSettingsProvider(DockerDesktopSettings settings) : IDockerDesktopSettingsProvider
