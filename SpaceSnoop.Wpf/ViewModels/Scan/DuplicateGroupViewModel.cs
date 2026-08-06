@@ -4,12 +4,13 @@ namespace SpaceSnoop.Wpf.ViewModels.Scan;
 
 public sealed class DuplicateGroupViewModel
 {
-    internal DuplicateGroupViewModel(DuplicateGroup group, Func<IReadOnlyList<SpaceBase>, bool, int> mark)
+    internal DuplicateGroupViewModel(DuplicateGroup group, string? root, Func<IReadOnlyList<SpaceBase>, bool, int> mark)
     {
-        Members = [.. group.Members.Select(x => new DuplicateMemberViewModel(x, mark))];
+        Members = [.. group.Members.Select(x => new DuplicateMemberViewModel(x, root, mark))];
         SizeText = SizeFormatter.Format(group.Size);
         ReclaimText = SizeFormatter.Format(group.ReclaimableBytes);
         CountText = Plural.Format(group.Members.Count, "файл", "файла", "файлов");
+        DetailText = $"{CountText} по {SizeText}";
         OmittedText = group.OmittedMembers > 0 ? $"ещё {group.OmittedMembers:N0} не показано" : string.Empty;
     }
 
@@ -20,6 +21,8 @@ public sealed class DuplicateGroupViewModel
     public string ReclaimText { get; }
 
     public string CountText { get; }
+
+    public string DetailText { get; }
 
     public string OmittedText { get; }
 

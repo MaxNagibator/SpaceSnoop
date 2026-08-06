@@ -18,10 +18,20 @@ public sealed partial class ScanDuplicatesViewModel : ObservableObject
     private bool _suppressPersist;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowInitialEmpty))]
+    [NotifyPropertyChangedFor(nameof(ShowNothingFound))]
     private bool _hasResult;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowNothingFound))]
+    private bool _hasGroups;
+
+    [ObservableProperty]
     private string _summaryText = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasReclaim))]
+    private string _reclaimText = string.Empty;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasNotice))]
@@ -61,12 +71,25 @@ public sealed partial class ScanDuplicatesViewModel : ObservableObject
 
     public bool HasNotice => NoticeText.Length > 0;
 
+    public bool HasReclaim => ReclaimText.Length > 0;
+
+    public bool ShowInitialEmpty => !HasResult;
+
+    public bool ShowNothingFound => HasResult && !HasGroups;
+
     internal void Clear()
     {
         Groups.Clear();
         HasResult = false;
+        HasGroups = false;
         SummaryText = string.Empty;
+        ReclaimText = string.Empty;
         NoticeText = string.Empty;
+    }
+
+    internal static string DescribeReclaim(DuplicateReport report)
+    {
+        return report.Groups.Count == 0 ? string.Empty : $"вернёт {SizeFormatter.Format(report.ReclaimableBytes)}";
     }
 
     internal static string DescribeReport(DuplicateReport report)
@@ -76,7 +99,7 @@ public sealed partial class ScanDuplicatesViewModel : ObservableObject
             return $"Дубликатов не найдено · проверено файлов: {report.Examined:N0}";
         }
 
-        return $"Групп: {report.Groups.Count:N0} · вернёт {SizeFormatter.Format(report.ReclaimableBytes)} · проверено файлов: {report.Examined:N0}";
+        return $"Групп: {report.Groups.Count:N0} · проверено файлов: {report.Examined:N0}";
     }
 
     internal static string DescribeLimits(DuplicateReport report)
@@ -110,6 +133,8 @@ public sealed partial class ScanDuplicatesViewModel : ObservableObject
             MinSizeMb = clamped;
             return;
         }
+
+        LowerThresholdCommand.NotifyCanExecuteChanged();
 
         if (!_suppressPersist)
         {
@@ -155,19 +180,36 @@ public sealed partial class ScanDuplicatesViewModel : ObservableObject
         Apply(report);
     }
 
+    private bool CanLowerThreshold()
+    {
+        return MinSizeMb > AppDefaults.ScanDuplicatesMinSizeMbMin && CanFind();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanLowerThreshold))]
+    private async Task LowerThresholdAsync()
+    {
+        MinSizeMb = AppDefaults.ScanDuplicatesMinSizeMbMin;
+
+        await FindAsync();
+    }
+
     internal void Apply(DuplicateReport report)
     {
+        var root = _root()?.AbsolutePath;
+
         Groups.Clear();
 
         foreach (var group in report.Groups)
         {
-            Groups.Add(new(group, _mark));
+            Groups.Add(new(group, root, _mark));
         }
 
         SummaryText = DescribeReport(report);
+        ReclaimText = DescribeReclaim(report);
         NoticeText = DescribeLimits(report);
+        HasGroups = Groups.Count > 0;
         HasResult = true;
 
-        _notifier.Notify(SummaryText);
+        _notifier.Notify(HasReclaim ? $"{SummaryText} · {ReclaimText}" : SummaryText);
     }
 }

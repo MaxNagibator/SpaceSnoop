@@ -12,6 +12,104 @@
              d:DesignHeight="420"
              d:DesignWidth="560">
 
+    <UserControl.Resources>
+        <Style x:Key="DuplicateKindIcon"
+               TargetType="iconPacks:PackIconLucide">
+            <Setter Property="Width"
+                    Value="13" />
+            <Setter Property="Height"
+                    Value="13" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Setter Property="Margin"
+                    Value="0,0,8,0" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource State.Warning}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ReclaimsSpace}"
+                             Value="True">
+                    <Setter Property="Visibility"
+                            Value="Hidden" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="DuplicateName"
+               TargetType="TextBlock">
+            <Setter Property="FontFamily"
+                    Value="{DynamicResource Font.Mono}" />
+            <Setter Property="FontSize"
+                    Value="{DynamicResource Font.Size.S}" />
+            <Setter Property="FontWeight"
+                    Value="SemiBold" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Primary}" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Setter Property="TextWrapping"
+                    Value="NoWrap" />
+            <Setter Property="TextTrimming"
+                    Value="CharacterEllipsis" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsMarked}"
+                             Value="True">
+                    <Setter Property="TextDecorations"
+                            Value="Strikethrough" />
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.Error}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="DuplicateDirectory"
+               TargetType="TextBlock">
+            <Setter Property="FontFamily"
+                    Value="{DynamicResource Font.Mono}" />
+            <Setter Property="FontSize"
+                    Value="{DynamicResource Font.Size.S}" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Muted}" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Setter Property="Margin"
+                    Value="10,0,0,0" />
+            <Setter Property="TextWrapping"
+                    Value="NoWrap" />
+            <Setter Property="TextTrimming"
+                    Value="CharacterEllipsis" />
+        </Style>
+
+        <Style x:Key="DuplicateMarkToggle"
+               TargetType="ToggleButton"
+               BasedOn="{StaticResource ToggleButton.Filter}">
+            <Setter Property="MinWidth"
+                    Value="0" />
+            <Setter Property="Padding"
+                    Value="8,2" />
+            <Setter Property="Margin"
+                    Value="10,0,0,0" />
+            <Setter Property="Opacity"
+                    Value="0.55" />
+            <Style.Triggers>
+                <Trigger Property="IsChecked"
+                         Value="True">
+                    <Setter Property="Opacity"
+                            Value="1" />
+                </Trigger>
+                <Trigger Property="IsKeyboardFocusWithin"
+                         Value="True">
+                    <Setter Property="Opacity"
+                            Value="1" />
+                </Trigger>
+                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Border}}"
+                             Value="True">
+                    <Setter Property="Opacity"
+                            Value="1" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -37,22 +135,34 @@
                         Orientation="Horizontal"
                         VerticalAlignment="Center"
                         Margin="12,0,0,0">
-                <TextBlock Text="От, МБ"
+                <TextBlock Text="Файлы от"
                            Style="{StaticResource Caption}"
                            VerticalAlignment="Center"
                            Margin="0,0,6,0" />
                 <TextBox Text="{Binding MinSizeMb, UpdateSourceTrigger=LostFocus}"
-                         Width="72"
+                         Width="56"
+                         TextAlignment="Right"
                          VerticalAlignment="Center"
                          ToolTip="Файлы меньше порога не рассматриваются. Порог поднимают, когда групп слишком много." />
+                <TextBlock Text="МБ"
+                           Style="{StaticResource Caption}"
+                           VerticalAlignment="Center"
+                           Margin="6,0,0,0" />
             </StackPanel>
 
-            <TextBlock Grid.Column="2"
-                       Text="{Binding SummaryText}"
-                       Style="{StaticResource Caption}"
-                       HorizontalAlignment="Right"
-                       VerticalAlignment="Center"
-                       TextTrimming="CharacterEllipsis" />
+            <StackPanel Grid.Column="2"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Margin="12,0,0,0">
+                <TextBlock Text="{Binding ReclaimText}"
+                           Style="{StaticResource StatValue}"
+                           Visibility="{Binding HasReclaim, Converter={StaticResource BoolToVisibility}}" />
+                <TextBlock Text="{Binding SummaryText}"
+                           Style="{StaticResource Caption}"
+                           Margin="10,0,0,0"
+                           TextTrimming="CharacterEllipsis" />
+            </StackPanel>
         </Grid>
 
         <Grid Grid.Row="1"
@@ -83,7 +193,7 @@
                  BorderThickness="0"
                  HorizontalContentAlignment="Stretch"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                 Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}"
+                 Visibility="{Binding HasGroups, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}"
                  VirtualizingStackPanel.IsVirtualizing="True"
                  VirtualizingStackPanel.VirtualizationMode="Recycling">
             <ListBox.ItemContainerStyle>
@@ -107,14 +217,10 @@
                             Padding="10,8">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{Binding SizeText}"
+                                <TextBlock Text="{Binding ReclaimText, StringFormat=вернёт {0}}"
                                            Style="{StaticResource StatValue}"
                                            VerticalAlignment="Center" />
-                                <TextBlock Text="{Binding CountText}"
-                                           Style="{StaticResource Caption}"
-                                           VerticalAlignment="Center"
-                                           Margin="10,0,0,0" />
-                                <TextBlock Text="{Binding ReclaimText, StringFormat=вернёт {0}}"
+                                <TextBlock Text="{Binding DetailText}"
                                            Style="{StaticResource Caption}"
                                            VerticalAlignment="Center"
                                            Margin="10,0,0,0" />
@@ -129,42 +235,83 @@
                                           Margin="0,6,0,0">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate DataType="{x:Type vm:DuplicateMemberViewModel}">
-                                        <Grid Margin="0,2,0,2">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto" />
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
+                                        <Border x:Name="Row"
+                                                Background="Transparent"
+                                                CornerRadius="4"
+                                                Padding="4,0"
+                                                Height="{DynamicResource Control.Height.Compact}"
+                                                ToolTip="{Binding Path}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*"
+                                                                      MinWidth="64" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
 
-                                            <iconPacks:PackIconLucide Grid.Column="0"
-                                                                      Kind="{Binding KindIconKind}"
-                                                                      Width="13"
-                                                                      Height="13"
-                                                                      VerticalAlignment="Center"
-                                                                      Margin="0,0,8,0"
-                                                                      Foreground="{DynamicResource Fg.Muted}"
-                                                                      ToolTip="{Binding KindText}" />
+                                                <iconPacks:PackIconLucide Grid.Column="0"
+                                                                          Style="{StaticResource DuplicateKindIcon}"
+                                                                          Kind="{Binding KindIconKind}"
+                                                                          ToolTip="{Binding KindText}" />
 
-                                            <TextBlock Grid.Column="1"
-                                                       Text="{Binding Path}"
-                                                       FontFamily="{DynamicResource Font.Mono}"
-                                                       FontSize="{DynamicResource Font.Size.S}"
-                                                       Foreground="{DynamicResource Fg.Primary}"
-                                                       VerticalAlignment="Center"
-                                                       TextWrapping="NoWrap"
-                                                       TextTrimming="CharacterEllipsis"
-                                                       ToolTip="{Binding Path}" />
+                                                <TextBlock Grid.Column="1"
+                                                           Style="{StaticResource DuplicateName}"
+                                                           Text="{Binding Name}"
+                                                           MaxWidth="340" />
 
-                                            <ToggleButton Grid.Column="2"
-                                                          Style="{StaticResource ToggleButton.Filter}"
-                                                          IsChecked="{Binding IsMarked, Mode=OneWay}"
-                                                          Command="{Binding ToggleMarkCommand}"
-                                                          Content="Пометить"
-                                                          MinWidth="0"
-                                                          Padding="8,2"
-                                                          Margin="10,0,0,0"
-                                                          ToolTip="Пометить файл на удаление. Удаление – кнопкой «Удалить помеченное», в корзину." />
-                                        </Grid>
+                                                <TextBlock Grid.Column="2"
+                                                           Style="{StaticResource DuplicateDirectory}"
+                                                           Text="{Binding Directory}" />
+
+                                                <TextBlock Grid.Column="3"
+                                                           Style="{StaticResource Caption}"
+                                                           Text="{Binding StateText}"
+                                                           Foreground="{DynamicResource State.Warning}"
+                                                           Margin="10,0,0,0" />
+
+                                                <ToggleButton Grid.Column="4"
+                                                              Style="{StaticResource DuplicateMarkToggle}"
+                                                              IsChecked="{Binding IsMarked, Mode=OneWay}"
+                                                              Command="{Binding ToggleMarkCommand}"
+                                                              ToolTip="Пометить файл на удаление. Удаление – кнопкой «Удалить помеченное», в корзину.">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Check}"
+                                                                                  Width="12"
+                                                                                  Height="12"
+                                                                                  VerticalAlignment="Center"
+                                                                                  Margin="0,0,6,0"
+                                                                                  Visibility="{Binding IsMarked, Converter={StaticResource BoolToVisibility}}" />
+                                                        <TextBlock VerticalAlignment="Center">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Text"
+                                                                            Value="Пометить" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsMarked}"
+                                                                                     Value="True">
+                                                                            <Setter Property="Text"
+                                                                                    Value="Помечен" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                    </StackPanel>
+                                                </ToggleButton>
+                                            </Grid>
+                                        </Border>
+
+                                        <DataTemplate.Triggers>
+                                            <Trigger SourceName="Row"
+                                                     Property="IsMouseOver"
+                                                     Value="True">
+                                                <Setter TargetName="Row"
+                                                        Property="Background"
+                                                        Value="{DynamicResource Bg.SurfaceMute}" />
+                                            </Trigger>
+                                        </DataTemplate.Triggers>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -184,6 +331,18 @@
                               ActionCommand="{Binding FindCommand}"
                               VerticalAlignment="Center"
                               HorizontalAlignment="Center"
-                              Visibility="{Binding HasResult, Converter={StaticResource InverseBoolToVisibility}, FallbackValue=Visible}" />
+                              Visibility="{Binding ShowInitialEmpty, Converter={StaticResource BoolToVisibility}, FallbackValue=Visible}" />
+
+        <keepshell:EmptyState Grid.Row="2"
+                              Icon="SearchX"
+                              IconSize="40"
+                              Heading="Дубликатов не найдено"
+                              Description="Ни один файл выше порога размера не совпал с другим побайтно. Порог можно опустить – тогда в поиск попадут и мелкие файлы, но групп станет заметно больше."
+                              DescriptionMaxWidth="440"
+                              ActionText="Искать от 0 МБ"
+                              ActionCommand="{Binding LowerThresholdCommand}"
+                              VerticalAlignment="Center"
+                              HorizontalAlignment="Center"
+                              Visibility="{Binding ShowNothingFound, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
     </Grid>
 </UserControl>

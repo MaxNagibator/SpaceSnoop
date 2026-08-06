@@ -10,18 +10,24 @@ public sealed partial class DuplicateMemberViewModel : ObservableObject
     [ObservableProperty]
     private bool _isMarked;
 
-    internal DuplicateMemberViewModel(DuplicateMember member, Func<IReadOnlyList<SpaceBase>, bool, int> mark)
+    internal DuplicateMemberViewModel(DuplicateMember member, string? root, Func<IReadOnlyList<SpaceBase>, bool, int> mark)
     {
         _mark = mark;
         Space = member.Space;
         Path = member.Path;
         Kind = member.Kind;
+        Name = DuplicateText.Name(member.Path);
+        Directory = DuplicateText.Directory(member.Path, root);
         IsMarked = member.Space.IsDeleted;
     }
 
     public FileSpace Space { get; }
 
     public string Path { get; }
+
+    public string Name { get; }
+
+    public string Directory { get; }
 
     public DuplicateMemberKind Kind { get; }
 
@@ -33,6 +39,8 @@ public sealed partial class DuplicateMemberViewModel : ObservableObject
         DuplicateMemberKind.SymbolicLink => "символьная ссылка · тот же файл, места не вернёт",
         _ => "копия",
     };
+
+    public string StateText => ReclaimsSpace ? string.Empty : "ссылка · места не вернёт";
 
     public PackIconLucideKind KindIconKind => Kind switch
     {

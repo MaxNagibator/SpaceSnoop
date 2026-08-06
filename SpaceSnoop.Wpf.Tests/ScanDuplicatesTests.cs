@@ -14,11 +14,42 @@ public class ScanDuplicatesTests
     }
 
     [Test]
-    public void Итог_называет_группы_и_возвращаемое_место()
+    public void Итог_называет_группы_отдельно_от_возвращаемого_места()
     {
         var report = new DuplicateReport([Group()], 4096, 8, 0, 0, []);
 
-        Assert.That(ScanDuplicatesViewModel.DescribeReport(report), Does.StartWith("Групп: 1 · вернёт "));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(ScanDuplicatesViewModel.DescribeReport(report), Is.EqualTo("Групп: 1 · проверено файлов: 8"));
+            Assert.That(ScanDuplicatesViewModel.DescribeReclaim(report), Does.StartWith("вернёт "));
+        }
+    }
+
+    [Test]
+    public void Пустой_результат_возвращаемого_места_не_называет()
+    {
+        Assert.That(ScanDuplicatesViewModel.DescribeReclaim(new([], 0, 128, 0, 0, [])), Is.Empty);
+    }
+
+    [TestCase(@"C:\Data\Загрузки\отпуск.jpg", @"C:\Data", "Загрузки")]
+    [TestCase(@"C:\Data\отпуск.jpg", @"C:\Data", ".")]
+    [TestCase(@"D:\Прочее\отпуск.jpg", @"C:\Data", @"D:\Прочее")]
+    public void Каталог_показывается_от_корня_скана(string path, string root, string expected)
+    {
+        Assert.That(DuplicateText.Directory(path, root), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void Длинный_каталог_обрезается_слева()
+    {
+        var directory = DuplicateText.Directory(@"C:\" + new string('и', 80) + @"\файл.bin", null, 20);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(directory, Has.Length.EqualTo(20));
+            Assert.That(directory, Does.StartWith("…"));
+            Assert.That(directory, Does.EndWith(new string('и', 19)));
+        }
     }
 
     [Test]
