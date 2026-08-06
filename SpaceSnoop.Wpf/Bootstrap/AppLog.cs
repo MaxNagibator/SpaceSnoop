@@ -43,6 +43,10 @@ internal static partial class AppLog
         Message = "Не удалось подгрузить заполненность дисков")]
     public static partial void DriveSizesFailed(this ILogger logger, Exception exception);
 
+    [LoggerMessage(EventId = 1008, Level = LogLevel.Information,
+        Message = "Обход в один поток: {Path} лежит на диске со штрафом за позиционирование (запрошено потоков: {Requested})")]
+    public static partial void ScanMediaLimited(this ILogger logger, string path, int requested);
+
     [LoggerMessage(EventId = 1100, Level = LogLevel.Information,
         Message = "Старт удаления: {Count} элемент(ов), {BytesText} (безвозвратно: {Permanent})")]
     public static partial void DeletionStarted(this ILogger logger, int count, string bytesText, bool permanent);

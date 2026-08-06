@@ -165,7 +165,7 @@ public sealed partial class ScanDuplicatesViewModel : ObservableObject
         var options = DuplicateOptions.Default with
         {
             MinSize = Math.Max(1, (long)MinSizeMb * 1024 * 1024),
-            MaxParallelism = _preferences.UseMultithreading ? _preferences.MaxParallelism : 1,
+            MaxParallelism = _preferences.ResolveParallelism(root.AbsolutePath),
         };
 
         var dialog = _dialogFactory.Create(new(root, options));

@@ -9,6 +9,7 @@ public static class AppDefaults
     public const double IntensityMax = 20;
 
     public const bool ScanMultithreadingDefault = true;
+    public const bool ScanMediaAwareDefault = true;
     public const ScanSortField ScanSortModeDefault = ScanSortField.Size;
     public const bool ScanSortInvertDefault = true;
     public const bool ScanTreemapDefault = false;

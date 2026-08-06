@@ -42,7 +42,7 @@ internal sealed class McpScanTools(
 
         // Те же параметры обхода, что и у человека на странице «Сканирование».
         var multithreaded = scanPreferences.UseMultithreading;
-        var parallelism = scanPreferences.MaxParallelism;
+        var parallelism = scanPreferences.ResolveParallelism(path);
 
         var directory = new DirectoryInfo(path);
 
@@ -55,9 +55,9 @@ internal sealed class McpScanTools(
                     using var probe = new BackgroundScanProbe(performance,
                         runs,
                         ScanProgressViewModel.EstimateTotalBytes(directory),
-                        multithreaded ? parallelism : 1);
+                        parallelism);
 
-                    var root = multithreaded
+                    var root = parallelism > 1
                         ? calculator.CalculateMultithreaded(directory, parallelism, probe.Progress, cancellationToken)
                         : calculator.Calculate(directory, probe.Progress, cancellationToken);
 
@@ -146,7 +146,7 @@ internal sealed class McpScanTools(
         var options = DuplicateOptions.Default with
         {
             MinSize = minSize,
-            MaxParallelism = scanPreferences.UseMultithreading ? scanPreferences.MaxParallelism : 1,
+            MaxParallelism = scanPreferences.ResolveParallelism(root.AbsolutePath),
             GroupLimit = entryLimit,
             MemberLimit = entryLimit,
         };

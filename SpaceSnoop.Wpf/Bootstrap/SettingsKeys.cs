@@ -22,6 +22,7 @@ public static class SettingsKeys
 
     public const string ScanMultithreading = "wpf.scan.multithreading";
     public const string ScanParallelism = "wpf.scan.parallelism";
+    public const string ScanMediaAware = "wpf.scan.media_aware";
     public const string ScanIntensity = "wpf.scan.intensity";
     public const string ScanLastDrive = "wpf.scan.last_drive";
     public const string ScanSortMode = "wpf.scan.sort_mode";

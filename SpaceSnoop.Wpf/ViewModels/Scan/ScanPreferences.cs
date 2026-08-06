@@ -12,6 +12,9 @@ public sealed partial class ScanPreferences : ObservableObject
     private int _maxParallelism = Environment.ProcessorCount;
 
     [ObservableProperty]
+    private bool _mediaAware = AppDefaults.ScanMediaAwareDefault;
+
+    [ObservableProperty]
     private double _intensity = AppDefaults.IntensityDefault;
 
     [ObservableProperty]
@@ -24,12 +27,23 @@ public sealed partial class ScanPreferences : ObservableObject
         _suppressPersist = true;
         UseMultithreading = _settings.GetBool(SettingsKeys.ScanMultithreading, AppDefaults.ScanMultithreadingDefault);
         MaxParallelism = Math.Clamp(_settings.GetInt(SettingsKeys.ScanParallelism, ProcessorCount), 1, ProcessorCount);
+        MediaAware = _settings.GetBool(SettingsKeys.ScanMediaAware, AppDefaults.ScanMediaAwareDefault);
         Intensity = _settings.GetDouble(SettingsKeys.ScanIntensity, AppDefaults.IntensityDefault);
         RevealFiles = _settings.GetBool(SettingsKeys.ScanRevealFiles, AppDefaults.ScanRevealFilesDefault);
         _suppressPersist = false;
     }
 
     public int ProcessorCount { get; } = Environment.ProcessorCount;
+
+    public int ResolveParallelism(string path)
+    {
+        if (!UseMultithreading)
+        {
+            return 1;
+        }
+
+        return MediaAware ? StorageMedia.LimitParallelism(path, MaxParallelism) : MaxParallelism;
+    }
 
     public string ParallelismHint =>
         $"Сколько каталогов обходить одновременно. "
@@ -49,6 +63,14 @@ public sealed partial class ScanPreferences : ObservableObject
         if (!_suppressPersist)
         {
             _settings.SetInt(SettingsKeys.ScanParallelism, value);
+        }
+    }
+
+    partial void OnMediaAwareChanged(bool value)
+    {
+        if (!_suppressPersist)
+        {
+            _settings.SetBool(SettingsKeys.ScanMediaAware, value);
         }
     }
 

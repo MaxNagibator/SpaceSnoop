@@ -56,6 +56,18 @@
                 </StackPanel>
             </Grid>
 
+            <CheckBox Content="Учитывать тип носителя"
+                      IsChecked="{Binding Scan.MediaAware, Mode=TwoWay}"
+                      Margin="0,16,0,0"
+                      IsEnabled="{Binding Scan.UseMultithreading}"
+                      VerticalAlignment="Center" />
+            <TextBlock Style="{StaticResource Setting.CheckHint}"
+                       Text="На диске со штрафом за позиционирование обход идёт в один поток." />
+            <Expander Style="{StaticResource Setting.CheckDetails}">
+                <TextBlock Style="{StaticResource Setting.Hint}"
+                           Text="У вращающегося диска параллельный обход заставляет головку метаться между каталогами и отнимает больше, чем даёт. Тип носителя спрашивается у драйвера один раз на том; сетевые и съёмные диски считаются неизвестными, и для них настройка ничего не меняет." />
+            </Expander>
+
             <Grid Margin="0,16,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />

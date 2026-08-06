@@ -421,14 +421,20 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
         SelectedNode = null;
 
-        var progress = Progress.Begin(directory, path, Preferences.UseMultithreading ? Preferences.MaxParallelism : 1);
+        var parallelism = Preferences.ResolveParallelism(path);
+        var progress = Progress.Begin(directory, path, parallelism);
 
-        _logger.ScanStarted(path, Preferences.UseMultithreading, Preferences.MaxParallelism);
+        if (parallelism == 1 && Preferences.UseMultithreading && Preferences.MaxParallelism > 1)
+        {
+            _logger.ScanMediaLimited(path, Preferences.MaxParallelism);
+        }
+
+        _logger.ScanStarted(path, Preferences.UseMultithreading, parallelism);
 
         try
         {
-            var result = await Task.Run(() => Preferences.UseMultithreading
-                    ? _calculator.CalculateMultithreaded(directory, Preferences.MaxParallelism, progress, token)
+            var result = await Task.Run(() => parallelism > 1
+                    ? _calculator.CalculateMultithreaded(directory, parallelism, progress, token)
                     : _calculator.Calculate(directory, progress, token),
                 token);
 
