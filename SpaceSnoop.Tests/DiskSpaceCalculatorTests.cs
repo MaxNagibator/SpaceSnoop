@@ -204,17 +204,54 @@ public class DiskSpaceCalculatorTests
             : calculator.Calculate(new(_tempDir), source.Token));
     }
 
-    [Test]
-    public void CalculateMultithreaded_KeepsPartialContentOfUnreadableDirectory()
+    [TestCase(true)]
+    [TestCase(false)]
+    public void Calculate_KeepsReadableSiblingsOfUnreadableDirectory(bool multithreaded)
+    {
+        var closed = Path.Combine(_tempDir, "closed");
+        Directory.CreateDirectory(closed);
+        File.WriteAllText(Path.Combine(closed, "f.txt"), new string('f', 600));
+        TestAcl.DenyEnumeration(closed);
+
+        try
+        {
+            var calculator = new DiskSpaceCalculator();
+
+            var result = multithreaded
+                ? calculator.CalculateMultithreaded(new(_tempDir), 4, CancellationToken.None)
+                : calculator.Calculate(new(_tempDir), CancellationToken.None);
+
+            var blocked = result.SubDirectories.Single(x => x.Name == "closed");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(blocked.State, Is.EqualTo(SpaceState.Error));
+                Assert.That(result.TotalSize, Is.EqualTo(1500));
+                Assert.That(result.TotalFileCount, Is.EqualTo(5));
+            }
+        }
+        finally
+        {
+            TestAcl.AllowEnumeration(closed);
+        }
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void Calculate_GivesAbsolutePathsToTree(bool multithreaded)
     {
         var calculator = new DiskSpaceCalculator();
 
-        var result = calculator.CalculateMultithreaded(new(Path.Combine(_tempDir, "vanished")), 4, CancellationToken.None);
+        var result = multithreaded
+            ? calculator.CalculateMultithreaded(new(_tempDir), 4, CancellationToken.None)
+            : calculator.Calculate(new(_tempDir), CancellationToken.None);
+
+        var file = result.Files.Single(x => x.Name == "a.txt");
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(result.State, Is.EqualTo(SpaceState.Error));
-            Assert.That(result.TotalSize, Is.Zero);
+            Assert.That(result.AbsolutePath, Is.EqualTo(_tempDir));
+            Assert.That(file.AbsolutePath, Is.EqualTo(Path.Combine(_tempDir, "a.txt")));
         }
     }
 

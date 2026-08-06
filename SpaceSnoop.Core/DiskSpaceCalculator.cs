@@ -56,6 +56,7 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator>? logger = null)
         }
 
         root.AggregateTotals();
+        root.FixAbsolutePath(directory);
         return root;
     }
 
@@ -150,22 +151,32 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator>? logger = null)
         using var run = new ScanRun(cancel);
         run.Queue.Add(new(rootPath, root), cancel);
 
-        var threads = new Thread[degree];
+        var threads = new Thread?[degree];
 
-        for (var index = 0; index < degree; index++)
+        try
         {
-            threads[index] = new(() => Work(run, progress, cancel))
+            for (var index = 0; index < degree; index++)
             {
-                IsBackground = true,
-                Name = "SpaceSnoop scan",
-            };
+                var thread = new Thread(() => Work(run, progress, cancel))
+                {
+                    IsBackground = true,
+                    Name = "SpaceSnoop scan",
+                };
 
-            threads[index].Start();
+                thread.Start();
+                threads[index] = thread;
+            }
         }
-
-        foreach (var thread in threads)
+        catch (Exception exception)
         {
-            thread.Join();
+            run.Fail(exception);
+        }
+        finally
+        {
+            foreach (var thread in threads)
+            {
+                thread?.Join();
+            }
         }
 
         run.Failure?.Throw();
