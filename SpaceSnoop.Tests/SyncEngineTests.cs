@@ -278,6 +278,40 @@ public class SyncEngineTests
     }
 
     [Test]
+    public void CopyToRight_KeepsLockedFileNamedLikeTemp()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "new content");
+        File.WriteAllText(Path.Combine(_rightDir, "a.txt"), "old content");
+
+        var bystander = Path.Combine(_rightDir, "a.txt.sstmp");
+        File.WriteAllText(bystander, "bystander");
+
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("a.txt", "a.txt")
+        {
+            Status = ComparisonStatus.Modified,
+            Action = SyncAction.CopyToRight,
+        });
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
+
+        SyncReport report;
+
+        using (File.Open(bystander, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            report = engine.Execute(result, CancellationToken.None);
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.Errors, Is.Empty);
+            Assert.That(File.ReadAllText(Path.Combine(_rightDir, "a.txt")), Is.EqualTo("new content"));
+            Assert.That(File.ReadAllText(bystander), Is.EqualTo("bystander"));
+        }
+    }
+
+    [Test]
     public void CopyToRight_OverwritesReadOnlyDestination()
     {
         File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "new content");

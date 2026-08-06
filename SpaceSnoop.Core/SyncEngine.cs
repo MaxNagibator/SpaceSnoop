@@ -8,6 +8,7 @@ namespace SpaceSnoop.Core;
 public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = true, bool recycleOverwritten = false)
 {
     private const string TempSuffix = ".sstmp";
+    private const int TempNameAttempts = 20;
 
     public SyncReport Execute(ComparisonResult comparisonResult, CancellationToken cancel, IProgress<OperationProgress>? progress = null)
     {
@@ -104,23 +105,39 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         };
     }
 
-    // TODO: имя занимается проверкой существования, между ней и копированием остаётся окно; апгрейд – эксклюзивное создание (FileMode.CreateNew) при первой жалобе на пропавший файл рядом с синхронизируемым
     private static string ReserveTempPath(string destination)
     {
-        var temp = destination + TempSuffix;
-        var index = 2;
-
-        while (File.Exists(temp) || Directory.Exists(temp))
+        for (var index = 1; index <= TempNameAttempts; index++)
         {
-            temp = $"{destination}.{index++}{TempSuffix}";
+            var temp = index == 1 ? destination + TempSuffix : $"{destination}.{index}{TempSuffix}";
+
+            if (TryCreateExclusive(temp))
+            {
+                return temp;
+            }
         }
 
-        return temp;
+        throw new IOException($"Не удалось занять временное имя рядом с «{destination}»");
+    }
+
+    private static bool TryCreateExclusive(string path)
+    {
+        try
+        {
+            using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException && (File.Exists(path) || Directory.Exists(path)))
+        {
+            return false;
+        }
     }
 
     private void CopyAtomic(string source, string destination, TransferTracker tracker, CancellationToken cancel)
     {
         var temp = ReserveTempPath(destination);
+        var moved = false;
 
         try
         {
@@ -128,10 +145,11 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
             cancel.ThrowIfCancellationRequested();
             RecyclePrevious(destination);
             File.Move(temp, destination, true);
+            moved = true;
         }
         finally
         {
-            if (File.Exists(temp))
+            if (!moved && File.Exists(temp))
             {
                 File.Delete(temp);
             }
