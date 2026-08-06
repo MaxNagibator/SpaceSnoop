@@ -26,6 +26,12 @@ internal static partial class CoreLog
     [LoggerMessage(EventId = 1216, Level = LogLevel.Warning, Message = "Синхронизация: {Action} «{RelativePath}» отклонено, обход стороны неполон")]
     public static partial void SyncDeleteBlocked(this ILogger logger, SyncAction action, string relativePath);
 
+    [LoggerMessage(EventId = 1250, Level = LogLevel.Information, Message = "Дубликаты: групп {Groups}, вернёт {ReclaimableBytes} Б, проверено файлов {Examined}")]
+    public static partial void DuplicatesFinished(this ILogger logger, int groups, long reclaimableBytes, int examined);
+
+    [LoggerMessage(EventId = 1251, Level = LogLevel.Warning, Message = "Дубликаты: файл пропущен «{Path}»")]
+    public static partial void DuplicateFileSkipped(this ILogger logger, Exception exception, string path);
+
     [LoggerMessage(EventId = 1240, Level = LogLevel.Information, Message = "Очистка: начата цель «{TargetId}»")]
     public static partial void CleanupStarted(this ILogger logger, string targetId);
 
