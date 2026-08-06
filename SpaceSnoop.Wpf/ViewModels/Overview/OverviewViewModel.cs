@@ -67,7 +67,7 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
         if (run.Report is { } report)
         {
             row.Comparison = null;
-            row.ApplySyncReport(report);
+            row.ApplySyncReport(report, run.Verify);
         }
         else if (run.Comparison is { } comparison)
         {

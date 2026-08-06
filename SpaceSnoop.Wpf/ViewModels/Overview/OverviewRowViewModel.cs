@@ -43,8 +43,16 @@ public sealed partial class OverviewRowViewModel : ObservableObject
     private int _syncDeleted;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(StatusText), nameof(StatusIconKind), nameof(SyncHadErrors))]
+    [NotifyPropertyChangedFor(nameof(StatusText), nameof(StatusIconKind), nameof(SyncHadErrors), nameof(IsUnchanged), nameof(GroupOrder), nameof(GroupKey))]
     private int _syncErrors;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatusText), nameof(StatusIconKind), nameof(SyncHadErrors), nameof(SyncNotConverged), nameof(IsUnchanged), nameof(GroupOrder), nameof(GroupKey))]
+    private int _syncMismatches;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatusText), nameof(StatusIconKind), nameof(SyncHadErrors), nameof(SyncNotConverged), nameof(IsUnchanged), nameof(GroupOrder), nameof(GroupKey))]
+    private SyncVerifyState _syncVerify;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StatusText))]
@@ -178,7 +186,7 @@ public sealed partial class OverviewRowViewModel : ObservableObject
 
     public bool IsUnchanged =>
         Status == OverviewRunStatus.Compared && DiffCount == 0
-        || Status == OverviewRunStatus.Synced && SyncErrors == 0 && SyncCopied == 0 && SyncDeleted == 0;
+        || Status == OverviewRunStatus.Synced && SyncErrors == 0 && SyncCopied == 0 && SyncDeleted == 0 && !SyncNotConverged;
 
     public int GroupOrder => IsUnchanged ? 1 : 0;
 
@@ -204,7 +212,9 @@ public sealed partial class OverviewRowViewModel : ObservableObject
 
     public bool HasCounts => Status == OverviewRunStatus.Compared;
 
-    public bool SyncHadErrors => Status == OverviewRunStatus.Synced && SyncErrors > 0;
+    public bool SyncNotConverged => SyncMismatches > 0 || SyncVerify == SyncVerifyState.Interrupted;
+
+    public bool SyncHadErrors => Status == OverviewRunStatus.Synced && (SyncErrors > 0 || SyncNotConverged);
 
     public bool ShowNewerBadge => Status == OverviewRunStatus.Compared && _freshness.Verdict != NewerSide.None;
 
@@ -255,7 +265,7 @@ public sealed partial class OverviewRowViewModel : ObservableObject
         OverviewRunStatus.Comparing => PackIconLucideKind.Loader,
         OverviewRunStatus.Compared => DiffCount == 0 ? PackIconLucideKind.Check : PackIconLucideKind.GitCompareArrows,
         OverviewRunStatus.Syncing => PackIconLucideKind.RefreshCw,
-        OverviewRunStatus.Synced => SyncErrors > 0 ? PackIconLucideKind.TriangleAlert : PackIconLucideKind.FolderCheck,
+        OverviewRunStatus.Synced => SyncHadErrors ? PackIconLucideKind.TriangleAlert : PackIconLucideKind.FolderCheck,
         OverviewRunStatus.Unavailable => PackIconLucideKind.FolderX,
         OverviewRunStatus.Overlap => PackIconLucideKind.TriangleAlert,
         OverviewRunStatus.Skipped => PackIconLucideKind.SkipForward,
@@ -283,11 +293,13 @@ public sealed partial class OverviewRowViewModel : ObservableObject
         OnPropertyChanged(nameof(BreakdownText));
     }
 
-    public void ApplySyncReport(SyncReport report)
+    public void ApplySyncReport(SyncReport report, SyncVerifyState verify)
     {
         SyncCopied = report.CopiedCount;
         SyncDeleted = report.DeletedCount;
         SyncErrors = report.Errors.Count;
+        SyncMismatches = report.Mismatches.Count;
+        SyncVerify = verify;
         Status = OverviewRunStatus.Synced;
     }
 
@@ -351,6 +363,16 @@ public sealed partial class OverviewRowViewModel : ObservableObject
         if (SyncErrors > 0)
         {
             parts.Add($"ошибок {SyncErrors}");
+        }
+
+        if (SyncMismatches > 0)
+        {
+            parts.Add($"расхождений {SyncMismatches}");
+        }
+
+        if (SyncVerify == SyncVerifyState.Interrupted)
+        {
+            parts.Add("проверка прервана");
         }
 
         return parts.Count > 0 ? $"Синхронизировано: {string.Join(" · ", parts)}" : "Синхронизировано: изменений не потребовалось";

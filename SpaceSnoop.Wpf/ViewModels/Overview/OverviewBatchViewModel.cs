@@ -368,16 +368,18 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
         {
             var request = BuildCompareRequest(profile);
             var recycleOverwritten = _settings.GetBool(SettingsKeys.SyncRecycleOverwritten, AppDefaults.SyncRecycleOverwrittenDefault);
+            var verify = _settings.GetBool(SettingsKeys.SyncVerify, AppDefaults.SyncVerifyDefault);
 
             var run = await Task.Run(() =>
                 {
                     var result = _compare.Execute(request, rowCts.Token);
-                    var applied = _sync.Execute(new(result, SyncConflictPolicy.SkipUnresolved, SyncDeleteUi.Silent, false, recycleOverwritten), rowCts.Token);
+                    var applied = _sync.Execute(new(result, SyncConflictPolicy.SkipUnresolved, SyncDeleteUi.Silent, verify, recycleOverwritten), rowCts.Token);
                     return (Report: applied, Unreadable: result.IncompleteDirectories());
                 },
                 rowCts.Token);
 
             var report = run.Report;
+            var verifyState = SyncPlanNarrative.ResolveVerify(verify, report);
 
             if (run.Unreadable.Count > 0)
             {
@@ -385,10 +387,10 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
             }
 
             stopwatch.Stop();
-            row.ApplySyncReport(report);
+            row.ApplySyncReport(report, verifyState);
             row.ElapsedMs = (long)stopwatch.Elapsed.TotalMilliseconds;
             row.Error = null;
-            SyncLog.AppendSafe(SyncLogOrigin.Overview, profile.Name, report, SyncVerifyState.None, _logger);
+            SyncLog.AppendSafe(SyncLogOrigin.Overview, profile.Name, report, verifyState, _logger);
         }
         catch (OperationCanceledException) when (!token.IsCancellationRequested)
         {

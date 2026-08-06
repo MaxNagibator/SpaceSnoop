@@ -405,7 +405,7 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
         _lastReport = report;
         _outcomes = SyncOutcomes.Build(result, report.Errors, report.Mismatches);
         RaiseComparisonChanged(SyncComparisonChange.Applied);
-        RaiseProfileRun(null, report, (long)stopwatch.Elapsed.TotalMilliseconds);
+        RaiseProfileRun(null, report, (long)stopwatch.Elapsed.TotalMilliseconds, LastVerifyState);
         await ReadGitStateAsync();
 
         var verifyText = SyncPlanNarrative.DescribeVerify(LastVerifyState, report.Mismatches.Count);
@@ -454,11 +454,11 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
         _session.StatusCaption = $"Разрешено элементов: {count}.";
     }
 
-    private void RaiseProfileRun(ComparisonResult? comparison, SyncReport? report, long elapsedMs)
+    private void RaiseProfileRun(ComparisonResult? comparison, SyncReport? report, long elapsedMs, SyncVerifyState verify = SyncVerifyState.None)
     {
         if (_setup.ActiveProfileId is { } id)
         {
-            ProfileRunCompleted?.Invoke(new(id, comparison, report, elapsedMs));
+            ProfileRunCompleted?.Invoke(new(id, comparison, report, elapsedMs, verify));
         }
     }
 

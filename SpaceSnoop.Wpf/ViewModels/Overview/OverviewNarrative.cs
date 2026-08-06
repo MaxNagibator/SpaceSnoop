@@ -6,7 +6,7 @@ internal static class OverviewNarrative
     {
         return row.Status switch
         {
-            OverviewRunStatus.Synced when row.SyncErrors == 0 => (1, 0, 0),
+            OverviewRunStatus.Synced when !row.SyncHadErrors => (1, 0, 0),
             OverviewRunStatus.Synced or OverviewRunStatus.Error => (0, 1, 0),
             _ => (0, 0, 1),
         };
