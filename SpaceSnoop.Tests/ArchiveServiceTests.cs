@@ -74,6 +74,23 @@ public class ArchiveServiceTests
     }
 
     [Test]
+    public void Zip_OccupiedNameKeepsForeignFile()
+    {
+        File.WriteAllText(_zipPath, "чужой архив");
+
+        var service = new ArchiveService();
+
+        var failure = Assert.Throws<IOException>(() =>
+            service.ZipFiles(_sourceDir, SourceFiles(), _zipPath, CompressionLevel.Optimal, null, CancellationToken.None));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(failure!.Message, Does.Contain(Path.GetFileName(_zipPath)).And.Contain("занято"));
+            Assert.That(File.ReadAllText(_zipPath), Is.EqualTo("чужой архив"));
+        }
+    }
+
+    [Test]
     public void Zip_CancelledMidwayLeavesNoOrphanArchive()
     {
         var service = new ArchiveService();

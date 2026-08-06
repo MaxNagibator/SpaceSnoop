@@ -97,44 +97,47 @@ public sealed class ArchiveService
         long bytes = 0;
         var written = 0;
 
+        var target = CreateArchiveFile(zipPath);
+
         try
         {
-            using var target = new FileStream(zipPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-            using var zip = new ZipArchive(target, ZipArchiveMode.Create);
-
-            foreach (var file in content.Files)
+            using (target)
+            using (var zip = new ZipArchive(target, ZipArchiveMode.Create))
             {
-                token.ThrowIfCancellationRequested();
-
-                if (!File.Exists(file))
+                foreach (var file in content.Files)
                 {
-                    continue;
+                    token.ThrowIfCancellationRequested();
+
+                    if (!File.Exists(file))
+                    {
+                        continue;
+                    }
+
+                    var rel = Relative(prefix, file);
+
+                    bytes += WriteEntry(zip, file, rel, level, token);
+                    written++;
+                    progress?.Report(new(written, rel));
                 }
 
-                var rel = Relative(prefix, file);
-
-                bytes += WriteEntry(zip, file, rel, level, token);
-                written++;
-                progress?.Report(new(written, rel));
-            }
-
-            foreach (var directory in content.EmptyDirectories)
-            {
-                token.ThrowIfCancellationRequested();
-
-                if (!Directory.Exists(directory))
+                foreach (var directory in content.EmptyDirectories)
                 {
-                    continue;
+                    token.ThrowIfCancellationRequested();
+
+                    if (!Directory.Exists(directory))
+                    {
+                        continue;
+                    }
+
+                    var rel = Relative(prefix, directory) + "/";
+
+                    zip.CreateEntry(rel, level);
+                    written++;
+                    progress?.Report(new(written, rel));
                 }
 
-                var rel = Relative(prefix, directory) + "/";
-
-                zip.CreateEntry(rel, level);
-                written++;
-                progress?.Report(new(written, rel));
+                token.ThrowIfCancellationRequested();
             }
-
-            token.ThrowIfCancellationRequested();
         }
         catch
         {
@@ -143,6 +146,18 @@ public sealed class ArchiveService
         }
 
         return new(written, bytes);
+    }
+
+    private static FileStream CreateArchiveFile(string zipPath)
+    {
+        try
+        {
+            return new(zipPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException && (File.Exists(zipPath) || Directory.Exists(zipPath)))
+        {
+            throw new IOException($"Имя «{Path.GetFileName(zipPath)}» уже занято – архив не создан, существующий файл не тронут.", exception);
+        }
     }
 
     public VerifyResult VerifyCoverage(string root, string zipPath, CancellationToken token)
