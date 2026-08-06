@@ -141,6 +141,26 @@
                       Color="{StaticResource Heat.Color0}" />
     </LinearGradientBrush>
 
+    <Style x:Key="ToggleButton.Filter"
+           TargetType="ToggleButton"
+           BasedOn="{StaticResource ToggleButton.Toolbar}">
+        <Setter Property="MinWidth"
+                Value="0" />
+        <Setter Property="Padding"
+                Value="9,0" />
+        <Setter Property="Margin"
+                Value="0,0,8,4" />
+        <Setter Property="BorderBrush"
+                Value="{DynamicResource Border.Subtle}" />
+        <Style.Triggers>
+            <Trigger Property="IsChecked"
+                     Value="True">
+                <Setter Property="FontWeight"
+                        Value="{DynamicResource Font.Weight.Bold}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <LinearGradientBrush x:Key="DiffSpectrumVertical"
                          StartPoint="0,0"
                          EndPoint="0,1">

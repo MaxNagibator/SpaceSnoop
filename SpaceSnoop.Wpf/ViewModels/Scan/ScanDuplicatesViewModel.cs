@@ -155,7 +155,7 @@ public sealed partial class ScanDuplicatesViewModel : ObservableObject
         Apply(report);
     }
 
-    private void Apply(DuplicateReport report)
+    internal void Apply(DuplicateReport report)
     {
         Groups.Clear();
 

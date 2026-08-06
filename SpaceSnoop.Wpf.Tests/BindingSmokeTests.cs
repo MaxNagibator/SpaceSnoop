@@ -1,5 +1,7 @@
 ﻿using KeepShell.Bootstrap;
 using Microsoft.Extensions.DependencyInjection;
+using SpaceSnoop.Core;
+using SpaceSnoop.Core.Duplicates;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.ViewModels;
 using SpaceSnoop.Wpf.ViewModels.Cleanup;
@@ -202,6 +204,76 @@ public class BindingSmokeTests
             Assert.That(enabledBinding?.Status, Is.EqualTo(BindingStatus.Active), "Доступность тумблера зеркала не привязалась к странице.");
             Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
         });
+    }
+
+    [Test]
+    public void Панель_дубликатов_не_теряет_биндинги()
+    {
+        var report = FindDuplicates();
+        var page = _services.GetRequiredService<ScanViewModel>();
+
+        Assert.That(_shell.TryNavigate(SectionKey.Scan), Is.True, "Страница «Сканирование» не открылась.");
+        Settle();
+
+        _sink.Clear();
+        page.Duplicates.Apply(report);
+        page.ViewMode = ScanViewMode.Duplicates;
+        Settle();
+
+        var panel = ViewCapture.Find(_window, "Duplicates");
+
+        try
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.That(report.Groups, Has.Count.EqualTo(2), "Дерево-образец не дало двух групп дубликатов.");
+                Assert.That(panel?.IsVisible, Is.True, "Панель дубликатов не показана в третьем режиме.");
+                Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
+            });
+
+            SaveFrame(panel);
+        }
+        finally
+        {
+            page.ViewMode = ScanViewMode.Tree;
+            page.Duplicates.Clear();
+            Settle();
+        }
+    }
+
+    private static DuplicateReport FindDuplicates()
+    {
+        var root = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "spacesnoop-duplicates", Guid.NewGuid().ToString("N")));
+        var nested = root.CreateSubdirectory("Загрузки");
+
+        var photo = new byte[96 * 1024];
+        var archive = new byte[640 * 1024];
+        Random.Shared.NextBytes(photo);
+        Random.Shared.NextBytes(archive);
+
+        File.WriteAllBytes(Path.Combine(root.FullName, "отпуск.jpg"), photo);
+        File.WriteAllBytes(Path.Combine(root.FullName, "отпуск (1).jpg"), photo);
+        File.WriteAllBytes(Path.Combine(nested.FullName, "отпуск - копия.jpg"), photo);
+        File.WriteAllBytes(Path.Combine(root.FullName, "дистрибутив.zip"), archive);
+        File.WriteAllBytes(Path.Combine(nested.FullName, "дистрибутив.zip"), archive);
+
+        var tree = new DiskSpaceCalculator().Calculate(root);
+        tree.FixAbsolutePath(root);
+
+        return new DuplicateFinder().Find(tree, DuplicateOptions.Default, null, CancellationToken.None);
+    }
+
+    private static void SaveFrame(FrameworkElement? panel)
+    {
+        if (panel is null)
+        {
+            return;
+        }
+
+        var directory = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "spacesnoop-frames"));
+        var file = Path.Combine(directory.FullName, "scan-duplicates.png");
+        ViewCapture.Save(panel, file, AppDefaults.ViewCaptureScaleDefault);
+        TestContext.Out.WriteLine($"Кадр панели дубликатов: {file}");
     }
 
     [Test]

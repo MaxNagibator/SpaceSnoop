@@ -298,7 +298,8 @@
                 </Border>
             </Grid>
 
-            <controls:ScanDuplicatesPanel Grid.Row="1"
+            <controls:ScanDuplicatesPanel x:Name="Duplicates"
+                                          Grid.Row="1"
                                           Margin="0,4,0,0"
                                           DataContext="{Binding Duplicates}"
                                           Visibility="{Binding DataContext.DuplicatesVisible, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />

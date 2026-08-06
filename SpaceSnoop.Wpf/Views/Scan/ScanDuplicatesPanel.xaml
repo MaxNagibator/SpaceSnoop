@@ -151,8 +151,9 @@
                                                        FontSize="{DynamicResource Font.Size.S}"
                                                        Foreground="{DynamicResource Fg.Primary}"
                                                        VerticalAlignment="Center"
+                                                       TextWrapping="NoWrap"
                                                        TextTrimming="CharacterEllipsis"
-                                                       ToolTip="{Binding KindText}" />
+                                                       ToolTip="{Binding Path}" />
 
                                             <ToggleButton Grid.Column="2"
                                                           Style="{StaticResource ToggleButton.Filter}"
