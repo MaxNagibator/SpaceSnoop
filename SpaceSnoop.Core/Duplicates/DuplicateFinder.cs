@@ -118,16 +118,15 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
 
         using var stream = Open(path);
         var identity = FileIdentity.Read(stream.SafeFileHandle);
-        var hash = withHash ? Hash(stream, state, token) : (UInt128?)null;
+        var hash = withHash ? Hash(stream, stream.Length > FullHashLimit ? PrefixHashSize : long.MaxValue, state, token) : (UInt128?)null;
 
         return new(space, path, identity, hash, symbolic);
     }
 
-    private static UInt128 Hash(FileStream stream, FindState state, CancellationToken token)
+    private static UInt128 Hash(FileStream stream, long budget, FindState state, CancellationToken token)
     {
         var hash = new XxHash128();
         var buffer = ArrayPool<byte>.Shared.Rent(BlockSize);
-        var budget = stream.Length > FullHashLimit ? PrefixHashSize : long.MaxValue;
 
         try
         {
@@ -249,6 +248,12 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
     {
         var withHash = bucket.Count > HashThreshold;
         var physical = ProbeBucket(bucket, withHash, state, token);
+
+        if (withHash)
+        {
+            Refine(physical, bucket[0].Size, state, token);
+        }
+
         var clusters = Cluster(physical, withHash, state, token);
 
         return Build(bucket[0].Size, clusters, Math.Max(2, options.MemberLimit));
@@ -303,6 +308,38 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
         return physical;
     }
 
+    private void Refine(List<List<Probe>> physical, long size, FindState state, CancellationToken token)
+    {
+        if (size <= FullHashLimit)
+        {
+            return;
+        }
+
+        var crowded = physical.GroupBy(static x => x[0].Digest).Where(static x => x.Count() > HashThreshold);
+
+        foreach (var group in crowded)
+        {
+            foreach (var links in group)
+            {
+                token.ThrowIfCancellationRequested();
+
+                var probe = links[0];
+
+                try
+                {
+                    using var stream = Open(probe.Path);
+                    links[0] = probe with { Digest = Hash(stream, long.MaxValue, state, token) };
+                }
+                catch (Exception exception) when (IsReadError(exception))
+                {
+                    _logger.DuplicateFileSkipped(exception, probe.Path);
+                    state.Fail(probe.Path, exception);
+                    links[0] = probe with { Digest = null };
+                }
+            }
+        }
+    }
+
     private List<List<List<Probe>>> Cluster(List<List<Probe>> physical, bool withHash, FindState state, CancellationToken token)
     {
         var clusters = new List<List<List<Probe>>>();
@@ -319,7 +356,7 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
             {
                 var other = cluster[0][0];
 
-                if (withHash && other.Digest != candidate.Digest)
+                if (withHash && candidate.Digest is { } digest && other.Digest is { } head && digest != head)
                 {
                     continue;
                 }
