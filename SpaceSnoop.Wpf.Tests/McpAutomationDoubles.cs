@@ -113,7 +113,7 @@ internal sealed class CleanupAutomationDouble : ICleanupAutomation
 
     public bool IsModalBusy { get; set; }
 
-    public CleanupOutcome Outcome { get; set; } = new(CleanupConsent.Granted, 1024, 3, 0, false, "Готово");
+    public CleanupOutcome Outcome { get; set; } = new(CleanupConsent.Granted, 1024, 3, 0, false, false, "Готово");
 
     public int CleanCalls { get; private set; }
 

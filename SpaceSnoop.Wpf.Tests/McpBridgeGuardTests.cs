@@ -290,17 +290,27 @@ public class McpBridgeGuardTests
         });
     }
 
-    [TestCase(CleanupConsent.Declined, "отказал")]
-    [TestCase(CleanupConsent.TimedOut, "не ответил")]
-    public void Неподтверждённая_очистка_возвращает_ошибку_а_не_отчёт(CleanupConsent consent, string expected)
+    [TestCase(CleanupConsent.Declined, "Человек отказал в очистке.", "отказал")]
+    [TestCase(CleanupConsent.TimedOut, "Человек не ответил на подтверждение вовремя.", "не ответил")]
+    [TestCase(CleanupConsent.Nothing, "Очищать нечего: названные корзины пусты или недоступны.", "нечего")]
+    [TestCase(CleanupConsent.Stale, "Порог возраста файлов меняли во время подготовки.", "Порог возраста")]
+    public void Неподтверждённая_очистка_возвращает_ошибку_а_не_отчёт(CleanupConsent consent, string status, string expected)
     {
         var tools = ToolsOverRunnableTarget();
-        _cleanup.Outcome = new(consent, 0, 0, 0, false, consent == CleanupConsent.Declined
-            ? "Человек отказал в очистке."
-            : "Человек не ответил на подтверждение вовремя.");
+        _cleanup.Outcome = new(consent, 0, 0, 0, false, false, status);
 
         Assert.That(Assert.ThrowsAsync<McpException>(() => tools.RunAsync([RunnableTargetId], false, CancellationToken.None))?.Message,
             Does.Contain(expected));
+    }
+
+    [Test]
+    public void Упавшая_очистка_возвращает_ошибку_а_не_отчёт()
+    {
+        var tools = ToolsOverRunnableTarget();
+        _cleanup.Outcome = new(CleanupConsent.Granted, 0, 0, 1, false, true, "Ошибка: отказано в доступе.");
+
+        Assert.That(Assert.ThrowsAsync<McpException>(() => tools.RunAsync([RunnableTargetId], false, CancellationToken.None))?.Message,
+            Does.Contain("отказано в доступе"));
     }
 
     [Test]

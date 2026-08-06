@@ -283,15 +283,17 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
         }
     }
 
-    private void ApplyPendingRebuild()
+    private bool ApplyPendingRebuild()
     {
         if (!_rebuildPending)
         {
-            return;
+            return false;
         }
 
         _rebuildPending = false;
         BuildTargets();
+
+        return true;
     }
 
     [RelayCommand]
@@ -443,9 +445,23 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
             dialog.HasErrors || dialog.WasCancelled || dialog.FreedBytes == 0 ? StatusSeverity.Warning : StatusSeverity.Success);
         StatusText = dialog.StatusText;
 
-        foreach (var row in rows)
+        IsBusy = true;
+
+        try
         {
-            await MeasureOneAsync(row);
+            foreach (var row in rows)
+            {
+                await MeasureRowAsync(row, cancellationToken);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = $"{dialog.StatusText} Замер после очистки прерван.";
+        }
+        finally
+        {
+            IsBusy = false;
+            ApplyPendingRebuild();
         }
 
         return dialog;

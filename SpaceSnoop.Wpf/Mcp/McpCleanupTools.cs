@@ -88,10 +88,15 @@ internal sealed class McpCleanupTools(
         List<string> ids = [.. ready.Select(static item => item.Id)];
         var outcome = await McpDispatch.Run(() => StartRun(ids, cancellationToken)).ConfigureAwait(false);
 
-        if (outcome.Consent is CleanupConsent.Declined or CleanupConsent.TimedOut or CleanupConsent.Busy)
+        if (outcome.Consent != CleanupConsent.Granted)
         {
             logger.McpToolRejected("cleanup_run", outcome.StatusText);
 
+            throw new McpException(outcome.StatusText);
+        }
+
+        if (outcome.Failed)
+        {
             throw new McpException(outcome.StatusText);
         }
 

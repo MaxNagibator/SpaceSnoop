@@ -191,6 +191,35 @@ public class CleanupServiceTests
     }
 
     [Test]
+    public void Clean_DirectoryHeldByFreshFileIsNotReportedAsError()
+    {
+        var nested = Path.Combine(_targetDir, "nested");
+        File.WriteAllText(Path.Combine(nested, "fresh.tmp"), "new");
+
+        var report = new CleanupService().Clean(Target(TimeSpan.FromHours(24)), null, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(Directory.Exists(nested), Is.True);
+            Assert.That(report.Errors, Is.Empty);
+            Assert.That(report.Skipped, Is.Zero);
+        }
+    }
+
+    [Test]
+    public void Clean_EmptiedSubdirectoryRemovedRootKept()
+    {
+        var report = new CleanupService().Clean(Target(), null, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(Directory.Exists(Path.Combine(_targetDir, "nested")), Is.False);
+            Assert.That(Directory.Exists(_targetDir), Is.True);
+            Assert.That(report.Errors, Is.Empty);
+        }
+    }
+
+    [Test]
     public void Measure_UnreadableSubdirectoryReported()
     {
         var closed = Path.Combine(_targetDir, "closed");

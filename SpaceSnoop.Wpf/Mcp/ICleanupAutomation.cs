@@ -8,6 +8,7 @@ public enum CleanupConsent
     TimedOut = 3,
     Nothing = 4,
     Busy = 5,
+    Stale = 6,
 }
 
 public readonly record struct CleanupOutcome(
@@ -16,6 +17,7 @@ public readonly record struct CleanupOutcome(
     int Deleted,
     int Skipped,
     bool Cancelled,
+    bool Failed,
     string StatusText);
 
 public interface ICleanupAutomation

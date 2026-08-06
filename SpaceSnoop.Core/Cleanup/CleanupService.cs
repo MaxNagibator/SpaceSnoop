@@ -209,8 +209,10 @@ public sealed class CleanupService(ILogger<CleanupService>? logger = null)
                     continue;
                 }
 
-                foreach (var sub in directory.GetDirectories())
+                foreach (var sub in directory.EnumerateDirectories())
                 {
+                    token.ThrowIfCancellationRequested();
+
                     if (IsReparsePoint(sub))
                     {
                         continue;
@@ -326,7 +328,10 @@ public sealed class CleanupService(ILogger<CleanupService>? logger = null)
 
         if (!cancelled)
         {
-            RemoveEmptyDirectories(directories);
+            var (dirSkipped, dirCancelled) = RemoveEmptyDirectories(directories, errors, token);
+
+            skipped += dirSkipped;
+            cancelled |= dirCancelled;
         }
 
         foreach (var path in unreadable)
@@ -362,26 +367,46 @@ public sealed class CleanupService(ILogger<CleanupService>? logger = null)
         }
     }
 
-    private void RemoveEmptyDirectories(List<string> directories)
+    private (int Skipped, bool Cancelled) RemoveEmptyDirectories(List<string> directories, List<string> errors, CancellationToken token)
     {
         directories.Sort(static (left, right) => right.Length.CompareTo(left.Length));
 
         var reported = 0;
+        var skipped = 0;
 
         foreach (var directory in directories)
         {
+            if (token.IsCancellationRequested)
+            {
+                return (skipped, true);
+            }
+
             try
             {
+                if (Directory.EnumerateFileSystemEntries(directory).Any())
+                {
+                    continue;
+                }
+
                 Directory.Delete(directory, false);
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException)
             {
+                skipped++;
+
                 if (reported++ < MaxReportedErrors)
                 {
                     _logger.CleanupDirectorySkipped(exception, directory);
                 }
+
+                if (errors.Count < MaxReportedErrors)
+                {
+                    errors.Add($"«{directory}»: каталог не удалён – {exception.Message}");
+                }
             }
         }
+
+        return (skipped, token.IsCancellationRequested);
     }
 
     private static string Relative(string root, string path)

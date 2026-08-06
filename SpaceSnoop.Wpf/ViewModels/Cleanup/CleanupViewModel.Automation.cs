@@ -10,17 +10,24 @@ public sealed partial class CleanupViewModel
         IReadOnlyList<string> targetIds,
         CancellationToken cancellationToken)
     {
-        var rows = Targets
-            .Where(row => targetIds.Contains(row.Model.Id, StringComparer.OrdinalIgnoreCase))
-            .ToList();
+        var rows = SelectForAutomation(targetIds);
 
-        await MeasureForAutomationAsync(rows, cancellationToken);
+        if (await MeasureForAutomationAsync(rows, cancellationToken))
+        {
+            rows = SelectForAutomation(targetIds);
+
+            if (await MeasureForAutomationAsync(rows, cancellationToken))
+            {
+                return new(CleanupConsent.Stale, 0, 0, 0, false, false,
+                    "Порог возраста файлов меняли во время подготовки – очистки не было, повторите вызов.");
+            }
+        }
 
         var ready = rows.Where(static row => row.CanClean).ToList();
 
         if (ready.Count == 0)
         {
-            return new(CleanupConsent.Nothing, 0, 0, 0, false, "Очищать нечего: названные корзины пусты или недоступны.");
+            return new(CleanupConsent.Nothing, 0, 0, 0, false, false, "Очищать нечего: названные корзины пусты или недоступны.");
         }
 
         var bytes = ready.Sum(static row => row.SizeBytes);
@@ -35,7 +42,7 @@ public sealed partial class CleanupViewModel
         {
             _logger.CleanupRunDeclined(consent.ToString());
 
-            return new(consent, 0, 0, 0, false, consent switch
+            return new(consent, 0, 0, 0, false, false, consent switch
             {
                 CleanupConsent.Declined => "Человек отказал в очистке.",
                 CleanupConsent.Busy => "В окне приложения открыт другой диалог – подтверждение показать нельзя.",
@@ -52,10 +59,18 @@ public sealed partial class CleanupViewModel
             dialog.Deleted,
             dialog.Skipped,
             dialog.WasCancelled,
+            dialog.HasFailure,
             dialog.StatusText);
     }
 
-    private async Task MeasureForAutomationAsync(IReadOnlyList<CleanupTargetViewModel> rows, CancellationToken cancellationToken)
+    private List<CleanupTargetViewModel> SelectForAutomation(IReadOnlyList<string> targetIds)
+    {
+        return Targets
+            .Where(row => targetIds.Contains(row.Model.Id, StringComparer.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    private async Task<bool> MeasureForAutomationAsync(IReadOnlyList<CleanupTargetViewModel> rows, CancellationToken cancellationToken)
     {
         IsBusy = true;
 
@@ -71,6 +86,8 @@ public sealed partial class CleanupViewModel
         {
             IsBusy = false;
         }
+
+        return ApplyPendingRebuild();
     }
 
     private async Task RunDialogForAutomationAsync(CleanupProgressDialogViewModel dialog)

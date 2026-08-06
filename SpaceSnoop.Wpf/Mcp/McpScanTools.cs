@@ -153,19 +153,21 @@ internal sealed class McpScanTools(
     {
         McpGuards.RequireMutations(preferences, logger, "mark_for_deletion");
 
-        logger.McpToolInvoked("mark_for_deletion", $"путей {paths.Count}, пометить {mark}");
+        List<string> wanted = [.. paths.Where(static path => path is not null).Select(static path => path.Trim()).Where(static path => path.Length > 0)];
 
-        if (paths.Count == 0)
+        logger.McpToolInvoked("mark_for_deletion", $"путей {wanted.Count}, пометить {mark}");
+
+        if (wanted.Count == 0)
         {
             throw new McpException("Список путей пуст.");
         }
 
-        if (paths.Count > AppDefaults.McpEntryLimitMax)
+        if (wanted.Count > AppDefaults.McpEntryLimitMax)
         {
             throw new McpException($"За один вызов можно пометить не больше {AppDefaults.McpEntryLimitMax} путей.");
         }
 
-        return McpDispatch.Run(() => MarkOnScanPage(paths, mark));
+        return McpDispatch.Run(() => MarkOnScanPage(wanted, mark));
     }
 
     public async Task<string> ArchiveDirectoryAsync(string path, bool deleteOriginal, bool dryRun, CancellationToken cancellationToken)

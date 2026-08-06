@@ -9,6 +9,8 @@ public readonly record struct CleanupRequest(
     int EstimatedFiles,
     CancellationToken External = default);
 
+internal readonly record struct CleanupTick(int Start, OperationProgress Update);
+
 public sealed partial class CleanupProgressDialogViewModel : OperationDialogViewModelBase
 {
     private readonly CleanupRequest _request;
@@ -54,6 +56,8 @@ public sealed partial class CleanupProgressDialogViewModel : OperationDialogView
 
     public bool WasCancelled => Cancelled;
 
+    public bool HasFailure => Failure is not null;
+
     public bool IsIndeterminate => _request.EstimatedFiles == 0;
 
     protected override string RunningStatus => "Очистка…";
@@ -66,7 +70,9 @@ public sealed partial class CleanupProgressDialogViewModel : OperationDialogView
     {
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, _request.External);
 
-        await Task.Run(() => Execute(linked.Token), linked.Token);
+        var progress = new Progress<CleanupTick>(tick => OnTick(tick.Start, tick.Update));
+
+        await Task.Run(() => Execute(progress, linked.Token), linked.Token);
     }
 
     protected override void OnStarting()
@@ -118,16 +124,16 @@ public sealed partial class CleanupProgressDialogViewModel : OperationDialogView
         return $"Готово: {done}.";
     }
 
-    private void Execute(CancellationToken token)
+    private void Execute(IProgress<CleanupTick> progress, CancellationToken token)
     {
         foreach (var target in _request.Targets)
         {
             token.ThrowIfCancellationRequested();
 
             var start = _deleted;
-            var progress = new Progress<OperationProgress>(update => OnTick(start, update));
+            var forwarder = new Progress<OperationProgress>(update => progress.Report(new(start, update)));
 
-            var report = _service.Clean(target, progress, token);
+            var report = _service.Clean(target, forwarder, token);
 
             _freed += report.FreedBytes;
             _deleted += report.Deleted;
