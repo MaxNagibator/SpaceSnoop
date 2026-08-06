@@ -248,11 +248,13 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         Progress.IsScanning = value;
         Summary.IsScanning = value;
         Marks.DeleteMarkedCommand.NotifyCanExecuteChanged();
+        Duplicates.NotifyScanStateChanged();
     }
 
     partial void OnHasResultChanged(bool value)
     {
         Summary.HasResult = value;
+        Duplicates.NotifyScanStateChanged();
     }
 
     partial void OnSelectedDriveChanged(string value)

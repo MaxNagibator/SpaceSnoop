@@ -77,6 +77,12 @@ public sealed partial class ScanDuplicatesViewModel : ObservableObject
 
     public bool ShowNothingFound => HasResult && !HasGroups;
 
+    internal void NotifyScanStateChanged()
+    {
+        FindCommand.NotifyCanExecuteChanged();
+        LowerThresholdCommand.NotifyCanExecuteChanged();
+    }
+
     internal void Clear()
     {
         Groups.Clear();
