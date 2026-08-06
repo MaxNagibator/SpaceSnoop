@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Scan"
              xmlns:bootstrap="clr-namespace:SpaceSnoop.Wpf.Bootstrap"
+             xmlns:behaviors="clr-namespace:SpaceSnoop.Wpf.Views.Behaviors"
              xmlns:keepshell="https://schemas.keepshell.dev/wpf"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -263,7 +264,7 @@
 
                                                 <TextBlock Grid.Column="2"
                                                            Style="{StaticResource DuplicateDirectory}"
-                                                           Text="{Binding Directory}" />
+                                                           behaviors:PathTrimmer.FullPath="{Binding Directory}" />
 
                                                 <TextBlock Grid.Column="3"
                                                            Style="{StaticResource Caption}"

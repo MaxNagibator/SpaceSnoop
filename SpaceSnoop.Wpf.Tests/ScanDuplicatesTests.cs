@@ -40,16 +40,11 @@ public class ScanDuplicatesTests
     }
 
     [Test]
-    public void Длинный_каталог_обрезается_слева()
+    public void Каталог_вне_корня_остаётся_полным()
     {
-        var directory = DuplicateText.Directory(@"C:\" + new string('и', 80) + @"\файл.bin", null, 20);
+        var nested = @"C:\Data\" + new string('и', 200);
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(directory, Has.Length.EqualTo(20));
-            Assert.That(directory, Does.StartWith("…"));
-            Assert.That(directory, Does.EndWith(new string('и', 19)));
-        }
+        Assert.That(DuplicateText.Directory(nested + @"\файл.bin", @"C:\Data"), Is.EqualTo(new string('и', 200)));
     }
 
     [Test]

@@ -2,9 +2,6 @@
 
 internal static class DuplicateText
 {
-    internal const int DirectoryMaxChars = 60;
-
-    private const string Ellipsis = "…";
     private const string ScanRoot = ".";
 
     internal static string Name(string path)
@@ -14,7 +11,7 @@ internal static class DuplicateText
         return name.Length > 0 ? name : path;
     }
 
-    internal static string Directory(string path, string? root, int maxChars = DirectoryMaxChars)
+    internal static string Directory(string path, string? root)
     {
         var directory = System.IO.Path.GetDirectoryName(path) ?? string.Empty;
 
@@ -29,16 +26,6 @@ internal static class DuplicateText
                 .TrimStart(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
         }
 
-        if (directory.Length == 0)
-        {
-            return ScanRoot;
-        }
-
-        if (maxChars > 1 && directory.Length > maxChars)
-        {
-            directory = Ellipsis + directory[^(maxChars - 1)..];
-        }
-
-        return directory;
+        return directory.Length == 0 ? ScanRoot : directory;
     }
 }
