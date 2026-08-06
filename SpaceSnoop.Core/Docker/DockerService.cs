@@ -324,7 +324,7 @@ public sealed class DockerService
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var detail = "Docker Desktop ещё не остановлен или образ занят.";
 
-        while (stopwatch.Elapsed < _compactOptions.StopTimeout)
+        do
         {
             var status = await RunAsync("docker", "desktop status", cancel: cancel);
             if (status.Canceled)
@@ -354,6 +354,7 @@ public sealed class DockerService
                 return DockerWaitResult.CanceledResult;
             }
         }
+        while (stopwatch.Elapsed < _compactOptions.StopTimeout);
 
         return new(false, false, $"Не удалось дождаться остановки Docker Desktop и освобождения образа за {_compactOptions.StopTimeout.TotalSeconds:0} с. {detail}");
     }
@@ -362,7 +363,7 @@ public sealed class DockerService
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-        while (stopwatch.Elapsed < _compactOptions.StopTimeout)
+        do
         {
             if (_fileSystem.IsAvailable(vhdx))
             {
@@ -378,6 +379,7 @@ public sealed class DockerService
                 return DockerWaitResult.CanceledResult;
             }
         }
+        while (stopwatch.Elapsed < _compactOptions.StopTimeout);
 
         return new(false, false, $"Образ остаётся занятым после остановки WSL более {_compactOptions.StopTimeout.TotalSeconds:0} с.");
     }

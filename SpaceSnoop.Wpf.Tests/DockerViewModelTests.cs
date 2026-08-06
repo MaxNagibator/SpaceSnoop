@@ -32,7 +32,17 @@ public sealed class DockerViewModelTests
         Assert.That(vm.StatusText, Does.Contain("Docker остановлен"));
     }
 
-    private static DockerViewModel CreateViewModel(DockerProcessResult diskpart)
+    [Test]
+    public async Task Исчерпанный_таймаут_не_отменяет_первую_проверку_состояния()
+    {
+        var vm = CreateViewModel(diskpart: Success("DiskPart successfully compacted the virtual disk file."), stopTimeout: TimeSpan.Zero);
+
+        await vm.Compact.RunCommand.ExecuteAsync(null);
+
+        Assert.That(vm.StatusText, Is.EqualTo("Готово. Запустите Docker заново."));
+    }
+
+    private static DockerViewModel CreateViewModel(DockerProcessResult diskpart, TimeSpan? stopTimeout = null)
     {
         var runner = new ScriptedProcessRunner((fileName, arguments) => (fileName, arguments) switch
         {
@@ -50,7 +60,7 @@ public sealed class DockerViewModelTests
             new DockerCompactOptions
             {
                 ProcessTimeout = TimeSpan.FromSeconds(1),
-                StopTimeout = TimeSpan.FromSeconds(1),
+                StopTimeout = stopTimeout ?? TimeSpan.FromSeconds(1),
                 StatusPollInterval = TimeSpan.Zero,
             },
             administratorCheck: () => true);
