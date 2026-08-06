@@ -1,8 +1,6 @@
 ﻿using Microsoft.Extensions.Logging.Abstractions;
 using SpaceSnoop.Core;
 using SpaceSnoop.Core.Domain;
-using System.Security.AccessControl;
-using System.Security.Principal;
 
 namespace SpaceSnoop.Tests;
 
@@ -255,7 +253,7 @@ public class DirectoryComparerTests
         File.WriteAllText(Path.Combine(leftLocked, "a.txt"), "hello");
         File.WriteAllText(Path.Combine(rightLocked, "a.txt"), "hello");
         File.WriteAllText(Path.Combine(rightLocked, "orphan.txt"), "payload");
-        DenyEnumeration(leftLocked);
+        TestAcl.DenyEnumeration(leftLocked);
 
         try
         {
@@ -279,7 +277,7 @@ public class DirectoryComparerTests
         }
         finally
         {
-            AllowEnumeration(leftLocked);
+            TestAcl.AllowEnumeration(leftLocked);
         }
     }
 
@@ -294,26 +292,6 @@ public class DirectoryComparerTests
         {
             return false;
         }
-    }
-
-    private static void DenyEnumeration(string path)
-    {
-        var security = new DirectoryInfo(path).GetAccessControl();
-        security.AddAccessRule(new(WindowsIdentity.GetCurrent().User!,
-            FileSystemRights.ListDirectory | FileSystemRights.ReadData,
-            AccessControlType.Deny));
-
-        new DirectoryInfo(path).SetAccessControl(security);
-    }
-
-    private static void AllowEnumeration(string path)
-    {
-        var security = new DirectoryInfo(path).GetAccessControl();
-        security.RemoveAccessRuleAll(new(WindowsIdentity.GetCurrent().User!,
-            FileSystemRights.ListDirectory | FileSystemRights.ReadData,
-            AccessControlType.Deny));
-
-        new DirectoryInfo(path).SetAccessControl(security);
     }
 
     [TestCase(SyncMode.LeftToRight, false, SyncWinner.Newest)]

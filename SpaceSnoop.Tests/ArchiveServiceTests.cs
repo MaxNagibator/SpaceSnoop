@@ -1,7 +1,5 @@
 ﻿using SpaceSnoop.Core;
 using System.IO.Compression;
-using System.Security.AccessControl;
-using System.Security.Principal;
 using System.Text;
 
 namespace SpaceSnoop.Tests;
@@ -269,7 +267,7 @@ public class ArchiveServiceTests
 
         var locked = Path.Combine(_sourceDir, "locked");
         Directory.CreateDirectory(locked);
-        DenyEnumeration(locked);
+        TestAcl.DenyEnumeration(locked);
 
         try
         {
@@ -290,7 +288,7 @@ public class ArchiveServiceTests
         }
         finally
         {
-            AllowEnumeration(locked);
+            TestAcl.AllowEnumeration(locked);
         }
     }
 
@@ -371,26 +369,6 @@ public class ArchiveServiceTests
             Assert.That(File.Exists(_zipPath), Is.True);
             Assert.That(Directory.Exists(_sourceDir), Is.True);
         }
-    }
-
-    private static void DenyEnumeration(string path)
-    {
-        var security = new DirectoryInfo(path).GetAccessControl();
-        security.AddAccessRule(new(WindowsIdentity.GetCurrent().User!,
-            FileSystemRights.ListDirectory | FileSystemRights.ReadData,
-            AccessControlType.Deny));
-
-        new DirectoryInfo(path).SetAccessControl(security);
-    }
-
-    private static void AllowEnumeration(string path)
-    {
-        var security = new DirectoryInfo(path).GetAccessControl();
-        security.RemoveAccessRuleAll(new(WindowsIdentity.GetCurrent().User!,
-            FileSystemRights.ListDirectory | FileSystemRights.ReadData,
-            AccessControlType.Deny));
-
-        new DirectoryInfo(path).SetAccessControl(security);
     }
 
     private void CorruptStoredContent(string marker)

@@ -1,7 +1,5 @@
 ﻿using SpaceSnoop.Core.Cleanup;
 using System.Diagnostics;
-using System.Security.AccessControl;
-using System.Security.Principal;
 
 namespace SpaceSnoop.Tests;
 
@@ -92,26 +90,6 @@ public class CleanupServiceTests
         process.WaitForExit();
 
         return process.ExitCode == 0;
-    }
-
-    private static void DenyEnumeration(string path)
-    {
-        var security = new DirectoryInfo(path).GetAccessControl();
-        security.AddAccessRule(new(WindowsIdentity.GetCurrent().User!,
-            FileSystemRights.ListDirectory | FileSystemRights.ReadData,
-            AccessControlType.Deny));
-
-        new DirectoryInfo(path).SetAccessControl(security);
-    }
-
-    private static void AllowEnumeration(string path)
-    {
-        var security = new DirectoryInfo(path).GetAccessControl();
-        security.RemoveAccessRuleAll(new(WindowsIdentity.GetCurrent().User!,
-            FileSystemRights.ListDirectory | FileSystemRights.ReadData,
-            AccessControlType.Deny));
-
-        new DirectoryInfo(path).SetAccessControl(security);
     }
 
     [Test]
@@ -217,7 +195,7 @@ public class CleanupServiceTests
     {
         var closed = Path.Combine(_targetDir, "closed");
         Directory.CreateDirectory(closed);
-        DenyEnumeration(closed);
+        TestAcl.DenyEnumeration(closed);
 
         try
         {
@@ -231,7 +209,7 @@ public class CleanupServiceTests
         }
         finally
         {
-            AllowEnumeration(closed);
+            TestAcl.AllowEnumeration(closed);
         }
     }
 
