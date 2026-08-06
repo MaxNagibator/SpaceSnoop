@@ -31,9 +31,20 @@
                 <TextBlock Text="Выбрано"
                            Style="{StaticResource Caption}" />
                 <TextBlock Text="{Binding SelectedText}"
-                           Style="{StaticResource StatValue}"
-                           FontSize="{DynamicResource Font.Size.L}"
-                           Foreground="{DynamicResource Accent.Primary}" />
+                           FontSize="{DynamicResource Font.Size.L}">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock"
+                               BasedOn="{StaticResource StatValue}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasSelectedBytes}"
+                                             Value="True">
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource Accent.Primary}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
             </StackPanel>
 
             <Button Grid.Column="3"

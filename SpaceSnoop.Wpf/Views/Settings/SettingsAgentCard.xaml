@@ -128,7 +128,7 @@
                       HorizontalAlignment="Left"
                       Margin="0,8,0,0" />
             <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="Чем выше уровень, тем дольше и дороже ответ. «По умолчанию» – уровень самого CLI." />
+                       Text="Чем выше уровень, тем дольше и дороже ответ. «Уровень CLI» – значение, выбранное в самом CLI." />
 
             <TextBlock Text="{Binding AgentCliPathLabel}"
                        Style="{StaticResource Setting.Label}"

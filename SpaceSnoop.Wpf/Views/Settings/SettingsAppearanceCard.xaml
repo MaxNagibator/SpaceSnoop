@@ -85,12 +85,12 @@
             <TextBlock Style="{StaticResource Setting.CheckHint}"
                        Text="Итоги операций (сканирование, синхронизация, действия агента) в углу окна." />
 
-            <CheckBox Content="Показывать счётчик производительности"
+            <CheckBox Content="Показывать производительность в строке состояния"
                       IsChecked="{Binding Shell.ShowPerformanceHud, Mode=TwoWay}"
                       Margin="0,14,0,0"
                       VerticalAlignment="Center" />
             <TextBlock Style="{StaticResource Setting.CheckHint}"
-                       Text="Отклик интерфейса, память и скорость текущей операции в правом верхнем углу окна." />
+                       Text="Отклик интерфейса, память и скорость текущей операции в строке состояния внизу окна." />
         </StackPanel>
     </HeaderedContentControl>
 </UserControl>

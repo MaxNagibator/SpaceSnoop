@@ -30,7 +30,7 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
         _logger = logger;
 
         SourceName = Path.GetFileName(request.SourcePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-        SourceSize = $"≈ {SizeFormatter.Format(request.TotalBytes)} · ≈ {request.EstimatedFiles:N0} файлов";
+        SourceSize = $"≈ {SizeFormatter.Format(request.TotalBytes)} · ≈ {request.EstimatedFiles:N0} {Plural.Word(request.EstimatedFiles, "файл", "файла", "файлов")}";
         TargetName = Path.GetFileName(request.TargetPath);
         FateText = request.DeleteOriginal
             ? "Архив будет прочитан целиком с проверкой контрольных сумм, и только потом оригинал отправится в корзину."
@@ -191,7 +191,7 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
         }
 
         _packTotal = update.Entries;
-        SourceSize = $"{SizeFormatter.Format(update.Bytes)} · {update.Files:N0} файлов";
+        SourceSize = $"{SizeFormatter.Format(update.Bytes)} · {update.Files:N0} {Plural.Word(update.Files, "файл", "файла", "файлов")}";
         SetPhaseTotal(update.Entries);
     }
 

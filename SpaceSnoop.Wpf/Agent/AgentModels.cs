@@ -24,9 +24,9 @@ public sealed record AgentEffortOption(string Id, string Title)
 
 public static class AgentModels
 {
-    public static readonly AgentModelOption CliDefault = new(string.Empty, "По умолчанию CLI", "Модель, выбранная по умолчанию в самом CLI");
+    public static readonly AgentModelOption CliDefault = new(string.Empty, "Модель CLI", "Модель, выбранная по умолчанию в самом CLI");
 
-    public static readonly AgentEffortOption EffortDefault = new(string.Empty, "По умолчанию");
+    public static readonly AgentEffortOption EffortDefault = new(string.Empty, "Уровень CLI");
 
     private static readonly string[] ClaudeEfforts = ["low", "medium", "high", "xhigh", "max"];
 

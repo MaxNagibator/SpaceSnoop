@@ -43,6 +43,7 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SelectedText))]
+    [NotifyPropertyChangedFor(nameof(HasSelectedBytes))]
     private long _selectedBytes;
 
     [ObservableProperty]
@@ -101,6 +102,8 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
     public string TotalText => SizeFormatter.Format(TotalBytes);
 
     public string SelectedText => SizeFormatter.Format(SelectedBytes);
+
+    public bool HasSelectedBytes => SelectedBytes > 0;
 
     public ICommand? CancelCommand => IsBusy && _measureCts is not null ? CancelMeasureCommand : null;
 
