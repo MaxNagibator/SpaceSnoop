@@ -34,6 +34,8 @@ internal sealed class ScanAutomationDouble : IScanAutomation
 
     public Func<ScanExportModel>? ExportBuilder { get; set; }
 
+    public DirectorySpace? ScanRoot { get; set; }
+
     public SpaceBase? Found { get; set; }
 
     public bool RootMatches { get; set; }
@@ -60,6 +62,11 @@ internal sealed class ScanAutomationDouble : IScanAutomation
     public Func<ScanExportModel>? CaptureExportBuilder(int depth, int entryLimit)
     {
         return ExportBuilder;
+    }
+
+    public DirectorySpace? CaptureScanRoot()
+    {
+        return ScanRoot;
     }
 
     public SpaceBase? FindForAutomation(string path)

@@ -3,6 +3,7 @@ using ModelContextProtocol;
 using SpaceSnoop.Core;
 using SpaceSnoop.Core.Cleanup;
 using SpaceSnoop.Core.Docker;
+using SpaceSnoop.Core.Duplicates;
 using SpaceSnoop.Core.UseCases;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Diagnostics;
@@ -47,6 +48,7 @@ public class McpBridgeGuardTests
             _preferences,
             new ScanPreferences(settings),
             new DiskSpaceCalculator(),
+            new DuplicateFinder(),
             new DockerService(),
             new CleanupService(),
             _cleanup,
@@ -78,6 +80,16 @@ public class McpBridgeGuardTests
             Assert.That(Assert.Throws<McpException>(() => _bridge.Scan.MarkForDeletion([_root], true))?.Message, Does.Contain(MutationsBlocked));
             Assert.That(_scan.MarkCalls, Is.Zero);
         });
+    }
+
+    [Test]
+    public void Поиск_дубликатов_без_сканирования_отбивается_с_причиной()
+    {
+        _scan.ScanRoot = null;
+
+        Assert.That(
+            Assert.ThrowsAsync<McpException>(() => _bridge.Scan.FindDuplicatesAsync(1, 10, CancellationToken.None))?.Message,
+            Does.Contain("результата ещё нет"));
     }
 
     [Test]

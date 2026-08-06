@@ -28,6 +28,8 @@ public interface IScanAutomation
 
     Func<ScanExportModel>? CaptureExportBuilder(int depth, int entryLimit);
 
+    DirectorySpace? CaptureScanRoot();
+
     SpaceBase? FindForAutomation(string path);
 
     bool IsScanRoot(SpaceBase space);

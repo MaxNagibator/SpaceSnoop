@@ -55,6 +55,7 @@ public class AgentToolPolicyTests
                 "list_drives",
                 "scan_directory",
                 "get_current_scan",
+                "find_duplicates",
                 "compare_directories",
                 "get_current_comparison",
                 "docker_usage",

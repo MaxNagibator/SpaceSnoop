@@ -215,6 +215,30 @@ internal sealed record McpProfile(
     string Schedule,
     string? Unavailable);
 
+internal sealed record McpDuplicateMember(string Path, DuplicateMemberKind Kind, bool ReclaimsSpace);
+
+internal sealed record McpDuplicateGroup(
+    long Size,
+    string SizeText,
+    int Members,
+    int DistinctFiles,
+    long ReclaimableBytes,
+    string ReclaimableSize,
+    int OmittedMembers,
+    IReadOnlyList<McpDuplicateMember> Files);
+
+internal sealed record McpDuplicates(
+    string Root,
+    long MinSizeBytes,
+    int Examined,
+    int GroupCount,
+    int OmittedGroups,
+    long ReclaimableBytes,
+    string ReclaimableSize,
+    int UnreadableDirectories,
+    int FailedFiles,
+    IReadOnlyList<McpDuplicateGroup> Groups);
+
 internal sealed record McpNavigationResult(string Page, McpSyncState Sync, string? Navigation, string? IgnoredParameters);
 
 internal sealed record McpCapture(

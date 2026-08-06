@@ -9,6 +9,7 @@ internal sealed class McpScanTools(
     IScanAutomation scan,
     ScanPreferences scanPreferences,
     DiskSpaceCalculator calculator,
+    DuplicateFinder duplicates,
     McpPreferences preferences,
     ToastNotifier notifier,
     McpNavigator navigator,
@@ -130,6 +131,50 @@ internal sealed class McpScanTools(
         }
 
         return BuildScanJsonAsync(build, cancellationToken);
+    }
+
+    public async Task<string> FindDuplicatesAsync(long minSize, int entryLimit, CancellationToken cancellationToken)
+    {
+        entryLimit = McpGuards.ClampEntryLimit(entryLimit);
+        minSize = Math.Max(1, minSize);
+
+        logger.McpToolInvoked("find_duplicates", $"порог {minSize} Б, записей до {entryLimit}");
+
+        var root = McpDispatch.Run(scan.CaptureScanRoot)
+                   ?? throw new McpException("На странице «Сканирование» результата ещё нет. Запустите scan_directory с show=true или open_scan с scan=true.");
+
+        var options = DuplicateOptions.Default with
+        {
+            MinSize = minSize,
+            MaxParallelism = scanPreferences.UseMultithreading ? scanPreferences.MaxParallelism : 1,
+            GroupLimit = entryLimit,
+            MemberLimit = entryLimit,
+        };
+
+        var report = await duplicates.FindAsync(root, options, null, cancellationToken).ConfigureAwait(false);
+
+        return McpFormat.Serialize(DescribeDuplicates(root.AbsolutePath, minSize, report));
+    }
+
+    internal static McpDuplicates DescribeDuplicates(string root, long minSize, DuplicateReport report)
+    {
+        return new(root,
+            minSize,
+            report.Examined,
+            report.Groups.Count,
+            report.OmittedGroups,
+            report.ReclaimableBytes,
+            SizeFormatter.Format(report.ReclaimableBytes),
+            report.UnreadableDirectories,
+            report.Errors.Count,
+            [.. report.Groups.Select(static x => new McpDuplicateGroup(x.Size,
+                SizeFormatter.Format(x.Size),
+                x.Members.Count,
+                x.DistinctFiles,
+                x.ReclaimableBytes,
+                SizeFormatter.Format(x.ReclaimableBytes),
+                x.OmittedMembers,
+                [.. x.Members.Select(static member => new McpDuplicateMember(member.Path, member.Kind, member.ReclaimsSpace))]))]);
     }
 
     public async Task<string> OpenScanAsync(string? path, bool start, CancellationToken cancellationToken)

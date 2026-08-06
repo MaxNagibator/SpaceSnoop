@@ -26,6 +26,11 @@ public sealed partial class ScanViewModel : IScanAutomation
         return CaptureExportBuilder(depth, entryLimit);
     }
 
+    DirectorySpace? IScanAutomation.CaptureScanRoot()
+    {
+        return CurrentRoot;
+    }
+
     SpaceBase? IScanAutomation.FindForAutomation(string path)
     {
         return FindForAutomation(path);
