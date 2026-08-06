@@ -98,6 +98,7 @@ public class SyncSchedulerTests
     [TestCase(1, "Завершилась с ошибками")]
     [TestCase(3, "Каталог недоступен")]
     [TestCase(5, "Каталоги пересекаются")]
+    [TestCase(6, "Проверка нашла расхождения")]
     [TestCase(ScheduleStatus.NeverRun, "Ещё не запускалась")]
     [TestCase(ScheduleStatus.Running, "Выполняется")]
     [TestCase(12345, "Код 12345")]

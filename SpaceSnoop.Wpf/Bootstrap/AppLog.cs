@@ -85,8 +85,8 @@ internal static partial class AppLog
     public static partial void HeadlessSyncStarted(this ILogger logger, string left, string right, SyncMode mode, bool mirror);
 
     [LoggerMessage(EventId = 1212, Level = LogLevel.Information,
-        Message = "Автосинхронизация завершена: успешно {Success}, ошибок {Errors}, за {ElapsedMs} мс")]
-    public static partial void HeadlessSyncFinished(this ILogger logger, int success, int errors, long elapsedMs);
+        Message = "Автосинхронизация завершена: успешно {Success}, ошибок {Errors}, расхождений {Mismatches}, за {ElapsedMs} мс")]
+    public static partial void HeadlessSyncFinished(this ILogger logger, int success, int errors, int mismatches, long elapsedMs);
 
     [LoggerMessage(EventId = 1213, Level = LogLevel.Warning, Message = "Автосинхронизация отменена: {Reason}")]
     public static partial void HeadlessSyncAborted(this ILogger logger, string reason);

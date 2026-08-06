@@ -49,13 +49,14 @@ internal sealed class HeadlessSync
 
             var sync = new ExecuteSyncUseCase(NullLogger<SyncEngine>.Instance);
             var recycleOverwritten = settings.GetBool(SettingsKeys.SyncRecycleOverwritten, AppDefaults.SyncRecycleOverwrittenDefault);
-            var report = sync.Execute(new(result, SyncConflictPolicy.SkipUnresolved, SyncDeleteUi.Silent, false, recycleOverwritten), CancellationToken.None);
+            var verify = settings.GetBool(SettingsKeys.SyncVerify, AppDefaults.SyncVerifyDefault);
+            var report = sync.Execute(new(result, SyncConflictPolicy.SkipUnresolved, SyncDeleteUi.Silent, verify, recycleOverwritten), CancellationToken.None);
 
             stopwatch.Stop();
-            WriteLog(options.Name, report, SyncVerifyState.None, logger);
-            logger.HeadlessSyncFinished(report.SuccessCount, report.Errors.Count, (long)stopwatch.Elapsed.TotalMilliseconds);
+            WriteLog(options.Name, report, SyncPlanNarrative.ResolveVerify(verify, report), logger);
+            logger.HeadlessSyncFinished(report.SuccessCount, report.Errors.Count, report.Mismatches.Count, (long)stopwatch.Elapsed.TotalMilliseconds);
 
-            return report.Errors.Count == 0 ? 0 : 1;
+            return Outcome(report);
         }
         catch (Exception exception)
         {
@@ -71,6 +72,16 @@ internal sealed class HeadlessSync
         }
     }
 
+    internal static int Outcome(SyncReport report)
+    {
+        if (report.Errors.Count > 0)
+        {
+            return 1;
+        }
+
+        return report.Mismatches.Count > 0 ? 6 : 0;
+    }
+
     internal static SyncMode MapMode(int modeIndex)
     {
         return modeIndex switch
@@ -81,7 +92,7 @@ internal sealed class HeadlessSync
         };
     }
 
-    private static RunOptions? LoadOptions(ISettingsStore settings, string? profileId, ILogger logger)
+    internal static RunOptions? LoadOptions(ISettingsStore settings, string? profileId, ILogger logger)
     {
         if (!string.IsNullOrEmpty(profileId))
         {
@@ -112,7 +123,7 @@ internal sealed class HeadlessSync
             exclusions);
     }
 
-    private static int Validate(RunOptions options, ILogger logger)
+    internal static int Validate(RunOptions options, ILogger logger)
     {
         if (string.IsNullOrEmpty(options.Left) || string.IsNullOrEmpty(options.Right))
         {
@@ -164,7 +175,7 @@ internal sealed class HeadlessSync
         SyncLog.AppendSafe(SyncLogOrigin.Scheduled, name, report, verify, logger);
     }
 
-    private sealed record RunOptions(
+    internal sealed record RunOptions(
         string Name,
         string Left,
         string Right,
