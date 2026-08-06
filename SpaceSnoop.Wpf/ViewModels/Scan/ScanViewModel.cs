@@ -209,6 +209,8 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
     internal TimeSpan LastScanElapsed { get; private set; }
 
+    internal int LastScanParallelism { get; private set; } = 1;
+
     private void OnProgressPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(IsIndeterminate) or nameof(ProgressValue))
@@ -421,18 +423,18 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
         SelectedNode = null;
 
-        var parallelism = Preferences.ResolveParallelism(path);
-        var progress = Progress.Begin(directory, path, parallelism);
-
-        if (parallelism == 1 && Preferences.UseMultithreading && Preferences.MaxParallelism > 1)
-        {
-            _logger.ScanMediaLimited(path, Preferences.MaxParallelism);
-        }
-
-        _logger.ScanStarted(path, Preferences.UseMultithreading, parallelism);
-
         try
         {
+            var parallelism = await Task.Run(() => Preferences.ResolveParallelism(path), token);
+            var progress = Progress.Begin(directory, path, parallelism);
+
+            if (parallelism == 1 && Preferences.UseMultithreading && Preferences.MaxParallelism > 1)
+            {
+                _logger.ScanMediaLimited(path, Preferences.MaxParallelism);
+            }
+
+            _logger.ScanStarted(path, parallelism > 1, parallelism);
+
             var result = await Task.Run(() => parallelism > 1
                     ? _calculator.CalculateMultithreaded(directory, parallelism, progress, token)
                     : _calculator.Calculate(directory, progress, token),

@@ -162,10 +162,13 @@ public sealed partial class ScanDuplicatesViewModel : ObservableObject
             return;
         }
 
+        var path = root.AbsolutePath;
+        var parallelism = await Task.Run(() => _preferences.ResolveParallelism(path));
+
         var options = DuplicateOptions.Default with
         {
             MinSize = Math.Max(1, (long)MinSizeMb * 1024 * 1024),
-            MaxParallelism = _preferences.ResolveParallelism(root.AbsolutePath),
+            MaxParallelism = parallelism,
         };
 
         var dialog = _dialogFactory.Create(new(root, options));
@@ -179,7 +182,7 @@ public sealed partial class ScanDuplicatesViewModel : ObservableObject
             await dialog.StopAsync();
         }
 
-        if (dialog.Report is not { } report)
+        if (dialog.Report is not { } report || !ReferenceEquals(_root(), root))
         {
             return;
         }

@@ -41,8 +41,8 @@ internal sealed class McpScanTools(
         }
 
         // Те же параметры обхода, что и у человека на странице «Сканирование».
-        var multithreaded = scanPreferences.UseMultithreading;
         var parallelism = scanPreferences.ResolveParallelism(path);
+        var multithreaded = parallelism > 1;
 
         var directory = new DirectoryInfo(path);
 

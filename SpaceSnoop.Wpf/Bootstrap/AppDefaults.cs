@@ -74,6 +74,7 @@ public static class AppDefaults
     public const int McpShutdownTimeoutSeconds = 3;
 
     public const int VolumeSpaceTimeoutMs = 1500;
+    public const int StorageMediaTimeoutMs = 3000;
 
     public const int ViewCaptureLimit = 20;
     public const int ViewCaptureNamesHint = 20;

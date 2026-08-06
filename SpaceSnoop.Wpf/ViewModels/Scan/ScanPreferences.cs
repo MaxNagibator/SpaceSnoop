@@ -42,7 +42,15 @@ public sealed partial class ScanPreferences : ObservableObject
             return 1;
         }
 
-        return MediaAware ? StorageMedia.LimitParallelism(path, MaxParallelism) : MaxParallelism;
+        if (!MediaAware)
+        {
+            return MaxParallelism;
+        }
+
+        var requested = MaxParallelism;
+        var probe = Task.Run(() => StorageMedia.LimitParallelism(path, requested));
+
+        return probe.Wait(AppDefaults.StorageMediaTimeoutMs) ? probe.Result : requested;
     }
 
     public string ParallelismHint =>

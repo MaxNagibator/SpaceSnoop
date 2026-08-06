@@ -78,7 +78,7 @@ public sealed partial class ScanViewModel : IScanAutomation
             return null;
         }
 
-        var options = new ScanExportOptions(depth, Preferences.UseMultithreading, Preferences.MaxParallelism);
+        var options = new ScanExportOptions(depth, LastScanParallelism > 1, LastScanParallelism);
         var path = root.AbsolutePath;
 
         return () => ScanExport.Build(root, path, options, AppInfo.Version, entryLimit);
@@ -113,6 +113,7 @@ public sealed partial class ScanViewModel : IScanAutomation
         Treemap.SetRoot(node);
 
         LastScanElapsed = elapsed;
+        LastScanParallelism = Math.Max(1, traversal?.Parallelism ?? 1);
         _runs.Report(Summary.Apply(result, elapsed, traversal));
         HasResult = true;
         Duplicates.Clear();
