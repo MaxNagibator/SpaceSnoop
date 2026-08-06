@@ -400,7 +400,7 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
             _logger.SyncVerified(report.Applied.Count, report.Mismatches.Count);
         }
 
-        SyncLog.AppendSafe(interactive ? SyncLogOrigin.Manual : SyncLogOrigin.Mcp, null, report, _logger);
+        SyncLog.AppendSafe(interactive ? SyncLogOrigin.Manual : SyncLogOrigin.Mcp, null, report, LastVerifyState, _logger);
 
         _lastReport = report;
         _outcomes = SyncOutcomes.Build(result, report.Errors, report.Mismatches);
@@ -408,7 +408,7 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
         RaiseProfileRun(null, report, (long)stopwatch.Elapsed.TotalMilliseconds);
         await ReadGitStateAsync();
 
-        var verifyText = SyncPlanNarrative.DescribeVerify(verify, report);
+        var verifyText = SyncPlanNarrative.DescribeVerify(LastVerifyState, report.Mismatches.Count);
         var volumeText = report.CopiedBytes > 0 ? $" Перенесено: {SizeFormatter.Format(report.CopiedBytes)}." : string.Empty;
         var rateText = SyncSessionViewModel.DescribeRate("Синхронизация", report, stopwatch.Elapsed);
         Report($"Готово за {stopwatch.Elapsed.TotalSeconds:F2} с.{volumeText}{rateText} Успешно: {report.SuccessCount:N0}, ошибок: {report.Errors.Count:N0}{verifyText}");

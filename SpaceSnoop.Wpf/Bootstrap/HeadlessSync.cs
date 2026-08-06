@@ -52,7 +52,7 @@ internal sealed class HeadlessSync
             var report = sync.Execute(new(result, SyncConflictPolicy.SkipUnresolved, SyncDeleteUi.Silent, false, recycleOverwritten), CancellationToken.None);
 
             stopwatch.Stop();
-            WriteLog(options.Name, report, logger);
+            WriteLog(options.Name, report, SyncVerifyState.None, logger);
             logger.HeadlessSyncFinished(report.SuccessCount, report.Errors.Count, (long)stopwatch.Elapsed.TotalMilliseconds);
 
             return report.Errors.Count == 0 ? 0 : 1;
@@ -159,9 +159,9 @@ internal sealed class HeadlessSync
         }
     }
 
-    private static void WriteLog(string name, SyncReport report, ILogger logger)
+    private static void WriteLog(string name, SyncReport report, SyncVerifyState verify, ILogger logger)
     {
-        SyncLog.AppendSafe(SyncLogOrigin.Scheduled, name, report, logger);
+        SyncLog.AppendSafe(SyncLogOrigin.Scheduled, name, report, verify, logger);
     }
 
     private sealed record RunOptions(

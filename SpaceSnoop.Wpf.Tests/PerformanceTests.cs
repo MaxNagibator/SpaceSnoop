@@ -264,14 +264,14 @@ public class PerformanceTests
         var report = new SyncReport();
         report.AddApplied(SyncAction.CopyToRight, "a.txt", 1024);
 
-        var interrupted = SyncPlanNarrative.DescribeVerify(true, report);
+        var interrupted = SyncPlanNarrative.DescribeVerify(SyncPlanNarrative.ResolveVerify(true, report), report.Mismatches.Count);
         report.MarkVerified();
 
         Assert.Multiple(() =>
         {
             Assert.That(interrupted, Does.Contain("проверка прервана"));
-            Assert.That(SyncPlanNarrative.DescribeVerify(true, report), Is.EqualTo(", расхождений: 0"));
-            Assert.That(SyncPlanNarrative.DescribeVerify(false, report), Is.Empty);
+            Assert.That(SyncPlanNarrative.DescribeVerify(SyncPlanNarrative.ResolveVerify(true, report), report.Mismatches.Count), Is.EqualTo(", расхождений: 0"));
+            Assert.That(SyncPlanNarrative.DescribeVerify(SyncPlanNarrative.ResolveVerify(false, report), report.Mismatches.Count), Is.Empty);
         });
     }
 

@@ -149,12 +149,12 @@ internal static class SyncPlanNarrative
         return report.Verified ? SyncVerifyState.Completed : SyncVerifyState.Interrupted;
     }
 
-    internal static string DescribeVerify(bool requested, SyncReport report)
+    internal static string DescribeVerify(SyncVerifyState state, int mismatches)
     {
-        return ResolveVerify(requested, report) switch
+        return state switch
         {
-            SyncVerifyState.Completed => $", расхождений: {report.Mismatches.Count:N0}",
-            SyncVerifyState.Interrupted => $", проверка прервана (расхождений к тому моменту: {report.Mismatches.Count:N0})",
+            SyncVerifyState.Completed => $", расхождений: {mismatches:N0}",
+            SyncVerifyState.Interrupted => $", проверка прервана (расхождений к тому моменту: {mismatches:N0})",
             _ => string.Empty,
         };
     }

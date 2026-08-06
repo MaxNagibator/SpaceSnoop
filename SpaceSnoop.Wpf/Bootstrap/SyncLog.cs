@@ -20,13 +20,15 @@ public static class SyncLog
 
     private const string NoErrors = ", 0 ошибок";
 
+    private const string NoMismatches = $"{NoErrors}, расхождений: 0";
+
     public static string FilePath => Path.Combine(AppStorage.DataDirectory, AppInfo.SyncLogFileName);
 
-    internal static void AppendSafe(SyncLogOrigin origin, string? name, SyncReport report, ILogger logger)
+    internal static void AppendSafe(SyncLogOrigin origin, string? name, SyncReport report, SyncVerifyState verify, ILogger logger)
     {
         try
         {
-            Append(FilePath, FormatHeader(origin, name, report, DateTime.Now), report);
+            Append(FilePath, FormatHeader(origin, name, report, verify, DateTime.Now), report);
         }
         catch (Exception exception)
         {
@@ -34,10 +36,11 @@ public static class SyncLog
         }
     }
 
-    internal static string FormatHeader(SyncLogOrigin origin, string? name, SyncReport report, DateTime timestamp)
+    internal static string FormatHeader(SyncLogOrigin origin, string? name, SyncReport report, SyncVerifyState verify, DateTime timestamp)
     {
         var scope = string.IsNullOrEmpty(name) ? string.Empty : $" [{name}]";
-        return $"[{timestamp:yyyy-MM-dd HH:mm:ss}] {Marker(origin)}{scope}: {report.SuccessCount} успешно, {report.Errors.Count} ошибок";
+        var outcome = SyncPlanNarrative.DescribeVerify(verify, report.Mismatches.Count);
+        return $"[{timestamp:yyyy-MM-dd HH:mm:ss}] {Marker(origin)}{scope}: {report.SuccessCount} успешно, {report.Errors.Count} ошибок{outcome}";
     }
 
     internal static bool MatchesOrigin(string line, SyncLogOrigin origin)
@@ -62,7 +65,8 @@ public static class SyncLog
 
     internal static bool LineHasErrors(string line)
     {
-        return !line.Contains(NoErrors, StringComparison.Ordinal);
+        return !line.EndsWith(NoErrors, StringComparison.Ordinal)
+               && !line.EndsWith(NoMismatches, StringComparison.Ordinal);
     }
 
     private static string Marker(SyncLogOrigin origin)

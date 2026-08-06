@@ -388,7 +388,7 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
             row.ApplySyncReport(report);
             row.ElapsedMs = (long)stopwatch.Elapsed.TotalMilliseconds;
             row.Error = null;
-            SyncLog.AppendSafe(SyncLogOrigin.Overview, profile.Name, report, _logger);
+            SyncLog.AppendSafe(SyncLogOrigin.Overview, profile.Name, report, SyncVerifyState.None, _logger);
         }
         catch (OperationCanceledException) when (!token.IsCancellationRequested)
         {
