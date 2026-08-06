@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Dialogs"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:behaviors="clr-namespace:SpaceSnoop.Wpf.Views.Behaviors"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
@@ -109,10 +110,10 @@
                            Foreground="{DynamicResource Accent.Primary}" />
             </Grid>
 
-            <TextBlock Text="{Binding CurrentPath}"
+            <TextBlock behaviors:PathTrimmer.FullPath="{Binding CurrentPath}"
                        AutomationProperties.Name="Текущий файл"
                        Margin="0,8,0,0"
-                       TextTrimming="CharacterEllipsis"
+                       TextWrapping="NoWrap"
                        FontFamily="{DynamicResource Font.Mono}"
                        FontSize="{DynamicResource Font.Size.S}"
                        Foreground="{DynamicResource Fg.Muted}"

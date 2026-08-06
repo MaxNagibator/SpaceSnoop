@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Dialogs"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:behaviors="clr-namespace:SpaceSnoop.Wpf.Views.Behaviors"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
@@ -44,6 +45,7 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <iconPacks:PackIconLucide Grid.Column="0"
                                                   Kind="{x:Static iconPacks:PackIconLucideKind.Folder}"
@@ -53,15 +55,19 @@
                                                   Margin="0,0,9,0"
                                                   Foreground="{DynamicResource Fg.Muted}" />
                         <TextBlock Grid.Column="1"
-                                   Text="{Binding PlanText}"
+                                   behaviors:PathTrimmer.FullPath="{Binding RootPath}"
                                    AutomationProperties.Name="Где ищем"
                                    VerticalAlignment="Center"
                                    TextWrapping="NoWrap"
-                                   TextTrimming="CharacterEllipsis"
                                    FontFamily="{DynamicResource Font.Mono}"
                                    FontSize="{DynamicResource Font.Size.S}"
                                    Foreground="{DynamicResource Fg.Primary}"
                                    ToolTip="{Binding PlanText}" />
+                        <TextBlock Grid.Column="2"
+                                   Text="{Binding ThresholdText}"
+                                   Style="{StaticResource Caption}"
+                                   VerticalAlignment="Center"
+                                   Margin="10,0,0,0" />
                     </Grid>
 
                     <TextBlock Text="{Binding FateText}"
@@ -105,11 +111,10 @@
                            Foreground="{DynamicResource Accent.Primary}" />
             </Grid>
 
-            <TextBlock Text="{Binding CurrentPath}"
+            <TextBlock behaviors:PathTrimmer.FullPath="{Binding CurrentPath}"
                        AutomationProperties.Name="Текущий файл"
                        Margin="0,8,0,0"
                        TextWrapping="NoWrap"
-                       TextTrimming="CharacterEllipsis"
                        FontFamily="{DynamicResource Font.Mono}"
                        FontSize="{DynamicResource Font.Size.S}"
                        Foreground="{DynamicResource Fg.Muted}"

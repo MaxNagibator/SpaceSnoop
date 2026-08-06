@@ -20,12 +20,18 @@ public sealed partial class DuplicateProgressDialogViewModel : OperationDialogVi
         _finder = finder;
         _logger = logger;
 
-        PlanText = $"{request.Root.AbsolutePath} · от {SizeFormatter.Format(request.Options.MinSize)}";
+        RootPath = request.Root.AbsolutePath;
+        ThresholdText = $"от {SizeFormatter.Format(request.Options.MinSize)}";
+        PlanText = $"{RootPath} · {ThresholdText}";
     }
 
     public override string Title => "Поиск дубликатов";
 
     public string ActionText => "Искать";
+
+    public string RootPath { get; }
+
+    public string ThresholdText { get; }
 
     public string PlanText { get; }
 
