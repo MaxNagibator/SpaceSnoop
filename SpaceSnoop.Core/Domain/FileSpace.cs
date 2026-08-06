@@ -18,6 +18,11 @@ public class FileSpace : SpaceBase
         return new(info.Name, parent, info.CreationTime, info.LastAccessTime, info.Length);
     }
 
+    internal static FileSpace Create(in ScanEntry entry, SpaceBase? parent)
+    {
+        return new(entry.Name, parent, entry.CreationTime, entry.LastAccessTime, entry.Length);
+    }
+
     public override string ToString()
     {
         return $"{Name} [{SizeText}]";

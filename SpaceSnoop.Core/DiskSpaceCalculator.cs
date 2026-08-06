@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Collections.Concurrent;
+using System.IO.Enumeration;
+using System.Runtime.ExceptionServices;
 using System.Security;
 
 namespace SpaceSnoop.Core;
@@ -10,7 +12,16 @@ namespace SpaceSnoop.Core;
 /// </summary>
 public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator>? logger = null)
 {
+    private static readonly EnumerationOptions Enumeration = new()
+    {
+        AttributesToSkip = 0,
+        IgnoreInaccessible = false,
+        RecurseSubdirectories = false,
+        ReturnSpecialDirectories = false,
+    };
+
     private readonly ILogger _log = logger ?? NullLogger<DiskSpaceCalculator>.Instance;
+
     /// <summary>
     /// Вычисляет занимаемое дисковое пространство указанной директории и ее подкаталогов.
     /// </summary>
@@ -19,7 +30,7 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator>? logger = null)
     /// <returns>Объект <see cref="DirectorySpace" /> с вычисленной информацией о занимаемом дисковом пространстве.</returns>
     public DirectorySpace Calculate(DirectoryInfo directory, CancellationToken cancel = default)
     {
-        return CalculateInner(directory, null, null, cancel);
+        return Calculate(directory, null, cancel);
     }
 
     /// <summary>
@@ -32,7 +43,20 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator>? logger = null)
     /// <returns>Объект <see cref="DirectorySpace" /> с вычисленной информацией о занимаемом дисковом пространстве.</returns>
     public DirectorySpace Calculate(DirectoryInfo directory, ScanProgress? progress, CancellationToken cancel = default)
     {
-        return CalculateInner(directory, null, progress, cancel);
+        var root = CreateRoot(directory);
+        var children = new List<ScanChild>();
+
+        ReadDirectory(directory.FullName, root, progress, cancel, children);
+        progress?.SetTopLevelTotal(children.Count);
+
+        foreach (var child in children)
+        {
+            ScanRecursive(child, progress, cancel);
+            progress?.CompleteTopLevel();
+        }
+
+        root.AggregateTotals();
+        return root;
     }
 
     /// <summary>
@@ -78,178 +102,221 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator>? logger = null)
     /// <remarks>Повышенное выделение памяти; растёт со степенью параллелизма.</remarks>
     public DirectorySpace CalculateMultithreaded(DirectoryInfo directory, int maxDegreeOfParallelism, ScanProgress? progress, CancellationToken cancel = default)
     {
-        var counter = new InterlockedInt(Math.Max(1, maxDegreeOfParallelism));
+        var root = CreateRoot(directory);
 
-        var directorySpace = CalculateMultithreadedInner(directory, null, counter, progress, cancel);
-        directorySpace.FixAbsolutePath(directory);
-        return directorySpace;
+        ScanParallel(directory.FullName, root, Math.Max(1, maxDegreeOfParallelism), progress, cancel);
+
+        root.AggregateTotals();
+        root.FixAbsolutePath(directory);
+        return root;
     }
 
-    private DirectorySpace CalculateInner(DirectoryInfo directory, DirectorySpace? parent, ScanProgress? progress, CancellationToken cancel)
+    private static DirectorySpace CreateRoot(DirectoryInfo directory)
     {
-        var directorySpace = new DirectorySpace(directory.Name, parent, directory.CreationTime, directory.LastAccessTime);
-
-        try
-        {
-            cancel.ThrowIfCancellationRequested();
-
-            progress?.EnterDirectory(directory.FullName);
-
-            var files = directory.GetFiles();
-            directorySpace.AddFiles(files);
-            progress?.AddFiles(files.Length, directorySpace.Size);
-
-            var isRoot = parent is null;
-            var subDirectories = Traversable(directory.GetDirectories());
-
-            if (isRoot)
-            {
-                progress?.SetTopLevelTotal(subDirectories.Length);
-            }
-
-            foreach (var subDirectory in subDirectories)
-            {
-                cancel.ThrowIfCancellationRequested();
-                var subDirectorySpace = CalculateInner(subDirectory, directorySpace, progress, cancel);
-                directorySpace.Add(subDirectorySpace);
-
-                if (isRoot)
-                {
-                    progress?.CompleteTopLevel();
-                }
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception exception) when (IsTraversalError(exception))
-        {
-            _log.ScanDirectorySkipped(exception, directory.FullName);
-            directorySpace.Error();
-            progress?.FailDirectory();
-        }
-
-        return directorySpace;
+        return new(directory.Name, null, directory.CreationTime, directory.LastAccessTime);
     }
 
-    private DirectorySpace CalculateMultithreadedInner(DirectoryInfo directory, DirectorySpace? parent, InterlockedInt counter, ScanProgress? progress, CancellationToken cancel)
+    private static FileSystemEnumerable<ScanEntry> Enumerate(string path)
     {
-        var directorySpace = DirectorySpace.Create(directory, parent);
-
-        if (cancel.IsCancellationRequested)
-        {
-            directorySpace.Error();
-            cancel.ThrowIfCancellationRequested();
-        }
-
-        progress?.EnterDirectory(directory.FullName);
-
-        Span<FileInfo> files;
-        DirectoryInfo[] subDirectories;
-
-        try
-        {
-            files = directory.GetFiles();
-            subDirectories = directory.GetDirectories();
-        }
-        catch (Exception exception) when (IsTraversalError(exception))
-        {
-            _log.ScanDirectorySkipped(exception, directory.FullName);
-            directorySpace.Error();
-            progress?.FailDirectory();
-            return directorySpace;
-        }
-
-        directorySpace.AddFiles(files);
-        progress?.AddFiles(files.Length, directorySpace.Size);
-
-        AddSubDirectories(directorySpace, Traversable(subDirectories), counter, progress, cancel);
-
-        return directorySpace;
-    }
-
-    private void AddSubDirectories(DirectorySpace directorySpace, DirectoryInfo[] subDirectories, InterlockedInt counter, ScanProgress? progress, CancellationToken cancel)
-    {
-        counter.Dec();
-
-        ConcurrentBag<DirectorySpace> subDirSpaces = [];
-        var availableDegreeOfParallelism = Math.Max(1, counter.Inc());
-
-        // Корень определяется по отсутствию родителя – на нём знаем число «веток» верхнего уровня.
-        var isRoot = directorySpace.Parent is null;
-
-        if (isRoot)
-        {
-            progress?.SetTopLevelTotal(subDirectories.Length);
-        }
-
-        var options = new ParallelOptions
-        {
-            MaxDegreeOfParallelism = availableDegreeOfParallelism,
-            CancellationToken = cancel,
-        };
-
-        try
-        {
-            Parallel.For(0, subDirectories.Length, options, x =>
-            {
-                var subDir = CalculateMultithreadedInner(subDirectories[x], directorySpace, counter, progress, cancel);
-                subDirSpaces.Add(subDir);
-
-                if (isRoot)
-                {
-                    progress?.CompleteTopLevel();
-                }
-            });
-
-            if (cancel.IsCancellationRequested)
-            {
-                directorySpace.Error();
-                cancel.ThrowIfCancellationRequested();
-            }
-
-            foreach (var subDirSpace in subDirSpaces)
-            {
-                directorySpace.Add(subDirSpace);
-            }
-        }
-        finally
-        {
-            counter.Inc();
-        }
-    }
-
-    private DirectoryInfo[] Traversable(DirectoryInfo[] subDirectories)
-    {
-        if (!Array.Exists(subDirectories, IsReparsePoint))
-        {
-            return subDirectories;
-        }
-
-        var traversable = new List<DirectoryInfo>(subDirectories.Length);
-
-        foreach (var subDirectory in subDirectories)
-        {
-            if (IsReparsePoint(subDirectory))
-            {
-                _log.ScanReparsePointSkipped(subDirectory.FullName);
-                continue;
-            }
-
-            traversable.Add(subDirectory);
-        }
-
-        return [.. traversable];
-    }
-
-    private static bool IsReparsePoint(DirectoryInfo directory)
-    {
-        return (directory.Attributes & FileAttributes.ReparsePoint) != 0;
+        return new(path,
+            static (ref FileSystemEntry entry) => new ScanEntry(entry.FileName.ToString(),
+                entry.Length,
+                entry.CreationTimeUtc.LocalDateTime,
+                entry.LastAccessTimeUtc.LocalDateTime,
+                entry.Attributes,
+                entry.IsDirectory),
+            Enumeration);
     }
 
     private static bool IsTraversalError(Exception exception)
     {
         return exception is IOException or UnauthorizedAccessException or SecurityException or ArgumentException or NotSupportedException;
+    }
+
+    private void ScanRecursive(ScanChild item, ScanProgress? progress, CancellationToken cancel)
+    {
+        var children = new List<ScanChild>();
+
+        ReadDirectory(item.Path, item.Node, progress, cancel, children);
+
+        foreach (var child in children)
+        {
+            ScanRecursive(child, progress, cancel);
+        }
+    }
+
+    private void ScanParallel(string rootPath, DirectorySpace root, int degree, ScanProgress? progress, CancellationToken cancel)
+    {
+        using var run = new ScanRun(cancel);
+        run.Queue.Add(new(rootPath, root), cancel);
+
+        var threads = new Thread[degree];
+
+        for (var index = 0; index < degree; index++)
+        {
+            threads[index] = new(() => Work(run, progress, cancel))
+            {
+                IsBackground = true,
+                Name = "SpaceSnoop scan",
+            };
+
+            threads[index].Start();
+        }
+
+        foreach (var thread in threads)
+        {
+            thread.Join();
+        }
+
+        run.Failure?.Throw();
+    }
+
+    private void Work(ScanRun run, ScanProgress? progress, CancellationToken cancel)
+    {
+        var children = new List<ScanChild>();
+
+        try
+        {
+            foreach (var item in run.Queue.GetConsumingEnumerable(run.Token))
+            {
+                children.Clear();
+                ReadDirectory(item.Path, item.Node, progress, cancel, children);
+
+                run.Expect(children.Count);
+
+                if (item.Branch is null)
+                {
+                    progress?.SetTopLevelTotal(children.Count);
+                }
+                else
+                {
+                    item.Branch.Expect(children.Count);
+                }
+
+                foreach (var child in children)
+                {
+                    run.Queue.Add(child with { Branch = item.Branch ?? new ScanBranch() }, run.Token);
+                }
+
+                if (item.Branch is { } branch && branch.Complete())
+                {
+                    progress?.CompleteTopLevel();
+                }
+
+                run.Complete();
+            }
+        }
+        catch (Exception exception)
+        {
+            run.Fail(exception);
+        }
+    }
+
+    private void ReadDirectory(string path, DirectorySpace node, ScanProgress? progress, CancellationToken cancel, List<ScanChild> children)
+    {
+        cancel.ThrowIfCancellationRequested();
+        progress?.EnterDirectory(path);
+
+        var files = 0;
+
+        try
+        {
+            foreach (var entry in Enumerate(path))
+            {
+                cancel.ThrowIfCancellationRequested();
+
+                if (!entry.IsDirectory)
+                {
+                    node.AddScannedFile(entry);
+                    files++;
+                    continue;
+                }
+
+                if (entry.IsReparsePoint)
+                {
+                    _log.ScanReparsePointSkipped(Path.Join(path, entry.Name));
+                    continue;
+                }
+
+                var child = new DirectorySpace(entry.Name, node, entry.CreationTime, entry.LastAccessTime);
+                node.AddScannedDirectory(child);
+                children.Add(new(Path.Join(path, entry.Name), child));
+            }
+        }
+        catch (Exception exception) when (IsTraversalError(exception))
+        {
+            _log.ScanDirectorySkipped(exception, path);
+            node.Error();
+            progress?.FailDirectory();
+        }
+
+        node.SealFiles();
+        progress?.AddFiles(files, node.Size);
+    }
+
+    private readonly record struct ScanChild(string Path, DirectorySpace Node, ScanBranch? Branch = null);
+
+    private sealed class ScanBranch
+    {
+        private int _pending = 1;
+
+        public void Expect(int count)
+        {
+            if (count > 0)
+            {
+                Interlocked.Add(ref _pending, count);
+            }
+        }
+
+        public bool Complete()
+        {
+            return Interlocked.Decrement(ref _pending) == 0;
+        }
+    }
+
+    private sealed class ScanRun : IDisposable
+    {
+        private readonly CancellationTokenSource _stop;
+        private int _pending = 1;
+        private ExceptionDispatchInfo? _failure;
+
+        public ScanRun(CancellationToken cancel)
+        {
+            _stop = CancellationTokenSource.CreateLinkedTokenSource(cancel);
+        }
+
+        public BlockingCollection<ScanChild> Queue { get; } = new(new ConcurrentQueue<ScanChild>());
+
+        public CancellationToken Token => _stop.Token;
+
+        public ExceptionDispatchInfo? Failure => _failure;
+
+        public void Expect(int count)
+        {
+            if (count > 0)
+            {
+                Interlocked.Add(ref _pending, count);
+            }
+        }
+
+        public void Complete()
+        {
+            if (Interlocked.Decrement(ref _pending) == 0)
+            {
+                Queue.CompleteAdding();
+            }
+        }
+
+        public void Fail(Exception exception)
+        {
+            Interlocked.CompareExchange(ref _failure, ExceptionDispatchInfo.Capture(exception), null);
+            _stop.Cancel();
+        }
+
+        public void Dispose()
+        {
+            _stop.Dispose();
+            Queue.Dispose();
+        }
     }
 }

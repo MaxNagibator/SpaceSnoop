@@ -142,6 +142,82 @@ public class DiskSpaceCalculatorTests
         }
     }
 
+    [TestCase(true)]
+    [TestCase(false)]
+    public void Calculate_CountsHiddenAndSystemFiles(bool multithreaded)
+    {
+        var hidden = Path.Combine(_tempDir, "hidden.txt");
+        File.WriteAllText(hidden, new string('h', 700));
+        File.SetAttributes(hidden, FileAttributes.Hidden | FileAttributes.System);
+
+        var calculator = new DiskSpaceCalculator();
+
+        var result = multithreaded
+            ? calculator.CalculateMultithreaded(new(_tempDir), 4, CancellationToken.None)
+            : calculator.Calculate(new(_tempDir), CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.TotalFileCount, Is.EqualTo(6));
+            Assert.That(result.TotalSize, Is.EqualTo(2200));
+        }
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void Calculate_DoesNotFollowReparsePoint(bool multithreaded)
+    {
+        var link = Path.Combine(_tempDir, "link");
+
+        try
+        {
+            Directory.CreateSymbolicLink(link, Path.Combine(_tempDir, "sub"));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Assert.Ignore("не удалось создать символьную ссылку");
+        }
+
+        var calculator = new DiskSpaceCalculator();
+
+        var result = multithreaded
+            ? calculator.CalculateMultithreaded(new(_tempDir), 4, CancellationToken.None)
+            : calculator.Calculate(new(_tempDir), CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.TotalSize, Is.EqualTo(1500));
+            Assert.That(result.TotalDirectoryCount, Is.EqualTo(2));
+        }
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void Calculate_ThrowsOnCancellation(bool multithreaded)
+    {
+        var calculator = new DiskSpaceCalculator();
+        using var source = new CancellationTokenSource();
+        source.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => _ = multithreaded
+            ? calculator.CalculateMultithreaded(new(_tempDir), 4, source.Token)
+            : calculator.Calculate(new(_tempDir), source.Token));
+    }
+
+    [Test]
+    public void CalculateMultithreaded_KeepsPartialContentOfUnreadableDirectory()
+    {
+        var calculator = new DiskSpaceCalculator();
+
+        var result = calculator.CalculateMultithreaded(new(Path.Combine(_tempDir, "vanished")), 4, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.State, Is.EqualTo(SpaceState.Error));
+            Assert.That(result.TotalSize, Is.Zero);
+        }
+    }
+
     [Test]
     public void ScanProgressSnapshot_FractionIsNull_WhenTopLevelUnknown()
     {
