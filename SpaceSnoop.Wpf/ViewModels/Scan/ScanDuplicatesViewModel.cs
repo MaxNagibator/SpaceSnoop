@@ -77,6 +77,7 @@ public sealed partial class ScanDuplicatesViewModel : ObservableObject
 
     public bool ShowNothingFound => HasResult && !HasGroups;
 
+    // TODO: связь «состояние страницы – CanExecute» держится вызовом из ScanViewModel, а не типом: Func<bool> прячет её от компилятора, и забытая проводка обнаруживается только нажатием кнопки. Апгрейд – когда появится восьмая дочерняя модель с таким CanExecute: отдавать источник состояния и подписываться вместо Func.
     internal void NotifyScanStateChanged()
     {
         FindCommand.NotifyCanExecuteChanged();
