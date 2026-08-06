@@ -1,5 +1,6 @@
 ﻿using ModelContextProtocol;
 using SpaceSnoop.Core.Export;
+using System.Diagnostics;
 using System.IO;
 
 namespace SpaceSnoop.Wpf.Mcp;
@@ -46,6 +47,8 @@ internal sealed class McpScanTools(
 
         // Замер останавливается до сборки выгрузки: она обходит дерево ещё раз, и «время скана»
         // в окне означало бы не то же, что «время скана» у агента.
+        var phases = new ScanPhases();
+
         var (tree, model, run) = await Task.Run(() =>
                 {
                     using var probe = new BackgroundScanProbe(performance,
@@ -58,8 +61,13 @@ internal sealed class McpScanTools(
                         : calculator.Calculate(directory, probe.Progress, cancellationToken);
 
                     var walked = probe.Finish();
+                    phases.WalkMs = (long)walked.Elapsed.TotalMilliseconds;
 
-                    return (root, ScanExport.Build(root, directory.FullName, new(depth, multithreaded, parallelism), AppInfo.Version, entryLimit), walked);
+                    var stopwatch = Stopwatch.StartNew();
+                    var built = ScanExport.Build(root, directory.FullName, new(depth, multithreaded, parallelism), AppInfo.Version, entryLimit);
+                    phases.ExportMs = stopwatch.ElapsedMilliseconds;
+
+                    return (root, built, walked);
                 },
                 cancellationToken)
             .ConfigureAwait(false);
@@ -67,6 +75,8 @@ internal sealed class McpScanTools(
         if (show)
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            var stopwatch = Stopwatch.StartNew();
 
             McpDispatch.Run(() =>
             {
@@ -81,9 +91,28 @@ internal sealed class McpScanTools(
                 navigator.DeferOrNavigate(SectionKey.Scan);
                 notifier.Notify($"Агент показал сканирование: {tree.AbsolutePath} · {tree.TotalSizeText}");
             });
+
+            phases.ApplyMs = stopwatch.ElapsedMilliseconds;
         }
 
-        return ScanExport.ToJson(model);
+        var serializing = Stopwatch.StartNew();
+        var json = ScanExport.ToJson(model);
+        phases.JsonMs = serializing.ElapsedMilliseconds;
+
+        logger.McpScanPhases(phases.WalkMs, phases.ExportMs, phases.JsonMs, phases.ApplyMs, json.Length);
+
+        return json;
+    }
+
+    private sealed class ScanPhases
+    {
+        public long WalkMs { get; set; }
+
+        public long ExportMs { get; set; }
+
+        public long JsonMs { get; set; }
+
+        public long ApplyMs { get; set; }
     }
 
     public Task<string> GetCurrentScanAsync(int depth, int entryLimit, CancellationToken cancellationToken)

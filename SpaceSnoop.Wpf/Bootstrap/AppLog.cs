@@ -288,6 +288,9 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 2009, Level = LogLevel.Error, Message = "MCP-сервер не остановился штатно")]
     public static partial void McpServerStopFailed(this ILogger logger, Exception exception);
 
+    [LoggerMessage(EventId = 2010, Level = LogLevel.Debug, Message = "scan_directory по фазам: обход {WalkMs} мс, выгрузка {ExportMs} мс, сериализация {JsonMs} мс, показ {ApplyMs} мс, ответ {JsonLength} знаков")]
+    public static partial void McpScanPhases(this ILogger logger, long walkMs, long exportMs, long jsonMs, long applyMs, int jsonLength);
+
     [LoggerMessage(EventId = 2100, Level = LogLevel.Information, Message = "CLI агента найден: {Path} ({Version})")]
     public static partial void AgentCliDetected(this ILogger logger, string path, string version);
 
