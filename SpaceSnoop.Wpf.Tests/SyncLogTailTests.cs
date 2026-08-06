@@ -39,6 +39,17 @@ public class SyncLogTailTests
     }
 
     [Test]
+    public void Журнал_легаси_приложения_в_хвост_не_попадает()
+    {
+        File.WriteAllLines(Path.Combine(_dir, "sync-log.txt"), ["[x] Синхронизация: 1 успешно, 0 ошибок"]);
+        File.WriteAllLines(Path.Combine(_dir, "winforms-sync-log.txt"), ["[y] Синхронизация: 9 успешно, 0 ошибок"]);
+
+        var tail = SyncLog.ReadTail(_dir, static _ => true, 10);
+
+        Assert.That(tail, Is.EqualTo(new[] { "[x] Синхронизация: 1 успешно, 0 ошибок" }));
+    }
+
+    [Test]
     public void Предикат_отбирает_только_подходящие_строки()
     {
         File.WriteAllLines(Path.Combine(_dir, "sync-log.txt"), ["[x] Автосинхронизация", "  деталь", "[y] Синхронизация"]);

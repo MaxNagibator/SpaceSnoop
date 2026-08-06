@@ -287,7 +287,7 @@ public partial class SyncForm : Form
 
     private static void WriteSyncLog(SyncReport report)
     {
-        var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "sync-log.txt");
+        var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "winforms-sync-log.txt");
 
         using var writer = new StreamWriter(logPath, true);
         writer.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Синхронизация: {report.SuccessCount} успешно, {report.Errors.Count} ошибок");
