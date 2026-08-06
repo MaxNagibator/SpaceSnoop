@@ -293,8 +293,8 @@ public sealed class ArchiveService
 
         entry.LastWriteTime = lastWrite.Year switch
         {
-            < ZipMinYear => new DateTime(ZipMinYear, 1, 1, 0, 0, 0),
-            > ZipMaxYear => new DateTime(ZipMaxYear, 12, 31, 23, 59, 58),
+            < ZipMinYear => new DateTime(ZipMinYear, 1, 1, 0, 0, 0, DateTimeKind.Local),
+            > ZipMaxYear => new DateTime(ZipMaxYear, 12, 31, 23, 59, 58, DateTimeKind.Local),
             _ => lastWrite,
         };
 

@@ -422,15 +422,8 @@ public sealed class DockerService
             candidates.Add(Path.Combine(localDockerPath, "Docker", "wsl", "disk", "docker_data.vhdx"));
         }
 
-        foreach (var candidate in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
-        {
-            if (_fileSystem.FileExists(candidate))
-            {
-                return candidate;
-            }
-        }
-
-        return _legacyVhdxProvider.Locate().FirstOrDefault(_fileSystem.FileExists);
+        return candidates.Distinct(StringComparer.OrdinalIgnoreCase).FirstOrDefault(_fileSystem.FileExists)
+            ?? _legacyVhdxProvider.Locate().FirstOrDefault(_fileSystem.FileExists);
     }
 
     private async Task<DockerProcessResult> RunAsync(
