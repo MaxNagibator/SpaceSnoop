@@ -291,9 +291,12 @@ public sealed class ArchiveService
         var entry = zip.CreateEntry(entryName, level);
         var lastWrite = File.GetLastWriteTime(path);
 
-        entry.LastWriteTime = lastWrite.Year is < ZipMinYear or > ZipMaxYear
-            ? new DateTime(ZipMinYear, 1, 1, 0, 0, 0)
-            : lastWrite;
+        entry.LastWriteTime = lastWrite.Year switch
+        {
+            < ZipMinYear => new DateTime(ZipMinYear, 1, 1, 0, 0, 0),
+            > ZipMaxYear => new DateTime(ZipMaxYear, 12, 31, 23, 59, 58),
+            _ => lastWrite,
+        };
 
         using var source = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         using var target = entry.Open();

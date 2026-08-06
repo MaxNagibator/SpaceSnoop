@@ -191,6 +191,24 @@ public class ArchiveServiceTests
             Is.LessThanOrEqualTo(DirectoryComparer.FatTimestampTolerance));
     }
 
+    [TestCase(1900, 1980, 1, 1, 0, 0, 0)]
+    [TestCase(2200, 2107, 12, 31, 23, 59, 58)]
+    public void Zip_ClampsModificationTimeToZipRange(int sourceYear, int year, int month, int day, int hour, int minute, int second)
+    {
+        var service = new ArchiveService();
+        var file = Path.Combine(_sourceDir, "a.txt");
+        File.SetLastWriteTime(file, new DateTime(sourceYear, 5, 6, 7, 8, 9, DateTimeKind.Local));
+
+        service.ZipFiles(_sourceDir, Content(file), _zipPath, CompressionLevel.Optimal, null, CancellationToken.None);
+
+        using var zip = ZipFile.OpenRead(_zipPath);
+        var entry = zip.GetEntry("a.txt");
+
+        Assert.That(entry, Is.Not.Null);
+        Assert.That((entry.LastWriteTime.DateTime - new DateTime(year, month, day, hour, minute, second)).Duration(),
+            Is.LessThanOrEqualTo(DirectoryComparer.FatTimestampTolerance));
+    }
+
     [Test]
     public void Collect_EmptyDirectorySurvivesRoundTrip()
     {
