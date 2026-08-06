@@ -56,4 +56,20 @@ public class PathSuggestTests
 
         Assert.That(PathSuggest.Matches(input), Is.Empty);
     }
+
+    [TestCase(@"\\server\", ExpectedResult = "server")]
+    [TestCase("//server/", ExpectedResult = "server")]
+    [TestCase(@"\\server\share\", ExpectedResult = null)]
+    [TestCase(@"C:\", ExpectedResult = null)]
+    [TestCase(@"\\", ExpectedResult = null)]
+    public string? Корень_сервера_отличается_от_обычного_каталога(string directory)
+    {
+        return PathSuggest.ServerName(directory);
+    }
+
+    [Test]
+    public void Первый_запрос_к_недоступному_серверу_не_блокирует_ввод()
+    {
+        Assert.That(PathSuggest.Matches($@"\\{Guid.NewGuid():N}\sh"), Is.Empty);
+    }
 }

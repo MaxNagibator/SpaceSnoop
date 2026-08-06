@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System.Collections.Concurrent;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Security;
 using System.Windows.Input;
@@ -15,6 +16,8 @@ public static class PathSuggest
         new(false, OnEnabledChanged));
 
     private static readonly ConditionalWeakTable<TextBox, State> States = [];
+    private static readonly ConcurrentDictionary<string, IReadOnlyList<string>> Shares = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, bool> PendingShares = new(StringComparer.OrdinalIgnoreCase);
     private static bool _suppress;
 
     public static bool GetEnabled(DependencyObject element)
@@ -27,7 +30,6 @@ public static class PathSuggest
         element.SetValue(EnabledProperty, value);
     }
 
-    // TODO: UNC share
     internal static IReadOnlyList<string> Matches(string text)
     {
         var separator = text.LastIndexOfAny(['\\', '/']);
@@ -43,6 +45,11 @@ public static class PathSuggest
         if (prefix.Length == 0)
         {
             return [];
+        }
+
+        if (ServerName(directory) is { } server)
+        {
+            return ShareMatches(server, directory, prefix);
         }
 
         try
@@ -65,6 +72,59 @@ public static class PathSuggest
         {
             return [];
         }
+    }
+
+    internal static string? ServerName(string directory)
+    {
+        if (directory.Length < 3 || directory[0] is not ('\\' or '/') || directory[1] is not ('\\' or '/'))
+        {
+            return null;
+        }
+
+        var body = directory[2..];
+        var end = body.IndexOfAny(['\\', '/']);
+
+        return end > 0 && end == body.Length - 1 ? body[..end] : null;
+    }
+
+    private static IReadOnlyList<string> ShareMatches(string server, string directory, string prefix)
+    {
+        if (!Shares.TryGetValue(server, out var shares))
+        {
+            RequestShares(server);
+            return [];
+        }
+
+        var matches = shares
+            .Where(share => share.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            .Take(MaxCandidates)
+            .Select(share => directory + share)
+            .ToList();
+
+        matches.Sort(StringComparer.OrdinalIgnoreCase);
+        return matches;
+    }
+
+    private static void RequestShares(string server)
+    {
+        if (!PendingShares.TryAdd(server, true))
+        {
+            return;
+        }
+
+        _ = Task.Run(() =>
+        {
+            var shares = NetworkShares.List(server);
+
+            if (shares.Count > 0)
+            {
+                Shares[server] = shares;
+            }
+            else
+            {
+                PendingShares.TryRemove(server, out _);
+            }
+        });
     }
 
     private static void OnTextChanged(object sender, TextChangedEventArgs e)

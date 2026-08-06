@@ -1,6 +1,4 @@
-﻿using System.IO;
-
-namespace SpaceSnoop.Wpf.ViewModels.Sync;
+﻿namespace SpaceSnoop.Wpf.ViewModels.Sync;
 
 internal static class SyncPlanNarrative
 {
@@ -195,12 +193,12 @@ internal static class SyncPlanNarrative
 
         if (planned.RequiredLeftBytes > 0)
         {
-            receivers.Add(new(result.LeftPath, planned.RequiredLeftBytes, TryGetFreeSpace(result.LeftPath)));
+            receivers.Add(new(result.LeftPath, planned.RequiredLeftBytes, VolumeSpace.TryReadFree(result.LeftPath)));
         }
 
         if (planned.RequiredRightBytes > 0)
         {
-            receivers.Add(new(result.RightPath, planned.RequiredRightBytes, TryGetFreeSpace(result.RightPath)));
+            receivers.Add(new(result.RightPath, planned.RequiredRightBytes, VolumeSpace.TryReadFree(result.RightPath)));
         }
 
         return receivers;
@@ -319,27 +317,5 @@ internal static class SyncPlanNarrative
         }
 
         return lines;
-    }
-
-    private static long? TryGetFreeSpace(string path)
-    {
-        // TODO: свободное место на UNC-приёмнике не читается – DriveInfo знает только локальные корни; перейти на GetDiskFreeSpaceEx, когда появятся жалобы на сетевые папки
-        try
-        {
-            var root = Path.GetPathRoot(Path.GetFullPath(path));
-
-            if (string.IsNullOrEmpty(root))
-            {
-                return null;
-            }
-
-            var drive = new DriveInfo(root);
-
-            return drive.IsReady ? drive.AvailableFreeSpace : null;
-        }
-        catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException or NotSupportedException)
-        {
-            return null;
-        }
     }
 }
