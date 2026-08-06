@@ -32,7 +32,7 @@ public sealed partial class CleanupViewModel
 
         var bytes = ready.Sum(static row => row.SizeBytes);
         var files = ready.Sum(static row => row.Files);
-        var confirm = BuildConfirm(ready, bytes, files, "Очистку запросил агент через MCP.");
+        var confirm = CleanupConfirm.Build(ready, bytes, files, "Очистку запросил агент через MCP.");
 
         _logger.CleanupRunRequested(ready.Count, bytes);
 

@@ -1,6 +1,5 @@
 ﻿using KeepShell.Services;
 using KeepShell.Services.Platform;
-using MahApps.Metro.IconPacks;
 using SpaceSnoop.Core.Cleanup;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
@@ -210,37 +209,15 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
 
     private void UpdateTotals()
     {
-        long total = 0;
-        long selected = 0;
-        var count = 0;
-        var files = 0;
+        var rows = Targets.ToList();
+        var tally = CleanupTotals.Compute(rows);
 
-        foreach (var row in Targets)
-        {
-            if (row.IsAvailable)
-            {
-                total += row.SizeBytes;
-            }
+        TotalBytes = tally.TotalBytes;
+        SelectedBytes = tally.SelectedBytes;
+        SelectedFiles = tally.SelectedFiles;
+        SelectedCount = tally.SelectedCount;
 
-            if (!row.IsSelected || !row.IsAvailable)
-            {
-                continue;
-            }
-
-            selected += row.SizeBytes;
-            files += row.Files;
-            count++;
-        }
-
-        TotalBytes = total;
-        SelectedBytes = selected;
-        SelectedFiles = files;
-        SelectedCount = count;
-
-        foreach (var row in Targets)
-        {
-            row.Share = total > 0 && row.IsAvailable ? (double)row.SizeBytes / total : 0;
-        }
+        CleanupTotals.ApplyShares(rows, tally.TotalBytes);
     }
 
     private List<CleanupTargetViewModel> SelectedRows()
@@ -420,7 +397,7 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
 
         var bytes = rows.Sum(static x => x.SizeBytes);
         var files = rows.Sum(static x => x.Files);
-        var confirm = BuildConfirm(rows, bytes, files, null);
+        var confirm = CleanupConfirm.Build(rows, bytes, files, null);
 
         if (!await _dialogs.ShowAsync(confirm))
         {
@@ -485,36 +462,4 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
         return dialog;
     }
 
-    private ConfirmDialogViewModel BuildConfirm(
-        IReadOnlyList<CleanupTargetViewModel> rows,
-        long bytes,
-        int files,
-        string? requestedBy)
-    {
-        List<ConfirmLine> lines = [];
-
-        if (requestedBy is not null)
-        {
-            lines.Add(new ConfirmTextLine(requestedBy, ConfirmTextTone.Strong));
-            lines.Add(new ConfirmGapLine());
-        }
-
-        lines.Add(new ConfirmTextLine($"Будет очищено корзин: {rows.Count:N0}."));
-        lines.Add(new ConfirmMetricLine("Файлов", $"{files:N0}", SizeFormatter.Format(bytes)));
-
-        lines.AddRange(rows.Select(static row =>
-            new ConfirmMetricLine(row.Name, row.FilesText, row.SizeText, ConfirmMetricTone.Sub)));
-
-        return new ConfirmDialogViewModel(
-            "Очистка диска",
-            PackIconLucideKind.Trash2,
-            lines,
-            [
-                new("Отмена", ConfirmChoiceKind.Dismissive),
-                new("Очистить", ConfirmChoiceKind.Destructive),
-            ])
-        {
-            Warning = "Файлы удаляются безвозвратно, мимо корзины – восстановить их нельзя.",
-        };
-    }
 }
