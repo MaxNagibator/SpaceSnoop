@@ -12,6 +12,8 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
     private const int BlockSize = 80 * 1024;
     private const int HashThreshold = 8;
     private const int MaxReportedErrors = 50;
+    private const int PrefixHashSize = 4 * 1024;
+    private const int FullHashLimit = 64 * 1024;
 
     private readonly ILogger<DuplicateFinder> _logger = logger ?? NullLogger<DuplicateFinder>.Instance;
 
@@ -125,16 +127,18 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
     {
         var hash = new XxHash128();
         var buffer = ArrayPool<byte>.Shared.Rent(BlockSize);
+        var budget = stream.Length > FullHashLimit ? PrefixHashSize : long.MaxValue;
 
         try
         {
             int read;
 
-            while ((read = stream.Read(buffer, 0, BlockSize)) > 0)
+            while (budget > 0 && (read = stream.Read(buffer, 0, (int)Math.Min(BlockSize, budget))) > 0)
             {
                 token.ThrowIfCancellationRequested();
                 hash.Append(buffer.AsSpan(0, read));
                 state.AddBytes(read);
+                budget -= read;
             }
         }
         finally

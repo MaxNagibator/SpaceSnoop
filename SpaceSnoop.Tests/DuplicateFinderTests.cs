@@ -218,6 +218,40 @@ public class DuplicateFinderTests
         }
     }
 
+    [Test]
+    public void Совпадающее_начало_при_разных_хвостах_группы_не_даёт()
+    {
+        var head = new string('h', 64 * 1024);
+
+        for (var index = 0; index < 12; index++)
+        {
+            Write($"head{index}.bin", head + new string((char)('a' + index), 4096));
+        }
+
+        var report = Find();
+
+        Assert.That(report.Groups, Is.Empty);
+    }
+
+    [Test]
+    public void Совпадающее_начало_при_одинаковых_хвостах_даёт_группу()
+    {
+        var content = new string('h', 64 * 1024) + "хвост";
+
+        for (var index = 0; index < 12; index++)
+        {
+            Write($"same{index}.bin", content);
+        }
+
+        var report = Find();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.Groups, Has.Count.EqualTo(1));
+            Assert.That(report.Groups[0].Members, Has.Count.EqualTo(12));
+        }
+    }
+
     [DllImport("kernel32.dll", EntryPoint = "CreateHardLinkW", CharSet = CharSet.Unicode, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool CreateHardLink(string fileName, string existingFileName, IntPtr attributes);
