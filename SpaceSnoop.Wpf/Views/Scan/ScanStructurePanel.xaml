@@ -44,24 +44,13 @@
                             VerticalAlignment="Center">
                     <TextBlock Text="Структура каталога"
                                Style="{StaticResource SectionTitle}" />
-                    <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
-                                  IsChecked="{Binding ShowTreemap}"
-                                  Margin="16,0,0,0"
-                                  MinWidth="0"
-                                  Padding="9,0"
-                                  ToolTip="Карта занятого места (treemap). Повторное нажатие – назад к дереву."
-                                  AutomationProperties.Name="Показать карту занятого места"
-                                  Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
-                        <StackPanel Orientation="Horizontal">
-                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Map}"
-                                                      Width="14"
-                                                      Height="14"
-                                                      VerticalAlignment="Center"
-                                                      Margin="0,0,6,0" />
-                            <TextBlock Text="Карта"
-                                       VerticalAlignment="Center" />
-                        </StackPanel>
-                    </ToggleButton>
+                    <ListBox Style="{StaticResource ListBox.SegmentedCompact}"
+                             ItemsSource="{Binding ViewModes}"
+                             SelectedIndex="{Binding SelectedViewIndex}"
+                             Margin="16,0,0,0"
+                             VerticalAlignment="Center"
+                             AutomationProperties.Name="Вид структуры"
+                             Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
 
                     <ToggleButton x:Name="HeatToggle"
                                   Style="{StaticResource ToggleButton.Toolbar}"
@@ -308,6 +297,11 @@
                     </Grid>
                 </Border>
             </Grid>
+
+            <controls:ScanDuplicatesPanel Grid.Row="1"
+                                          Margin="0,4,0,0"
+                                          DataContext="{Binding Duplicates}"
+                                          Visibility="{Binding DataContext.DuplicatesVisible, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
 
             <keepshell:EmptyState Grid.Row="1"
                                   Icon="HardDrive"

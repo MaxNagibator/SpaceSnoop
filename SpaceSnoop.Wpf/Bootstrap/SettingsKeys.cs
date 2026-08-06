@@ -29,6 +29,10 @@ public static class SettingsKeys
     public const string ScanTreemap = "wpf.scan.treemap";
     public const string ScanRevealFiles = "wpf.scan.reveal_files";
 
+    public const string ScanView = "wpf.scan.view";
+
+    public const string ScanDuplicatesMinSize = "wpf.scan.duplicates.min_size_mb";
+
     public const string ScanInspectorCollapsed = "wpf.scan.inspector.collapsed";
     public const string ScanInspectorWidth = "wpf.scan.inspector.width";
 

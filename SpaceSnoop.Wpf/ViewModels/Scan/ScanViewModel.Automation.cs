@@ -110,6 +110,7 @@ public sealed partial class ScanViewModel : IScanAutomation
         LastScanElapsed = elapsed;
         _runs.Report(Summary.Apply(result, elapsed, traversal));
         HasResult = true;
+        Duplicates.Clear();
         Marks.RecountMarked();
 
         _logger.ScanCompleted(result.AbsolutePath,

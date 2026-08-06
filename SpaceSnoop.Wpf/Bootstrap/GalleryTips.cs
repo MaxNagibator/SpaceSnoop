@@ -28,7 +28,7 @@ public static class GalleryTips
         {
             case TreemapCenter:
             case TreemapCorner:
-                services.GetRequiredService<ScanViewModel>().ShowTreemap = true;
+                services.GetRequiredService<ScanViewModel>().ViewMode = ScanViewMode.Treemap;
                 break;
 
             default:

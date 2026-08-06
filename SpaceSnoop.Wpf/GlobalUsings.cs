@@ -8,6 +8,7 @@ global using SpaceSnoop.Core;
 global using SpaceSnoop.Core.Cleanup;
 global using SpaceSnoop.Core.Docker;
 global using SpaceSnoop.Core.Domain;
+global using SpaceSnoop.Core.Duplicates;
 global using SpaceSnoop.Core.UseCases;
 global using SpaceSnoop.Wpf.Agent;
 global using SpaceSnoop.Wpf.Bootstrap;

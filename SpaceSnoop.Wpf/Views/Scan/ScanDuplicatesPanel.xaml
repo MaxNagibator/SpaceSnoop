@@ -1,0 +1,188 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Scan.ScanDuplicatesPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Scan"
+             xmlns:bootstrap="clr-namespace:SpaceSnoop.Wpf.Bootstrap"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:ScanDuplicatesViewModel}"
+             d:DesignHeight="420"
+             d:DesignWidth="560">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0"
+              Margin="10,2,12,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="0"
+                    Style="{StaticResource Button.Secondary}"
+                    Command="{Binding FindCommand}"
+                    Content="Найти дубликаты"
+                    ToolTip="Читает файлы и сличает их содержимое. Ничего не удаляет и не помечает." />
+
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        Margin="12,0,0,0">
+                <TextBlock Text="От, МБ"
+                           Style="{StaticResource Caption}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,6,0" />
+                <TextBox Text="{Binding MinSizeMb, UpdateSourceTrigger=LostFocus}"
+                         Width="72"
+                         VerticalAlignment="Center"
+                         ToolTip="Файлы меньше порога не рассматриваются. Порог поднимают, когда групп слишком много." />
+            </StackPanel>
+
+            <TextBlock Grid.Column="2"
+                       Text="{Binding SummaryText}"
+                       Style="{StaticResource Caption}"
+                       HorizontalAlignment="Right"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis" />
+        </Grid>
+
+        <Grid Grid.Row="1"
+              Margin="10,0,12,8"
+              Visibility="{Binding HasNotice, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <iconPacks:PackIconLucide Grid.Column="0"
+                                      Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
+                                      Width="14"
+                                      Height="14"
+                                      VerticalAlignment="Top"
+                                      Margin="0,2,8,0"
+                                      Foreground="{DynamicResource State.Warning}" />
+
+            <TextBlock Grid.Column="1"
+                       Text="{Binding NoticeText}"
+                       Style="{StaticResource Caption}"
+                       TextWrapping="Wrap" />
+        </Grid>
+
+        <ListBox Grid.Row="2"
+                 ItemsSource="{Binding Groups}"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 HorizontalContentAlignment="Stretch"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}"
+                 VirtualizingStackPanel.IsVirtualizing="True"
+                 VirtualizingStackPanel.VirtualizationMode="Recycling">
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="Padding"
+                            Value="0" />
+                    <Setter Property="Margin"
+                            Value="0,0,0,6" />
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ListBoxItem">
+                                <ContentPresenter />
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemTemplate>
+                <DataTemplate DataType="{x:Type vm:DuplicateGroupViewModel}">
+                    <Border Style="{StaticResource Card.Inset}"
+                            Padding="10,8">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding SizeText}"
+                                           Style="{StaticResource StatValue}"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding CountText}"
+                                           Style="{StaticResource Caption}"
+                                           VerticalAlignment="Center"
+                                           Margin="10,0,0,0" />
+                                <TextBlock Text="{Binding ReclaimText, StringFormat=вернёт {0}}"
+                                           Style="{StaticResource Caption}"
+                                           VerticalAlignment="Center"
+                                           Margin="10,0,0,0" />
+                                <TextBlock Text="{Binding OmittedText}"
+                                           Style="{StaticResource Caption}"
+                                           VerticalAlignment="Center"
+                                           Margin="10,0,0,0"
+                                           Visibility="{Binding HasOmitted, Converter={StaticResource BoolToVisibility}}" />
+                            </StackPanel>
+
+                            <ItemsControl ItemsSource="{Binding Members}"
+                                          Margin="0,6,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:DuplicateMemberViewModel}">
+                                        <Grid Margin="0,2,0,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <iconPacks:PackIconLucide Grid.Column="0"
+                                                                      Kind="{Binding KindIconKind}"
+                                                                      Width="13"
+                                                                      Height="13"
+                                                                      VerticalAlignment="Center"
+                                                                      Margin="0,0,8,0"
+                                                                      Foreground="{DynamicResource Fg.Muted}"
+                                                                      ToolTip="{Binding KindText}" />
+
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding Path}"
+                                                       FontFamily="{DynamicResource Font.Mono}"
+                                                       FontSize="{DynamicResource Font.Size.S}"
+                                                       Foreground="{DynamicResource Fg.Primary}"
+                                                       VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding KindText}" />
+
+                                            <ToggleButton Grid.Column="2"
+                                                          Style="{StaticResource ToggleButton.Filter}"
+                                                          IsChecked="{Binding IsMarked, Mode=OneWay}"
+                                                          Command="{Binding ToggleMarkCommand}"
+                                                          Content="Пометить"
+                                                          MinWidth="0"
+                                                          Padding="8,2"
+                                                          Margin="10,0,0,0"
+                                                          ToolTip="Пометить файл на удаление. Удаление – кнопкой «Удалить помеченное», в корзину." />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <keepshell:EmptyState Grid.Row="2"
+                              Icon="CopyCheck"
+                              IconSize="40"
+                              Heading="Дубликаты ещё не искали"
+                              Description="Поиск читает файлы отсканированного дерева и сличает их содержимое побайтно. Совпадение размера или хеша дубликатом не считается."
+                              DescriptionMaxWidth="440"
+                              ActionText="Найти дубликаты"
+                              ActionCommand="{Binding FindCommand}"
+                              VerticalAlignment="Center"
+                              HorizontalAlignment="Center"
+                              Visibility="{Binding HasResult, Converter={StaticResource InverseBoolToVisibility}, FallbackValue=Visible}" />
+    </Grid>
+</UserControl>

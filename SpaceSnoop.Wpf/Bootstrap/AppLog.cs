@@ -27,6 +27,18 @@ internal static partial class AppLog
         Message = "Результат удаления применён к дереву: убрано узлов – {Count}")]
     public static partial void DeletionResultApplied(this ILogger logger, int count);
 
+    [LoggerMessage(EventId = 1050, Level = LogLevel.Information, Message = "Поиск дубликатов начат: {Path}, порог {MinSize} Б")]
+    public static partial void DuplicateSearchStarted(this ILogger logger, string path, long minSize);
+
+    [LoggerMessage(EventId = 1051, Level = LogLevel.Information, Message = "Поиск дубликатов завершён: групп {Groups}, вернёт {ReclaimableBytes} Б, проверено {Examined}")]
+    public static partial void DuplicateSearchFinished(this ILogger logger, int groups, long reclaimableBytes, int examined);
+
+    [LoggerMessage(EventId = 1052, Level = LogLevel.Information, Message = "Поиск дубликатов отменён")]
+    public static partial void DuplicateSearchCancelled(this ILogger logger);
+
+    [LoggerMessage(EventId = 1053, Level = LogLevel.Error, Message = "Ошибка поиска дубликатов")]
+    public static partial void DuplicateSearchFailed(this ILogger logger, Exception exception);
+
     [LoggerMessage(EventId = 1007, Level = LogLevel.Warning,
         Message = "Не удалось подгрузить заполненность дисков")]
     public static partial void DriveSizesFailed(this ILogger logger, Exception exception);

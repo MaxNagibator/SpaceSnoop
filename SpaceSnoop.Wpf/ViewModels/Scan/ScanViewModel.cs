@@ -1,4 +1,6 @@
 ﻿using KeepShell.Services;
+
+using MahApps.Metro.IconPacks;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
@@ -46,12 +48,14 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TreeVisible))]
     [NotifyPropertyChangedFor(nameof(TreemapVisible))]
+    [NotifyPropertyChangedFor(nameof(DuplicatesVisible))]
     private bool _hasResult;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TreeVisible))]
     [NotifyPropertyChangedFor(nameof(TreemapVisible))]
-    private bool _showTreemap = AppDefaults.ScanTreemapDefault;
+    [NotifyPropertyChangedFor(nameof(DuplicatesVisible))]
+    private int _selectedViewIndex;
 
     [ObservableProperty]
     private ScanNodeViewModel? _selectedNode;
@@ -69,6 +73,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         ScanNodeFactory nodeFactory,
         DeleteProgressDialogFactory deleteDialogFactory,
         ArchiveProgressDialogFactory archiveDialogFactory,
+        DuplicateProgressDialogFactory duplicateDialogFactory,
         ILogger<ScanViewModel> logger,
         ToastNotifier notifier,
         PerformanceMonitor performance,
@@ -115,6 +120,15 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
         _archive = new(archiveDialogFactory, dialogs, nodeFactory, Roots, Treemap, Inspector, () => SelectedNode, Marks);
 
+        Duplicates = new(dialogs,
+            duplicateDialogFactory,
+            settings,
+            preferences,
+            notifier,
+            () => CurrentRoot,
+            MarkForAutomation,
+            () => IsScanning);
+
         Drives = new(logger);
 
         LoadSettings();
@@ -136,6 +150,8 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     public ScanTreemapViewModel Treemap { get; }
 
     public ScanInspectorViewModel Inspector { get; }
+
+    public ScanDuplicatesViewModel Duplicates { get; }
 
     public ObservableCollection<ScanSortOption> SortOptions { get; } =
     [
@@ -162,9 +178,24 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
     public int MarkedCount => Marks.MarkedCount;
 
-    public bool TreeVisible => HasResult && !ShowTreemap;
+    public static IReadOnlyList<SegmentOption> ViewModes { get; } =
+    [
+        new(PackIconLucideKind.FolderTree, "Дерево", "Дерево каталогов с тепловой подсветкой"),
+        new(PackIconLucideKind.Map, "Карта", "Карта занятого места (treemap)"),
+        new(PackIconLucideKind.CopyCheck, "Дубликаты", "Одинаковые файлы, найденные сличением содержимого"),
+    ];
 
-    public bool TreemapVisible => HasResult && ShowTreemap;
+    public ScanViewMode ViewMode
+    {
+        get => (ScanViewMode)(SelectedViewIndex + 1);
+        set => SelectedViewIndex = Math.Clamp((int)value - 1, 0, ViewModes.Count - 1);
+    }
+
+    public bool TreeVisible => HasResult && ViewMode == ScanViewMode.Tree;
+
+    public bool TreemapVisible => HasResult && ViewMode == ScanViewMode.Treemap;
+
+    public bool DuplicatesVisible => HasResult && ViewMode == ScanViewMode.Duplicates;
 
     public bool IsIndeterminate => Progress.IsIndeterminate;
 
@@ -264,11 +295,13 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         }
     }
 
-    partial void OnShowTreemapChanged(bool value)
+    partial void OnSelectedViewIndexChanged(int value)
     {
-        Persist(() => _settings.SetBool(SettingsKeys.ScanTreemap, value));
+        var mode = ViewMode;
 
-        if (value && Treemap.TreemapRoot is null && Roots.Count > 0)
+        Persist(() => _settings.SetEnum(SettingsKeys.ScanView, mode));
+
+        if (mode == ScanViewMode.Treemap && Treemap.TreemapRoot is null && Roots.Count > 0)
         {
             Treemap.SetRoot(Roots[0]);
         }
@@ -294,7 +327,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         SelectedSortOption = SortOptions.FirstOrDefault(option => option.Field == sortField)
                              ?? SortOptions.First(option => option.Field == AppDefaults.ScanSortModeDefault);
 
-        ShowTreemap = _settings.GetBool(SettingsKeys.ScanTreemap);
+        ViewMode = _settings.GetEnum(SettingsKeys.ScanView, AppDefaults.ScanViewDefault);
 
         var lastDrive = _settings.GetStringValue(SettingsKeys.ScanLastDrive);
 

@@ -13,6 +13,14 @@ public static class AppDefaults
     public const bool ScanSortInvertDefault = true;
     public const bool ScanTreemapDefault = false;
     public const bool ScanRevealFilesDefault = false;
+
+    public const ScanViewMode ScanViewDefault = ScanViewMode.Tree;
+
+    public const int ScanDuplicatesMinSizeMbDefault = 1;
+
+    public const int ScanDuplicatesMinSizeMbMin = 0;
+
+    public const int ScanDuplicatesMinSizeMbMax = 10240;
     public const int TopChildrenLimit = 7;
     public const int TreemapTileLimit = 150;
     public const int TreemapPreviewLimit = 40;

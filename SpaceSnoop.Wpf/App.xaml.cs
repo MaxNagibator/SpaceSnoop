@@ -151,6 +151,8 @@ public partial class App : Application
         services.AddKeepShellLogging(logging);
 
         services.AddSingleton<DiskSpaceCalculator>();
+
+        services.AddSingleton<DuplicateFinder>();
         services.AddSingleton<DockerService>();
         services.AddSingleton<ArchiveService>();
         services.AddSingleton<CleanupService>();
@@ -184,6 +186,8 @@ public partial class App : Application
         services.AddSingleton<DeleteProgressDialogFactory>();
         services.AddSingleton<ArchiveProgressDialogFactory>();
         services.AddSingleton<CleanupProgressDialogFactory>();
+
+        services.AddSingleton<DuplicateProgressDialogFactory>();
 
         services.AddSingleton<ScanViewModel>();
         services.AddSingleton<IScanAutomation>(static provider => provider.GetRequiredService<ScanViewModel>());
