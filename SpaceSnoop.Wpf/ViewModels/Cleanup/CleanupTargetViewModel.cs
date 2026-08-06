@@ -24,6 +24,7 @@ public sealed partial class CleanupTargetViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsAvailable))]
     [NotifyPropertyChangedFor(nameof(AvailabilityText))]
     [NotifyPropertyChangedFor(nameof(HasAvailabilityIssue))]
+    [NotifyPropertyChangedFor(nameof(IsUnsupported))]
     [NotifyPropertyChangedFor(nameof(CanClean))]
     private CleanupAvailability _availability;
 
@@ -77,6 +78,8 @@ public sealed partial class CleanupTargetViewModel : ObservableObject
     public bool HasUnreadable => Unreadable > 0;
 
     public string UnreadableText => $"не прочитано каталогов: {Unreadable:N0} – этих данных в замере нет";
+
+    public bool IsUnsupported => Availability == CleanupAvailability.Unsupported;
 
     public bool HasAvailabilityIssue => Availability is not (CleanupAvailability.None or CleanupAvailability.Available);
 

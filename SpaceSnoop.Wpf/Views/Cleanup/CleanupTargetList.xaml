@@ -176,6 +176,16 @@
                                         </Button>
                                     </StackPanel>
                                     <Button Style="{StaticResource Button.Icon}"
+                                            Command="{Binding DataContext.OpenSystemToolCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            Visibility="{Binding IsUnsupported, Converter={StaticResource BoolToVisibility}}"
+                                            AutomationProperties.Name="Открыть «Очистку диска» Windows"
+                                            ToolTip="Открыть «Очистку диска» Windows – она умеет удалять предыдущую установку">
+                                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ExternalLink}"
+                                                                  Width="15"
+                                                                  Height="15" />
+                                    </Button>
+                                    <Button Style="{StaticResource Button.Icon}"
                                             Command="{Binding DataContext.CleanOneCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             CommandParameter="{Binding}"
                                             IsEnabled="{Binding CanClean}"

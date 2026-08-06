@@ -75,7 +75,6 @@ public static class CleanupCatalog
                 Path = Path.Combine(localAppData, "CrashDumps"),
                 MinimumAge = age,
             },
-            // TODO: Windows.old только показывается – удалить его мешает ACL TrustedInstaller; апгрейд – вызов cleanmgr или DISM, триггер – запрос пользователя
             new()
             {
                 Id = "OldWindowsInstallation",

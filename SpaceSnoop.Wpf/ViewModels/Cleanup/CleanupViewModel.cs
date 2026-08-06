@@ -362,6 +362,24 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
     }
 
     [RelayCommand]
+    private void OpenSystemTool(CleanupTargetViewModel? row)
+    {
+        if (row is not { IsUnsupported: true })
+        {
+            return;
+        }
+
+        var drive = System.IO.Path.GetPathRoot(row.Path)?.TrimEnd('\\');
+
+        var tool = System.IO.Path.Combine(Environment.SystemDirectory, "cleanmgr.exe");
+
+        if (string.IsNullOrEmpty(drive) || !_shell.Start(tool, "/d", drive))
+        {
+            _notifier.Notify("Не удалось запустить «Очистку диска» Windows.", StatusSeverity.Warning);
+        }
+    }
+
+    [RelayCommand]
     private void SelectAll()
     {
         foreach (var row in Targets)
