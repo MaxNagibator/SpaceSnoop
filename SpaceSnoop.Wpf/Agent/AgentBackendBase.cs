@@ -250,9 +250,14 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
         }
     }
 
-    private static ProcessStartInfo BuildProcessStartInfo(string executablePath, AgentLaunch launch)
+    private static ProcessStartInfo? BuildProcessStartInfo(string executablePath, AgentLaunch launch)
     {
         var info = AgentCli.CreateStartInfo(executablePath, launch.Arguments);
+
+        if (info is null)
+        {
+            return null;
+        }
 
         info.RedirectStandardInput = true;
         info.StandardInputEncoding = Encoding.UTF8;
@@ -288,7 +293,7 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
             await WriteTempFilesAsync(launch, transcript, cancellationToken).ConfigureAwait(false);
 
             var info = BuildProcessStartInfo(cli.ExecutablePath, launch);
-            process = TryStartProcess(info);
+            process = info is null ? null : TryStartProcess(info);
 
             if (process is null)
             {

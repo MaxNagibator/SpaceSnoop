@@ -119,7 +119,7 @@ public class AgentBackendTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(info.FileName, Is.EqualTo(@"C:\A\claude.exe"));
+            Assert.That(info!.FileName, Is.EqualTo(@"C:\A\claude.exe"));
             Assert.That(info.ArgumentList, Is.EqualTo(new[] { "--model", "sonnet" }));
             Assert.That(info.Arguments, Is.Empty);
         });
@@ -133,7 +133,7 @@ public class AgentBackendTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(Path.GetFileName(info.FileName), Is.EqualTo("cmd.exe").IgnoreCase);
+            Assert.That(Path.GetFileName(info!.FileName), Is.EqualTo("cmd.exe").IgnoreCase);
             Assert.That(info.ArgumentList, Is.Empty);
             Assert.That(info.Arguments, Is.EqualTo($"/s /c \"{path} --model sonnet\""));
         });
@@ -153,6 +153,28 @@ public class AgentBackendTests
     public string Метасимволы_командного_процессора_не_разрывают_команду(string argument)
     {
         return AgentCli.BuildScriptArguments("c.cmd", [argument]);
+    }
+
+    [TestCase("gpt-%USERNAME%-sol")]
+    [TestCase("x%\" & echo INJECTED & rem \"")]
+    [TestCase("обычная\"кавычка")]
+    public void Шим_не_запускается_с_аргументом_который_командный_процессор_раскроет(string argument)
+    {
+        Assert.That(AgentCli.CreateStartInfo(@"C:\A\claude.cmd", [argument]), Is.Null);
+    }
+
+    [Test]
+    public void Процент_в_пути_шима_тоже_отменяет_запуск()
+    {
+        Assert.That(AgentCli.CreateStartInfo(@"C:\Tools\%TEMP%\claude.cmd", ["--model", "sonnet"]), Is.Null);
+    }
+
+    [Test]
+    public void Тот_же_аргумент_у_настоящего_exe_запуску_не_мешает()
+    {
+        var info = AgentCli.CreateStartInfo(@"C:\A\claude.exe", ["gpt-%USERNAME%-sol"]);
+
+        Assert.That(info?.ArgumentList, Is.EqualTo(new[] { "gpt-%USERNAME%-sol" }));
     }
 
     [TestCase("2.1.220 (Claude Code)", ExpectedResult = "2.1.220")]

@@ -80,7 +80,7 @@ public static class AgentCli
         return directories;
     }
 
-    public static ProcessStartInfo CreateStartInfo(string path, IReadOnlyList<string> arguments)
+    public static ProcessStartInfo? CreateStartInfo(string path, IReadOnlyList<string> arguments)
     {
         var info = new ProcessStartInfo
         {
@@ -94,6 +94,11 @@ public static class AgentCli
 
         if (IsScript(path))
         {
+            if (!IsCmdSafe(path) || arguments.Any(argument => !IsCmdSafe(argument)))
+            {
+                return null;
+            }
+
             info.FileName = CommandProcessor();
             info.Arguments = BuildScriptArguments(path, arguments);
 
@@ -118,9 +123,11 @@ public static class AgentCli
                || string.Equals(extension, ".bat", StringComparison.OrdinalIgnoreCase);
     }
 
-    // TODO: аргумент с `%` уезжает в cmd.exe и раскрывается как переменная окружения; апгрейд –
-    //       запуск шима через сгенерированный временный .cmd с `setlocal disabledelayedexpansion`,
-    //       если в аргументах появится текст человека, а не флаги и пути.
+    internal static bool IsCmdSafe(string value)
+    {
+        return !value.Contains('%', StringComparison.Ordinal) && !value.Contains('"', StringComparison.Ordinal);
+    }
+
     internal static string BuildScriptArguments(string path, IReadOnlyList<string> arguments)
     {
         var builder = new StringBuilder("/s /c \"").Append(Quote(path));
@@ -185,7 +192,14 @@ public static class AgentCli
     {
         try
         {
-            using var process = Process.Start(CreateStartInfo(path, arguments));
+            var info = CreateStartInfo(path, arguments);
+
+            if (info is null)
+            {
+                return string.Empty;
+            }
+
+            using var process = Process.Start(info);
 
             if (process is null)
             {
