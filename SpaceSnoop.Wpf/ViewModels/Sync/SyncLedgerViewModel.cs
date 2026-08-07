@@ -201,9 +201,10 @@ public sealed class SyncLedgerViewModel : ObservableObject
     private static string? BuildSyncWarning(ComparisonResult current, int deletes)
     {
         var incomplete = SyncPlanNarrative.DescribeIncomplete(current);
+        var links = current.SkippedLinks() is { Count: > 0 } skipped ? SyncPlanNarrative.DescribeSkippedLinks(skipped) : null;
         var recency = deletes > 0 ? SyncPlanNarrative.DescribeDeletionRecency(current) : null;
 
-        return string.Join(' ', new[] { incomplete, recency }.OfType<string>()) is { Length: > 0 } warning
+        return string.Join(' ', new[] { incomplete, links, recency }.OfType<string>()) is { Length: > 0 } warning
             ? warning
             : null;
     }

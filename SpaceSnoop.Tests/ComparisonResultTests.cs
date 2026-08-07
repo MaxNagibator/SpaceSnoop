@@ -351,6 +351,21 @@ public class ComparisonResultTests
         Assert.That(result.HasUnresolvedConflicts(), Is.False);
     }
 
+    [Test]
+    public void SkippedLinks_ReportsRelativePathsFromWholeTree()
+    {
+        var root = new DirectoryComparison("root", "");
+        root.SkippedLinks.Add("junction");
+
+        var sub = new DirectoryComparison("modules", "modules");
+        sub.SkippedLinks.Add("link.txt");
+        root.SubDirectories.Add(sub);
+
+        var result = new ComparisonResult("C:\\Left", "C:\\Right", root);
+
+        Assert.That(result.SkippedLinks(), Is.EqualTo(new[] { "junction", Path.Combine("modules", "link.txt") }));
+    }
+
     [TestCase(SyncMode.LeftToRight, SyncWinner.Newest)]
     [TestCase(SyncMode.Bidirectional, SyncWinner.Left)]
     public void ApplyMode_IncompleteLeftSide_PlansNoDeletesOnRight(SyncMode mode, SyncWinner winner)

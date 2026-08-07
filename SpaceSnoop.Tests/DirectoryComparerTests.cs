@@ -200,6 +200,7 @@ public class DirectoryComparerTests
         {
             Assert.That(result.Root.Files, Is.Empty);
             Assert.That(result.Root.SubDirectories, Is.Empty);
+            Assert.That(result.SkippedLinks(), Is.EqualTo(new[] { "link" }), "пропуск ссылки должен доезжать до вызывающего");
         }
     }
 

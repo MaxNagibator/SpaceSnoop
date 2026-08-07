@@ -136,6 +136,10 @@ internal static partial class AppLog
         Message = "Сравнение неполное: каталогов не прочитано {Count}, первый – «{First}»; удаления в этих ветках отключены")]
     public static partial void CompareIncomplete(this ILogger logger, int count, string first);
 
+    [LoggerMessage(EventId = 1223, Level = LogLevel.Information,
+        Message = "Ссылок пропущено при сравнении: {Count}, первая – «{First}»; junction, symlink и облачные заглушки не синхронизируются")]
+    public static partial void CompareLinksSkipped(this ILogger logger, int count, string first);
+
     [LoggerMessage(EventId = 1250, Level = LogLevel.Information, Message = "Профиль расписания сохранён: «{Name}» (активно: {Enabled})")]
     public static partial void ScheduleProfileSaved(this ILogger logger, string name, bool enabled);
 

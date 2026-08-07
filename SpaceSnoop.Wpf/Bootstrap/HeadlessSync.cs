@@ -47,6 +47,11 @@ internal sealed class HeadlessSync
                 logger.CompareIncomplete(unreadable.Count, unreadable[0]);
             }
 
+            if (result.SkippedLinks() is { Count: > 0 } links)
+            {
+                logger.CompareLinksSkipped(links.Count, links[0]);
+            }
+
             var sync = new ExecuteSyncUseCase(NullLogger<SyncEngine>.Instance);
             var recycleOverwritten = settings.GetBool(SettingsKeys.SyncRecycleOverwritten, AppDefaults.SyncRecycleOverwrittenDefault);
             var verify = settings.GetBool(SettingsKeys.SyncVerify, AppDefaults.SyncVerifyDefault);

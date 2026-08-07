@@ -27,6 +27,7 @@ public sealed record SyncPlanExportModel
     public IReadOnlyList<SyncPlanEntry> Largest { get; init; } = [];
     public int OmittedEntries { get; init; }
     public ComparisonIncomplete? Incomplete { get; init; }
+    public ComparisonSkippedLinks? SkippedLinks { get; init; }
 }
 
 public static class SyncPlanExport
@@ -64,6 +65,7 @@ public static class SyncPlanExport
             Largest = largest,
             OmittedEntries = Math.Max(0, planned.Count - largest.Count),
             Incomplete = ComparisonExport.DescribeIncomplete(result),
+            SkippedLinks = ComparisonExport.DescribeSkippedLinks(result),
         };
     }
 

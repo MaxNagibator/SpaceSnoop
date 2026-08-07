@@ -313,7 +313,7 @@ public class McpBridgeTests
             [],
             [],
             "Готово",
-            new("C:\\left", "C:\\right", SyncMode.LeftToRight, SyncWinner.Newest, false, string.Empty, false, true, new Dictionary<string, int>(), []));
+            new("C:\\left", "C:\\right", SyncMode.LeftToRight, SyncWinner.Newest, false, string.Empty, false, true, new Dictionary<string, int>(), [], []));
     }
 
     private static McpPerformance Performance(McpPerformanceHistory? history)

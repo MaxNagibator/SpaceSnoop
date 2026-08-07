@@ -45,6 +45,14 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
         return paths;
     }
 
+    public IReadOnlyList<string> SkippedLinks()
+    {
+        var paths = new List<string>();
+        CollectSkippedLinks(Root, paths);
+
+        return paths;
+    }
+
     public bool HasUnresolvedConflicts()
     {
         return HasUnresolvedConflictsRecursive(Root);
@@ -198,6 +206,19 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
         foreach (var sub in dir.SubDirectories)
         {
             CollectIncomplete(sub, paths);
+        }
+    }
+
+    private static void CollectSkippedLinks(DirectoryComparison dir, List<string> paths)
+    {
+        foreach (var name in dir.SkippedLinks)
+        {
+            paths.Add(string.IsNullOrEmpty(dir.RelativePath) ? name : Path.Combine(dir.RelativePath, name));
+        }
+
+        foreach (var sub in dir.SubDirectories)
+        {
+            CollectSkippedLinks(sub, paths);
         }
     }
 

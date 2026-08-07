@@ -199,7 +199,8 @@ internal sealed record McpSyncState(
     bool Busy,
     bool HasComparison,
     IReadOnlyDictionary<string, int> Files,
-    IReadOnlyList<string> IncompleteDirectories);
+    IReadOnlyList<string> IncompleteDirectories,
+    IReadOnlyList<string> SkippedLinks);
 
 internal sealed record McpProfile(
     string Id,

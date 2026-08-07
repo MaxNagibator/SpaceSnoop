@@ -44,6 +44,8 @@ public sealed partial class SyncViewModel : ISyncAutomation
 
     IReadOnlyList<string> ISyncAutomation.IncompleteDirectories => Operations.Result?.IncompleteDirectories() ?? [];
 
+    IReadOnlyList<string> ISyncAutomation.SkippedLinks => Operations.Result?.SkippedLinks() ?? [];
+
     bool ISyncAutomation.HasPendingConflicts => Operations.HasPending;
 
     int ISyncAutomation.IdenticalCount => Ledger.IdenticalCount;

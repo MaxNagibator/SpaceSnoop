@@ -22,6 +22,8 @@ public interface ISyncAutomation
 
     IReadOnlyList<string> IncompleteDirectories { get; }
 
+    IReadOnlyList<string> SkippedLinks { get; }
+
     bool HasPendingConflicts { get; }
 
     int IdenticalCount { get; }

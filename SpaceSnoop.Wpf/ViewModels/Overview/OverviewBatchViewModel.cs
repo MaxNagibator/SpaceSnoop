@@ -134,6 +134,12 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
                     var result = await Task.Run(() => _compare.Execute(request, rowCts.Token), rowCts.Token);
 
                     rowStopwatch.Stop();
+
+                    if (result.SkippedLinks() is { Count: > 0 } links)
+                    {
+                        _logger.CompareLinksSkipped(links.Count, links[0]);
+                    }
+
                     row.ApplyStatistics(result.GetStatistics(), result.GetDirectoryStatistics());
                     row.ApplyFreshness(SyncFreshness.Compute(result.Root));
                     row.ElapsedMs = (long)rowStopwatch.Elapsed.TotalMilliseconds;
@@ -399,7 +405,7 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
                 {
                     var result = _compare.Execute(request, rowCts.Token);
                     var applied = _sync.Execute(new(result, SyncConflictPolicy.SkipUnresolved, SyncDeleteUi.Silent, verify, recycleOverwritten), rowCts.Token);
-                    return (Report: applied, Unreadable: result.IncompleteDirectories());
+                    return (Report: applied, Unreadable: result.IncompleteDirectories(), Links: result.SkippedLinks());
                 },
                 rowCts.Token);
 
@@ -409,6 +415,11 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
             if (run.Unreadable.Count > 0)
             {
                 _logger.CompareIncomplete(run.Unreadable.Count, run.Unreadable[0]);
+            }
+
+            if (run.Links.Count > 0)
+            {
+                _logger.CompareLinksSkipped(run.Links.Count, run.Links[0]);
             }
 
             stopwatch.Stop();

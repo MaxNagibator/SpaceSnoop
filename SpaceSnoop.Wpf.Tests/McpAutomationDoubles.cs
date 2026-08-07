@@ -155,6 +155,8 @@ internal sealed class SyncAutomationDouble : ISyncAutomation
 
     public IReadOnlyList<string> IncompleteDirectories { get; set; } = [];
 
+    public IReadOnlyList<string> SkippedLinks { get; set; } = [];
+
     public bool HasPendingConflicts { get; set; }
 
     public int IdenticalCount { get; set; }

@@ -36,7 +36,8 @@ internal sealed class McpStateReader(IScanAutomation scan, ISyncAutomation sync,
                 ["Modified"] = sync.ModifiedCount,
                 ["Conflict"] = sync.ConflictCount,
             },
-            [.. sync.IncompleteDirectories.Take(ComparisonExport.IncompletePathLimit)]);
+            [.. sync.IncompleteDirectories.Take(ComparisonExport.IncompletePathLimit)],
+            [.. sync.SkippedLinks.Take(ComparisonExport.IncompletePathLimit)]);
     }
 
     public string DescribeContext()

@@ -71,13 +71,16 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
             RightModified = rightDir is { Exists: true } ? rightDir.LastWriteTime : null,
         };
 
-        var leftFiles = GetFilteredFiles(leftDir, out var leftFilesIncomplete);
-        var rightFiles = GetFilteredFiles(rightDir, out var rightFilesIncomplete);
-        var leftDirs = GetFilteredDirectories(leftDir, out var leftDirsIncomplete);
-        var rightDirs = GetFilteredDirectories(rightDir, out var rightDirsIncomplete);
+        var links = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var leftFiles = GetFilteredFiles(leftDir, links, out var leftFilesIncomplete);
+        var rightFiles = GetFilteredFiles(rightDir, links, out var rightFilesIncomplete);
+        var leftDirs = GetFilteredDirectories(leftDir, links, out var leftDirsIncomplete);
+        var rightDirs = GetFilteredDirectories(rightDir, links, out var rightDirsIncomplete);
 
         comparison.LeftIncomplete = leftFilesIncomplete || leftDirsIncomplete;
         comparison.RightIncomplete = rightFilesIncomplete || rightDirsIncomplete;
+        comparison.SkippedLinks.AddRange(links.Order(StringComparer.OrdinalIgnoreCase));
 
         var typeConflicts = CollectTypeConflicts(leftFiles, rightFiles, leftDirs, rightDirs);
 
@@ -218,7 +221,7 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         }
     }
 
-    private Dictionary<string, FileInfo> GetFilteredFiles(DirectoryInfo? dir, out bool incomplete)
+    private Dictionary<string, FileInfo> GetFilteredFiles(DirectoryInfo? dir, ICollection<string> links, out bool incomplete)
     {
         if (dir is not { Exists: true })
         {
@@ -235,6 +238,7 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
             {
                 if (IsReparsePoint(file))
                 {
+                    links.Add(file.Name);
                     logger.CompareReparsePointSkipped(file.FullName);
                     continue;
                 }
@@ -251,7 +255,7 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         return result;
     }
 
-    private Dictionary<string, DirectoryInfo> GetFilteredDirectories(DirectoryInfo? dir, out bool incomplete)
+    private Dictionary<string, DirectoryInfo> GetFilteredDirectories(DirectoryInfo? dir, ICollection<string> links, out bool incomplete)
     {
         if (dir is not { Exists: true })
         {
@@ -268,6 +272,7 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
             {
                 if (IsReparsePoint(sub))
                 {
+                    links.Add(sub.Name);
                     logger.CompareReparsePointSkipped(sub.FullName);
                     continue;
                 }

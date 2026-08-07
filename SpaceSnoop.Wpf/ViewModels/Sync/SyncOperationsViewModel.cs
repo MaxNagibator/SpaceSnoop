@@ -250,6 +250,8 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
             _notifier.Notify(incomplete, StatusSeverity.Warning);
         }
 
+        ReportSkippedLinks(_result);
+
         _logger.CompareFinished(_ledger.Total, (long)stopwatch.Elapsed.TotalMilliseconds);
         RaiseProfileRun(_result, null, (long)stopwatch.Elapsed.TotalMilliseconds);
 
@@ -260,6 +262,19 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
             _setup.Exclusions = exclusions;
             await CompareAsync();
         }
+    }
+
+    private void ReportSkippedLinks(ComparisonResult result)
+    {
+        var paths = result.SkippedLinks();
+
+        if (paths.Count == 0)
+        {
+            return;
+        }
+
+        _logger.CompareLinksSkipped(paths.Count, paths[0]);
+        _notifier.Notify(SyncPlanNarrative.DescribeSkippedLinks(paths), StatusSeverity.Info);
     }
 
     private Task ReadGitStateAsync()

@@ -182,6 +182,13 @@ internal static class SyncPlanNarrative
         return $"Сравнение неполное: не удалось прочитать «{paths[0]}»{tail}. Удаления в этих ветках отключены – содержимое могло быть не увидено, а не отсутствовать.";
     }
 
+    internal static string DescribeSkippedLinks(IReadOnlyList<string> paths)
+    {
+        var tail = paths.Count > 1 ? $" и ещё {Plural.Format(paths.Count - 1, "ссылка", "ссылки", "ссылок")}" : string.Empty;
+
+        return $"Ссылки не сравниваются: пропущено «{paths[0]}»{tail}. Junction, symlink и облачные заглушки в сравнение не попадают и не синхронизируются.";
+    }
+
     internal static List<PlanReceiver> BuildReceivers(ComparisonResult? result, PlannedActions planned)
     {
         if (result is null)

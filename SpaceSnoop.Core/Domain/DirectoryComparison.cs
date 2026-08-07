@@ -13,6 +13,7 @@ public class DirectoryComparison(string name, string relativePath)
     public bool IsIncomplete => LeftIncomplete || RightIncomplete;
     public bool DeleteLeftBlocked { get; set; }
     public bool DeleteRightBlocked { get; set; }
+    public List<string> SkippedLinks { get; } = [];
     public List<FileComparison> Files { get; } = [];
     public List<DirectoryComparison> SubDirectories { get; } = [];
 }
