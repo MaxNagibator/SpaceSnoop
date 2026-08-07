@@ -10,6 +10,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
 {
     private readonly AgentBackends _backends;
     private readonly AgentPreferences _preferences;
+    private readonly ScanPreferences _scan;
     private readonly McpBridge _bridge;
     private readonly AgentTranscriptStore _transcripts;
     private readonly IDialogService _dialogs;
@@ -30,6 +31,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
     public ChatViewModel(
         AgentBackends backends,
         AgentPreferences preferences,
+        ScanPreferences scan,
         AgentModelSelector agentModel,
         McpPreferences mcp,
         McpServerHost mcpServer,
@@ -44,6 +46,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
     {
         _backends = backends;
         _preferences = preferences;
+        _scan = scan;
         _bridge = bridge;
         _transcripts = transcripts;
         _dialogs = dialogs;
@@ -360,7 +363,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
 
         var backend = Backend;
         var mutations = Gates.Mcp.AllowMutations;
-        var allowed = AgentPrompt.AllowedTools(mutations);
+        var allowed = AgentPrompt.AllowedTools(mutations, _scan.DuplicatesEnabled);
         var transcript = _transcripts.Begin(backend.Kind, Gates.Mcp.Token);
         assistant.TranscriptPath = transcript?.Path;
 

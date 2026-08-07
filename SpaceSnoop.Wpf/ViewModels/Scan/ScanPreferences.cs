@@ -31,9 +31,13 @@ public sealed partial class ScanPreferences : ObservableObject
         Intensity = _settings.GetDouble(SettingsKeys.ScanIntensity, AppDefaults.IntensityDefault);
         RevealFiles = _settings.GetBool(SettingsKeys.ScanRevealFiles, AppDefaults.ScanRevealFilesDefault);
         _suppressPersist = false;
+
+        DuplicatesEnabled = settings.GetBool(SettingsKeys.ScanDuplicatesEnabled, AppDefaults.ScanDuplicatesEnabledDefault);
     }
 
     public int ProcessorCount { get; } = Environment.ProcessorCount;
+
+    public bool DuplicatesEnabled { get; }
 
     public int ResolveParallelism(string path)
     {

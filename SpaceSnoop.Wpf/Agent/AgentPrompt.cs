@@ -18,7 +18,6 @@ public static class AgentPrompt
         "list_drives",
         "scan_directory",
         "get_current_scan",
-        "find_duplicates",
         "compare_directories",
         "get_current_comparison",
         "docker_usage",
@@ -26,6 +25,11 @@ public static class AgentPrompt
         "open_scan",
         "open_sync",
         "capture_view",
+    ];
+
+    private static readonly string[] DuplicateTools =
+    [
+        "find_duplicates",
     ];
 
     private static readonly string[] DestructiveTools =
@@ -40,9 +44,21 @@ public static class AgentPrompt
 
     public static IReadOnlyList<string> Destructive => [.. DestructiveTools];
 
-    public static IReadOnlyList<string> AllowedTools(bool mutations)
+    public static IReadOnlyList<string> AllowedTools(bool mutations, bool duplicates)
     {
-        return mutations ? [.. SafeTools, .. DestructiveTools] : [.. SafeTools];
+        List<string> tools = [.. SafeTools];
+
+        if (duplicates)
+        {
+            tools.AddRange(DuplicateTools);
+        }
+
+        if (mutations)
+        {
+            tools.AddRange(DestructiveTools);
+        }
+
+        return tools;
     }
 
     public static IReadOnlyList<string> DeniedTools(bool mutations)

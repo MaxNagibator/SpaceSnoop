@@ -5,6 +5,20 @@ namespace SpaceSnoop.Wpf.Tests;
 
 public class ScanDuplicatesTests
 {
+    [TestCase(true, ExpectedResult = 3)]
+    [TestCase(false, ExpectedResult = 2)]
+    public int Режим_дубликатов_появляется_в_панели_только_по_настройке(bool enabled)
+    {
+        var modes = ScanViewModel.BuildViewModes(enabled);
+
+        Assert.That(
+            modes.Any(mode => mode.Text == "Дубликаты"),
+            Is.EqualTo(enabled),
+            "Состав сегментов разошёлся с настройкой режима дубликатов.");
+
+        return modes.Count;
+    }
+
     [Test]
     public void Пустой_результат_называет_число_проверенных_файлов()
     {

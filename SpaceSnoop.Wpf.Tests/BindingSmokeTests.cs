@@ -49,6 +49,7 @@ public class BindingSmokeTests
 
         ISettingsStore settings = new MemorySettings();
         settings.SetBool(SettingsKeys.UpdateCheckOnStartup, false);
+        settings.SetBool(SettingsKeys.ScanDuplicatesEnabled, true);
         SyncProfileStore.Save(settings, GalleryFixtures.Profiles(_fixture));
 
         AppThemes.Register();

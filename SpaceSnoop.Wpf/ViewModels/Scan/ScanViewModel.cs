@@ -147,6 +147,8 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
             MarkForAutomation,
             () => IsScanning);
 
+        ViewModes = BuildViewModes(preferences.DuplicatesEnabled);
+
         LoadSettings();
         Drives.LoadDriveLabels();
     }
@@ -194,12 +196,9 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
     public int MarkedCount => Marks.MarkedCount;
 
-    public static IReadOnlyList<SegmentOption> ViewModes { get; } =
-    [
-        new(PackIconLucideKind.FolderTree, "Дерево", "Дерево каталогов с тепловой подсветкой"),
-        new(PackIconLucideKind.Map, "Карта", "Карта занятого места (treemap)"),
-        new(PackIconLucideKind.CopyCheck, "Дубликаты", "Одинаковые файлы, найденные сличением содержимого"),
-    ];
+    public IReadOnlyList<SegmentOption> ViewModes { get; }
+
+    public bool DuplicatesEnabled => Preferences.DuplicatesEnabled;
 
     public ScanViewMode ViewMode
     {
@@ -329,6 +328,22 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         {
             Treemap.SetRoot(Roots[0]);
         }
+    }
+
+    internal static IReadOnlyList<SegmentOption> BuildViewModes(bool duplicates)
+    {
+        List<SegmentOption> modes =
+        [
+            new(PackIconLucideKind.FolderTree, "Дерево", "Дерево каталогов с тепловой подсветкой"),
+            new(PackIconLucideKind.Map, "Карта", "Карта занятого места (treemap)"),
+        ];
+
+        if (duplicates)
+        {
+            modes.Add(new(PackIconLucideKind.CopyCheck, "Дубликаты", "Одинаковые файлы, найденные сличением содержимого"));
+        }
+
+        return modes;
     }
 
     private void ResortRoots()

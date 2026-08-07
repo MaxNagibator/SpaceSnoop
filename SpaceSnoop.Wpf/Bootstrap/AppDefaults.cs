@@ -17,6 +17,8 @@ public static class AppDefaults
 
     public const ScanViewMode ScanViewDefault = ScanViewMode.Tree;
 
+    public const bool ScanDuplicatesEnabledDefault = false;
+
     public const int ScanDuplicatesMinSizeMbDefault = 1;
 
     public const int ScanDuplicatesMinSizeMbMin = 0;

@@ -11,6 +11,7 @@ public sealed partial class McpServerHost : ObservableObject, IDisposable
 {
     private readonly McpPreferences _preferences;
     private readonly McpBridge _bridge;
+    private readonly ScanPreferences _scan;
     private readonly ILogger<McpServerHost> _logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
@@ -24,10 +25,11 @@ public sealed partial class McpServerHost : ObservableObject, IDisposable
     [ObservableProperty]
     private string? _lastError;
 
-    public McpServerHost(McpPreferences preferences, McpBridge bridge, ILogger<McpServerHost> logger)
+    public McpServerHost(McpPreferences preferences, McpBridge bridge, ScanPreferences scan, ILogger<McpServerHost> logger)
     {
         _preferences = preferences;
         _bridge = bridge;
+        _scan = scan;
         _logger = logger;
         _preferences.PropertyChanged += OnPreferencesChanged;
     }
@@ -115,10 +117,16 @@ public sealed partial class McpServerHost : ObservableObject, IDisposable
         builder.WebHost.ConfigureKestrel(options => options.Listen(IPAddress.Loopback, port));
 
         builder.Services.AddSingleton(_bridge);
-        builder.Services
+
+        var mcp = builder.Services
             .AddMcpServer()
             .WithHttpTransport()
             .WithTools<SpaceSnoopTools>();
+
+        if (_scan.DuplicatesEnabled)
+        {
+            mcp.WithTools<SpaceSnoopDuplicateTools>();
+        }
 
         var app = builder.Build();
         app.Use(async (context, next) => await AuthorizeAsync(context, next, token).ConfigureAwait(false));

@@ -16,7 +16,7 @@ public class AgentToolPolicyTests
     {
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(AgentPrompt.AllowedTools(mutations: false).Intersect(MutatingTools), Is.Empty);
+            Assert.That(AgentPrompt.AllowedTools(mutations: false, duplicates: true).Intersect(MutatingTools), Is.Empty);
             Assert.That(AgentPrompt.DeniedTools(mutations: false), Is.EquivalentTo(MutatingTools));
         }
     }
@@ -26,7 +26,7 @@ public class AgentToolPolicyTests
     {
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(AgentPrompt.AllowedTools(mutations: true), Is.SupersetOf(MutatingTools));
+            Assert.That(AgentPrompt.AllowedTools(mutations: true, duplicates: true), Is.SupersetOf(MutatingTools));
             Assert.That(AgentPrompt.DeniedTools(mutations: true), Is.Empty);
         }
     }
@@ -37,7 +37,7 @@ public class AgentToolPolicyTests
     {
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(AgentPrompt.AllowedTools(mutations), Does.Contain("open_sync"));
+            Assert.That(AgentPrompt.AllowedTools(mutations, duplicates: true), Does.Contain("open_sync"));
             Assert.That(AgentPrompt.DeniedTools(mutations), Does.Not.Contain("open_sync"));
         }
     }
@@ -47,7 +47,7 @@ public class AgentToolPolicyTests
     public void Читающие_инструменты_разрешены_всегда(bool mutations)
     {
         Assert.That(
-            AgentPrompt.AllowedTools(mutations),
+            AgentPrompt.AllowedTools(mutations, duplicates: false),
             Is.SupersetOf(new[]
             {
                 "get_app_state",
@@ -55,7 +55,6 @@ public class AgentToolPolicyTests
                 "list_drives",
                 "scan_directory",
                 "get_current_scan",
-                "find_duplicates",
                 "compare_directories",
                 "get_current_comparison",
                 "docker_usage",
@@ -63,26 +62,42 @@ public class AgentToolPolicyTests
             }));
     }
 
+    [TestCase(true)]
+    [TestCase(false)]
+    public void Поиск_дубликатов_разрешён_только_вместе_с_режимом(bool duplicates)
+    {
+        Assert.That(
+            AgentPrompt.AllowedTools(mutations: true, duplicates).Contains("find_duplicates"),
+            Is.EqualTo(duplicates));
+    }
+
     [Test]
     public void Каждый_инструмент_сервера_объявлен_в_политике_и_назван_по_русски()
     {
-        var tools = typeof(SpaceSnoopTools)
-            .GetMethods(BindingFlags.Public | BindingFlags.Static)
-            .Select(static method => method.GetCustomAttribute<McpServerToolAttribute>()?.Name)
-            .OfType<string>()
-            .ToList();
+        var tools = ToolNames(typeof(SpaceSnoopTools));
+        var duplicateTools = ToolNames(typeof(SpaceSnoopDuplicateTools));
 
         Assert.That(tools, Is.Not.Empty);
+        Assert.That(duplicateTools, Is.Not.Empty);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(AgentPrompt.AllowedTools(mutations: true), Is.EquivalentTo(tools));
+            Assert.That(AgentPrompt.AllowedTools(mutations: true, duplicates: false), Is.EquivalentTo(tools));
+            Assert.That(AgentPrompt.AllowedTools(mutations: true, duplicates: true), Is.EquivalentTo([.. tools, .. duplicateTools]));
 
-            foreach (var tool in tools)
+            foreach (var tool in tools.Concat(duplicateTools))
             {
                 Assert.That(AgentPrompt.Describe(tool), Is.Not.EqualTo(tool), $"инструмент {tool} остался без русского имени");
             }
         }
+    }
+
+    private static List<string> ToolNames(Type type)
+    {
+        return [.. type
+            .GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .Select(static method => method.GetCustomAttribute<McpServerToolAttribute>()?.Name)
+            .OfType<string>()];
     }
 
     [TestCase("mcp__spacesnoop__scan_directory", ExpectedResult = "scan_directory")]
