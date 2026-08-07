@@ -105,6 +105,8 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
         _nodeFactory.AskAgentRequested += OnAskAgentRequested;
 
+        Drives = new(logger);
+
         Marks = new(dialogs,
             deleteDialogFactory,
             operations,
@@ -116,9 +118,18 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
             () => SelectedNode,
             value => SelectedNode = value,
             () => HasResult = false,
-            () => IsScanning);
+            () => IsScanning,
+            () => Drives.ReloadLabels());
 
-        _archive = new(archiveDialogFactory, dialogs, nodeFactory, Roots, Treemap, Inspector, () => SelectedNode, Marks);
+        _archive = new(archiveDialogFactory,
+            dialogs,
+            nodeFactory,
+            Roots,
+            Treemap,
+            Inspector,
+            () => SelectedNode,
+            Marks,
+            () => Drives.ReloadLabels());
 
         Duplicates = new(dialogs,
             duplicateDialogFactory,
@@ -128,8 +139,6 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
             () => CurrentRoot,
             MarkForAutomation,
             () => IsScanning);
-
-        Drives = new(logger);
 
         LoadSettings();
         Drives.LoadDriveLabels();

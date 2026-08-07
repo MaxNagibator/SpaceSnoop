@@ -114,10 +114,11 @@ public sealed partial class ScanViewModel : IScanAutomation
 
         LastScanElapsed = elapsed;
         LastScanParallelism = Math.Max(1, traversal?.Parallelism ?? 1);
-        _runs.Report(Summary.Apply(result, elapsed, traversal));
+        _runs.Report(Summary.Apply(result, elapsed, traversal, node.Drive));
         HasResult = true;
         Duplicates.Clear();
         Marks.RecountMarked();
+        Drives.ReloadLabels();
 
         _logger.ScanCompleted(result.AbsolutePath,
             result.TotalSizeText,

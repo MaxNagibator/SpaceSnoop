@@ -12,6 +12,7 @@ internal sealed class ScanArchiveViewModel
     private readonly ScanInspectorViewModel _inspector;
     private readonly Func<ScanNodeViewModel?> _selectedNode;
     private readonly ScanMarksViewModel _marks;
+    private readonly Action _reloadDrives;
 
     internal ScanArchiveViewModel(
         ArchiveProgressDialogFactory archiveDialogFactory,
@@ -21,7 +22,8 @@ internal sealed class ScanArchiveViewModel
         ScanTreemapViewModel treemap,
         ScanInspectorViewModel inspector,
         Func<ScanNodeViewModel?> selectedNode,
-        ScanMarksViewModel marks)
+        ScanMarksViewModel marks,
+        Action reloadDrives)
     {
         _archiveDialogFactory = archiveDialogFactory;
         _dialogs = dialogs;
@@ -30,6 +32,7 @@ internal sealed class ScanArchiveViewModel
         _inspector = inspector;
         _selectedNode = selectedNode;
         _marks = marks;
+        _reloadDrives = reloadDrives;
 
         nodeFactory.ArchiveRequested += OnArchiveRequested;
     }
@@ -98,6 +101,9 @@ internal sealed class ScanArchiveViewModel
         if (dialog.OriginalDeleted)
         {
             _marks.ApplyDeletionResult([dir]);
+            return;
         }
+
+        _reloadDrives();
     }
 }

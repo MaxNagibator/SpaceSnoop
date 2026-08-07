@@ -22,6 +22,9 @@ public static class AppDefaults
     public const int ScanDuplicatesMinSizeMbMin = 0;
 
     public const int ScanDuplicatesMinSizeMbMax = 10240;
+
+    public const double ScanVolumeNoteFraction = 0.01;
+
     public const int TopChildrenLimit = 7;
     public const int TreemapTileLimit = 150;
     public const int TreemapPreviewLimit = 40;

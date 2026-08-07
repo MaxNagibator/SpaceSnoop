@@ -17,6 +17,14 @@ public sealed partial class DriveItem(string path) : ObservableObject
         return _loading ??= LoadCoreAsync();
     }
 
+    internal void Invalidate()
+    {
+        if (_loading is { IsCompleted: true })
+        {
+            _loading = null;
+        }
+    }
+
     private async Task LoadCoreAsync()
     {
         Label = await Task.Run(() => BuildLabel(Path));

@@ -30,6 +30,7 @@
                     <ComboBox ItemsSource="{Binding Drives.Items}"
                               SelectedValue="{Binding SelectedDrive}"
                               SelectedValuePath="Path"
+                              DropDownOpened="OnDrivesDropDownOpened"
                               Style="{StaticResource ComboBox.Toolbar}"
                               MinWidth="180"
                               MaxWidth="340"

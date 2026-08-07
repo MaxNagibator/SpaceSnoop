@@ -29,6 +29,16 @@ public sealed class DriveCatalog
         return Items.Any(drive => string.Equals(drive.Path, path, StringComparison.OrdinalIgnoreCase));
     }
 
+    internal void ReloadLabels()
+    {
+        foreach (var drive in Items)
+        {
+            drive.Invalidate();
+        }
+
+        LoadDriveLabels();
+    }
+
     internal void LoadDriveLabels()
     {
         _ = Task.WhenAll(Items.Select(drive => drive.LoadLabelAsync()))

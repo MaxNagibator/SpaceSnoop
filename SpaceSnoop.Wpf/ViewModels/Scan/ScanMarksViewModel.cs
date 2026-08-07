@@ -16,6 +16,7 @@ public sealed partial class ScanMarksViewModel : ObservableObject
     private readonly Action<ScanNodeViewModel?> _setSelectedNode;
     private readonly Action _clearHasResult;
     private readonly Func<bool> _isScanning;
+    private readonly Action _reloadDrives;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasMarked))]
@@ -34,7 +35,8 @@ public sealed partial class ScanMarksViewModel : ObservableObject
         Func<ScanNodeViewModel?> selectedNode,
         Action<ScanNodeViewModel?> setSelectedNode,
         Action clearHasResult,
-        Func<bool> isScanning)
+        Func<bool> isScanning,
+        Action reloadDrives)
     {
         _dialogs = dialogs;
         _deleteDialogFactory = deleteDialogFactory;
@@ -47,6 +49,7 @@ public sealed partial class ScanMarksViewModel : ObservableObject
         _setSelectedNode = setSelectedNode;
         _clearHasResult = clearHasResult;
         _isScanning = isScanning;
+        _reloadDrives = reloadDrives;
 
         nodeFactory.MarksChanged += RecountMarked;
     }
@@ -122,6 +125,7 @@ public sealed partial class ScanMarksViewModel : ObservableObject
 
         _treemap.RefreshAfterDeletion(deletedSet);
         RecountMarked();
+        _reloadDrives();
     }
 
     private bool CanDeleteMarked()
