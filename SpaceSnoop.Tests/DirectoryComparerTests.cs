@@ -204,6 +204,45 @@ public class DirectoryComparerTests
         }
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void LinkOnOneSide_RealObjectOnOther_IsConflictWithoutActions(bool isDirectory)
+    {
+        var target = Path.Combine(_tempDir, "target");
+        var real = Path.Combine(_rightDir, "data");
+
+        if (isDirectory)
+        {
+            Directory.CreateDirectory(target);
+            Directory.CreateDirectory(real);
+            File.WriteAllText(Path.Combine(real, "inner.txt"), "payload");
+        }
+        else
+        {
+            File.WriteAllText(target, "link target");
+            File.WriteAllText(real, "payload");
+        }
+
+        if (!TryCreateSymlink(Path.Combine(_leftDir, "data"), target, isDirectory))
+        {
+            Assert.Ignore("Создание символьных ссылок недоступно (нет прав / режима разработчика).");
+        }
+
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
+        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
+        result.ApplyMode(SyncMode.LeftToRight, true);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Root.SubDirectories, Is.Empty, "спорное имя живёт одной строкой-файлом, а не веткой дерева");
+            Assert.That(result.Root.Files, Has.Count.EqualTo(1));
+            Assert.That(result.Root.Files[0].TypeConflict, Is.EqualTo(FileTypeConflict.LeftLinkRightObject));
+            Assert.That(result.Root.Files[0].Status, Is.EqualTo(ComparisonStatus.Conflict));
+            Assert.That(result.Root.Files[0].Action, Is.EqualTo(SyncAction.None), "зеркало не удаляет объект, которого не видели");
+            Assert.That(result.CountPlannedActions().Total, Is.EqualTo(0));
+        }
+    }
+
     private static bool TryCreateSymlink(string path, string target, bool isDirectory)
     {
         try

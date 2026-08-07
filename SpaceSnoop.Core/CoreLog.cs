@@ -26,6 +26,10 @@ internal static partial class CoreLog
     [LoggerMessage(EventId = 1216, Level = LogLevel.Warning, Message = "Синхронизация: {Action} «{RelativePath}» отклонено, обход стороны неполон")]
     public static partial void SyncDeleteBlocked(this ILogger logger, SyncAction action, string relativePath);
 
+    [LoggerMessage(EventId = 1217, Level = LogLevel.Warning,
+        Message = "Синхронизация: {Action} «{RelativePath}» отклонено, конфликт вида объектов ({Conflict})")]
+    public static partial void SyncTypeConflictBlocked(this ILogger logger, SyncAction action, string relativePath, FileTypeConflict conflict);
+
     [LoggerMessage(EventId = 1250, Level = LogLevel.Information, Message = "Дубликаты: групп {Groups}, вернёт {ReclaimableBytes} Б, проверено файлов {Examined}")]
     public static partial void DuplicatesFinished(this ILogger logger, int groups, long reclaimableBytes, int examined);
 

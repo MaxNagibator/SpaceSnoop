@@ -199,6 +199,20 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         return true;
     }
 
+    private void RejectTypeConflict(FileComparison file, SyncReport report)
+    {
+        var reason = file.TypeConflict switch
+        {
+            FileTypeConflict.LeftLinkRightObject => "слева ссылка, справа настоящий объект – разрешается вручную",
+            FileTypeConflict.RightLinkLeftObject => "справа ссылка, слева настоящий объект – разрешается вручную",
+            FileTypeConflict.LeftFileRightDirectory => "слева файл, справа каталог – разрешается вручную",
+            _ => "справа файл, слева каталог – разрешается вручную",
+        };
+
+        report.Errors.Add(new(file.RelativePath, file.Action, $"действие отклонено: {reason}"));
+        logger.SyncTypeConflictBlocked(file.Action, file.RelativePath, file.TypeConflict);
+    }
+
     private readonly record struct DeleteGate(bool Left, bool Right, bool Reported)
     {
         public static DeleteGate Open { get; } = new(false, false, false);
@@ -388,6 +402,12 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
             if (gate.Blocks(file.Action, file.DeleteLeftBlocked, file.DeleteRightBlocked))
             {
                 gate = gate with { Reported = Reject(file.Action, file.RelativePath, report, gate.Reported) };
+                continue;
+            }
+
+            if (file.TypeConflict != FileTypeConflict.None)
+            {
+                RejectTypeConflict(file, report);
                 continue;
             }
 

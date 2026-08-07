@@ -71,18 +71,19 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
             RightModified = rightDir is { Exists: true } ? rightDir.LastWriteTime : null,
         };
 
-        var links = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var leftLinks = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var rightLinks = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        var leftFiles = GetFilteredFiles(leftDir, links, out var leftFilesIncomplete);
-        var rightFiles = GetFilteredFiles(rightDir, links, out var rightFilesIncomplete);
-        var leftDirs = GetFilteredDirectories(leftDir, links, out var leftDirsIncomplete);
-        var rightDirs = GetFilteredDirectories(rightDir, links, out var rightDirsIncomplete);
+        var leftFiles = GetFilteredFiles(leftDir, leftLinks, out var leftFilesIncomplete);
+        var rightFiles = GetFilteredFiles(rightDir, rightLinks, out var rightFilesIncomplete);
+        var leftDirs = GetFilteredDirectories(leftDir, leftLinks, out var leftDirsIncomplete);
+        var rightDirs = GetFilteredDirectories(rightDir, rightLinks, out var rightDirsIncomplete);
 
         comparison.LeftIncomplete = leftFilesIncomplete || leftDirsIncomplete;
         comparison.RightIncomplete = rightFilesIncomplete || rightDirsIncomplete;
-        comparison.SkippedLinks.AddRange(links.Order(StringComparer.OrdinalIgnoreCase));
+        comparison.SkippedLinks.AddRange(leftLinks.Union(rightLinks, StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase));
 
-        var typeConflicts = CollectTypeConflicts(leftFiles, rightFiles, leftDirs, rightDirs);
+        var typeConflicts = CollectTypeConflicts(leftFiles, rightFiles, leftDirs, rightDirs, leftLinks, rightLinks);
 
         CompareFiles(comparison, leftFiles, rightFiles, typeConflicts, relativePath);
         CompareSubDirectories(comparison, leftDirs, rightDirs, typeConflicts, relativePath, progress, ref processed, cancel);
@@ -98,7 +99,9 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         Dictionary<string, FileInfo> leftFiles,
         Dictionary<string, FileInfo> rightFiles,
         Dictionary<string, DirectoryInfo> leftDirs,
-        Dictionary<string, DirectoryInfo> rightDirs)
+        Dictionary<string, DirectoryInfo> rightDirs,
+        HashSet<string> leftLinks,
+        HashSet<string> rightLinks)
     {
         var conflicts = new Dictionary<string, FileTypeConflict>(StringComparer.OrdinalIgnoreCase);
 
@@ -110,6 +113,16 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         foreach (var name in rightFiles.Keys.Where(leftDirs.ContainsKey))
         {
             conflicts[name] = FileTypeConflict.RightFileLeftDirectory;
+        }
+
+        foreach (var name in leftLinks.Where(x => rightFiles.ContainsKey(x) || rightDirs.ContainsKey(x)))
+        {
+            conflicts[name] = FileTypeConflict.LeftLinkRightObject;
+        }
+
+        foreach (var name in rightLinks.Where(x => leftFiles.ContainsKey(x) || leftDirs.ContainsKey(x)))
+        {
+            conflicts[name] = FileTypeConflict.RightLinkLeftObject;
         }
 
         return conflicts;
@@ -124,6 +137,7 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
     {
         var allNames = new HashSet<string>(leftFiles.Keys, StringComparer.OrdinalIgnoreCase);
         allNames.UnionWith(rightFiles.Keys);
+        allNames.UnionWith(typeConflicts.Keys);
 
         foreach (var fileName in allNames.Order(StringComparer.OrdinalIgnoreCase))
         {

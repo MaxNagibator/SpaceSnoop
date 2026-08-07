@@ -8,9 +8,13 @@ internal static class SyncNodeText
     {
         if (file.TypeConflict != FileTypeConflict.None)
         {
-            return file.TypeConflict == FileTypeConflict.LeftFileRightDirectory
-                ? "слева файл, справа каталог"
-                : "слева каталог, справа файл";
+            return file.TypeConflict switch
+            {
+                FileTypeConflict.LeftFileRightDirectory => "слева файл, справа каталог",
+                FileTypeConflict.LeftLinkRightObject => "слева ссылка, справа настоящий объект",
+                FileTypeConflict.RightLinkLeftObject => "справа ссылка, слева настоящий объект",
+                _ => "слева каталог, справа файл",
+            };
         }
 
         if (file.Status != ComparisonStatus.Modified)

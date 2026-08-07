@@ -56,6 +56,34 @@ public class SyncEngineTests
         }
     }
 
+    [TestCase(SyncAction.DeleteRight)]
+    [TestCase(SyncAction.CopyToLeft)]
+    public void LinkConflict_ManualActionRejected_KeepsRealObject(SyncAction action)
+    {
+        var real = Path.Combine(_rightDir, "data");
+        File.WriteAllText(real, "payload");
+
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("data", "data")
+        {
+            Status = ComparisonStatus.Conflict,
+            TypeConflict = FileTypeConflict.LeftLinkRightObject,
+            Action = action,
+        });
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
+        var report = engine.Execute(result, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.Errors, Has.Count.EqualTo(1), "отказ обязан попасть в отчёт, а не пройти молча");
+            Assert.That(report.SuccessCount, Is.EqualTo(0));
+            Assert.That(File.Exists(real), Is.True, "настоящий объект напротив ссылки не трогается");
+            Assert.That(File.ReadAllText(real), Is.EqualTo("payload"));
+        }
+    }
+
     [Test]
     public void CopyToRight_DestinationTakenByDirectory_ReportsErrorAndKeepsDirectory()
     {
