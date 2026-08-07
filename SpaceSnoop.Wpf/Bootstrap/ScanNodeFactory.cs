@@ -6,6 +6,8 @@ public sealed class ScanNodeFactory(ScanPreferences preferences, AgentPreference
     public event Action<ScanNodeViewModel>? AskAgentRequested;
     public event Action? MarksChanged;
 
+    public bool MarksPresent { get; set; }
+
     public bool RevealFiles => preferences.RevealFiles;
 
     public bool ChatEnabled => agent.Enabled;

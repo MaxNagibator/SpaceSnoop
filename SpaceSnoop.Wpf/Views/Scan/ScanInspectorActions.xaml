@@ -40,6 +40,10 @@
             </StackPanel>
         </Button>
 
+        <Border BorderBrush="{DynamicResource Border.Subtle}"
+                BorderThickness="0,1,0,0"
+                Margin="0,8,0,8" />
+
         <Button Style="{StaticResource InspectorAction}"
                 Command="{Binding Node.MarkDeletedCommand}"
                 ToolTip="Пометить узел и всё вложенное на удаление"
@@ -75,7 +79,7 @@
         <Button Style="{StaticResource InspectorAction}"
                 Command="{Binding Node.MarkContentsDeletedCommand}"
                 ToolTip="Пометить на удаление всё вложенное; сама папка останется"
-                Visibility="{Binding IsDirectory, Converter={StaticResource BoolToVisibility}}">
+                Visibility="{Binding Node.CanMarkContentsDeleted, Converter={StaticResource BoolToVisibility}}">
             <StackPanel Orientation="Horizontal">
                 <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderX}"
                                           Width="15"
@@ -91,7 +95,7 @@
         <Button Style="{StaticResource InspectorAction}"
                 Command="{Binding Node.UnmarkContentsCommand}"
                 ToolTip="Снять пометку со всего содержимого папки"
-                Visibility="{Binding IsDirectory, Converter={StaticResource BoolToVisibility}}">
+                Visibility="{Binding Node.CanUnmarkContents, Converter={StaticResource BoolToVisibility}}">
             <StackPanel Orientation="Horizontal">
                 <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.RotateCcw}"
                                           Width="15"
@@ -108,30 +112,36 @@
                 BorderThickness="0,1,0,0"
                 Margin="0,8,0,8" />
 
-        <Button Style="{StaticResource InspectorAction}"
-                Command="{Binding CopyPathCommand}">
-            <StackPanel Orientation="Horizontal">
-                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Copy}"
-                                          Width="15"
-                                          Height="15"
-                                          VerticalAlignment="Center"
-                                          Margin="0,0,8,0" />
-                <TextBlock Text="Копировать путь"
-                           VerticalAlignment="Center" />
-            </StackPanel>
-        </Button>
+        <UniformGrid Columns="2">
+            <Button Style="{StaticResource InspectorAction}"
+                    Command="{Binding CopyPathCommand}"
+                    Margin="0,2,4,2"
+                    ToolTip="Скопировать путь в буфер обмена">
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Copy}"
+                                              Width="15"
+                                              Height="15"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,8,0" />
+                    <TextBlock Text="Путь"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
 
-        <Button Style="{StaticResource InspectorAction}"
-                Command="{Binding CopyDetailsCommand}">
-            <StackPanel Orientation="Horizontal">
-                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Clipboard}"
-                                          Width="15"
-                                          Height="15"
-                                          VerticalAlignment="Center"
-                                          Margin="0,0,8,0" />
-                <TextBlock Text="Копировать детали"
-                           VerticalAlignment="Center" />
-            </StackPanel>
-        </Button>
+            <Button Style="{StaticResource InspectorAction}"
+                    Command="{Binding CopyDetailsCommand}"
+                    Margin="4,2,0,2"
+                    ToolTip="Скопировать сводку деталей в буфер обмена">
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Clipboard}"
+                                              Width="15"
+                                              Height="15"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,8,0" />
+                    <TextBlock Text="Детали"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+        </UniformGrid>
     </StackPanel>
 </UserControl>

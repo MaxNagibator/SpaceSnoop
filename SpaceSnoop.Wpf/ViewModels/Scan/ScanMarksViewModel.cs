@@ -9,6 +9,7 @@ public sealed partial class ScanMarksViewModel : ObservableObject
     private readonly DeleteProgressDialogFactory _deleteDialogFactory;
     private readonly OperationPreferences _operations;
     private readonly ILogger _logger;
+    private readonly ScanNodeFactory _nodeFactory;
     private readonly ObservableCollection<ScanNodeViewModel> _roots;
     private readonly ScanSummaryViewModel _summary;
     private readonly ScanTreemapViewModel _treemap;
@@ -47,6 +48,7 @@ public sealed partial class ScanMarksViewModel : ObservableObject
         _deleteDialogFactory = deleteDialogFactory;
         _operations = operations;
         _logger = logger;
+        _nodeFactory = nodeFactory;
         _roots = roots;
         _summary = summary;
         _treemap = treemap;
@@ -69,6 +71,7 @@ public sealed partial class ScanMarksViewModel : ObservableObject
     {
         var marked = ScanTreeEditor.CollectMarked(_roots);
 
+        _nodeFactory.MarksPresent = marked.Count > 0;
         MarkedCount = marked.Count;
         MarkedSizeText = marked.Count > 0 ? SizeFormatter.Format(marked.Sum(item => item.TotalSize)) : string.Empty;
     }

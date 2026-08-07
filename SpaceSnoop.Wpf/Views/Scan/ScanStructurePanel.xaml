@@ -105,14 +105,6 @@
                     </ToggleButton>
                 </StackPanel>
 
-                <TextBlock Grid.Column="2"
-                           Text="Файлы · доля · размер"
-                           Style="{StaticResource Caption}"
-                           HorizontalAlignment="Right"
-                           VerticalAlignment="Center"
-                           TextTrimming="CharacterEllipsis"
-                           Visibility="{Binding TreeVisible, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
-
                 <Popup x:Name="HeatPopup"
                        Grid.Column="0"
                        PlacementTarget="{Binding ElementName=HeatToggle}"

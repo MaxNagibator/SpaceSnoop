@@ -39,6 +39,8 @@
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Bd"
                                 Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="{DynamicResource Radius.S}"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center"
@@ -75,6 +77,10 @@
                              Value="True">
                     <Setter Property="Background"
                             Value="{DynamicResource Bg.SurfaceMute}" />
+                    <Setter Property="BorderBrush"
+                            Value="{DynamicResource Border.Default}" />
+                    <Setter Property="BorderThickness"
+                            Value="1" />
                     <Setter Property="Foreground"
                             Value="{DynamicResource Fg.Primary}" />
                 </DataTrigger>

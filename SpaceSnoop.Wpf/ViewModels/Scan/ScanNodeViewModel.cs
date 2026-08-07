@@ -108,6 +108,10 @@ public sealed partial class ScanNodeViewModel : ObservableObject
         ? $"{Space!.GetTooltipText()}{Environment.NewLine}Доля диска: {ShareFormatter.Format(DriveShare)} – {DriveHint}"
         : Space?.GetTooltipText() ?? string.Empty;
 
+    public string ShareHint => ShowsDriveShare
+        ? "Доля занятого места на диске"
+        : "Доля от родительского каталога";
+
     public string KindText => IsDirectory ? "Каталог" : "Файл";
 
     public bool HasOwnSize => Space is DirectorySpace { Size: > 0 };
@@ -130,7 +134,9 @@ public sealed partial class ScanNodeViewModel : ObservableObject
 
     public IReadOnlyList<ScanNodeViewModel> PreviewTiles => _previewTiles ??= BuildPreviewTiles();
 
-    private bool HasMarkedContents => Space is DirectorySpace dir && EnumerateChildren(dir).Any(HasDeletedRecursive);
+    private bool HasMarkedContents => _factory?.MarksPresent == true
+                                      && Space is DirectorySpace dir
+                                      && EnumerateChildren(dir).Any(HasDeletedRecursive);
 
     public void EnsureLoaded()
     {
@@ -345,8 +351,8 @@ public sealed partial class ScanNodeViewModel : ObservableObject
 
     private void ApplyMarkChange()
     {
-        RefreshMarkRecursive();
         _factory?.RaiseMarksChanged();
+        RefreshMarkRecursive();
     }
 
     private void RefreshMarkRecursive()

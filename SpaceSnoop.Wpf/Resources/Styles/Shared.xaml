@@ -104,7 +104,7 @@
                 <Setter Property="Kind"
                         Value="Folder" />
                 <Setter Property="Foreground"
-                        Value="{DynamicResource Accent.Primary}" />
+                        Value="{DynamicResource Fg.Secondary}" />
             </DataTrigger>
         </Style.Triggers>
     </Style>
