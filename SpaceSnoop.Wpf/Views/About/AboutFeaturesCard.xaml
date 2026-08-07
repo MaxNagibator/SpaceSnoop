@@ -64,15 +64,15 @@
                 <Border Style="{StaticResource About.FeatureCard}">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal">
-                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Container}"
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
                                                       Style="{StaticResource About.FeatureIcon}"
                                                       Margin="0,0,10,0" />
-                            <TextBlock Text="Docker"
+                            <TextBlock Text="Очистка"
                                        Style="{StaticResource About.SectionTitle}"
                                        VerticalAlignment="Center" />
                         </StackPanel>
                         <TextBlock
-                            Text="Показывает, сколько диска отъел Docker – образы, контейнеры, тома, кэш сборки – и чистит лишнее: прунит мусор, сносит объекты по одному, жмёт VHDX. Безвозвратно, мимо корзины."
+                            Text="Системные корзины Windows – временные файлы, кэши обновлений и эскизов, дампы – и всё, что отъел Docker: образы, контейнеры, тома, кэш сборки. Тут удаление безвозвратное, мимо корзины: перенос временного файла в корзину не вернул бы ни байта."
                             Style="{StaticResource TextBlock.Subtle}"
                             TextWrapping="Wrap"
                             Margin="0,6,0,0" />
