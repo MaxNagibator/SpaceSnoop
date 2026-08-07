@@ -87,6 +87,39 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
         return $"{head} {verb}: {_deleted} из {Items.Count}. Освобождено: {SizeFormatter.Format(_freedBytes)}.{errors}";
     }
 
+    internal void ShowRunningForAutomation(int done)
+    {
+        IsRunning = true;
+        StatusText = RunningStatus;
+
+        for (var index = 0; index < Items.Count && index < done; index++)
+        {
+            _freedBytes += Items[index].Space.TotalSize;
+            OnTick(new(index, DeleteRowState.Done, null, _freedBytes, index + 1, 0));
+        }
+
+        if (done < Items.Count)
+        {
+            OnTick(new(done, DeleteRowState.Deleting, null, _freedBytes, done, 0));
+        }
+    }
+
+    internal void ShowFinishedForAutomation()
+    {
+        ShowRunningForAutomation(Items.Count);
+
+        IsRunning = false;
+        IsFinished = true;
+        HasErrors = HasFailedItems;
+        StatusText = BuildSummary();
+    }
+
+    internal void ClearForAutomation()
+    {
+        IsRunning = false;
+        IsFinished = false;
+    }
+
     private void OnTick(DeleteTick tick)
     {
         var row = Items[tick.Index];

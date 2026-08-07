@@ -119,6 +119,52 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
             : $"Готово. Архив {_resultSummary}.";
     }
 
+    internal void ShowRunningForAutomation(int packed, int total, long bytes, string current)
+    {
+        IsRunning = true;
+        StatusText = RunningStatus;
+        _packTotal = total;
+
+        OnStage(new(ArchiveStage.Packing, total, total, bytes));
+        OnTick(new(packed, current), false);
+    }
+
+    internal void ShowFinishedForAutomation(int total, long bytes, long compressed)
+    {
+        _packed = true;
+        _packTotal = total;
+        _resultSummary = Summarize(compressed, bytes);
+        OriginalDeleted = _request.DeleteOriginal;
+
+        CountText = $"{total} / {total}";
+        ProgressValue = 1d;
+        CurrentPath = string.Empty;
+        SetPhaseTotal(total);
+
+        IsRunning = false;
+        IsFinished = true;
+        HasErrors = HasFailedItems;
+        StatusText = BuildSummary();
+    }
+
+    internal void ClearForAutomation()
+    {
+        IsRunning = false;
+        IsFinished = false;
+        OriginalDeleted = false;
+        CreatedArchivePath = null;
+        _packed = false;
+        _resultSummary = string.Empty;
+        SetPhaseTotal(0);
+    }
+
+    private static string Summarize(long compressed, long original)
+    {
+        var ratio = original > 0 ? (1 - (double)compressed / original) * 100 : 0;
+
+        return $"{SizeFormatter.Format(compressed)} (было {SizeFormatter.Format(original)}, −{ratio:F0} %)";
+    }
+
     private void ExecuteZip(
         IProgress<ArchiveStageUpdate> stage,
         IProgress<OperationProgress> packProgress,
@@ -164,8 +210,7 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
         }
 
         var compressed = new FileInfo(_request.TargetPath).Length;
-        var ratio = stats.Bytes > 0 ? (1 - (double)compressed / stats.Bytes) * 100 : 0;
-        _resultSummary = $"{SizeFormatter.Format(compressed)} (было {SizeFormatter.Format(stats.Bytes)}, −{ratio:F0} %)";
+        _resultSummary = Summarize(compressed, stats.Bytes);
         CreatedArchivePath = _request.TargetPath;
 
         if (!_request.DeleteOriginal || _coverageIssue is not null || _unreadableIssue is not null)

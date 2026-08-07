@@ -8,6 +8,8 @@ namespace SpaceSnoop.Wpf.ViewModels.Cleanup;
 
 public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IPageRefresh, IPageStatus, ICleanupAutomation
 {
+    internal const string MeasuringStatus = "Замеряю…";
+
     private readonly CleanupService _service;
     private readonly CleanupProgressDialogFactory _dialogFactory;
     private readonly IDialogService _dialogs;
@@ -235,7 +237,7 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
 
         _measureCts = new();
         IsBusy = true;
-        StatusText = "Замеряю…";
+        StatusText = MeasuringStatus;
 
         try
         {
@@ -271,6 +273,39 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
         BuildTargets();
 
         return true;
+    }
+
+    internal void ShowBusyForAutomation(IReadOnlyList<CleanupMeasurement> measured)
+    {
+        _measureCts = new();
+        IsBusy = true;
+        StatusText = MeasuringStatus;
+
+        for (var index = 0; index < Targets.Count; index++)
+        {
+            if (index < measured.Count)
+            {
+                Targets[index].Apply(measured[index]);
+                continue;
+            }
+
+            Targets[index].IsMeasuring = index == measured.Count;
+        }
+
+        UpdateTotals();
+    }
+
+    internal void ClearBusyForAutomation()
+    {
+        _measureCts?.Dispose();
+        _measureCts = null;
+        IsBusy = false;
+        StatusText = null;
+
+        foreach (var row in Targets)
+        {
+            row.IsMeasuring = false;
+        }
     }
 
     [RelayCommand]

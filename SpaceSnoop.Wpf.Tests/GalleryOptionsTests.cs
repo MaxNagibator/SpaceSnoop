@@ -20,6 +20,7 @@ public class GalleryOptionsTests
             Assert.That(options.Dialogs, Is.EqualTo(GalleryDialogs.All));
             Assert.That(options.Tips, Is.EqualTo(GalleryTips.All));
             Assert.That(options.Element, Is.Empty);
+            Assert.That(options.State, Is.EqualTo(GalleryStates.Idle));
             Assert.That(options.Themes, Is.EqualTo(new[] { AppTheme.Light, AppTheme.Dark }));
             Assert.That(options.Width, Is.EqualTo(AppDefaults.GalleryWidthDefault));
             Assert.That(options.Scale, Is.EqualTo(AppDefaults.ViewCaptureScaleDefault));
@@ -86,6 +87,32 @@ public class GalleryOptionsTests
     public void Элемент_снимка_берётся_из_ключа_как_есть()
     {
         Assert.That(GalleryOptions.Parse(["--element", "Cleanup"], Default).Element, Is.EqualTo("Cleanup"));
+    }
+
+    [TestCase("busy", GalleryStates.Busy)]
+    [TestCase("BUSY", GalleryStates.Busy)]
+    [TestCase("done", GalleryStates.Done)]
+    public void Состояние_разбирается_без_учёта_регистра(string value, string state)
+    {
+        var options = GalleryOptions.Parse(["--state", value], Default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(options.State, Is.EqualTo(state));
+            Assert.That(options.Unknown, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Незнакомое_состояние_докладывается_и_откатывается_к_покою()
+    {
+        var options = GalleryOptions.Parse(["--state", "работает"], Default);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(options.State, Is.EqualTo(GalleryStates.Idle));
+            Assert.That(options.Unknown, Is.EqualTo(new[] { "работает" }));
+        });
     }
 
     [Test]

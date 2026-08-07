@@ -82,6 +82,33 @@ public sealed partial class SyncSessionViewModel : ObservableObject
         return PerformanceFormat.Rate(finished) is { } rate ? $" Скорость: {rate}." : string.Empty;
     }
 
+    internal void ShowBusyForAutomation(string caption, OperationProgress update, TimeSpan elapsed, int total = 0, long totalBytes = 0)
+    {
+        IsBusy = true;
+
+        var shape = new RunShape(caption, caption.TrimEnd(' ', ':'), total, totalBytes);
+
+        if (shape.Determinate)
+        {
+            ProgressMax = total;
+            IsIndeterminate = false;
+        }
+
+        Advance(shape, update, elapsed);
+    }
+
+    internal void ClearBusyForAutomation()
+    {
+        IsBusy = false;
+        IsIndeterminate = true;
+        ProgressValue = 0;
+        StatusCaption = null;
+        ProgressDetail = null;
+        ProgressRateText = string.Empty;
+        ProgressRemainingText = string.Empty;
+        HasProgressRate = false;
+    }
+
     internal async Task<T?> RunAsync<T>(
         string caption,
         Func<CancellationToken, IProgress<OperationProgress>, T> work,

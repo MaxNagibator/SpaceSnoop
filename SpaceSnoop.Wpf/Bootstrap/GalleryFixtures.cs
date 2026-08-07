@@ -8,7 +8,7 @@ public static class GalleryFixtures
 {
     public const string FolderName = "spacesnoop-gallery";
 
-    private const string MediaFolder = "media";
+    internal const string MediaFolder = "media";
 
     private static readonly DateTime Base = new(2025, 3, 14, 9, 30, 0, DateTimeKind.Local);
 

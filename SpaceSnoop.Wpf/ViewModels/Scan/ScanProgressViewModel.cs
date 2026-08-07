@@ -12,7 +12,8 @@ public sealed partial class ScanProgressViewModel : ObservableObject
 
     private ScanProgress? _progress;
     private PerformanceOperation? _reported;
-    private Stopwatch? _scanStopwatch;
+    private long? _scanStarted;
+    private TimeSpan _scanElapsed;
     private double? _progressFraction;
     private long? _estimatedTotalBytes;
     private int _parallelism = 1;
@@ -104,7 +105,8 @@ public sealed partial class ScanProgressViewModel : ObservableObject
         _estimatedTotalBytes = EstimateTotalBytes(directory);
         _parallelism = Math.Max(1, parallelism);
         _progress = new();
-        _scanStopwatch = Stopwatch.StartNew();
+        _scanStarted = Stopwatch.GetTimestamp();
+        _scanElapsed = TimeSpan.Zero;
         Traversal = null;
 
         ResetLiveProgress(path);
@@ -113,10 +115,19 @@ public sealed partial class ScanProgressViewModel : ObservableObject
         return _progress;
     }
 
+    internal void ShiftStartForAutomation(TimeSpan elapsed)
+    {
+        if (_scanStarted is { } started)
+        {
+            _scanStarted = started - (long)(elapsed.TotalSeconds * Stopwatch.Frequency);
+        }
+    }
+
     internal TimeSpan Finish()
     {
         _progressTimer.Stop();
-        _scanStopwatch?.Stop();
+        _scanElapsed = Elapsed();
+        _scanStarted = null;
         _performance.ClearOperation(_reported);
         _reported = null;
 
@@ -132,7 +143,12 @@ public sealed partial class ScanProgressViewModel : ObservableObject
         OnPropertyChanged(nameof(IsIndeterminate));
         OnPropertyChanged(nameof(ProgressValue));
 
-        return _scanStopwatch?.Elapsed ?? TimeSpan.Zero;
+        return _scanElapsed;
+    }
+
+    private TimeSpan Elapsed()
+    {
+        return _scanStarted is { } started ? Stopwatch.GetElapsedTime(started) : _scanElapsed;
     }
 
     private PerformanceTraversal Describe(ScanProgressSnapshot snapshot)
@@ -173,7 +189,7 @@ public sealed partial class ScanProgressViewModel : ObservableObject
         }
 
         var snapshot = _progress.CreateSnapshot();
-        var elapsed = _scanStopwatch?.Elapsed ?? TimeSpan.Zero;
+        var elapsed = Elapsed();
 
         ScanCurrentPath = string.IsNullOrEmpty(snapshot.CurrentPath) ? ScanCurrentPath : snapshot.CurrentPath;
         ScanDirCountText = snapshot.DirectoriesScanned.ToString("N0");

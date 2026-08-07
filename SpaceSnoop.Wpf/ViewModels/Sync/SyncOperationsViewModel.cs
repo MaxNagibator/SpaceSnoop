@@ -6,6 +6,8 @@ namespace SpaceSnoop.Wpf.ViewModels.Sync;
 
 public sealed partial class SyncOperationsViewModel : ObservableObject
 {
+    internal const string CompareCaption = "Сравнение каталогов:";
+
     private readonly ISettingsStore _settings;
     private readonly IDialogService _dialogs;
     private readonly ILogger _logger;
@@ -220,7 +222,7 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
 
         var request = new CompareDirectoriesRequest(left, right, _setup.Exclusions, _setup.CurrentMode, _setup.CurrentWinner, _setup.Mirror);
 
-        var prepared = await _session.RunAsync("Сравнение каталогов:", (token, progress) =>
+        var prepared = await _session.RunAsync(CompareCaption, (token, progress) =>
         {
             var compared = _compare.Execute(request, token, progress);
             return new ComparePreparation(compared, SyncRowsProjector.BuildDirSizeCache(compared.Root));

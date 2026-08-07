@@ -94,6 +94,8 @@ public static class AppDefaults
     public const int GalleryThemeDelayMs = 700;
     public const int GalleryModalPollMs = 50;
     public const int GalleryModalAttempts = 80;
+    public const int GalleryBusyPollMs = 50;
+    public const int GalleryBusyAttempts = 120;
 
     public const bool AgentEnabledDefault = true;
     public const bool AgentConsentDefault = false;

@@ -7,6 +7,8 @@ namespace SpaceSnoop.Wpf.ViewModels.Docker;
 
 public sealed partial class DockerViewModel : ObservableObject, IPageHeader, IPageRefresh, IPageStatus
 {
+    internal const string PollingStatus = "Опрашиваю Docker…";
+
     private readonly DockerService _docker;
     private readonly IDialogService _dialogs;
     private readonly ILogger<DockerViewModel> _logger;
@@ -107,7 +109,7 @@ public sealed partial class DockerViewModel : ObservableObject, IPageHeader, IPa
         }
 
         IsBusy = true;
-        StatusText = "Опрашиваю Docker…";
+        StatusText = PollingStatus;
         try
         {
             var snapshot = await _docker.GetSnapshotAsync(CancellationToken.None);

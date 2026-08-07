@@ -55,6 +55,31 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
         _rows = rows;
     }
 
+    internal static string PairCaption(int index, int total, string name)
+    {
+        return $"Пара {index + 1} из {total} · {name}";
+    }
+
+    internal void ShowBusyForAutomation(int index, int total, string name)
+    {
+        IsBusy = true;
+        IsBatchRunning = true;
+        IsIndeterminate = false;
+        ProgressMax = total;
+        ProgressValue = index;
+        StatusCaption = PairCaption(index, total, name);
+    }
+
+    internal void ClearBusyForAutomation()
+    {
+        IsBusy = false;
+        IsBatchRunning = false;
+        IsIndeterminate = false;
+        ProgressMax = 0;
+        ProgressValue = 0;
+        StatusCaption = string.Empty;
+    }
+
     [RelayCommand(CanExecute = nameof(CanCompareAll))]
     private async Task CompareAll()
     {
@@ -85,7 +110,7 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
 
                 var row = targets[i];
                 ProgressValue = i;
-                StatusCaption = $"Пара {i + 1} из {total} · {row.Name}";
+                StatusCaption = PairCaption(i, total, row.Name);
 
                 var preflight = OverviewPipeline.Classify(row.Profile);
 
@@ -288,7 +313,7 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
 
                 var row = targets[i];
                 ProgressValue = i;
-                StatusCaption = $"Пара {i + 1} из {total} · {row.Name}";
+                StatusCaption = PairCaption(i, total, row.Name);
 
                 await SyncRowCore(row, token);
 

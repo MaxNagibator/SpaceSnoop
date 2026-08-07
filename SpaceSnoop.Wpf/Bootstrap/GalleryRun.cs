@@ -8,7 +8,7 @@ using System.Windows.Threading;
 
 namespace SpaceSnoop.Wpf.Bootstrap;
 
-internal sealed record GalleryFrame(string Kind, string Name, string Theme, string File, int Width, int Height);
+internal sealed record GalleryFrame(string Kind, string Name, string State, string Theme, string File, int Width, int Height);
 
 internal sealed record GalleryIndex(
     string App,
@@ -17,6 +17,7 @@ internal sealed record GalleryIndex(
     int Height,
     double Scale,
     double FontScale,
+    string State,
     IReadOnlyList<string> Unknown,
     IReadOnlyList<GalleryFrame> Frames);
 
@@ -50,8 +51,21 @@ public static class GalleryRun
         var shell = services.GetRequiredService<ShellViewModel>();
         var modals = shell.Modal;
 
+        var pages = options.Pages.Where(page => GalleryStates.SupportsPage(page, options.State)).ToList();
+        var dialogs = options.Dialogs.Where(dialog => GalleryStates.SupportsDialog(dialog, options.State)).ToList();
+        var tips = GalleryStates.SupportsTip(options.State) ? options.Tips : [];
+
+        var dropped = options.Pages.Count - pages.Count
+            + options.Dialogs.Count - dialogs.Count
+            + options.Tips.Count - tips.Count;
+
+        if (dropped > 0)
+        {
+            logger.GalleryStateSkipped(options.State, dropped);
+        }
+
         Directory.CreateDirectory(options.Directory);
-        logger.GalleryStarted(options.Pages.Count + options.Dialogs.Count + options.Tips.Count, options.Themes.Count, options.Directory);
+        logger.GalleryStarted(pages.Count + dialogs.Count + tips.Count, options.Themes.Count, options.Directory);
 
         window.WindowStartupLocation = WindowStartupLocation.Manual;
         window.Left = OffScreen;
@@ -74,15 +88,15 @@ public static class GalleryRun
             await Task.Delay(AppDefaults.GalleryThemeDelayMs).ConfigureAwait(true);
 
             skipped += await CaptureCasesAsync(
-                options.Pages,
-                page => CaptureAsync(window, shell, options, page, themeKey),
+                pages,
+                page => CaptureAsync(window, shell, services, fixture, options, page, themeKey),
                 shell,
                 frames,
                 themeKey,
                 logger).ConfigureAwait(true);
 
             skipped += await CaptureCasesAsync(
-                options.Dialogs,
+                dialogs,
                 dialog => CaptureDialogAsync(window, shell, modals, services, fixture, options, dialog, themeKey),
                 shell,
                 frames,
@@ -90,7 +104,7 @@ public static class GalleryRun
                 logger).ConfigureAwait(true);
 
             skipped += await CaptureCasesAsync(
-                options.Tips,
+                tips,
                 tip => CaptureTipAsync(window, shell, services, options, tip, themeKey),
                 shell,
                 frames,
@@ -136,6 +150,8 @@ public static class GalleryRun
     private static async Task<GalleryFrame> CaptureAsync(
         Window window,
         ShellViewModel shell,
+        IServiceProvider services,
+        GalleryFixture fixture,
         GalleryOptions options,
         string page,
         string themeKey)
@@ -145,17 +161,32 @@ public static class GalleryRun
             throw new InvalidOperationException($"Страница «{page}» не открылась – её нет в навигации.");
         }
 
-        await SettleAsync(window).ConfigureAwait(true);
-
-        var file = $"{ViewCapture.Slug(page)}-{themeKey}{ViewCapture.FileExtension}";
-        var (width, height) = ViewCapture.Save(Target(window, options), Path.Combine(options.Directory, file), options.Scale);
-
-        if (width == 0 || height == 0)
+        try
         {
-            throw new InvalidOperationException("Окно не отрисовано – нулевой размер кадра.");
-        }
+            await GalleryStates.ApplyPageAsync(page, options.State, services, fixture).ConfigureAwait(true);
+            await SettleAsync(window).ConfigureAwait(true);
 
-        return new(PageKind, page, themeKey, file, width, height);
+            var file = FileName(ViewCapture.Slug(page), options, themeKey);
+            var (width, height) = ViewCapture.Save(Target(window, options), Path.Combine(options.Directory, file), options.Scale);
+
+            if (width == 0 || height == 0)
+            {
+                throw new InvalidOperationException("Окно не отрисовано – нулевой размер кадра.");
+            }
+
+            return new(PageKind, page, options.State, themeKey, file, width, height);
+        }
+        finally
+        {
+            GalleryStates.ResetPage(page, options.State, services);
+        }
+    }
+
+    private static string FileName(string slug, GalleryOptions options, string themeKey)
+    {
+        var state = GalleryStates.IsIdle(options.State) ? string.Empty : $"-{options.State}";
+
+        return $"{slug}{state}-{themeKey}{ViewCapture.FileExtension}";
     }
 
     private static async Task<GalleryFrame> CaptureDialogAsync(
@@ -185,9 +216,10 @@ public static class GalleryRun
                 throw new InvalidOperationException($"Диалог «{dialog}» не открылся за отведённое время.");
             }
 
+            GalleryStates.ApplyDialog(modals.Current, options.State);
             await SettleAsync(window).ConfigureAwait(true);
 
-            var file = $"{DialogFilePrefix}{ViewCapture.Slug(dialog)}-{themeKey}{ViewCapture.FileExtension}";
+            var file = FileName($"{DialogFilePrefix}{ViewCapture.Slug(dialog)}", options, themeKey);
             var (width, height) = ViewCapture.Save(window, Path.Combine(options.Directory, file), options.Scale);
 
             if (width == 0 || height == 0)
@@ -195,10 +227,11 @@ public static class GalleryRun
                 throw new InvalidOperationException("Окно не отрисовано – нулевой размер кадра.");
             }
 
-            return new(DialogKind, dialog, themeKey, file, width, height);
+            return new(DialogKind, dialog, options.State, themeKey, file, width, height);
         }
         finally
         {
+            GalleryStates.ResetDialog(modals.Current);
             modals.RequestCancel();
             await WaitForModalAsync(modals, false).ConfigureAwait(true);
             GalleryDialogs.Cleanup(dialog, services);
@@ -237,7 +270,7 @@ public static class GalleryRun
         {
             await SettleAsync(window).ConfigureAwait(true);
 
-            var file = $"{TipFilePrefix}{ViewCapture.Slug(tip)}-{themeKey}{ViewCapture.FileExtension}";
+            var file = FileName($"{TipFilePrefix}{ViewCapture.Slug(tip)}", options, themeKey);
 
             var (width, height) = ViewCapture.Save(window,
                 tooltip,
@@ -250,7 +283,7 @@ public static class GalleryRun
                 throw new InvalidOperationException("Окно не отрисовано – нулевой размер кадра.");
             }
 
-            return new(TipKind, tip, themeKey, file, width, height);
+            return new(TipKind, tip, options.State, themeKey, file, width, height);
         }
         finally
         {
@@ -316,6 +349,7 @@ public static class GalleryRun
             options.Height,
             options.Scale,
             options.FontScale,
+            options.State,
             options.Unknown,
             frames);
         File.WriteAllText(Path.Combine(options.Directory, IndexFileName), JsonSerializer.Serialize(index, JsonOptions));

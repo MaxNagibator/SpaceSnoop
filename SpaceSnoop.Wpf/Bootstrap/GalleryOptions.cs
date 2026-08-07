@@ -11,6 +11,7 @@ public sealed record GalleryOptions(
     double Scale,
     double FontScale,
     string Element,
+    string State,
     IReadOnlyList<string> Unknown)
 {
     public const string NoneValue = "none";
@@ -29,6 +30,7 @@ public sealed record GalleryOptions(
         var scale = AppDefaults.ViewCaptureScaleDefault;
         var fontScale = FontScaleManager.DefaultScale;
         var element = string.Empty;
+        var state = GalleryStates.Idle;
         var unknown = new List<string>();
 
         var rest = args.ToList();
@@ -80,6 +82,12 @@ public sealed record GalleryOptions(
                     positional = false;
                     break;
 
+                case "--state":
+                    state = ParseState(value, unknown);
+                    index++;
+                    positional = false;
+                    break;
+
                 case "--scale":
                     scale = ParseScale(value, scale);
                     index++;
@@ -107,7 +115,22 @@ public sealed record GalleryOptions(
             }
         }
 
-        return new(directory, pages, dialogs, tips, themes, width, height, scale, fontScale, element, unknown);
+        return new(directory, pages, dialogs, tips, themes, width, height, scale, fontScale, element, state, unknown);
+    }
+
+    private static string ParseState(string value, List<string> unknown)
+    {
+        if (GalleryStates.Match(value) is { } known)
+        {
+            return known;
+        }
+
+        if (value.Length > 0)
+        {
+            unknown.Add(value);
+        }
+
+        return GalleryStates.Idle;
     }
 
     private static double ParseScale(string value, double scale)
