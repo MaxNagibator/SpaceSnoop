@@ -37,6 +37,8 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsBusy))]
+    [NotifyPropertyChangedFor(nameof(ShowEmptyState))]
+    [NotifyPropertyChangedFor(nameof(ShowScanningState))]
     [NotifyCanExecuteChangedFor(nameof(StartCommand))]
     [NotifyCanExecuteChangedFor(nameof(BrowseCommand))]
     [NotifyCanExecuteChangedFor(nameof(StopCommand))]
@@ -46,9 +48,14 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     private string? _statusCaption;
 
     [ObservableProperty]
+    private string _scanTargetPath = string.Empty;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TreeVisible))]
     [NotifyPropertyChangedFor(nameof(TreemapVisible))]
     [NotifyPropertyChangedFor(nameof(DuplicatesVisible))]
+    [NotifyPropertyChangedFor(nameof(ShowEmptyState))]
+    [NotifyPropertyChangedFor(nameof(ShowScanningState))]
     private bool _hasResult;
 
     [ObservableProperty]
@@ -205,6 +212,10 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     public bool TreemapVisible => HasResult && ViewMode == ScanViewMode.Treemap;
 
     public bool DuplicatesVisible => HasResult && ViewMode == ScanViewMode.Duplicates;
+
+    public bool ShowEmptyState => !HasResult && !IsScanning;
+
+    public bool ShowScanningState => !HasResult && IsScanning;
 
     public bool IsIndeterminate => Progress.IsIndeterminate;
 
@@ -428,6 +439,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         var token = _cts.Token;
         IsScanning = true;
         ScanWasCancelled = false;
+        ScanTargetPath = path;
         StatusCaption = $"Сканирование: {path}";
 
         SelectedNode = null;

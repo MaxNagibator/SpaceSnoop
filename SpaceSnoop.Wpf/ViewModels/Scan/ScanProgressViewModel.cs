@@ -200,7 +200,8 @@ public sealed partial class ScanProgressViewModel : ObservableObject
             elapsed,
             TotalBytes: _estimatedTotalBytes,
             Basis: EtaBasis.Bytes,
-            Traversal: Describe(snapshot));
+            Traversal: Describe(snapshot),
+            LogicalBytes: true);
 
         ScanThroughputText = PerformanceFormat.Rate(operation) ?? "–";
         ScanRemainingText = PerformanceFormat.Remaining(operation) ?? string.Empty;

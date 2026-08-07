@@ -8,7 +8,8 @@ public sealed record PerformanceOperation(
     long? TotalItems = null,
     long? TotalBytes = null,
     EtaBasis Basis = EtaBasis.None,
-    PerformanceTraversal? Traversal = null)
+    PerformanceTraversal? Traversal = null,
+    bool LogicalBytes = false)
 {
     public double? ItemsPerSecond => Rate(Items);
 

@@ -294,7 +294,7 @@ public static class PerformanceFormat
             parts.Add($"{items:N0} {Plural.Word((long)items, "файл", "файла", "файлов")}/с");
         }
 
-        if (operation.BytesPerSecond is { } bytes)
+        if (!operation.LogicalBytes && operation.BytesPerSecond is { } bytes)
         {
             parts.Add($"{SizeFormatter.Format((long)bytes)}/с");
         }

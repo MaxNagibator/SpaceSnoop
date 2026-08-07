@@ -67,7 +67,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         var overviewItem = new NavigationItem("Обзор", PackIconLucideKind.LayoutGrid, overview);
         var scheduleItem = new NavigationItem("Расписание", PackIconLucideKind.CalendarClock, schedule);
         var cleanupItem = new NavigationItem("Очистка", PackIconLucideKind.Trash2, cleanup);
-        var logsItem = new NavigationItem("Логи", PackIconLucideKind.ScrollText, logs);
+        var logsItem = new NavigationItem("Логи", PackIconLucideKind.ScrollText, logs) { StartsGroup = true };
         var performanceItem = new NavigationItem("Диагностика", PackIconLucideKind.Gauge, performance);
         var aboutItem = new NavigationItem("О программе", PackIconLucideKind.Info, about);
 
@@ -156,7 +156,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
 
     protected override void OnSelectionChanged(NavigationItem? value)
     {
-        StatusText = value?.Title ?? "Готов";
+        StatusText = "Готов";
         OnPropertyChanged(nameof(PageRefreshCommand));
 
         if (value is not null && Sections.Contains(value))

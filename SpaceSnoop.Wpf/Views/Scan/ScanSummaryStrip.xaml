@@ -85,8 +85,8 @@
                                Style="{StaticResource Caption}"
                                Margin="0,0,7,0" />
                     <TextBlock Text="{Binding ResultSizeText}"
-                               Style="{StaticResource StatValue}"
-                               Foreground="{DynamicResource Accent.Primary}" />
+                               Style="{StaticResource StatValue.Lead}"
+                               ToolTip="Логический объём учтённых файлов" />
                 </StackPanel>
 
                 <StackPanel Style="{StaticResource Metric}">
@@ -110,7 +110,7 @@
                                Style="{StaticResource Caption}"
                                Margin="0,0,7,0" />
                     <TextBlock Text="{Binding ResultElapsedText}"
-                               Style="{StaticResource StatValue}" />
+                               Style="{StaticResource StatValue.Aside}" />
                 </StackPanel>
 
                 <StackPanel Style="{StaticResource Metric}">
@@ -118,7 +118,7 @@
                                Style="{StaticResource Caption}"
                                Margin="0,0,7,0" />
                     <TextBlock Text="{Binding ResultRateText}"
-                               Style="{StaticResource StatValue}"
+                               Style="{StaticResource StatValue.Aside}"
                                ToolTip="Средняя скорость обхода за время сканирования" />
                 </StackPanel>
 

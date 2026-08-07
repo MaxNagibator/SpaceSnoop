@@ -62,6 +62,26 @@
                 Value="Center" />
         <Setter Property="TextWrapping"
                 Value="NoWrap" />
+        <Setter Property="Typography.NumeralAlignment"
+                Value="Tabular" />
+    </Style>
+
+    <Style x:Key="StatValue.Lead"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource StatValue}">
+        <Setter Property="FontSize"
+                Value="{DynamicResource Font.Size.L}" />
+        <Setter Property="Foreground"
+                Value="{DynamicResource Accent.Primary}" />
+    </Style>
+
+    <Style x:Key="StatValue.Aside"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource StatValue}">
+        <Setter Property="FontWeight"
+                Value="Medium" />
+        <Setter Property="Foreground"
+                Value="{DynamicResource Fg.Secondary}" />
     </Style>
 
     <Style x:Key="NodeIcon"

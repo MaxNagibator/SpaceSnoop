@@ -26,7 +26,15 @@
                         Margin="14,0">
                 <TextBlock Text="{Binding StatusText}"
                            Style="{StaticResource TextBlock.Subtle}"
-                           VerticalAlignment="Center" />
+                           VerticalAlignment="Center"
+                           Visibility="{Binding CurrentPageStatus.IsBusy, Converter={StaticResource InverseBoolToVisibility}, FallbackValue=Visible, TargetNullValue=Visible}" />
+                <TextBlock Text="{Binding CurrentPageStatus.StatusCaption}"
+                           Style="{StaticResource TextBlock.Subtle}"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           MaxWidth="520"
+                           ToolTip="{Binding CurrentPageStatus.StatusCaption}"
+                           Visibility="{Binding CurrentPageStatus.IsBusy, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
             </StackPanel>
 
             <views:PerformanceHudView Grid.Column="1"
@@ -40,31 +48,23 @@
                         HorizontalAlignment="Right"
                         Margin="14,0"
                         Visibility="{Binding CurrentPageStatus.IsBusy, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}">
-                <TextBlock Text="{Binding CurrentPageStatus.StatusCaption}"
-                           Style="{StaticResource TextBlock.Subtle}"
-                           VerticalAlignment="Center"
-                           Margin="0,0,10,0"
-                           TextTrimming="CharacterEllipsis"
-                           MaxWidth="420" />
-                <ProgressBar Width="160"
-                             Height="6"
-                             Minimum="0"
-                             Maximum="{Binding CurrentPageStatus.ProgressMax}"
-                             Value="{Binding CurrentPageStatus.ProgressValue, Mode=OneWay}"
-                             IsIndeterminate="{Binding CurrentPageStatus.IsIndeterminate}"
-                             VerticalAlignment="Center" />
                 <Button Style="{StaticResource Button.Ghost}"
                         Command="{Binding CurrentPageStatus.CancelCommand}"
-                        Margin="8,0,0,0"
-                        Padding="6,2"
+                        Padding="8,2"
                         MinHeight="22"
                         VerticalAlignment="Center"
                         ToolTip="Отменить операцию"
                         AutomationProperties.Name="Отменить операцию"
                         Visibility="{Binding CurrentPageStatus.CancelCommand, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}">
-                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.X}"
-                                              Width="12"
-                                              Height="12" />
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.X}"
+                                                  Width="12"
+                                                  Height="12"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,6,0" />
+                        <TextBlock Text="Отменить"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
                 </Button>
             </StackPanel>
         </Grid>

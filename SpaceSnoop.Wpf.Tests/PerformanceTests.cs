@@ -194,6 +194,18 @@ public class PerformanceTests
     }
 
     [Test]
+    public void Логический_объём_не_выдаётся_за_пропускную_способность()
+    {
+        var scan = new PerformanceOperation("Сканирование", 100, 2048, TimeSpan.FromSeconds(2), LogicalBytes: true);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(PerformanceFormat.Rate(scan), Is.EqualTo("50 файлов/с"));
+            Assert.That(scan.BytesPerSecond, Is.EqualTo(1024).Within(1));
+        });
+    }
+
+    [Test]
     public void Слишком_короткий_замер_не_даёт_строки_скорости()
     {
         var operation = new PerformanceOperation("Сравнение", 5, 500, TimeSpan.FromMilliseconds(50));

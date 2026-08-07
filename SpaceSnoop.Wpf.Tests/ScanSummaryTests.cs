@@ -42,4 +42,15 @@ public class ScanSummaryTests
             Assert.That(run.BytesPerSecond, Is.EqualTo(2560).Within(1));
         });
     }
+
+    [Test]
+    public void Скорость_итога_меряется_файлами_а_не_байтами_в_секунду()
+    {
+        var tree = new DiskSpaceCalculator().Calculate(new DirectoryInfo(_root));
+        var summary = new ScanSummaryViewModel();
+
+        summary.Apply(tree, TimeSpan.FromSeconds(2));
+
+        Assert.That(summary.ResultRateText, Is.EqualTo("1 файл/с"));
+    }
 }

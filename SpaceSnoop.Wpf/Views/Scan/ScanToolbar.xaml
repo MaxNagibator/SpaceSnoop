@@ -47,20 +47,22 @@
                 <Button Style="{StaticResource Button.Secondary}"
                         Command="{Binding BrowseCommand}"
                         Margin="0,2,14,2"
-                        ToolTip="Выбрать каталог">
+                        ToolTip="Выбрать другой каталог для анализа">
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderOpen}"
                                                   Width="15"
                                                   Height="15"
                                                   VerticalAlignment="Center"
                                                   Margin="0,0,6,0" />
-                        <TextBlock Text="Обзор" />
+                        <TextBlock Text="Каталог…" />
                     </StackPanel>
                 </Button>
 
                 <Button Style="{StaticResource Button.Primary}"
                         Command="{Binding StartCommand}"
-                        Margin="0,2,6,2">
+                        Margin="0,2,0,2"
+                        ToolTip="Посчитать занятое место в выбранном каталоге"
+                        Visibility="{Binding IsScanning, Converter={StaticResource InverseBoolToVisibility}, FallbackValue=Visible}">
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Play}"
                                                   Width="15"
@@ -71,17 +73,18 @@
                     </StackPanel>
                 </Button>
 
-                <Button Style="{StaticResource Button.Ghost}"
+                <Button Style="{StaticResource Button.Primary}"
                         Command="{Binding StopCommand}"
                         Margin="0,2,0,2"
-                        ToolTip="Остановить сканирование (ESC)">
+                        ToolTip="Остановить сканирование (ESC)"
+                        Visibility="{Binding IsScanning, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Square}"
                                                   Width="13"
                                                   Height="13"
                                                   VerticalAlignment="Center"
                                                   Margin="0,0,6,0" />
-                        <TextBlock Text="Стоп" />
+                        <TextBlock Text="Остановить" />
                     </StackPanel>
                 </Button>
             </WrapPanel>
@@ -92,7 +95,7 @@
                         Margin="10,0,0,0">
                 <Button Style="{StaticResource Button.Destructive}"
                         Command="{Binding Marks.DeleteMarkedCommand}"
-                        ToolTip="Переместить помеченные элементы в корзину (пометка – ПКМ по узлу)">
+                        ToolTip="{Binding Marks.DeleteHint}">
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
                                                   Width="14"

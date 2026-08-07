@@ -62,7 +62,8 @@
                 <TextBlock Grid.Column="2"
                            Text="{Binding ScanElapsedText}"
                            Style="{StaticResource StatValue}"
-                           Foreground="{DynamicResource Accent.Primary}" />
+                           MinWidth="64"
+                           TextAlignment="Right" />
             </Grid>
 
             <Grid Margin="0,11,0,0">
@@ -85,7 +86,8 @@
                            VerticalAlignment="Center"
                            FontSize="{DynamicResource Font.Size.S}"
                            FontWeight="Medium"
-                           Foreground="{DynamicResource Accent.Primary}"
+                           Typography.NumeralAlignment="Tabular"
+                           Foreground="{DynamicResource Fg.Secondary}"
                            Visibility="{Binding ScanHasDeterminateProgress, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
             </Grid>
 
@@ -99,6 +101,15 @@
                                 Value="0,4,18,0" />
                     </Style>
                 </WrapPanel.Resources>
+
+                <StackPanel Style="{StaticResource Metric}">
+                    <TextBlock Text="Объём"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ScanBytesText}"
+                               Style="{StaticResource StatValue.Lead}"
+                               ToolTip="Логический объём учтённых файлов" />
+                </StackPanel>
 
                 <StackPanel Style="{StaticResource Metric}">
                     <TextBlock Text="Каталогов"
@@ -117,20 +128,12 @@
                 </StackPanel>
 
                 <StackPanel Style="{StaticResource Metric}">
-                    <TextBlock Text="Объём"
-                               Style="{StaticResource Caption}"
-                               Margin="0,0,7,0" />
-                    <TextBlock Text="{Binding ScanBytesText}"
-                               Style="{StaticResource StatValue}"
-                               Foreground="{DynamicResource Accent.Primary}" />
-                </StackPanel>
-
-                <StackPanel Style="{StaticResource Metric}">
                     <TextBlock Text="Скорость"
                                Style="{StaticResource Caption}"
                                Margin="0,0,7,0" />
                     <TextBlock Text="{Binding ScanThroughputText}"
-                               Style="{StaticResource StatValue}" />
+                               Style="{StaticResource StatValue.Aside}"
+                               ToolTip="Скорость обхода: сколько файлов в секунду учитывает скан" />
                 </StackPanel>
 
                 <StackPanel Style="{StaticResource Metric}"
@@ -139,18 +142,18 @@
                                Style="{StaticResource Caption}"
                                Margin="0,0,7,0" />
                     <TextBlock Text="{Binding ScanRemainingText}"
-                               Style="{StaticResource StatValue}"
-                               Foreground="{DynamicResource Accent.Primary}"
+                               Style="{StaticResource StatValue.Aside}"
                                ToolTip="Оценка по средней скорости от начала сканирования" />
                 </StackPanel>
 
                 <StackPanel Style="{StaticResource Metric}"
                             Visibility="{Binding ScanHasBranches, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
-                    <TextBlock Text="Ветки"
+                    <TextBlock Text="Верхний уровень"
                                Style="{StaticResource Caption}"
                                Margin="0,0,7,0" />
                     <TextBlock Text="{Binding ScanTopLevelText}"
-                               Style="{StaticResource StatValue}" />
+                               Style="{StaticResource StatValue.Aside}"
+                               ToolTip="Сколько каталогов верхнего уровня уже обойдено" />
                 </StackPanel>
             </WrapPanel>
         </StackPanel>

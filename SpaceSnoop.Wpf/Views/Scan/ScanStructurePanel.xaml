@@ -314,7 +314,19 @@
                                   ActionCommand="{Binding BrowseCommand}"
                                   VerticalAlignment="Center"
                                   HorizontalAlignment="Center"
-                                  Visibility="{Binding HasResult, Converter={StaticResource InverseBoolToVisibility}, FallbackValue=Collapsed}" />
+                                  Visibility="{Binding ShowEmptyState, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+
+            <keepshell:EmptyState Grid.Row="1"
+                                  Icon="Radar"
+                                  IconSize="40"
+                                  Heading="Обходим каталоги"
+                                  Description="{Binding ScanTargetPath, StringFormat='Дерево появится, когда обход {0} закончится – ход виден в панели выше.'}"
+                                  DescriptionMaxWidth="440"
+                                  ActionText="Остановить"
+                                  ActionCommand="{Binding StopCommand}"
+                                  VerticalAlignment="Center"
+                                  HorizontalAlignment="Center"
+                                  Visibility="{Binding ShowScanningState, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
         </Grid>
     </Border>
 </UserControl>

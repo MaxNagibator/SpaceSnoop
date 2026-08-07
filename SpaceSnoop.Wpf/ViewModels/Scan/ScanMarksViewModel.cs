@@ -20,8 +20,13 @@ public sealed partial class ScanMarksViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasMarked))]
+    [NotifyPropertyChangedFor(nameof(DeleteHint))]
     [NotifyCanExecuteChangedFor(nameof(DeleteMarkedCommand))]
     private int _markedCount;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DeleteHint))]
+    private string _markedSizeText = string.Empty;
 
     internal ScanMarksViewModel(
         IDialogService dialogs,
@@ -56,9 +61,16 @@ public sealed partial class ScanMarksViewModel : ObservableObject
 
     public bool HasMarked => MarkedCount > 0;
 
+    public string DeleteHint => HasMarked
+        ? $"Переместить в корзину: {MarkedCount} {Plural.Word(MarkedCount, "объект", "объекта", "объектов")}, ≈{MarkedSizeText}"
+        : "Пометьте узлы дерева (Ctrl + правый клик), чтобы удалить их в корзину";
+
     internal void RecountMarked()
     {
-        MarkedCount = ScanTreeEditor.CollectMarked(_roots).Count;
+        var marked = ScanTreeEditor.CollectMarked(_roots);
+
+        MarkedCount = marked.Count;
+        MarkedSizeText = marked.Count > 0 ? SizeFormatter.Format(marked.Sum(item => item.TotalSize)) : string.Empty;
     }
 
     internal void ApplyDeletionResult(IReadOnlyList<SpaceBase> deletedItems)

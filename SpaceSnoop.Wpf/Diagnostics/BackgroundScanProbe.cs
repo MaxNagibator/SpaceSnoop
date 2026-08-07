@@ -39,7 +39,8 @@ internal sealed class BackgroundScanProbe : IDisposable
             elapsed,
             TotalBytes: totalBytes,
             Basis: totalBytes.HasValue ? EtaBasis.Bytes : EtaBasis.None,
-            Traversal: new(snapshot.DirectoriesScanned, snapshot.DirectoriesFailed, Math.Max(1, parallelism)));
+            Traversal: new(snapshot.DirectoriesScanned, snapshot.DirectoriesFailed, Math.Max(1, parallelism)),
+            LogicalBytes: true);
     }
 
     public PerformanceOperation Finish()
