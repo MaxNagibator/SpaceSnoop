@@ -478,7 +478,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
             var elapsed = Progress.Finish();
 
-            ApplyScanResult(path, result, elapsed, Progress.Traversal);
+            ApplyScanResult(result, elapsed, Progress.Traversal);
 
             _notifier.Notify($"Сканирование завершено: {result.AbsolutePath} · {result.TotalSizeText}", StatusSeverity.Success);
         }

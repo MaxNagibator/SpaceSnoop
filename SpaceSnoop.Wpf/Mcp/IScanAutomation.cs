@@ -40,7 +40,7 @@ public interface IScanAutomation
 
     void SelectPathForAutomation(string path);
 
-    void ApplyScanResult(string path, DirectorySpace result, TimeSpan elapsed, PerformanceTraversal? traversal);
+    void ApplyScanResult(DirectorySpace result, TimeSpan elapsed, PerformanceTraversal? traversal);
 
     Task ScanFromAutomationAsync(string path, CancellationToken cancellationToken);
 

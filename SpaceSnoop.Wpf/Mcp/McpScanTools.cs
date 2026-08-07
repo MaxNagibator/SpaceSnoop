@@ -26,7 +26,7 @@ internal sealed class McpScanTools(
 
         logger.McpToolInvoked("scan_directory", $"«{path}», глубина {depth}, записей до {entryLimit}, показать в окне {show}");
 
-        McpGuards.ValidateScanPath(path);
+        path = McpGuards.ValidateScanPath(path);
 
         if (show)
         {
@@ -87,7 +87,7 @@ internal sealed class McpScanTools(
                     throw new McpException("Страница «Сканирование» занялась другой операцией, пока шёл обход – результат не показан. Повторите с show=false, чтобы получить данные без окна.");
                 }
 
-                scan.ApplyScanResult(path, tree, run.Elapsed, run.Traversal);
+                scan.ApplyScanResult(tree, run.Elapsed, run.Traversal);
                 scan.SelectPathForAutomation(tree.AbsolutePath);
                 navigator.DeferOrNavigate(SectionKey.Scan);
                 notifier.Notify($"Агент показал сканирование: {tree.AbsolutePath} · {tree.TotalSizeText}");
@@ -268,7 +268,7 @@ internal sealed class McpScanTools(
 
         if (start || explicitPath)
         {
-            McpGuards.ValidateScanPath(target);
+            target = McpGuards.ValidateScanPath(target);
         }
 
         if (target.Length > 0)

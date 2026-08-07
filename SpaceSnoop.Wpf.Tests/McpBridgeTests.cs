@@ -212,10 +212,26 @@ public class McpBridgeTests
         });
     }
 
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    public void Скорость_в_байтах_уходит_агенту_только_у_настоящей_пропускной_способности(bool logical, bool expected)
+    {
+        var operation = new PerformanceOperation("Сканирование", 1000, 2048, TimeSpan.FromSeconds(2), LogicalBytes: logical);
+
+        Assert.That(McpFormat.DescribeOperation(operation)?.BytesPerSecond is not null, Is.EqualTo(expected));
+    }
+
     [Test]
     public void Путь_скана_пропускается_для_существующего_каталога()
     {
         Assert.DoesNotThrow(() => McpGuards.ValidateScanPath(_left));
+    }
+
+    [TestCase("/")]
+    [TestCase("\\.\\")]
+    public void Путь_скана_приводится_к_каноничному(string tail)
+    {
+        Assert.That(McpGuards.ValidateScanPath(_left.Replace('\\', '/') + tail), Is.EqualTo(_left));
     }
 
     [Test]

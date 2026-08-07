@@ -95,7 +95,7 @@ internal sealed class ScanAutomationDouble : IScanAutomation
         SelectCalls++;
     }
 
-    public void ApplyScanResult(string path, DirectorySpace result, TimeSpan elapsed, PerformanceTraversal? traversal)
+    public void ApplyScanResult(DirectorySpace result, TimeSpan elapsed, PerformanceTraversal? traversal)
     {
         ApplyCalls++;
         AppliedTraversal = traversal;

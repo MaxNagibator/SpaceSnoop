@@ -11,23 +11,27 @@ public sealed partial class DriveItem(string path) : ObservableObject
     private string _label = path;
 
     private Task? _loading;
+    private int _generation;
 
     public Task LoadLabelAsync()
     {
-        return _loading ??= LoadCoreAsync();
+        return _loading ??= LoadCoreAsync(_generation);
     }
 
     internal void Invalidate()
     {
-        if (_loading is { IsCompleted: true })
-        {
-            _loading = null;
-        }
+        _generation++;
+        _loading = null;
     }
 
-    private async Task LoadCoreAsync()
+    private async Task LoadCoreAsync(int generation)
     {
-        Label = await Task.Run(() => BuildLabel(Path));
+        var label = await Task.Run(() => BuildLabel(Path));
+
+        if (generation == _generation)
+        {
+            Label = label;
+        }
     }
 
     private static string BuildLabel(string path)

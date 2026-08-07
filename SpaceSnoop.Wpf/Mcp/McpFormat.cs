@@ -74,7 +74,7 @@ internal static class McpFormat
             SizeFormatter.Format(operation.Bytes),
             Math.Round(operation.Elapsed.TotalSeconds, 1),
             operation.ItemsPerSecond is { } items ? Math.Round(items, 1) : null,
-            operation.BytesPerSecond is { } bytes ? Math.Round(bytes, 1) : null,
+            !operation.LogicalBytes && operation.BytesPerSecond is { } bytes ? Math.Round(bytes, 1) : null,
             operation.Remaining() is { } remaining ? Math.Round(remaining.TotalSeconds, 1) : null,
             PerformanceFormat.Operation(operation) ?? operation.Name);
     }

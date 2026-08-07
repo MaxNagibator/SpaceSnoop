@@ -56,9 +56,9 @@ public sealed partial class ScanViewModel : IScanAutomation
         SelectPathForAutomation(path);
     }
 
-    void IScanAutomation.ApplyScanResult(string path, DirectorySpace result, TimeSpan elapsed, PerformanceTraversal? traversal)
+    void IScanAutomation.ApplyScanResult(DirectorySpace result, TimeSpan elapsed, PerformanceTraversal? traversal)
     {
-        ApplyScanResult(path, result, elapsed, traversal);
+        ApplyScanResult(result, elapsed, traversal);
     }
 
     Task IScanAutomation.ScanFromAutomationAsync(string path, CancellationToken cancellationToken)
@@ -102,9 +102,9 @@ public sealed partial class ScanViewModel : IScanAutomation
         return ScanAsync(path, cancellationToken);
     }
 
-    internal void ApplyScanResult(string path, DirectorySpace result, TimeSpan elapsed, PerformanceTraversal? traversal)
+    internal void ApplyScanResult(DirectorySpace result, TimeSpan elapsed, PerformanceTraversal? traversal)
     {
-        ScanTreeEditor.RemoveRoot(Roots, path);
+        ScanTreeEditor.RemoveRoot(Roots, result.AbsolutePath);
 
         var node = _nodeFactory.CreateRoot(result, _sortState);
         node.IsExpanded = true;

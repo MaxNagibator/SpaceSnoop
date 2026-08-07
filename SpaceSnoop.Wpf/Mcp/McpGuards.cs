@@ -1,6 +1,7 @@
 ﻿using ModelContextProtocol;
 using SpaceSnoop.Core.Export;
 using System.IO;
+using System.Security;
 
 namespace SpaceSnoop.Wpf.Mcp;
 
@@ -26,17 +27,30 @@ internal static class McpGuards
         return Math.Clamp(seconds, 0, AppDefaults.PerformanceHistorySecondsMax);
     }
 
-    public static void ValidateScanPath(string path)
+    public static string ValidateScanPath(string path)
     {
         if (path.Length == 0)
         {
             throw new McpException("Путь к каталогу должен быть задан.");
         }
 
-        if (!Directory.Exists(path))
+        string full;
+
+        try
+        {
+            full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException or SecurityException)
+        {
+            throw new McpException($"Путь «{path}» не удалось разобрать: {exception.Message}");
+        }
+
+        if (!Directory.Exists(full))
         {
             throw new McpException($"Каталог «{path}» не найден или недоступен.");
         }
+
+        return full;
     }
 
     public static void Validate(string left, string right, SyncMode mode)
