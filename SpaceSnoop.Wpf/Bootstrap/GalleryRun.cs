@@ -73,47 +73,29 @@ public static class GalleryRun
             shell.IsTarkovBootPlaying = false;
             await Task.Delay(AppDefaults.GalleryThemeDelayMs).ConfigureAwait(true);
 
-            foreach (var page in options.Pages)
-            {
-                try
-                {
-                    shell.Toasts.Toasts.Clear();
-                    frames.Add(await CaptureAsync(window, shell, options, page, themeKey).ConfigureAwait(true));
-                }
-                catch (Exception exception)
-                {
-                    skipped++;
-                    logger.GalleryCaseFailed(exception.Unwrap(), $"{page}/{themeKey}");
-                }
-            }
+            skipped += await CaptureCasesAsync(
+                options.Pages,
+                page => CaptureAsync(window, shell, options, page, themeKey),
+                shell,
+                frames,
+                themeKey,
+                logger).ConfigureAwait(true);
 
-            foreach (var dialog in options.Dialogs)
-            {
-                try
-                {
-                    shell.Toasts.Toasts.Clear();
-                    frames.Add(await CaptureDialogAsync(window, shell, modals, services, fixture, options, dialog, themeKey).ConfigureAwait(true));
-                }
-                catch (Exception exception)
-                {
-                    skipped++;
-                    logger.GalleryCaseFailed(exception.Unwrap(), $"{dialog}/{themeKey}");
-                }
-            }
+            skipped += await CaptureCasesAsync(
+                options.Dialogs,
+                dialog => CaptureDialogAsync(window, shell, modals, services, fixture, options, dialog, themeKey),
+                shell,
+                frames,
+                themeKey,
+                logger).ConfigureAwait(true);
 
-            foreach (var tip in options.Tips)
-            {
-                try
-                {
-                    shell.Toasts.Toasts.Clear();
-                    frames.Add(await CaptureTipAsync(window, shell, services, options, tip, themeKey).ConfigureAwait(true));
-                }
-                catch (Exception exception)
-                {
-                    skipped++;
-                    logger.GalleryCaseFailed(exception.Unwrap(), $"{tip}/{themeKey}");
-                }
-            }
+            skipped += await CaptureCasesAsync(
+                options.Tips,
+                tip => CaptureTipAsync(window, shell, services, options, tip, themeKey),
+                shell,
+                frames,
+                themeKey,
+                logger).ConfigureAwait(true);
         }
 
         WriteIndex(options, frames);
@@ -122,6 +104,33 @@ public static class GalleryRun
         logger.GalleryFinished(frames.Count, skipped, (long)stopwatch.Elapsed.TotalMilliseconds);
 
         return skipped == 0 && frames.Count > 0 ? 0 : 1;
+    }
+
+    private static async Task<int> CaptureCasesAsync(
+        IReadOnlyList<string> cases,
+        Func<string, Task<GalleryFrame>> capture,
+        ShellViewModel shell,
+        List<GalleryFrame> frames,
+        string themeKey,
+        ILogger logger)
+    {
+        var skipped = 0;
+
+        foreach (var item in cases)
+        {
+            try
+            {
+                shell.Toasts.Toasts.Clear();
+                frames.Add(await capture(item).ConfigureAwait(true));
+            }
+            catch (Exception exception)
+            {
+                skipped++;
+                logger.GalleryCaseFailed(exception.Unwrap(), $"{item}/{themeKey}");
+            }
+        }
+
+        return skipped;
     }
 
     private static async Task<GalleryFrame> CaptureAsync(

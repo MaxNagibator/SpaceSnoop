@@ -18,6 +18,11 @@ internal sealed class McpScanTools(
     PerformanceRunTracker runs,
     ILogger logger)
 {
+    private const string BusyReason = "страница занята операцией";
+    private const string ScanBusyMessage = "Страница «Сканирование» сейчас занята другой операцией.";
+    private const string MarkTool = "mark_for_deletion";
+    private const string ArchiveTool = "archive_directory";
+
     public async Task<string> ScanAsync(string path, int depth, int entryLimit, bool show, CancellationToken cancellationToken)
     {
         path = path.Trim();
@@ -34,8 +39,8 @@ internal sealed class McpScanTools(
             {
                 if (scan.IsScanning)
                 {
-                    logger.McpToolRejected("scan_directory", "страница занята операцией");
-                    throw new McpException("Страница «Сканирование» сейчас занята другой операцией.");
+                    logger.McpToolRejected("scan_directory", BusyReason);
+                    throw new McpException(ScanBusyMessage);
                 }
             });
         }
@@ -196,11 +201,11 @@ internal sealed class McpScanTools(
 
     public string MarkForDeletion(IReadOnlyList<string> paths, bool mark)
     {
-        McpGuards.RequireMutations(preferences, logger, "mark_for_deletion");
+        McpGuards.RequireMutations(preferences, logger, MarkTool);
 
         List<string> wanted = [.. paths.Where(static path => path is not null).Select(static path => path.Trim()).Where(static path => path.Length > 0)];
 
-        logger.McpToolInvoked("mark_for_deletion", $"путей {wanted.Count}, пометить {mark}");
+        logger.McpToolInvoked(MarkTool, $"путей {wanted.Count}, пометить {mark}");
 
         if (wanted.Count == 0)
         {
@@ -221,12 +226,12 @@ internal sealed class McpScanTools(
 
         if (dryRun)
         {
-            logger.McpToolInvoked("archive_directory", $"«{path}», план");
+            logger.McpToolInvoked(ArchiveTool, $"«{path}», план");
 
             return McpDispatch.Run(() => BuildArchivePlan(path, deleteOriginal));
         }
 
-        McpGuards.RequireMutations(preferences, logger, "archive_directory");
+        McpGuards.RequireMutations(preferences, logger, ArchiveTool);
 
         var (prepared, run) = McpDispatch.Run(() => PrepareArchiveRun(path, deleteOriginal, cancellationToken));
 
@@ -259,8 +264,8 @@ internal sealed class McpScanTools(
     {
         if (scan.IsScanning)
         {
-            logger.McpToolRejected("open_scan", "страница занята операцией");
-            throw new McpException("Страница «Сканирование» сейчас занята другой операцией.");
+            logger.McpToolRejected("open_scan", BusyReason);
+            throw new McpException(ScanBusyMessage);
         }
 
         var explicitPath = !string.IsNullOrWhiteSpace(path);
@@ -297,8 +302,8 @@ internal sealed class McpScanTools(
 
         if (scan.IsScanning)
         {
-            logger.McpToolRejected("mark_for_deletion", "страница занята операцией");
-            throw new McpException("Страница «Сканирование» сейчас занята другой операцией.");
+            logger.McpToolRejected(MarkTool, BusyReason);
+            throw new McpException(ScanBusyMessage);
         }
 
         var (targets, missing, rejected) = CollectMarkTargets(paths, mark);
@@ -306,7 +311,7 @@ internal sealed class McpScanTools(
 
         if (changed > 0)
         {
-            logger.McpMutationRequested("mark_for_deletion", $"{(mark ? "помечено" : "снято")} {changed}, всего помечено {scan.MarkedCount}");
+            logger.McpMutationRequested(MarkTool, $"{(mark ? "помечено" : "снято")} {changed}, всего помечено {scan.MarkedCount}");
 
             notifier.Notify(mark
                     ? $"Агент пометил на удаление: {changed} · всего {SizeFormatter.Format(scan.MarkedBytes())}"
@@ -364,12 +369,12 @@ internal sealed class McpScanTools(
     {
         if (scan.IsScanning)
         {
-            logger.McpToolRejected("archive_directory", "страница занята операцией");
-            throw new McpException("Страница «Сканирование» сейчас занята другой операцией.");
+            logger.McpToolRejected(ArchiveTool, BusyReason);
+            throw new McpException(ScanBusyMessage);
         }
 
         var (dir, request) = PrepareArchive(path, deleteOriginal);
-        logger.McpMutationRequested("archive_directory", $"«{request.SourcePath}» → «{request.TargetPath}», файлов ≈{request.EstimatedFiles}, оригинал в корзину {request.DeleteOriginal}");
+        logger.McpMutationRequested(ArchiveTool, $"«{request.SourcePath}» → «{request.TargetPath}», файлов ≈{request.EstimatedFiles}, оригинал в корзину {request.DeleteOriginal}");
         notifier.Notify($"Агент упаковывает в архив: {request.SourcePath}", StatusSeverity.Warning);
 
         return (request, scan.ArchiveFromAutomationAsync(dir, request, cancellationToken));

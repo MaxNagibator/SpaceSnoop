@@ -242,37 +242,27 @@ public static class TextDiff
     private static bool TryMyers(IReadOnlyList<string> left, IReadOnlyList<string> right, int leftStart, int n, int m, List<DiffLine> output)
     {
         var max = n + m;
-        var offset = max;
         var maxD = (int)Math.Min(max, MaxTraceCells / (2L * max + 1));
+        var window = new MyersWindow(left, right, leftStart, n, m, max);
 
-        if (!TryFindTrace(left, right, leftStart, n, m, offset, maxD, out var trace,
-                out var foundD))
+        if (!TryFindTrace(window, maxD, out var trace, out var foundD))
         {
             return false;
         }
 
-        var edits = BuildEdits(left, right, leftStart, n, m, offset, trace, foundD);
+        var edits = BuildEdits(window, trace, foundD);
 
         edits.Reverse();
         output.AddRange(edits);
         return true;
     }
 
-    private static bool TryFindTrace(
-        IReadOnlyList<string> left,
-        IReadOnlyList<string> right,
-        int leftStart,
-        int n,
-        int m,
-        int offset,
-        int maxD,
-        out List<int[]> trace,
-        out int foundD)
+    private static bool TryFindTrace(in MyersWindow window, int maxD, out List<int[]> trace, out int foundD)
     {
-        var v = new int[2 * offset + 1];
+        var v = new int[2 * window.Offset + 1];
         trace = [];
 
-        for (var d = 0; d <= n + m; d++)
+        for (var d = 0; d <= window.N + window.M; d++)
         {
             if (d > maxD)
             {
@@ -282,8 +272,7 @@ public static class TextDiff
 
             trace.Add((int[])v.Clone());
 
-            if (AdvanceTrace(v, left, right, leftStart, n, m, offset, d,
-                    out foundD))
+            if (AdvanceTrace(v, window, d, out foundD))
             {
                 return true;
             }
@@ -293,17 +282,10 @@ public static class TextDiff
         return false;
     }
 
-    private static bool AdvanceTrace(
-        int[] v,
-        IReadOnlyList<string> left,
-        IReadOnlyList<string> right,
-        int leftStart,
-        int n,
-        int m,
-        int offset,
-        int d,
-        out int foundD)
+    private static bool AdvanceTrace(int[] v, in MyersWindow window, int d, out int foundD)
     {
+        var (left, right, leftStart, n, m, offset) = window;
+
         for (var k = -d; k <= d; k += 2)
         {
             var x = k == -d || k != d && v[offset + k - 1] < v[offset + k + 1]
@@ -331,16 +313,9 @@ public static class TextDiff
         return false;
     }
 
-    private static List<DiffLine> BuildEdits(
-        IReadOnlyList<string> left,
-        IReadOnlyList<string> right,
-        int leftStart,
-        int n,
-        int m,
-        int offset,
-        IReadOnlyList<int[]> trace,
-        int foundD)
+    private static List<DiffLine> BuildEdits(in MyersWindow window, IReadOnlyList<int[]> trace, int foundD)
     {
+        var (left, right, leftStart, n, m, offset) = window;
         var edits = new List<DiffLine>();
         var px = n;
         var py = m;
@@ -384,4 +359,12 @@ public static class TextDiff
 
         return edits;
     }
+
+    private readonly record struct MyersWindow(
+        IReadOnlyList<string> Left,
+        IReadOnlyList<string> Right,
+        int LeftStart,
+        int N,
+        int M,
+        int Offset);
 }

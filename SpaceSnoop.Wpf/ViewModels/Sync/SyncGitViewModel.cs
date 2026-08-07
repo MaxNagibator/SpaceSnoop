@@ -6,6 +6,8 @@ namespace SpaceSnoop.Wpf.ViewModels.Sync;
 
 public sealed partial class SyncGitViewModel : ObservableObject
 {
+    private const string NoCommits = "нет коммитов";
+
     private readonly ISettingsStore _settings;
     private readonly IDialogService _dialogs;
     private readonly ILogger _logger;
@@ -99,7 +101,7 @@ public sealed partial class SyncGitViewModel : ObservableObject
 
             if (!_leftGit.HasCommits || !_rightGit.HasCommits)
             {
-                return "нет коммитов";
+                return NoCommits;
             }
 
             if (!string.Equals(_leftGit.Oid, _rightGit.Oid, StringComparison.OrdinalIgnoreCase))
@@ -125,9 +127,9 @@ public sealed partial class SyncGitViewModel : ObservableObject
 
     public bool RightGitLogEmpty => _gitHistoryLoaded && RightGitLog.Count == 0;
 
-    public string LeftGitLogEmptyText => _leftGit is null ? "не репозиторий" : "нет коммитов";
+    public string LeftGitLogEmptyText => _leftGit is null ? "не репозиторий" : NoCommits;
 
-    public string RightGitLogEmptyText => _rightGit is null ? "не репозиторий" : "нет коммитов";
+    public string RightGitLogEmptyText => _rightGit is null ? "не репозиторий" : NoCommits;
 
     public string? GitTooltip
     {
@@ -369,7 +371,7 @@ public sealed partial class SyncGitViewModel : ObservableObject
 
         if (!git.HasCommits)
         {
-            return "нет коммитов";
+            return NoCommits;
         }
 
         return string.IsNullOrEmpty(git.Subject) ? git.ShortHash : $"{git.ShortHash} · {git.Subject}";

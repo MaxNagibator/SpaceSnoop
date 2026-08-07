@@ -118,9 +118,14 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
 
         using var stream = Open(path);
         var identity = FileIdentity.Read(stream.SafeFileHandle);
-        var hash = withHash ? Hash(stream, stream.Length > FullHashLimit ? PrefixHashSize : long.MaxValue, state, token) : (UInt128?)null;
+        var hash = withHash ? HashPrefix(stream, state, token) : (UInt128?)null;
 
         return new(space, path, identity, hash, symbolic);
+    }
+
+    private static UInt128 HashPrefix(FileStream stream, FindState state, CancellationToken token)
+    {
+        return Hash(stream, stream.Length > FullHashLimit ? PrefixHashSize : long.MaxValue, state, token);
     }
 
     private static UInt128 Hash(FileStream stream, long budget, FindState state, CancellationToken token)
@@ -348,46 +353,60 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
         {
             token.ThrowIfCancellationRequested();
 
-            var candidate = links[0];
-            var failed = false;
-            var matched = false;
+            var matched = MatchCluster(clusters, links[0], withHash, state, out var failed, token);
 
-            foreach (var cluster in clusters)
+            if (matched is not null)
             {
-                var other = cluster[0][0];
-
-                if (withHash && candidate.Digest is { } digest && other.Digest is { } head && digest != head)
-                {
-                    continue;
-                }
-
-                try
-                {
-                    if (!ContentEqual(other.Path, candidate.Path, state, token))
-                    {
-                        continue;
-                    }
-                }
-                catch (Exception exception) when (IsReadError(exception))
-                {
-                    _logger.DuplicateFileSkipped(exception, candidate.Path);
-                    state.Fail(candidate.Path, exception);
-                    failed = true;
-                    break;
-                }
-
-                cluster.Add(links);
-                matched = true;
-                break;
+                matched.Add(links);
             }
-
-            if (!matched && !failed)
+            else if (!failed)
             {
                 clusters.Add([links]);
             }
         }
 
         return clusters;
+    }
+
+    private List<List<Probe>>? MatchCluster(
+        List<List<List<Probe>>> clusters,
+        Probe candidate,
+        bool withHash,
+        FindState state,
+        out bool failed,
+        CancellationToken token)
+    {
+        failed = false;
+
+        foreach (var cluster in clusters)
+        {
+            var other = cluster[0][0];
+
+            if (withHash && candidate.Digest is { } digest && other.Digest is { } head && digest != head)
+            {
+                continue;
+            }
+
+            try
+            {
+                if (!ContentEqual(other.Path, candidate.Path, state, token))
+                {
+                    continue;
+                }
+            }
+            catch (Exception exception) when (IsReadError(exception))
+            {
+                _logger.DuplicateFileSkipped(exception, candidate.Path);
+                state.Fail(candidate.Path, exception);
+                failed = true;
+
+                return null;
+            }
+
+            return cluster;
+        }
+
+        return null;
     }
 
     private readonly record struct Probe(FileSpace Space, string Path, FileIdentity? Identity, UInt128? Digest, bool Symbolic);

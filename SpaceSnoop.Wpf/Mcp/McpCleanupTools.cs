@@ -13,6 +13,8 @@ internal sealed class McpCleanupTools(
     ToastNotifier notifier,
     ILogger logger)
 {
+    private const string RunTool = "cleanup_run";
+
     public async Task<string> ScanAsync(string[]? targets, CancellationToken cancellationToken)
     {
         var wanted = Normalize(targets);
@@ -38,7 +40,7 @@ internal sealed class McpCleanupTools(
     {
         var wanted = Normalize(targets);
 
-        logger.McpToolInvoked("cleanup_run", $"{string.Join(", ", wanted)}, {(dryRun ? "план" : "запуск")}");
+        logger.McpToolInvoked(RunTool, $"{string.Join(", ", wanted)}, {(dryRun ? "план" : "запуск")}");
 
         var minAgeHours = MinAgeHours();
         var catalog = catalogSource(TimeSpan.FromHours(minAgeHours));
@@ -52,7 +54,7 @@ internal sealed class McpCleanupTools(
 
         if (!dryRun)
         {
-            McpGuards.RequireMutations(preferences, logger, "cleanup_run");
+            McpGuards.RequireMutations(preferences, logger, RunTool);
             McpDispatch.Run(EnsureIdle);
         }
 
@@ -90,7 +92,7 @@ internal sealed class McpCleanupTools(
 
         if (outcome.Consent != CleanupConsent.Granted)
         {
-            logger.McpToolRejected("cleanup_run", outcome.StatusText);
+            logger.McpToolRejected(RunTool, outcome.StatusText);
 
             throw new McpException(outcome.StatusText);
         }
@@ -119,14 +121,14 @@ internal sealed class McpCleanupTools(
     {
         if (automation.IsBusy)
         {
-            logger.McpToolRejected("cleanup_run", "страница занята операцией");
+            logger.McpToolRejected(RunTool, "страница занята операцией");
 
             throw new McpException("Страница «Очистка» сейчас занята другой операцией.");
         }
 
         if (automation.IsModalBusy)
         {
-            logger.McpToolRejected("cleanup_run", "окно занято диалогом");
+            logger.McpToolRejected(RunTool, "окно занято диалогом");
 
             throw new McpException("В окне приложения открыт другой диалог – подтверждение показать нельзя.");
         }

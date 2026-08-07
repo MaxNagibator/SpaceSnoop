@@ -292,36 +292,36 @@ public sealed partial class SyncRowsViewModel : ObservableObject, ISyncRowHost
 
     partial void OnShowIdenticalChanged(bool value)
     {
-        Persist(SettingsKeys.SyncShowIdentical, value ? "true" : "false");
+        Persist(SettingsKeys.SyncShowIdentical, value);
         RebuildIfResult();
     }
 
     partial void OnShowSizesChanged(bool value)
     {
-        Persist(SettingsKeys.SyncShowSizes, value ? "true" : "false");
+        Persist(SettingsKeys.SyncShowSizes, value);
     }
 
     partial void OnShowModifiedChanged(bool value)
     {
-        Persist(SettingsKeys.SyncShowModified, value ? "true" : "false");
+        Persist(SettingsKeys.SyncShowModified, value);
     }
 
     partial void OnBlankAbsentChanged(bool value)
     {
-        Persist(SettingsKeys.SyncBlankAbsent, value ? "true" : "false");
+        Persist(SettingsKeys.SyncBlankAbsent, value);
         RebuildIfResult();
     }
 
     partial void OnHideAppliedChanged(bool value)
     {
         OnPropertyChanged(nameof(ShowApplied));
-        Persist(SettingsKeys.SyncHideApplied, value ? "true" : "false");
+        Persist(SettingsKeys.SyncHideApplied, value);
         RebuildIfResult();
     }
 
     partial void OnFlatViewChanged(bool value)
     {
-        Persist(SettingsKeys.SyncFlatView, value ? "true" : "false");
+        Persist(SettingsKeys.SyncFlatView, value);
         RebuildIfResult();
     }
 
@@ -334,7 +334,7 @@ public sealed partial class SyncRowsViewModel : ObservableObject, ISyncRowHost
 
     partial void OnRowSortDescendingChanged(bool value)
     {
-        Persist(SettingsKeys.SyncFlatSortDesc, value ? "true" : "false");
+        Persist(SettingsKeys.SyncFlatSortDesc, value);
         NotifySortChanged();
         RebuildIfResult();
     }
@@ -375,6 +375,11 @@ public sealed partial class SyncRowsViewModel : ObservableObject, ISyncRowHost
         RowSortDescending = _settings.GetBool(SettingsKeys.SyncFlatSortDesc);
 
         _suppressPersist = false;
+    }
+
+    private void Persist(string key, bool value)
+    {
+        Persist(key, value ? bool.TrueString.ToLowerInvariant() : bool.FalseString.ToLowerInvariant());
     }
 
     private void Persist(string key, string value)

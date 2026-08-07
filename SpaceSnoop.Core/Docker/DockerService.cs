@@ -4,6 +4,10 @@ namespace SpaceSnoop.Core.Docker;
 
 public sealed class DockerService
 {
+    private const string DockerExecutable = "docker";
+    private const string CancelledDetail = "Операция отменена.";
+    private const string WaitStep = "Ожидание освобождения образа";
+
     private readonly IDockerProcessRunner _processRunner;
     private readonly IDockerFileSystem _fileSystem;
     private readonly IDockerDesktopSettingsProvider _settingsProvider;
@@ -29,7 +33,7 @@ public sealed class DockerService
 
     public async Task<DockerSnapshot> GetSnapshotAsync(CancellationToken cancel = default)
     {
-        var run = await RunAsync("docker", "system df --format \"{{json .}}\"", cancel: cancel);
+        var run = await RunAsync(DockerExecutable, "system df --format \"{{json .}}\"", cancel: cancel);
 
         return run.Failed
             ? DockerSnapshot.Unavailable(DescribeFailure(run, "docker system df"))
@@ -38,7 +42,7 @@ public sealed class DockerService
 
     public async Task<IReadOnlyList<DockerObject>> GetInventoryAsync(CancellationToken cancel = default)
     {
-        var run = await RunAsync("docker", "system df -v --format \"{{json .}}\"", cancel: cancel);
+        var run = await RunAsync(DockerExecutable, "system df -v --format \"{{json .}}\"", cancel: cancel);
         return run.Failed ? [] : DockerInventory.Parse(run.StdOut);
     }
 
@@ -52,7 +56,7 @@ public sealed class DockerService
             _ => throw new ArgumentOutOfRangeException(nameof(target), target.Kind, null),
         };
 
-        var run = await RunAsync("docker", args, cancel: cancel);
+        var run = await RunAsync(DockerExecutable, args, cancel: cancel);
         return run.Failed ? throw new InvalidOperationException(DescribeFailure(run, $"docker {args}")) : run.StdOut.Trim();
     }
 
@@ -68,7 +72,7 @@ public sealed class DockerService
             _ => throw new ArgumentOutOfRangeException(nameof(target), target, null),
         };
 
-        var run = await RunAsync("docker", args, cancel: cancel);
+        var run = await RunAsync(DockerExecutable, args, cancel: cancel);
 
         return run.Failed ? throw new InvalidOperationException(DescribeFailure(run, $"docker {args}")) : run.StdOut.Trim();
     }
@@ -87,54 +91,19 @@ public sealed class DockerService
             return Canceled(null, steps);
         }
 
-        var settings = _settingsProvider.Read();
-        if (settings is null)
+        var (failure, vhdx) = Prepare(steps);
+
+        if (failure is { } prepared)
         {
-            steps.Add(new("Настройки Docker Desktop", false, "Не найден или не прочитан settings-store.json."));
-            return Failed(null, null, null, steps);
+            return prepared;
         }
 
-        if (!settings.WslEngineEnabled)
+        var (distroFailure, distributions) = await ReadDistributionsAsync(vhdx, steps, cancel);
+
+        if (distroFailure is { } listed)
         {
-            steps.Add(new("Проверка бэкенда", false, "Включён не WSL2-бэкенд Docker Desktop. Этот способ поддерживает только WSL2."));
-            return Failed(null, null, null, steps);
+            return listed;
         }
-
-        var vhdx = LocateDataVhdx(settings);
-        if (vhdx is null)
-        {
-            steps.Add(new(
-                "Поиск образа данных",
-                false,
-                "Не найден образ данных в CustomWslDistroDir\\disk\\docker_data.vhdx, стандартном пути %LOCALAPPDATA%\\Docker\\wsl\\disk\\docker_data.vhdx или старой раскладке docker-desktop-data\\ext4.vhdx."));
-            return Failed(null, null, null, steps);
-        }
-
-        steps.Add(new("Поиск образа данных", true, vhdx));
-
-        if (!_administratorCheck())
-        {
-            steps.Add(new("Проверка прав администратора", false, "Для diskpart нужны права администратора. Запустите SpaceSnoop с повышением прав."));
-            return Failed(null, null, null, steps);
-        }
-
-        steps.Add(new("Проверка прав администратора", true, "Права администратора доступны."));
-
-        var distroResult = await ListDockerDistrosAsync(cancel);
-        if (distroResult.IsCanceled)
-        {
-            steps.Add(new("Проверка WSL", false, "Операция отменена."));
-            return Canceled(vhdx, steps);
-        }
-
-        if (distroResult.IsFailed)
-        {
-            steps.Add(new("Проверка WSL", false, DescribeFailure(distroResult.Run, "wsl --list --quiet")));
-            return Failed(vhdx, null, null, steps, distroResult.Distributions);
-        }
-
-        var distributions = distroResult.Distributions;
-        steps.Add(new("Проверка WSL", true, string.Join(", ", distributions)));
 
         // TODO: Проверить отдельным экспериментом fstrim в namespace держателя data-образа перед остановкой Docker.
         ReportStage(DockerCompactStage.Stopping, progress, stageChanged);
@@ -162,55 +131,21 @@ public sealed class DockerService
             return Failed(vhdx, null, null, steps, distributions);
         }
 
-        DockerCompactMeasurement? before = null;
-        try
+        if (!TryMeasure(vhdx, "Измерение до сжатия", steps, out var before))
         {
-            before = ToMeasurement(_fileSystem.GetMetrics(vhdx));
-            steps.Add(new("Измерение до сжатия", true, DescribeMeasurement(before.Value)));
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
-        {
-            steps.Add(new("Измерение до сжатия", false, ex.Message));
             return Failed(vhdx, null, null, steps, distributions);
         }
 
         ReportStage(DockerCompactStage.Compacting, progress, stageChanged);
-        if (cancel.IsCancellationRequested)
+
+        var (diskpartSucceeded, diskpartCanceled) = await RunDiskpartAsync(vhdx, steps, cancel);
+
+        if (diskpartCanceled)
         {
-            steps.Add(new("Сжатие через diskpart", false, "Операция отменена до запуска diskpart."));
             return Canceled(vhdx, steps, before, distributions);
         }
 
-        var escapedVhdx = vhdx.Replace("\"", "\"\"");
-        var script = $"select vdisk file=\"{escapedVhdx}\"\r\ncompact vdisk\r\nexit\r\n";
-        var compact = await RunAsync(
-            "diskpart",
-            string.Empty,
-            stdin: script,
-            cancel: CancellationToken.None,
-            timeout: _compactOptions.CompactTimeout);
-        if (compact.Canceled)
-        {
-            steps.Add(new("Сжатие через diskpart", false, "Операция отменена. Процесс завершён."));
-            return Canceled(vhdx, steps, before, distributions);
-        }
-
-        var diskpartSucceeded = compact.Succeeded && !ContainsDiskpartError(compact);
-        steps.Add(new(
-            "Сжатие через diskpart",
-            diskpartSucceeded,
-            diskpartSucceeded ? "Выполнено без attach/detach." : DescribeFailure(compact, "diskpart")));
-
-        DockerCompactMeasurement? after = null;
-        try
-        {
-            after = ToMeasurement(_fileSystem.GetMetrics(vhdx));
-            steps.Add(new("Измерение после сжатия", true, DescribeMeasurement(after.Value)));
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
-        {
-            steps.Add(new("Измерение после сжатия", false, ex.Message));
-        }
+        TryMeasure(vhdx, "Измерение после сжатия", steps, out var after);
 
         if (!diskpartSucceeded)
         {
@@ -226,13 +161,137 @@ public sealed class DockerService
             distributions);
     }
 
+    private (DockerCompactResult? Failure, string Vhdx) Prepare(List<DockerCompactStep> steps)
+    {
+        var settings = _settingsProvider.Read();
+
+        if (settings is null)
+        {
+            steps.Add(new("Настройки Docker Desktop", false, "Не найден или не прочитан settings-store.json."));
+            return (Failed(null, null, null, steps), string.Empty);
+        }
+
+        if (!settings.WslEngineEnabled)
+        {
+            steps.Add(new("Проверка бэкенда", false, "Включён не WSL2-бэкенд Docker Desktop. Этот способ поддерживает только WSL2."));
+            return (Failed(null, null, null, steps), string.Empty);
+        }
+
+        var vhdx = LocateDataVhdx(settings);
+
+        if (vhdx is null)
+        {
+            steps.Add(new(
+                "Поиск образа данных",
+                false,
+                "Не найден образ данных в CustomWslDistroDir\\disk\\docker_data.vhdx, стандартном пути %LOCALAPPDATA%\\Docker\\wsl\\disk\\docker_data.vhdx или старой раскладке docker-desktop-data\\ext4.vhdx."));
+            return (Failed(null, null, null, steps), string.Empty);
+        }
+
+        steps.Add(new("Поиск образа данных", true, vhdx));
+
+        if (!_administratorCheck())
+        {
+            steps.Add(new("Проверка прав администратора", false, "Для diskpart нужны права администратора. Запустите SpaceSnoop с повышением прав."));
+            return (Failed(null, null, null, steps), string.Empty);
+        }
+
+        steps.Add(new("Проверка прав администратора", true, "Права администратора доступны."));
+
+        return (null, vhdx);
+    }
+
+    private async Task<(DockerCompactResult? Failure, IReadOnlyList<string> Distributions)> ReadDistributionsAsync(
+        string vhdx,
+        List<DockerCompactStep> steps,
+        CancellationToken cancel)
+    {
+        var distroResult = await ListDockerDistrosAsync(cancel);
+
+        if (distroResult.IsCanceled)
+        {
+            steps.Add(new("Проверка WSL", false, CancelledDetail));
+            return (Canceled(vhdx, steps), distroResult.Distributions);
+        }
+
+        if (distroResult.IsFailed)
+        {
+            steps.Add(new("Проверка WSL", false, DescribeFailure(distroResult.Run, "wsl --list --quiet")));
+            return (Failed(vhdx, null, null, steps, distroResult.Distributions), distroResult.Distributions);
+        }
+
+        steps.Add(new("Проверка WSL", true, string.Join(", ", distroResult.Distributions)));
+
+        return (null, distroResult.Distributions);
+    }
+
+    private bool TryMeasure(
+        string vhdx,
+        string step,
+        List<DockerCompactStep> steps,
+        out DockerCompactMeasurement? measurement)
+    {
+        try
+        {
+            var value = ToMeasurement(_fileSystem.GetMetrics(vhdx));
+
+            measurement = value;
+            steps.Add(new(step, true, DescribeMeasurement(value)));
+
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+        {
+            measurement = null;
+            steps.Add(new(step, false, ex.Message));
+
+            return false;
+        }
+    }
+
+    private async Task<(bool Succeeded, bool Canceled)> RunDiskpartAsync(
+        string vhdx,
+        List<DockerCompactStep> steps,
+        CancellationToken cancel)
+    {
+        if (cancel.IsCancellationRequested)
+        {
+            steps.Add(new("Сжатие через diskpart", false, "Операция отменена до запуска diskpart."));
+            return (false, true);
+        }
+
+        var escapedVhdx = vhdx.Replace("\"", "\"\"");
+        var script = $"select vdisk file=\"{escapedVhdx}\"\r\ncompact vdisk\r\nexit\r\n";
+        var compact = await RunAsync(
+            "diskpart",
+            string.Empty,
+            stdin: script,
+            cancel: CancellationToken.None,
+            timeout: _compactOptions.CompactTimeout);
+
+        if (compact.Canceled)
+        {
+            steps.Add(new("Сжатие через diskpart", false, "Операция отменена. Процесс завершён."));
+            return (false, true);
+        }
+
+        var succeeded = compact.Succeeded && !ContainsDiskpartError(compact);
+
+        steps.Add(new(
+            "Сжатие через diskpart",
+            succeeded,
+            succeeded ? "Выполнено без attach/detach." : DescribeFailure(compact, "diskpart")));
+
+        return (succeeded, false);
+    }
+
     private async Task<DockerStopResult> StopDockerAsync(
         string vhdx,
         IReadOnlyList<string> distributions,
         List<DockerCompactStep> steps,
         CancellationToken cancel)
     {
-        var stop = await RunAsync("docker", "desktop stop", cancel: cancel);
+        var stop = await RunAsync(DockerExecutable, "desktop stop", cancel: cancel);
         if (stop.Canceled)
         {
             steps.Add(new("Остановка Docker Desktop", false, "Операция отменена. Процесс завершён."));
@@ -249,17 +308,17 @@ public sealed class DockerService
         var wait = await WaitForDockerReleaseAsync(vhdx, cancel);
         if (wait.WasCanceled)
         {
-            steps.Add(new("Ожидание освобождения образа", false, "Операция отменена."));
+            steps.Add(new(WaitStep, false, CancelledDetail));
             return DockerStopResult.CanceledResult;
         }
 
         if (wait.IsReady)
         {
-            steps.Add(new("Ожидание освобождения образа", true, "Docker Desktop остановлен, файл свободен."));
+            steps.Add(new(WaitStep, true, "Docker Desktop остановлен, файл свободен."));
             return DockerStopResult.ReadyResult;
         }
 
-        steps.Add(new("Ожидание освобождения образа", false, wait.Detail));
+        steps.Add(new(WaitStep, false, wait.Detail));
         return await HandleFallbackAsync(vhdx, distributions, false, steps, cancel);
     }
 
@@ -305,28 +364,28 @@ public sealed class DockerService
         var wait = await WaitForFileReleaseAsync(vhdx, cancel);
         if (wait.WasCanceled)
         {
-            steps.Add(new("Ожидание освобождения образа", false, "Операция отменена."));
+            steps.Add(new(WaitStep, false, CancelledDetail));
             return DockerStopResult.CanceledResult;
         }
 
         if (!wait.IsReady)
         {
-            steps.Add(new("Ожидание освобождения образа", false, wait.Detail));
+            steps.Add(new(WaitStep, false, wait.Detail));
             return DockerStopResult.FailedResult;
         }
 
-        steps.Add(new("Ожидание освобождения образа", true, "Образ данных свободен."));
+        steps.Add(new(WaitStep, true, "Образ данных свободен."));
         return DockerStopResult.ReadyResult;
     }
 
     private async Task<DockerWaitResult> WaitForDockerReleaseAsync(string vhdx, CancellationToken cancel)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        var detail = "Docker Desktop ещё не остановлен или образ занят.";
+        string detail;
 
         do
         {
-            var status = await RunAsync("docker", "desktop status", cancel: cancel);
+            var status = await RunAsync(DockerExecutable, "desktop status", cancel: cancel);
             if (status.Canceled)
             {
                 return DockerWaitResult.CanceledResult;
@@ -529,7 +588,7 @@ public sealed class DockerService
     {
         if (run.Canceled)
         {
-            return "Операция отменена.";
+            return CancelledDetail;
         }
 
         if (run.TimedOut)
@@ -577,7 +636,7 @@ public sealed class DockerService
     {
         public static DockerWaitResult ReadyResult { get; } = new(true, false, string.Empty);
 
-        public static DockerWaitResult CanceledResult { get; } = new(false, true, "Операция отменена.");
+        public static DockerWaitResult CanceledResult { get; } = new(false, true, CancelledDetail);
     }
 
     private sealed record DockerDistroResult(

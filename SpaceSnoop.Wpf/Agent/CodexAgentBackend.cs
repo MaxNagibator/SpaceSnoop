@@ -6,6 +6,7 @@ namespace SpaceSnoop.Wpf.Agent;
 public sealed class CodexAgentBackend : AgentBackendBase
 {
     private const string SandboxMode = "danger-full-access";
+    private const string ErrorEvent = "error";
 
     private readonly ILogger<CodexAgentBackend> _logger;
 
@@ -167,7 +168,7 @@ public sealed class CodexAgentBackend : AgentBackendBase
 
             if (root.ValueKind != JsonValueKind.Object
                 || !root.TryGetProperty("type", out var type)
-                || type.GetString() != "error")
+                || type.GetString() != ErrorEvent)
             {
                 return null;
             }
@@ -246,7 +247,7 @@ public sealed class CodexAgentBackend : AgentBackendBase
                     case "turn.failed":
                         return ParseFailed(root);
 
-                    case "error":
+                    case ErrorEvent:
                         FailureHint = ReadMessage(root) ?? FailureHint;
                         return null;
 
@@ -333,7 +334,7 @@ public sealed class CodexAgentBackend : AgentBackendBase
 
         private void RememberItemError(JsonElement root)
         {
-            if (TryGetItem(root, out var item, out var itemType) && itemType == "error")
+            if (TryGetItem(root, out var item, out var itemType) && itemType == ErrorEvent)
             {
                 FailureHint = ReadMessage(item) ?? FailureHint;
             }

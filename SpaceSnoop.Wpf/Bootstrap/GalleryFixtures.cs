@@ -8,6 +8,8 @@ public static class GalleryFixtures
 {
     public const string FolderName = "spacesnoop-gallery";
 
+    private const string MediaFolder = "media";
+
     private static readonly DateTime Base = new(2025, 3, 14, 9, 30, 0, DateTimeKind.Local);
 
     private static readonly string[] LeftNotes =
@@ -49,7 +51,7 @@ public static class GalleryFixtures
 
         File.Delete(Path.Combine(right, "docs", "план.txt"));
         WriteText(Path.Combine(right, "docs", "заметки.md"), RightNotes, Base.AddHours(-1));
-        Write(Path.Combine(right, "media", "обложка.png"), 512_000, Base.AddDays(-2));
+        Write(Path.Combine(right, MediaFolder, "обложка.png"), 512_000, Base.AddDays(-2));
         Write(Path.Combine(right, "docs", "README.md"), 12_000, Base.AddHours(-30));
         Write(Path.Combine(right, "архив", "прошлый-год.zip"), 3_400_000, Base.AddDays(-40));
 
@@ -74,8 +76,8 @@ public static class GalleryFixtures
             {
                 Id = "gallery-media",
                 Name = "Медиа на внешний диск",
-                Left = Path.Combine(fixture.Left, "media"),
-                Right = Path.Combine(fixture.Right, "media"),
+                Left = Path.Combine(fixture.Left, MediaFolder),
+                Right = Path.Combine(fixture.Right, MediaFolder),
                 Mode = SyncProfile.IndexOfMode(SyncMode.Bidirectional),
                 Winner = SyncWinner.Newest,
                 Interval = ScheduleInterval.OnLogon,
@@ -114,8 +116,8 @@ public static class GalleryFixtures
         Write(Path.Combine(root, "docs", "план.txt"), 2_400, Base.AddDays(-1));
         WriteText(Path.Combine(root, "docs", "заметки.md"), LeftNotes, Base.AddHours(-6));
 
-        Write(Path.Combine(root, "media", "разбор-логов.mp4"), 6_200_000, Base.AddDays(-3));
-        Write(Path.Combine(root, "media", "обложка.png"), 806_000, Base.AddDays(-2));
+        Write(Path.Combine(root, MediaFolder, "разбор-логов.mp4"), 6_200_000, Base.AddDays(-3));
+        Write(Path.Combine(root, MediaFolder, "обложка.png"), 806_000, Base.AddDays(-2));
 
         Write(Path.Combine(root, "build", "SpaceSnoop.exe"), 1_450_000, Base.AddHours(-2));
         Write(Path.Combine(root, "build", "SpaceSnoop.pdb"), 920_000, Base.AddHours(-2));

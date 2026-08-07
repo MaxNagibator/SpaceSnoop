@@ -28,37 +28,46 @@ public static class AgentModels
 
     public static readonly AgentEffortOption EffortDefault = new(string.Empty, "Уровень CLI");
 
-    private static readonly string[] ClaudeEfforts = ["low", "medium", "high", "xhigh", "max"];
+    private const string EffortNone = "none";
+    private const string EffortMinimal = "minimal";
+    private const string EffortLow = "low";
+    private const string EffortMedium = "medium";
+    private const string EffortHigh = "high";
+    private const string EffortExtraHigh = "xhigh";
+    private const string EffortMax = "max";
+    private const string EffortUltra = "ultra";
 
-    private static readonly string[] CodexEfforts = ["low", "medium", "high", "xhigh", "max", "ultra"];
+    private static readonly string[] StandardEfforts = [EffortLow, EffortMedium, EffortHigh, EffortExtraHigh, EffortMax];
 
-    private static readonly string[] OpenCodeVariants = ["minimal", "low", "medium", "high", "max"];
+    private static readonly string[] CodexEfforts = [.. StandardEfforts, EffortUltra];
+
+    private static readonly string[] OpenCodeVariants = [EffortMinimal, EffortLow, EffortMedium, EffortHigh, EffortMax];
 
     private static readonly AgentModelOption[] ClaudeModels =
     [
-        new("fable", "Fable 5", "Самая сильная и самая дорогая") { Efforts = ClaudeEfforts },
-        new("opus", "Opus 5", "Сильная модель для сложных задач") { Efforts = ClaudeEfforts },
-        new("sonnet", "Sonnet 5", "Баланс скорости и качества") { Efforts = ClaudeEfforts },
-        new("haiku", "Haiku 4.5", "Самая быстрая и дешёвая") { Efforts = ClaudeEfforts },
+        new("fable", "Fable 5", "Самая сильная и самая дорогая") { Efforts = StandardEfforts },
+        new("opus", "Opus 5", "Сильная модель для сложных задач") { Efforts = StandardEfforts },
+        new("sonnet", "Sonnet 5", "Баланс скорости и качества") { Efforts = StandardEfforts },
+        new("haiku", "Haiku 4.5", "Самая быстрая и дешёвая") { Efforts = StandardEfforts },
     ];
 
     private static readonly AgentModelOption[] CodexFallbackModels =
     [
         new("gpt-5.6-sol", "GPT-5.6-Sol", "Флагманская агентная модель") { Efforts = CodexEfforts },
-        new("gpt-5.6-terra", "GPT-5.6-Terra", "Баланс скорости и качества") { Efforts = ["low", "medium", "high", "xhigh", "max"] },
-        new("gpt-5.6-luna", "GPT-5.6-Luna", "Быстрая модель для простых задач") { Efforts = ["low", "medium", "high", "xhigh", "max"] },
+        new("gpt-5.6-terra", "GPT-5.6-Terra", "Баланс скорости и качества") { Efforts = StandardEfforts },
+        new("gpt-5.6-luna", "GPT-5.6-Luna", "Быстрая модель для простых задач") { Efforts = StandardEfforts },
     ];
 
     private static readonly Dictionary<string, string> EffortTitles = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["none"] = "Без рассуждений",
-        ["minimal"] = "Минимальный",
-        ["low"] = "Низкий",
-        ["medium"] = "Средний",
-        ["high"] = "Высокий",
-        ["xhigh"] = "Очень высокий",
-        ["max"] = "Максимальный",
-        ["ultra"] = "Предельный",
+        [EffortNone] = "Без рассуждений",
+        [EffortMinimal] = "Минимальный",
+        [EffortLow] = "Низкий",
+        [EffortMedium] = "Средний",
+        [EffortHigh] = "Высокий",
+        [EffortExtraHigh] = "Очень высокий",
+        [EffortMax] = "Максимальный",
+        [EffortUltra] = "Предельный",
     };
 
     private static readonly Lazy<IReadOnlyList<AgentModelOption>> LazyCodexModels = new(LoadCodexModels);
@@ -98,7 +107,7 @@ public static class AgentModels
         {
             AgentBackendKind.Codex => CodexEfforts,
             AgentBackendKind.OpenCode => OpenCodeVariants,
-            _ => ClaudeEfforts,
+            _ => StandardEfforts,
         };
     }
 

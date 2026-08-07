@@ -128,57 +128,66 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
                 ? fileName
                 : Path.Combine(relativePath, fileName);
 
-            var fileComparison = new FileComparison(fileName, fileRelativePath);
-            var hasLeft = leftFiles.TryGetValue(fileName, out var leftFile);
-            var hasRight = rightFiles.TryGetValue(fileName, out var rightFile);
+            leftFiles.TryGetValue(fileName, out var leftFile);
+            rightFiles.TryGetValue(fileName, out var rightFile);
+            typeConflicts.TryGetValue(fileName, out var typeConflict);
 
-            if (typeConflicts.TryGetValue(fileName, out var typeConflict))
-            {
-                fileComparison.TypeConflict = typeConflict;
-                fileComparison.Status = ComparisonStatus.Conflict;
-
-                if (hasLeft)
-                {
-                    fileComparison.LeftSize = leftFile!.Length;
-                    fileComparison.LeftModified = leftFile.LastWriteTime;
-                }
-
-                if (hasRight)
-                {
-                    fileComparison.RightSize = rightFile!.Length;
-                    fileComparison.RightModified = rightFile.LastWriteTime;
-                }
-
-                comparison.Files.Add(fileComparison);
-                continue;
-            }
-
-            if (hasLeft && hasRight)
-            {
-                fileComparison.LeftSize = leftFile!.Length;
-                fileComparison.RightSize = rightFile!.Length;
-                fileComparison.LeftModified = leftFile.LastWriteTime;
-                fileComparison.RightModified = rightFile.LastWriteTime;
-
-                fileComparison.Status = FilesIdentical(leftFile, rightFile)
-                    ? ComparisonStatus.Identical
-                    : ComparisonStatus.Modified;
-            }
-            else if (hasLeft)
-            {
-                fileComparison.LeftSize = leftFile!.Length;
-                fileComparison.LeftModified = leftFile.LastWriteTime;
-                fileComparison.Status = ComparisonStatus.LeftOnly;
-            }
-            else
-            {
-                fileComparison.RightSize = rightFile!.Length;
-                fileComparison.RightModified = rightFile.LastWriteTime;
-                fileComparison.Status = ComparisonStatus.RightOnly;
-            }
-
-            comparison.Files.Add(fileComparison);
+            comparison.Files.Add(CompareFile(fileName, fileRelativePath, leftFile, rightFile, typeConflict));
         }
+    }
+
+    private static FileComparison CompareFile(
+        string fileName,
+        string relativePath,
+        FileInfo? leftFile,
+        FileInfo? rightFile,
+        FileTypeConflict typeConflict)
+    {
+        var fileComparison = new FileComparison(fileName, relativePath);
+
+        if (typeConflict != FileTypeConflict.None)
+        {
+            fileComparison.TypeConflict = typeConflict;
+            fileComparison.Status = ComparisonStatus.Conflict;
+            ApplyLeft(fileComparison, leftFile);
+            ApplyRight(fileComparison, rightFile);
+
+            return fileComparison;
+        }
+
+        ApplyLeft(fileComparison, leftFile);
+        ApplyRight(fileComparison, rightFile);
+
+        fileComparison.Status = (leftFile, rightFile) switch
+        {
+            (not null, not null) => FilesIdentical(leftFile, rightFile) ? ComparisonStatus.Identical : ComparisonStatus.Modified,
+            (not null, null) => ComparisonStatus.LeftOnly,
+            _ => ComparisonStatus.RightOnly,
+        };
+
+        return fileComparison;
+    }
+
+    private static void ApplyLeft(FileComparison comparison, FileInfo? file)
+    {
+        if (file is null)
+        {
+            return;
+        }
+
+        comparison.LeftSize = file.Length;
+        comparison.LeftModified = file.LastWriteTime;
+    }
+
+    private static void ApplyRight(FileComparison comparison, FileInfo? file)
+    {
+        if (file is null)
+        {
+            return;
+        }
+
+        comparison.RightSize = file.Length;
+        comparison.RightModified = file.LastWriteTime;
     }
 
     private void CompareSubDirectories(

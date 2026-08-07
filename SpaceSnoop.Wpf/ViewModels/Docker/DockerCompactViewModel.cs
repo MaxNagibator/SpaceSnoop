@@ -69,124 +69,45 @@ public sealed partial class DockerCompactViewModel : ObservableObject
         _owner.NotifyCancelChanged();
         _owner.IsBusy = true;
         _owner.StatusText = "Сжимаю образ диска Docker…";
-        var dockerStopped = false;
-        var settled = 0;
+
+        var run = new CompactRun(this);
+
         try
         {
             _logger.DockerCompactStarted();
-            var uiContext = SynchronizationContext.Current;
 
-            void Settle(string text)
-            {
-                Volatile.Write(ref settled, 1);
-                _owner.StatusText = text;
-            }
-
-            void AnnounceCompacting()
-            {
-                if (Volatile.Read(ref settled) != 0)
-                {
-                    return;
-                }
-
-                _owner.StatusText = "Сжимаю образ disk\\docker_data.vhdx… Отмена недоступна после запуска diskpart.";
-                _owner.NotifyCancelChanged();
-            }
-
-            void StageChanged(DockerCompactStage stage)
-            {
-                if (stage != DockerCompactStage.Compacting)
-                {
-                    return;
-                }
-
-                dockerStopped = true;
-                _cancellationAllowed = false;
-
-                if (uiContext is null)
-                {
-                    AnnounceCompacting();
-                }
-                else
-                {
-                    uiContext.Post(_ => AnnounceCompacting(), null);
-                }
-            }
-
-            var result = await _docker.CompactAsync(_cts.Token, stageChanged: StageChanged);
-            dockerStopped = result.DockerStopped;
+            var result = await _docker.CompactAsync(_cts.Token, stageChanged: run.StageChanged);
+            run.DockerStopped = result.DockerStopped;
 
             if (result.RequiresWslShutdownConfirmation)
             {
-                if (!await ConfirmWslShutdownFallbackAsync(result))
+                if (await RetryWithFallbackAsync(run, result) is not { } retried)
                 {
-                    Settle(result.DockerStopped
-                        ? "Сжатие отменено. Docker остановлен – запустите его заново."
-                        : "Сжатие отменено.");
-
                     return;
                 }
 
-                var fallbackResult = await _docker.CompactAsync(
-                    _cts.Token,
-                    allowWslShutdownFallback: true,
-                    stageChanged: StageChanged);
-                var attempts = new List<DockerCompactStep>(result.Steps)
-                {
-                    new("Повтор после подтверждения остановки WSL", true, "Повторена операция с подтверждённым fallback."),
-                };
-                attempts.AddRange(fallbackResult.Steps);
-                result = fallbackResult with { Steps = attempts };
-                dockerStopped = result.DockerStopped;
+                result = retried;
+                run.DockerStopped = result.DockerStopped;
             }
 
-            if (result.Status == DockerCompactStatus.Canceled)
-            {
-                _logger.DockerCompactCancelled();
-
-                Settle(result.DockerStopped
-                    ? "Сжатие отменено. Docker остановлен – запустите его заново."
-                    : "Сжатие отменено.");
-
-                return;
-            }
-
-            if (!result.Succeeded)
-            {
-                var failure = new InvalidOperationException(result.Summary);
-                _logger.DockerCompactFailed(failure);
-                _dialogs.Error("Сжатие диска Docker", result.ToDisplayText());
-
-                Settle(result.DockerStopped
-                    ? "Сжатие не выполнено. Docker остановлен – запустите его заново."
-                    : "Сжатие не выполнено.");
-
-                return;
-            }
-
-            _logger.DockerCompactFinished(result.Summary);
-            _dialogs.Info("Сжатие диска Docker", result.ToDisplayText());
-            Settle("Готово. Запустите Docker заново.");
-            _owner.ForgetSnapshot();
+            Finish(run, result);
         }
         catch (OperationCanceledException)
         {
             _logger.DockerCompactCancelled();
-            Volatile.Write(ref settled, 1);
 
-            _owner.StatusText = dockerStopped
+            run.Settle(run.DockerStopped
                 ? "Сжатие отменено. Docker остановлен – запустите его заново."
-                : "Сжатие отменено.";
+                : "Сжатие отменено.");
         }
         catch (Exception ex)
         {
             _logger.DockerCompactFailed(ex);
             _dialogs.Error("Сжатие диска Docker", ex.Message);
-            Volatile.Write(ref settled, 1);
 
-            _owner.StatusText = dockerStopped
+            run.Settle(run.DockerStopped
                 ? "Сжатие не выполнено. Docker остановлен – запустите его заново."
-                : "Сжатие не выполнено.";
+                : "Сжатие не выполнено.");
         }
         finally
         {
@@ -196,6 +117,63 @@ public sealed partial class DockerCompactViewModel : ObservableObject
             _cts = null;
             _owner.NotifyCancelChanged();
         }
+    }
+
+    private async Task<DockerCompactResult?> RetryWithFallbackAsync(CompactRun run, DockerCompactResult result)
+    {
+        if (!await ConfirmWslShutdownFallbackAsync(result))
+        {
+            run.Settle(result.DockerStopped
+                ? "Сжатие отменено. Docker остановлен – запустите его заново."
+                : "Сжатие отменено.");
+
+            return null;
+        }
+
+        var fallbackResult = await _docker.CompactAsync(
+            _cts!.Token,
+            allowWslShutdownFallback: true,
+            stageChanged: run.StageChanged);
+
+        var attempts = new List<DockerCompactStep>(result.Steps)
+        {
+            new("Повтор после подтверждения остановки WSL", true, "Повторена операция с подтверждённым fallback."),
+        };
+
+        attempts.AddRange(fallbackResult.Steps);
+
+        return fallbackResult with { Steps = attempts };
+    }
+
+    private void Finish(CompactRun run, DockerCompactResult result)
+    {
+        if (result.Status == DockerCompactStatus.Canceled)
+        {
+            _logger.DockerCompactCancelled();
+
+            run.Settle(result.DockerStopped
+                ? "Сжатие отменено. Docker остановлен – запустите его заново."
+                : "Сжатие отменено.");
+
+            return;
+        }
+
+        if (!result.Succeeded)
+        {
+            _logger.DockerCompactFailed(new InvalidOperationException(result.Summary));
+            _dialogs.Error("Сжатие диска Docker", result.ToDisplayText());
+
+            run.Settle(result.DockerStopped
+                ? "Сжатие не выполнено. Docker остановлен – запустите его заново."
+                : "Сжатие не выполнено.");
+
+            return;
+        }
+
+        _logger.DockerCompactFinished(result.Summary);
+        _dialogs.Info("Сжатие диска Docker", result.ToDisplayText());
+        run.Settle("Готово. Запустите Docker заново.");
+        _owner.ForgetSnapshot();
     }
 
     private async Task<bool> ConfirmWslShutdownFallbackAsync(DockerCompactResult result)
@@ -221,5 +199,51 @@ public sealed partial class DockerCompactViewModel : ObservableObject
         };
 
         return await _dialogs.ShowAsync(confirm);
+    }
+
+    private sealed class CompactRun(DockerCompactViewModel view)
+    {
+        private readonly SynchronizationContext? _uiContext = SynchronizationContext.Current;
+
+        private int _settled;
+
+        public bool DockerStopped { get; set; }
+
+        public void Settle(string text)
+        {
+            Volatile.Write(ref _settled, 1);
+            view._owner.StatusText = text;
+        }
+
+        public void StageChanged(DockerCompactStage stage)
+        {
+            if (stage != DockerCompactStage.Compacting)
+            {
+                return;
+            }
+
+            DockerStopped = true;
+            view._cancellationAllowed = false;
+
+            if (_uiContext is null)
+            {
+                Announce();
+            }
+            else
+            {
+                _uiContext.Post(_ => Announce(), null);
+            }
+        }
+
+        private void Announce()
+        {
+            if (Volatile.Read(ref _settled) != 0)
+            {
+                return;
+            }
+
+            view._owner.StatusText = "Сжимаю образ disk\\docker_data.vhdx… Отмена недоступна после запуска diskpart.";
+            view._owner.NotifyCancelChanged();
+        }
     }
 }

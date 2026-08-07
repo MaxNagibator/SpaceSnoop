@@ -192,35 +192,7 @@ public sealed class CleanupService(ILogger<CleanupService>? logger = null)
 
             try
             {
-                foreach (var file in directory.EnumerateFiles(target.SearchPattern))
-                {
-                    token.ThrowIfCancellationRequested();
-
-                    if (IsReparsePoint(file) || IsFresh(file, now, target.MinimumAge))
-                    {
-                        continue;
-                    }
-
-                    onFile(file);
-                }
-
-                if (!target.Recursive)
-                {
-                    continue;
-                }
-
-                foreach (var sub in directory.EnumerateDirectories())
-                {
-                    token.ThrowIfCancellationRequested();
-
-                    if (IsReparsePoint(sub))
-                    {
-                        continue;
-                    }
-
-                    stack.Push(sub);
-                    directories?.Add(sub.FullName);
-                }
+                ReadDirectory(directory, target, now, onFile, stack, directories, token);
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException)
             {
@@ -231,6 +203,46 @@ public sealed class CleanupService(ILogger<CleanupService>? logger = null)
 
                 unreadable.Add(directory.FullName);
             }
+        }
+    }
+
+    private static void ReadDirectory(
+        DirectoryInfo directory,
+        CleanupTarget target,
+        DateTime now,
+        Action<FileInfo> onFile,
+        Stack<DirectoryInfo> stack,
+        List<string>? directories,
+        CancellationToken token)
+    {
+        foreach (var file in directory.EnumerateFiles(target.SearchPattern))
+        {
+            token.ThrowIfCancellationRequested();
+
+            if (IsReparsePoint(file) || IsFresh(file, now, target.MinimumAge))
+            {
+                continue;
+            }
+
+            onFile(file);
+        }
+
+        if (!target.Recursive)
+        {
+            return;
+        }
+
+        foreach (var sub in directory.EnumerateDirectories())
+        {
+            token.ThrowIfCancellationRequested();
+
+            if (IsReparsePoint(sub))
+            {
+                continue;
+            }
+
+            stack.Push(sub);
+            directories?.Add(sub.FullName);
         }
     }
 
@@ -273,56 +285,7 @@ public sealed class CleanupService(ILogger<CleanupService>? logger = null)
 
         Walk(target, token, files.Add, unreadable, directories);
 
-        long freed = 0;
-        var deleted = 0;
-        var skipped = 0;
-        var cancelled = false;
-
-        var now = DateTime.UtcNow;
-
-        foreach (var file in files)
-        {
-            if (token.IsCancellationRequested)
-            {
-                cancelled = true;
-                break;
-            }
-
-            if (Changed(file, now, target.MinimumAge))
-            {
-                skipped++;
-
-                if (errors.Count < MaxReportedErrors)
-                {
-                    errors.Add($"«{file.FullName}»: файл изменился после обхода");
-                }
-
-                continue;
-            }
-
-            var length = file.Length;
-
-            try
-            {
-                File.Delete(file.FullName);
-            }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException)
-            {
-                _logger.CleanupFileFailed(exception, file.FullName);
-                skipped++;
-
-                if (errors.Count < MaxReportedErrors)
-                {
-                    errors.Add($"«{file.FullName}»: {exception.Message}");
-                }
-
-                continue;
-            }
-
-            freed += length;
-            deleted++;
-            progress?.Report(new(deleted, Relative(target.Path, file.FullName), freed));
-        }
+        var (freed, deleted, skipped, cancelled) = DeleteFiles(target, files, errors, progress, token);
 
         cancelled |= token.IsCancellationRequested;
 
@@ -337,14 +300,66 @@ public sealed class CleanupService(ILogger<CleanupService>? logger = null)
         foreach (var path in unreadable)
         {
             skipped++;
-
-            if (errors.Count < MaxReportedErrors)
-            {
-                errors.Add($"«{path}»: каталог не читается");
-            }
+            Report(errors, $"«{path}»: каталог не читается");
         }
 
         return new(freed, deleted, skipped, errors, cancelled);
+    }
+
+    private (long Freed, int Deleted, int Skipped, bool Cancelled) DeleteFiles(
+        CleanupTarget target,
+        List<FileInfo> files,
+        List<string> errors,
+        IProgress<OperationProgress>? progress,
+        CancellationToken token)
+    {
+        long freed = 0;
+        var deleted = 0;
+        var skipped = 0;
+        var now = DateTime.UtcNow;
+
+        foreach (var file in files)
+        {
+            if (token.IsCancellationRequested)
+            {
+                return (freed, deleted, skipped, true);
+            }
+
+            if (Changed(file, now, target.MinimumAge))
+            {
+                skipped++;
+                Report(errors, $"«{file.FullName}»: файл изменился после обхода");
+                continue;
+            }
+
+            var length = file.Length;
+
+            try
+            {
+                File.Delete(file.FullName);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException)
+            {
+                _logger.CleanupFileFailed(exception, file.FullName);
+                skipped++;
+                Report(errors, $"«{file.FullName}»: {exception.Message}");
+                continue;
+            }
+
+            freed += length;
+            deleted++;
+            progress?.Report(new(deleted, Relative(target.Path, file.FullName), freed));
+        }
+
+        return (freed, deleted, skipped, false);
+    }
+
+    private static void Report(List<string> errors, string message)
+    {
+        if (errors.Count < MaxReportedErrors)
+        {
+            errors.Add(message);
+        }
     }
 
     // TODO: подмену на другой файл с тем же размером и mtime здесь не отличить – закрывается удалением по дескриптору, заводить при появлении цели в недоверенном каталоге
@@ -399,10 +414,7 @@ public sealed class CleanupService(ILogger<CleanupService>? logger = null)
                     _logger.CleanupDirectorySkipped(exception, directory);
                 }
 
-                if (errors.Count < MaxReportedErrors)
-                {
-                    errors.Add($"«{directory}»: каталог не удалён – {exception.Message}");
-                }
+                Report(errors, $"«{directory}»: каталог не удалён – {exception.Message}");
             }
         }
 

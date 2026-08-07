@@ -99,10 +99,10 @@ public sealed partial class SyncSessionViewModel : ObservableObject
 
         IsBusy = true;
 
-        var operation = caption.TrimEnd(' ', ':');
-        var determinate = total > 0;
+        var shape = new RunShape(caption, caption.TrimEnd(' ', ':'), total, totalBytes);
+        var operation = shape.Operation;
 
-        if (determinate)
+        if (shape.Determinate)
         {
             ProgressMax = total;
             ProgressValue = 0;
@@ -123,42 +123,9 @@ public sealed partial class SyncSessionViewModel : ObservableObject
 
         var progress = new Progress<OperationProgress>(update =>
         {
-            var tail = string.IsNullOrEmpty(update.Current) ? string.Empty : $" · {update.Current}";
-
-            string head;
-
-            if (determinate)
-            {
-                ProgressValue = update.Completed;
-                var percent = update.Completed * 100 / total;
-                head = $"{caption} {update.Completed} / {total} ({percent} %)";
-            }
-            else
-            {
-                head = $"{caption} {update.Completed}";
-            }
-
-            if (totalBytes > 0)
-            {
-                head += $" · {SizeFormatter.Format(update.Bytes)} из {SizeFormatter.Format(totalBytes)}";
-            }
-
-            StatusCaption = head;
-            ProgressDetail = head + tail;
-
-            var current = new PerformanceOperation(operation,
-                update.Completed,
-                update.Bytes,
-                stopwatch.Elapsed,
-                determinate ? total : null,
-                totalBytes > 0 ? totalBytes : null,
-                totalBytes > 0 ? EtaBasis.Bytes : EtaBasis.Items);
+            var current = Advance(shape, update, stopwatch.Elapsed);
 
             measured = current;
-
-            ProgressRateText = PerformanceFormat.Rate(current) ?? string.Empty;
-            ProgressRemainingText = PerformanceFormat.Remaining(current) ?? string.Empty;
-            HasProgressRate = ProgressRateText.Length > 0 || ProgressRemainingText.Length > 0;
 
             if (_performance.TryReportOperation(current, reported))
             {
@@ -199,6 +166,45 @@ public sealed partial class SyncSessionViewModel : ObservableObject
         }
     }
 
+    private PerformanceOperation Advance(in RunShape shape, OperationProgress update, TimeSpan elapsed)
+    {
+        var tail = string.IsNullOrEmpty(update.Current) ? string.Empty : $" · {update.Current}";
+        string head;
+
+        if (shape.Determinate)
+        {
+            ProgressValue = update.Completed;
+            var percent = update.Completed * 100 / shape.Total;
+            head = $"{shape.Caption} {update.Completed} / {shape.Total} ({percent} %)";
+        }
+        else
+        {
+            head = $"{shape.Caption} {update.Completed}";
+        }
+
+        if (shape.HasBytes)
+        {
+            head += $" · {SizeFormatter.Format(update.Bytes)} из {SizeFormatter.Format(shape.TotalBytes)}";
+        }
+
+        StatusCaption = head;
+        ProgressDetail = head + tail;
+
+        var current = new PerformanceOperation(shape.Operation,
+            update.Completed,
+            update.Bytes,
+            elapsed,
+            shape.Determinate ? shape.Total : null,
+            shape.HasBytes ? shape.TotalBytes : null,
+            shape.HasBytes ? EtaBasis.Bytes : EtaBasis.Items);
+
+        ProgressRateText = PerformanceFormat.Rate(current) ?? string.Empty;
+        ProgressRemainingText = PerformanceFormat.Remaining(current) ?? string.Empty;
+        HasProgressRate = ProgressRateText.Length > 0 || ProgressRemainingText.Length > 0;
+
+        return current;
+    }
+
     private static PerformanceOperation Finished(string name, PerformanceOperation? measured, TimeSpan elapsed)
     {
         return measured is null
@@ -216,5 +222,12 @@ public sealed partial class SyncSessionViewModel : ObservableObject
     {
         _reportSummary(summary);
         StatusCaption = summary;
+    }
+
+    private readonly record struct RunShape(string Caption, string Operation, int Total, long TotalBytes)
+    {
+        public bool Determinate => Total > 0;
+
+        public bool HasBytes => TotalBytes > 0;
     }
 }

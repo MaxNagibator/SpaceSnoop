@@ -43,37 +43,7 @@ public sealed class ArchiveService
 
             try
             {
-                var found = 0;
-
-                foreach (var file in directory.GetFiles())
-                {
-                    if (IsReparsePoint(file))
-                    {
-                        continue;
-                    }
-
-                    files.Add(file.FullName);
-                    bytes += file.Length;
-                    found++;
-                }
-
-                var traversable = 0;
-
-                foreach (var sub in directory.GetDirectories())
-                {
-                    if (IsReparsePoint(sub))
-                    {
-                        continue;
-                    }
-
-                    stack.Push(sub);
-                    traversable++;
-                }
-
-                if (found == 0 && traversable == 0 && !IsSameDirectory(directory.FullName, root))
-                {
-                    emptyDirectories.Add(directory.FullName);
-                }
+                ReadDirectory(directory, root, stack, files, emptyDirectories, ref bytes);
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException)
             {
@@ -83,6 +53,47 @@ public sealed class ArchiveService
         }
 
         return new(files, emptyDirectories, unreadable, bytes);
+    }
+
+    private static void ReadDirectory(
+        DirectoryInfo directory,
+        string root,
+        Stack<DirectoryInfo> stack,
+        List<string> files,
+        List<string> emptyDirectories,
+        ref long bytes)
+    {
+        var found = 0;
+
+        foreach (var file in directory.GetFiles())
+        {
+            if (IsReparsePoint(file))
+            {
+                continue;
+            }
+
+            files.Add(file.FullName);
+            bytes += file.Length;
+            found++;
+        }
+
+        var traversable = 0;
+
+        foreach (var sub in directory.GetDirectories())
+        {
+            if (IsReparsePoint(sub))
+            {
+                continue;
+            }
+
+            stack.Push(sub);
+            traversable++;
+        }
+
+        if (found == 0 && traversable == 0 && !IsSameDirectory(directory.FullName, root))
+        {
+            emptyDirectories.Add(directory.FullName);
+        }
     }
 
     public ZipStats ZipFiles(

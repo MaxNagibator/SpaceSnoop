@@ -59,12 +59,7 @@ public sealed partial class ScanDuplicatesViewModel : ObservableObject
         _mark = mark;
         _isScanning = isScanning;
 
-        _suppressPersist = true;
-        MinSizeMb = Math.Clamp(
-            settings.GetInt(SettingsKeys.ScanDuplicatesMinSize, AppDefaults.ScanDuplicatesMinSizeMbDefault),
-            AppDefaults.ScanDuplicatesMinSizeMbMin,
-            AppDefaults.ScanDuplicatesMinSizeMbMax);
-        _suppressPersist = false;
+        LoadSettings();
     }
 
     public ObservableCollection<DuplicateGroupViewModel> Groups { get; } = [];
@@ -147,6 +142,18 @@ public sealed partial class ScanDuplicatesViewModel : ObservableObject
         {
             _settings.SetInt(SettingsKeys.ScanDuplicatesMinSize, clamped);
         }
+    }
+
+    private void LoadSettings()
+    {
+        _suppressPersist = true;
+
+        MinSizeMb = Math.Clamp(
+            _settings.GetInt(SettingsKeys.ScanDuplicatesMinSize, AppDefaults.ScanDuplicatesMinSizeMbDefault),
+            AppDefaults.ScanDuplicatesMinSizeMbMin,
+            AppDefaults.ScanDuplicatesMinSizeMbMax);
+
+        _suppressPersist = false;
     }
 
     private bool CanFind()
