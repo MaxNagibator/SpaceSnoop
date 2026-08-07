@@ -236,16 +236,21 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator>? logger = null)
             {
                 cancel.ThrowIfCancellationRequested();
 
+                if (entry.IsReparsePoint)
+                {
+                    var linkPath = Path.Join(path, entry.Name);
+
+                    if (ReparsePoint.IsLink(linkPath, whenUnknown: entry.IsDirectory))
+                    {
+                        _log.ScanReparsePointSkipped(linkPath);
+                        continue;
+                    }
+                }
+
                 if (!entry.IsDirectory)
                 {
                     node.AddScannedFile(entry);
                     files++;
-                    continue;
-                }
-
-                if (entry.IsReparsePoint)
-                {
-                    _log.ScanReparsePointSkipped(Path.Join(path, entry.Name));
                     continue;
                 }
 
