@@ -25,14 +25,15 @@ public sealed class SyncDiffView : UserControl
         [SyncAction.None] = ("\u26A1", Color.Red),
     };
 
-    private static readonly SyncAction[] ActionCycle =
-    [
-        SyncAction.CopyToRight,
-        SyncAction.CopyToLeft,
-        SyncAction.Skip,
-        SyncAction.DeleteLeft,
-        SyncAction.DeleteRight,
-    ];
+    private static readonly SyncAction[] LeftOnlyCycle = [SyncAction.CopyToRight, SyncAction.Skip, SyncAction.DeleteLeft];
+    private static readonly SyncAction[] RightOnlyCycle = [SyncAction.CopyToLeft, SyncAction.Skip, SyncAction.DeleteRight];
+    private static readonly SyncAction[] LeftOnlyCycleNoDelete = [SyncAction.CopyToRight, SyncAction.Skip];
+    private static readonly SyncAction[] RightOnlyCycleNoDelete = [SyncAction.CopyToLeft, SyncAction.Skip];
+    private static readonly SyncAction[] BothSidesCycle = [SyncAction.CopyToRight, SyncAction.CopyToLeft, SyncAction.Skip];
+    private static readonly SyncAction[] ConflictCycle = [SyncAction.Skip];
+
+    private const string DeleteBlockedHint = "противоположную сторону обошли не полностью";
+    private const string TypeConflictHint = "слева и справа объекты разного вида";
 
     private readonly VScrollBar _scrollBar;
     private readonly Font _boldFont;
@@ -306,10 +307,46 @@ public sealed class SyncDiffView : UserControl
 
     private static void CycleAction(FileComparison file)
     {
-        var currentIndex = Array.IndexOf(ActionCycle, file.Action);
+        var cycle = CycleFor(file);
+        var currentIndex = Array.IndexOf(cycle, file.Action);
         file.Action = currentIndex < 0
-            ? ActionCycle[0]
-            : ActionCycle[(currentIndex + 1) % ActionCycle.Length];
+            ? cycle[0]
+            : cycle[(currentIndex + 1) % cycle.Length];
+    }
+
+    private static SyncAction[] CycleFor(FileComparison file)
+    {
+        if (file.TypeConflict != FileTypeConflict.None)
+        {
+            return ConflictCycle;
+        }
+
+        return file.Status switch
+        {
+            ComparisonStatus.LeftOnly => file.DeleteLeftBlocked ? LeftOnlyCycleNoDelete : LeftOnlyCycle,
+            ComparisonStatus.RightOnly => file.DeleteRightBlocked ? RightOnlyCycleNoDelete : RightOnlyCycle,
+            _ => BothSidesCycle,
+        };
+    }
+
+    private static bool DeleteBlocked(FileComparison file, SyncAction action)
+    {
+        return action switch
+        {
+            SyncAction.DeleteLeft => file.DeleteLeftBlocked,
+            SyncAction.DeleteRight => file.DeleteRightBlocked,
+            _ => false,
+        };
+    }
+
+    private static bool DeleteBlocked(DirectoryComparison dir, SyncAction action)
+    {
+        return action switch
+        {
+            SyncAction.DeleteLeft => dir.DeleteLeftBlocked || dir.RightIncomplete,
+            SyncAction.DeleteRight => dir.DeleteRightBlocked || dir.LeftIncomplete,
+            _ => false,
+        };
     }
 
     private static long CalcDirectorySize(DirectoryComparison dir, bool isLeft)
@@ -351,10 +388,12 @@ public sealed class SyncDiffView : UserControl
     {
         foreach (var file in dir.Files)
         {
-            if (file.Status != ComparisonStatus.Identical)
+            if (file.Status == ComparisonStatus.Identical || file.TypeConflict != FileTypeConflict.None || DeleteBlocked(file, action))
             {
-                file.Action = action;
+                continue;
             }
+
+            file.Action = action;
         }
 
         foreach (var sub in dir.SubDirectories)
@@ -705,39 +744,29 @@ public sealed class SyncDiffView : UserControl
         var menu = new ContextMenuStrip();
         _contextMenu = menu;
 
-        menu.Items.Add("Копировать \u2192", null, (_, _) =>
-        {
-            file.Action = SyncAction.CopyToRight;
-            Invalidate();
-            ActionChanged?.Invoke(this, EventArgs.Empty);
-        });
+        var copyRight = menu.Items.Add("Копировать \u2192", null, (_, _) => AssignAction(file, SyncAction.CopyToRight));
+        var copyLeft = menu.Items.Add("\u2190 Копировать", null, (_, _) => AssignAction(file, SyncAction.CopyToLeft));
 
-        menu.Items.Add("\u2190 Копировать", null, (_, _) =>
+        if (file.TypeConflict != FileTypeConflict.None)
         {
-            file.Action = SyncAction.CopyToLeft;
-            Invalidate();
-            ActionChanged?.Invoke(this, EventArgs.Empty);
-        });
+            Block(copyRight, TypeConflictHint);
+            Block(copyLeft, TypeConflictHint);
+        }
 
-        menu.Items.Add("Пропустить", null, (_, _) =>
-        {
-            file.Action = SyncAction.Skip;
-            Invalidate();
-            ActionChanged?.Invoke(this, EventArgs.Empty);
-        });
+        menu.Items.Add("Пропустить", null, (_, _) => AssignAction(file, SyncAction.Skip));
 
-        if (file.Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly)
+        if (file.TypeConflict == FileTypeConflict.None && file.Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly)
         {
             var deleteSide = file.Status == ComparisonStatus.LeftOnly
                 ? SyncAction.DeleteLeft
                 : SyncAction.DeleteRight;
 
-            menu.Items.Add("Удалить", null, (_, _) =>
+            var delete = menu.Items.Add("Удалить", null, (_, _) => AssignAction(file, deleteSide));
+
+            if (DeleteBlocked(file, deleteSide))
             {
-                file.Action = deleteSide;
-                Invalidate();
-                ActionChanged?.Invoke(this, EventArgs.Empty);
-            });
+                Block(delete, DeleteBlockedHint);
+            }
         }
 
         menu.Show(this, location);
@@ -758,11 +787,11 @@ public sealed class SyncDiffView : UserControl
 
         if (dir.Status is ComparisonStatus.LeftOnly)
         {
-            menu.Items.Add("Всё удалить слева", null, (_, _) => ApplyActionToDirectory(dir, SyncAction.DeleteLeft));
+            AddDirectoryDelete(menu, dir, SyncAction.DeleteLeft, "Всё удалить слева");
         }
         else if (dir.Status is ComparisonStatus.RightOnly)
         {
-            menu.Items.Add("Всё удалить справа", null, (_, _) => ApplyActionToDirectory(dir, SyncAction.DeleteRight));
+            AddDirectoryDelete(menu, dir, SyncAction.DeleteRight, "Всё удалить справа");
         }
 
         menu.Show(this, location);
@@ -773,6 +802,29 @@ public sealed class SyncDiffView : UserControl
         ApplyActionRecursive(dir, action);
         Invalidate();
         ActionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void AssignAction(FileComparison file, SyncAction action)
+    {
+        file.Action = action;
+        Invalidate();
+        ActionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void AddDirectoryDelete(ContextMenuStrip menu, DirectoryComparison dir, SyncAction action, string header)
+    {
+        var item = menu.Items.Add(header, null, (_, _) => ApplyActionToDirectory(dir, action));
+
+        if (DeleteBlocked(dir, action))
+        {
+            Block(item, DeleteBlockedHint);
+        }
+    }
+
+    private static void Block(ToolStripItem item, string reason)
+    {
+        item.Text = $"{item.Text} – {reason}";
+        item.Enabled = false;
     }
 
     private int GetRowAtY(int y)
