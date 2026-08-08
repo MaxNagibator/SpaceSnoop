@@ -17,7 +17,7 @@ public sealed partial class GitFolderPromptViewModel(int count) : ObservableObje
 
     public event EventHandler<bool>? RequestClose;
 
-    public string Title => "Git-папки";
+    public static string Title => "Git-папки";
 
     public string CountText => $"Найдены git-папки (.git): {count}.";
 

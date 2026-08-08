@@ -329,7 +329,7 @@ public sealed class PerformanceChartCanvas : FrameworkElement
         }
     }
 
-    private void DrawSeries(
+    private static void DrawSeries(
         DrawingContext drawingContext,
         IReadOnlyList<IReadOnlyList<Point>> series,
         Rect plot,

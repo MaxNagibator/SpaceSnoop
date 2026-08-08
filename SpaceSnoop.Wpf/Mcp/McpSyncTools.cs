@@ -13,30 +13,26 @@ internal sealed class McpSyncTools(
     ILogger logger)
 {
     public async Task<string> CompareAsync(
-        string left,
-        string right,
-        SyncMode mode,
-        SyncWinner winner,
-        bool mirror,
-        string? exclusions,
+        CompareDirectoriesRequest request,
         int entryLimit,
         CancellationToken cancellationToken)
     {
-        left = left.Trim();
-        right = right.Trim();
+        var left = request.LeftPath.Trim();
+        var right = request.RightPath.Trim();
         entryLimit = McpGuards.ClampEntryLimit(entryLimit);
 
-        logger.McpToolInvoked("compare_directories", $"«{left}» → «{right}», режим {mode}, записей до {entryLimit}");
+        logger.McpToolInvoked("compare_directories", $"«{left}» → «{right}», режим {request.Mode}, записей до {entryLimit}");
 
-        McpGuards.Validate(left, right, mode);
+        McpGuards.Validate(left, right, request.Mode);
 
-        var patterns = exclusions?.Trim() ?? string.Empty;
+        var patterns = request.Exclusions.Trim();
+        request = request with { LeftPath = left, RightPath = right, Exclusions = patterns };
 
         var model = await Task.Run(() =>
                 {
-                    var result = compareUseCase.Execute(new(left, right, patterns, mode, winner, mirror), cancellationToken);
+                    var result = compareUseCase.Execute(request, cancellationToken);
 
-                    return ComparisonExport.Build(result, new(mode, winner, mirror, patterns), AppInfo.Version, entryLimit);
+                    return ComparisonExport.Build(result, new(request.Mode, request.Winner, request.Mirror, patterns), AppInfo.Version, entryLimit);
                 },
                 cancellationToken)
             .ConfigureAwait(false);

@@ -39,7 +39,7 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
 
     public override string Title => "Упаковка в архив";
 
-    public string ActionText => "Упаковать";
+    public static string ActionText => "Упаковать";
 
     public string SourceName { get; }
 

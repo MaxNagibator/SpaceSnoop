@@ -111,11 +111,11 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
 
     public string? PageDescription => $"{AgentPersona.Name} – агент внутри программы: смотрит на неё теми же инструментами, что и MCP-сервер.";
 
-    public string AgentName => AgentPersona.Name;
+    public static string AgentName => AgentPersona.Name;
 
-    public string Greeting => AgentPersona.Greeting;
+    public static string Greeting => AgentPersona.Greeting;
 
-    public string InputPlaceholder => AgentPersona.InputPlaceholder;
+    public static string InputPlaceholder => AgentPersona.InputPlaceholder;
 
     public bool HasMessages => Messages.Count > 0;
 

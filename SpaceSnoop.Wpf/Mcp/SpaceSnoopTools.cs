@@ -133,7 +133,7 @@ public sealed class SpaceSnoopTools
         [Description("Сколько различий выгружать (крупнейшие по размеру)")] int entryLimit = AppDefaults.McpEntryLimitDefault,
         CancellationToken cancellationToken = default)
     {
-        return bridge.Sync.CompareAsync(left, right, mode, winner, mirror, exclusions, entryLimit, cancellationToken);
+        return bridge.Sync.CompareAsync(new(left, right, exclusions ?? string.Empty, mode, winner, mirror), entryLimit, cancellationToken);
     }
 
     [McpServerTool(Name = "get_current_comparison")]

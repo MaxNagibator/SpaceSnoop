@@ -70,7 +70,7 @@ public sealed partial class ScanProgressViewModel : ObservableObject
 
     public double ProgressValue => _progressFraction ?? 0;
 
-    public double ProgressMax => 1;
+    public static double ProgressMax => 1;
 
     internal static long? EstimateTotalBytes(DirectoryInfo directory)
     {

@@ -45,7 +45,7 @@ public sealed partial class FileDiffDialogViewModel : ObservableObject, IDialogV
 
     public event EventHandler<bool>? RequestClose;
 
-    public string Title => "Сравнение содержимого";
+    public static string Title => "Сравнение содержимого";
 
     public string Name { get; }
 
