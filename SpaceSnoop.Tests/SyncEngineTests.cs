@@ -473,6 +473,81 @@ public class SyncEngineTests
     }
 
     [Test]
+    public void DeleteRight_BlockedDeeperInSubtree_KeepsWholeDirectory()
+    {
+        var dirPath = Path.Combine(_rightDir, "extra");
+        var innerPath = Path.Combine(dirPath, "inner");
+        Directory.CreateDirectory(innerPath);
+        File.WriteAllText(Path.Combine(innerPath, "keep.txt"), "keep me");
+
+        var inner = new DirectoryComparison("inner", "extra\\inner") { Status = ComparisonStatus.RightOnly };
+        inner.Files.Add(new("keep.txt", "extra\\inner\\keep.txt")
+        {
+            Status = ComparisonStatus.RightOnly,
+            Action = SyncAction.DeleteRight,
+            DeleteRightBlocked = true,
+        });
+
+        var extra = new DirectoryComparison("extra", "extra")
+        {
+            Status = ComparisonStatus.RightOnly,
+            Action = SyncAction.DeleteRight,
+        };
+
+        extra.SubDirectories.Add(inner);
+
+        var root = new DirectoryComparison("root", "");
+        root.SubDirectories.Add(extra);
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var report = new SyncEngine(NullLogger<SyncEngine>.Instance).Execute(result, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(Directory.Exists(dirPath), Is.True);
+            Assert.That(File.Exists(Path.Combine(innerPath, "keep.txt")), Is.True);
+            Assert.That(report.SuccessCount, Is.Zero);
+            Assert.That(report.Errors, Is.Not.Empty);
+        }
+    }
+
+    [Test]
+    public void DeleteRight_SubtreeWithoutBlocks_RemovesDirectory()
+    {
+        var dirPath = Path.Combine(_rightDir, "extra");
+        var innerPath = Path.Combine(dirPath, "inner");
+        Directory.CreateDirectory(innerPath);
+        File.WriteAllText(Path.Combine(innerPath, "gone.txt"), "delete me");
+
+        var inner = new DirectoryComparison("inner", "extra\\inner") { Status = ComparisonStatus.RightOnly };
+        inner.Files.Add(new("gone.txt", "extra\\inner\\gone.txt")
+        {
+            Status = ComparisonStatus.RightOnly,
+            Action = SyncAction.DeleteRight,
+        });
+
+        var extra = new DirectoryComparison("extra", "extra")
+        {
+            Status = ComparisonStatus.RightOnly,
+            Action = SyncAction.DeleteRight,
+        };
+
+        extra.SubDirectories.Add(inner);
+
+        var root = new DirectoryComparison("root", "");
+        root.SubDirectories.Add(extra);
+
+        var result = new ComparisonResult(_leftDir, _rightDir, root);
+        var report = new SyncEngine(NullLogger<SyncEngine>.Instance).Execute(result, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(Directory.Exists(dirPath), Is.False);
+            Assert.That(report.Errors, Is.Empty);
+        }
+    }
+
+    [Test]
     public void DeleteRight_IncompleteLeftSideWithoutApplyMode_KeepsFilesAndReportsOnce()
     {
         var dirPath = Path.Combine(_rightDir, "extra");

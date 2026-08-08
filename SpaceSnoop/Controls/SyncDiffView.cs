@@ -349,6 +349,23 @@ public sealed class SyncDiffView : UserControl
         };
     }
 
+    private static SyncAction DirActionFor(DirectoryComparison dir, SyncAction requested)
+    {
+        return dir.Status == ComparisonStatus.LeftOnly
+            ? requested switch
+            {
+                SyncAction.CopyToRight => SyncAction.CopyToRight,
+                SyncAction.DeleteLeft => SyncAction.DeleteLeft,
+                _ => SyncAction.Skip,
+            }
+            : requested switch
+            {
+                SyncAction.CopyToLeft => SyncAction.CopyToLeft,
+                SyncAction.DeleteRight => SyncAction.DeleteRight,
+                _ => SyncAction.Skip,
+            };
+    }
+
     private static long CalcDirectorySize(DirectoryComparison dir, bool isLeft)
     {
         long total = 0;
@@ -386,9 +403,19 @@ public sealed class SyncDiffView : UserControl
 
     private static void ApplyActionRecursive(DirectoryComparison dir, SyncAction action)
     {
+        if (dir.Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly && !DeleteBlocked(dir, action))
+        {
+            dir.Action = DirActionFor(dir, action);
+        }
+
         foreach (var file in dir.Files)
         {
-            if (file.Status == ComparisonStatus.Identical || file.TypeConflict != FileTypeConflict.None || DeleteBlocked(file, action))
+            if (file.Status == ComparisonStatus.Identical || DeleteBlocked(file, action))
+            {
+                continue;
+            }
+
+            if (file.TypeConflict != FileTypeConflict.None && action != SyncAction.Skip)
             {
                 continue;
             }
@@ -781,8 +808,8 @@ public sealed class SyncDiffView : UserControl
         menu.Items.Add($"Папка «{dir.Name}»:").Enabled = false;
         menu.Items.Add(new ToolStripSeparator());
 
-        menu.Items.Add("Всё копировать \u2192", null, (_, _) => ApplyActionToDirectory(dir, SyncAction.CopyToRight));
-        menu.Items.Add("\u2190 Всё копировать", null, (_, _) => ApplyActionToDirectory(dir, SyncAction.CopyToLeft));
+        menu.Items.Add("Всё копировать \u2192", null, (_, _) => ApplyActionToDirectory(dir, SyncAction.CopyToRight)).Enabled = dir.Status != ComparisonStatus.RightOnly;
+        menu.Items.Add("\u2190 Всё копировать", null, (_, _) => ApplyActionToDirectory(dir, SyncAction.CopyToLeft)).Enabled = dir.Status != ComparisonStatus.LeftOnly;
         menu.Items.Add("Всё пропустить", null, (_, _) => ApplyActionToDirectory(dir, SyncAction.Skip));
 
         if (dir.Status is ComparisonStatus.LeftOnly)

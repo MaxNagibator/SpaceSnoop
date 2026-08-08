@@ -81,6 +81,31 @@ public class SyncManualDeleteTests
         }
     }
 
+    [Test]
+    public void Конфликт_вида_не_принимает_копирование_но_принимает_пропуск()
+    {
+        var file = new FileComparison("config", "config")
+        {
+            Status = ComparisonStatus.Modified,
+            Action = SyncAction.None,
+            TypeConflict = FileTypeConflict.RightFileLeftDirectory,
+        };
+
+        var row = Row(file, out _);
+        row.CopyToRightCommand.Execute(null);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(file.Action, Is.EqualTo(SyncAction.None));
+            Assert.That(row.CopyAllowed, Is.False);
+            Assert.That(row.CopyHint, Is.Not.Empty);
+        }
+
+        row.SkipCommand.Execute(null);
+
+        Assert.That(file.Action, Is.EqualTo(SyncAction.Skip));
+    }
+
     private static SyncNodeViewModel Row(FileComparison file, out RowHost host)
     {
         host = new();

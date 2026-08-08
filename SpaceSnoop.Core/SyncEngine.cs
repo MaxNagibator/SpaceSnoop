@@ -14,7 +14,8 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
     {
         var report = new SyncReport();
         var tracker = new TransferTracker(progress, report);
-        ExecuteRecursive(comparisonResult.Root, comparisonResult.LeftPath, comparisonResult.RightPath, report, tracker, cancel, DeleteGate.Open);
+        var blocked = new Dictionary<(DirectoryComparison Directory, SyncAction Action), bool>();
+        ExecuteRecursive(comparisonResult.Root, comparisonResult.LeftPath, comparisonResult.RightPath, report, tracker, cancel, DeleteGate.Open, blocked);
         return report;
     }
 
@@ -237,6 +238,43 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         }
     }
 
+    private static bool SubtreeBlocks(
+        DirectoryComparison dir,
+        SyncAction action,
+        Dictionary<(DirectoryComparison Directory, SyncAction Action), bool> cache)
+    {
+        if (cache.TryGetValue((dir, action), out var known))
+        {
+            return known;
+        }
+
+        var blocked = false;
+
+        foreach (var file in dir.Files)
+        {
+            if (DeleteGate.Open.Blocks(action, file.DeleteLeftBlocked, file.DeleteRightBlocked))
+            {
+                blocked = true;
+                break;
+            }
+        }
+
+        if (!blocked)
+        {
+            foreach (var sub in dir.SubDirectories)
+            {
+                if (DeleteGate.Open.Inherit(sub).Blocks(action) || SubtreeBlocks(sub, action, cache))
+                {
+                    blocked = true;
+                    break;
+                }
+            }
+        }
+
+        cache[(dir, action)] = blocked;
+        return blocked;
+    }
+
     private void ExecuteFileAction(FileComparison file, string leftBase, string rightBase, TransferTracker tracker, CancellationToken cancel)
     {
         var leftPath = Path.Combine(leftBase, file.RelativePath);
@@ -367,7 +405,8 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         SyncReport report,
         TransferTracker tracker,
         CancellationToken cancel,
-        DeleteGate gate)
+        DeleteGate gate,
+        Dictionary<(DirectoryComparison Directory, SyncAction Action), bool> blocked)
     {
         cancel.ThrowIfCancellationRequested();
 
@@ -375,12 +414,13 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
 
         if (dir.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
         {
-            if (gate.Blocks(dir.Action))
+            if (gate.Blocks(dir.Action) || SubtreeBlocks(dir, dir.Action, blocked))
             {
                 gate = gate with { Reported = Reject(dir.Action, dir.RelativePath, report, gate.Reported) };
             }
             else
             {
+                cancel.ThrowIfCancellationRequested();
                 ApplyDirectoryActionAndReport(dir, leftBase, rightBase, report, tracker);
                 return;
             }
@@ -419,7 +459,7 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
 
         foreach (var sub in dir.SubDirectories)
         {
-            ExecuteRecursive(sub, leftBase, rightBase, report, tracker, cancel, gate);
+            ExecuteRecursive(sub, leftBase, rightBase, report, tracker, cancel, gate, blocked);
         }
     }
 

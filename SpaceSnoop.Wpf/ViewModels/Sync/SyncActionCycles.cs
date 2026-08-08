@@ -8,6 +8,8 @@ internal static class SyncActionCycles
     private static readonly SyncAction[] RightOnlyActionsNoDelete = [SyncAction.CopyToLeft, SyncAction.Skip];
     private static readonly SyncAction[] BothSidesActions = [SyncAction.CopyToRight, SyncAction.CopyToLeft, SyncAction.Skip];
 
+    private static readonly SyncAction[] ConflictActions = [SyncAction.Skip];
+
     private static readonly SyncAction[] OneSidedLeftCycle = [SyncAction.CopyToRight, SyncAction.Skip];
     private static readonly SyncAction[] OneSidedRightCycle = [SyncAction.CopyToLeft, SyncAction.Skip];
 
@@ -18,8 +20,13 @@ internal static class SyncActionCycles
         SyncAction.Skip,
     ];
 
-    internal static SyncAction[] ForFile(ComparisonStatus status, bool deleteAllowed = true)
+    internal static SyncAction[] ForFile(ComparisonStatus status, bool deleteAllowed = true, bool typeConflict = false)
     {
+        if (typeConflict)
+        {
+            return ConflictActions;
+        }
+
         return status switch
         {
             ComparisonStatus.LeftOnly => deleteAllowed ? LeftOnlyActions : LeftOnlyActionsNoDelete,

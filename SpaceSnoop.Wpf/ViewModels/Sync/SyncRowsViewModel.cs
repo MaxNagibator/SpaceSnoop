@@ -236,10 +236,17 @@ public sealed partial class SyncRowsViewModel : ObservableObject, ISyncRowHost
 
         foreach (var file in dir.Files)
         {
-            if (file.Status != ComparisonStatus.Identical && !DeleteBlocked(action, file.DeleteLeftBlocked, file.DeleteRightBlocked))
+            if (file.Status == ComparisonStatus.Identical || DeleteBlocked(action, file.DeleteLeftBlocked, file.DeleteRightBlocked))
             {
-                file.Action = action;
+                continue;
             }
+
+            if (file.TypeConflict != FileTypeConflict.None && action != SyncAction.Skip)
+            {
+                continue;
+            }
+
+            file.Action = action;
         }
 
         foreach (var sub in dir.SubDirectories)
@@ -265,15 +272,13 @@ public sealed partial class SyncRowsViewModel : ObservableObject, ISyncRowHost
             {
                 SyncAction.CopyToRight => SyncAction.CopyToRight,
                 SyncAction.DeleteLeft => SyncAction.DeleteLeft,
-                SyncAction.Skip => SyncAction.Skip,
-                _ => dir.Action,
+                _ => SyncAction.Skip,
             }
             : requested switch
             {
                 SyncAction.CopyToLeft => SyncAction.CopyToLeft,
                 SyncAction.DeleteRight => SyncAction.DeleteRight,
-                SyncAction.Skip => SyncAction.Skip,
-                _ => dir.Action,
+                _ => SyncAction.Skip,
             };
     }
 

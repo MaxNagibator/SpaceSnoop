@@ -163,6 +163,10 @@ public sealed partial class SyncNodeViewModel : ObservableObject
 
     public bool CanCopyLeft => IsFile && Status is ComparisonStatus.RightOnly or ComparisonStatus.Modified or ComparisonStatus.Conflict;
 
+    public bool CanDirCopyRight => IsDirectory && Status != ComparisonStatus.RightOnly;
+
+    public bool CanDirCopyLeft => IsDirectory && Status != ComparisonStatus.LeftOnly;
+
     public bool CanDeleteFile => IsFile && Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly;
 
     public string FileDeleteHeader => Status == ComparisonStatus.LeftOnly ? "Удалить слева (в корзину)" : "Удалить справа (в корзину)";
@@ -171,11 +175,21 @@ public sealed partial class SyncNodeViewModel : ObservableObject
 
     public string DirDeleteHeader => Status == ComparisonStatus.RightOnly ? "Удалить всё справа (в корзину)" : "Удалить всё слева (в корзину)";
 
-    public bool DeleteAllowed => !DeleteBlocked(Status == ComparisonStatus.RightOnly ? SyncAction.DeleteRight : SyncAction.DeleteLeft);
+    public bool HasTypeConflict => _file is { TypeConflict: not FileTypeConflict.None };
+
+    public bool CopyAllowed => !HasTypeConflict;
+
+    public string CopyHint => CopyAllowed
+        ? string.Empty
+        : "Копирование недоступно: слева и справа объекты разного вида, это разрешается вручную в файловой системе";
+
+    public bool DeleteAllowed => !HasTypeConflict && !DeleteBlocked(Status == ComparisonStatus.RightOnly ? SyncAction.DeleteRight : SyncAction.DeleteLeft);
 
     public string DeleteHint => DeleteAllowed
         ? string.Empty
-        : "Удаление недоступно: противоположную сторону обошли не полностью, и «нет файла» здесь неотличимо от «не увидели»";
+        : HasTypeConflict
+            ? CopyHint
+            : "Удаление недоступно: противоположную сторону обошли не полностью, и «нет файла» здесь неотличимо от «не увидели»";
 
     public string ActionHint
     {
@@ -302,7 +316,7 @@ public sealed partial class SyncNodeViewModel : ObservableObject
             return;
         }
 
-        SetAction(SyncActionCycles.Next(SyncActionCycles.ForFile(Status, DeleteAllowed), _file!.Action));
+        SetAction(SyncActionCycles.Next(SyncActionCycles.ForFile(Status, DeleteAllowed, HasTypeConflict), _file!.Action));
     }
 
     private void CycleDirectoryAction()
@@ -398,6 +412,11 @@ public sealed partial class SyncNodeViewModel : ObservableObject
     private void SetAction(SyncAction action)
     {
         if (_file is null || Status == ComparisonStatus.Identical || DeleteBlocked(action))
+        {
+            return;
+        }
+
+        if (HasTypeConflict && action != SyncAction.Skip)
         {
             return;
         }

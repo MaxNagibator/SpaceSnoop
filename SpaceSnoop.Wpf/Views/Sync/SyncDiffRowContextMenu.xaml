@@ -50,6 +50,9 @@
 
         <MenuItem
             Command="{Binding PlacementTarget.DataContext.CopyToRightCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            IsEnabled="{Binding PlacementTarget.DataContext.CopyAllowed, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            ToolTip="{Binding PlacementTarget.DataContext.CopyHint, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            ToolTipService.ShowOnDisabled="True"
             Visibility="{Binding PlacementTarget.DataContext.CanCopyRight, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
             <MenuItem.Header>
                 <StackPanel Orientation="Horizontal">
@@ -63,6 +66,9 @@
         </MenuItem>
         <MenuItem
             Command="{Binding PlacementTarget.DataContext.CopyToLeftCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            IsEnabled="{Binding PlacementTarget.DataContext.CopyAllowed, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            ToolTip="{Binding PlacementTarget.DataContext.CopyHint, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+            ToolTipService.ShowOnDisabled="True"
             Visibility="{Binding PlacementTarget.DataContext.CanCopyLeft, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
             <MenuItem.Header>
                 <StackPanel Orientation="Horizontal">
@@ -107,7 +113,7 @@
 
         <MenuItem
             Command="{Binding PlacementTarget.DataContext.DirCopyToRightCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-            Visibility="{Binding PlacementTarget.DataContext.IsDirectory, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+            Visibility="{Binding PlacementTarget.DataContext.CanDirCopyRight,RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
             <MenuItem.Header>
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
@@ -120,7 +126,7 @@
         </MenuItem>
         <MenuItem
             Command="{Binding PlacementTarget.DataContext.DirCopyToLeftCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-            Visibility="{Binding PlacementTarget.DataContext.IsDirectory, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
+            Visibility="{Binding PlacementTarget.DataContext.CanDirCopyLeft,RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}">
             <MenuItem.Header>
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
