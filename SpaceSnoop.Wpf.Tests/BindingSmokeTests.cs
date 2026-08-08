@@ -10,7 +10,9 @@ using SpaceSnoop.Wpf.ViewModels.Sync;
 using SpaceSnoop.Wpf.Views;
 using System.Diagnostics;
 using System.Runtime.ExceptionServices;
+using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Interop;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
@@ -72,7 +74,9 @@ public class BindingSmokeTests
         _window.Width = WindowWidth;
         _window.Height = WindowHeight;
         _window.ShowInTaskbar = false;
+        _window.ShowActivated = false;
         _window.Show();
+        HideFromScreen(_window);
 
         Run(() => GalleryRun.ArrangeAsync(_services, _fixture));
 
@@ -325,5 +329,28 @@ public class BindingSmokeTests
         Pump();
         _window.UpdateLayout();
         Pump();
+    }
+
+    private static void HideFromScreen(Window window)
+    {
+        var handle = new WindowInteropHelper(window).Handle;
+
+        if (handle != IntPtr.Zero)
+        {
+            _ = NativeMethods.SetWindowPos(handle, IntPtr.Zero, 0, 0, 0, 0, NativeMethods.SwpHideWindow | NativeMethods.SwpNoMove | NativeMethods.SwpNoSize | NativeMethods.SwpNoZOrder | NativeMethods.SwpNoActivate);
+        }
+    }
+
+    private static class NativeMethods
+    {
+        public const uint SwpNoSize = 0x0001;
+        public const uint SwpNoMove = 0x0002;
+        public const uint SwpNoZOrder = 0x0004;
+        public const uint SwpNoActivate = 0x0010;
+        public const uint SwpHideWindow = 0x0080;
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
     }
 }
