@@ -47,7 +47,7 @@ public sealed partial class PerformanceChartViewModel : ObservableObject, ILogsP
 
     public string Title => "График производительности";
 
-    public static string ChartDescription =>
+    public string ChartDescription =>
         "Верхнее поле – задержка UI-потока в миллисекундах: шкала идёт от нуля до круглого числа над пиком окна, "
         + $"поперечный пунктир – порог просадки {AppDefaults.PerformanceHitchMs} мс, кружком помечен каждый замер выше порога. "
         + "Нижнее поле – занятая управляемая память; её шкала подписана по краям делений, поэтому видно и величину, и размах. "

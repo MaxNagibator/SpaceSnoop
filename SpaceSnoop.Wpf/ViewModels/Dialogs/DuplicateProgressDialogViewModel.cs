@@ -27,7 +27,7 @@ public sealed partial class DuplicateProgressDialogViewModel : OperationDialogVi
 
     public override string Title => "Поиск дубликатов";
 
-    public static string ActionText => "Искать";
+    public string ActionText => "Искать";
 
     public string RootPath { get; }
 
@@ -35,11 +35,11 @@ public sealed partial class DuplicateProgressDialogViewModel : OperationDialogVi
 
     public string PlanText { get; }
 
-    public static string FateText => "Файлы только читаются: поиск ничего не удаляет и ничего не помечает.";
+    public string FateText => "Файлы только читаются: поиск ничего не удаляет и ничего не помечает.";
 
     public DuplicateReport? Report { get; private set; }
 
-    public static bool IsIndeterminate => true;
+    public bool IsIndeterminate => true;
 
     protected override string RunningStatus => "Сличение файлов…";
 

@@ -12,25 +12,25 @@ public sealed partial class AboutViewModel(
     ILogger<AboutViewModel> logger)
     : ObservableObject, IPageHeader
 {
-    public static string AppName => AppInfo.Name;
+    public string AppName => AppInfo.Name;
 
-    public static string Version => AppInfo.Version;
+    public string Version => AppInfo.Version;
 
-    public static string RepoSlug => AppInfo.RepoSlug;
+    public string RepoSlug => AppInfo.RepoSlug;
 
-    public static string Tagline => "Шнырь по твоим накопителям – покажет, где залёг весь хлам";
+    public string Tagline => "Шнырь по твоим накопителям – покажет, где залёг весь хлам";
 
-    public static string Description =>
+    public string Description =>
         "Исследуй бескрайние просторы своих накопителей и почувствуй себя археологом: SpaceSnoop "
         + "откопает древние артефакты среди данных и покажет занятое место деревом, где жирные папки "
         + "краснеют от стыда под тепловой подсветкой. А ещё сведёт две папки лицом к лицу и "
         + "синхронизирует их. Дай накопителям дышать полной грудью – убери весь хлам!";
 
-    public static string DotNetVersion => RuntimeInformation.FrameworkDescription;
+    public string DotNetVersion => RuntimeInformation.FrameworkDescription;
 
-    public static string OperatingSystem => RuntimeInformation.OSDescription;
+    public string OperatingSystem => RuntimeInformation.OSDescription;
 
-    public static string Architecture => RuntimeInformation.ProcessArchitecture.ToString();
+    public string Architecture => RuntimeInformation.ProcessArchitecture.ToString();
 
     public bool IsElevated { get; } = AdminElevation.IsElevated;
 

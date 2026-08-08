@@ -172,7 +172,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
 
     public string SettingsFilePath => _settings.FilePath;
 
-    public static string DataDirectory => AppStorage.DataDirectory;
+    public string DataDirectory => AppStorage.DataDirectory;
 
     public bool StoreInAppData
     {

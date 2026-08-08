@@ -40,11 +40,11 @@ public sealed partial class CleanupProgressDialogViewModel : OperationDialogView
 
     public override string Title => "Очистка диска";
 
-    public static string ActionText => "Очистить";
+    public string ActionText => "Очистить";
 
     public string PlanText { get; }
 
-    public static string FateText => "Файлы удаляются безвозвратно, мимо корзины – перенос временных файлов в корзину не освободил бы места.";
+    public string FateText => "Файлы удаляются безвозвратно, мимо корзины – перенос временных файлов в корзину не освободил бы места.";
 
     public long FreedBytes => _freed;
 

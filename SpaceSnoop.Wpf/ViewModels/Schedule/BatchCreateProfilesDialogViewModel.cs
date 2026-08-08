@@ -52,13 +52,13 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
 
     public event EventHandler<bool>? RequestClose;
 
-    public static string Title => "Создать пачку профилей";
+    public string Title => "Создать пачку профилей";
 
     public bool PathSuggest { get; }
 
-    public static IReadOnlyList<SegmentOption> Modes => SyncOptions.Modes;
+    public IReadOnlyList<SegmentOption> Modes => SyncOptions.Modes;
 
-    public static IReadOnlyList<SegmentOption> Winners => SyncOptions.Winners;
+    public IReadOnlyList<SegmentOption> Winners => SyncOptions.Winners;
 
     public IReadOnlyList<string> SortOptions { get; } = ["Имя (А–Я)", "Имя (Я–А)", "Сначала новые"];
 

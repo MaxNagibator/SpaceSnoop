@@ -208,7 +208,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
     public double ProgressValue => Progress.ProgressValue;
 
-    public double ProgressMax => ScanProgressViewModel.ProgressMax;
+    public double ProgressMax => Progress.ProgressMax;
 
     public ICommand CancelCommand => StopCommand;
 

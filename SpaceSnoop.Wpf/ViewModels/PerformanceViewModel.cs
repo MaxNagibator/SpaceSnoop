@@ -116,7 +116,7 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
 
     public bool HasHitches => Hitches.Length > 0;
 
-    public static string HitchesHint => PerformanceFormat.HitchesHint;
+    public string HitchesHint => PerformanceFormat.HitchesHint;
 
     public string PageTitle => "Производительность";
 
