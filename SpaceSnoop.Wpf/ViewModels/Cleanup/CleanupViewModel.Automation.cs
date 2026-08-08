@@ -2,6 +2,45 @@
 
 public sealed partial class CleanupViewModel
 {
+    internal void ShowBusyForAutomation(IReadOnlyList<CleanupMeasurement> measured)
+    {
+        _measureCts = new();
+        IsBusy = true;
+        StatusText = MeasuringStatus;
+
+        for (var index = 0; index < Targets.Count; index++)
+        {
+            if (index < measured.Count)
+            {
+                Targets[index].Apply(measured[index]);
+                continue;
+            }
+
+            Targets[index].IsMeasuring = index == measured.Count;
+        }
+
+        UpdateTotals();
+    }
+
+    internal void ResetForAutomation()
+    {
+        ClearBusyForAutomation();
+        BuildTargets();
+    }
+
+    internal void ClearBusyForAutomation()
+    {
+        _measureCts?.Dispose();
+        _measureCts = null;
+        IsBusy = false;
+        StatusText = null;
+
+        foreach (var row in Targets)
+        {
+            row.IsMeasuring = false;
+        }
+    }
+
     bool ICleanupAutomation.IsBusy => IsBusy;
 
     bool ICleanupAutomation.IsModalBusy => _modals.HasActive;

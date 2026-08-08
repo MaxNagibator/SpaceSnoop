@@ -73,6 +73,7 @@ public static class GalleryRun
         window.Width = options.Width;
         window.Height = options.Height;
         window.ShowInTaskbar = false;
+        window.ShowActivated = false;
         window.Show();
 
         await ArrangeAsync(services, fixture).ConfigureAwait(true);

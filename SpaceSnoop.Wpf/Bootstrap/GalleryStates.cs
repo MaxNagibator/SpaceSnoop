@@ -1,6 +1,8 @@
 ﻿using KeepShell.Services.Modal;
 using Microsoft.Extensions.DependencyInjection;
 using System.IO;
+using System.Windows.Input;
+using System.Windows.Threading;
 
 namespace SpaceSnoop.Wpf.Bootstrap;
 
@@ -85,6 +87,20 @@ public static class GalleryStates
     {
         if (IsIdle(state))
         {
+            switch (page)
+            {
+                case SectionKey.Cleanup:
+                    (await SettleCleanupAsync(services).ConfigureAwait(true)).ResetForAutomation();
+                    break;
+
+                case SectionKey.Chat:
+                    await SettleChatAsync(services).ConfigureAwait(true);
+                    break;
+
+                default:
+                    break;
+            }
+
             return;
         }
 
@@ -322,12 +338,32 @@ public static class GalleryStates
 
     private static async Task ApplyCleanupAsync(IServiceProvider services)
     {
+        var cleanup = await SettleCleanupAsync(services).ConfigureAwait(true);
+
+        cleanup.ShowBusyForAutomation(CleanupMeasured);
+    }
+
+    private static async Task SettleChatAsync(IServiceProvider services)
+    {
+        var gates = services.GetRequiredService<ChatViewModel>().Gates;
+
+        await Dispatcher.Yield(DispatcherPriority.Loaded);
+        await QuiesceAsync(() => gates.IsDetectingCli, "поиск CLI агента").ConfigureAwait(true);
+        await Dispatcher.Yield(DispatcherPriority.ContextIdle);
+
+        Keyboard.ClearFocus();
+    }
+
+    private static async Task<CleanupViewModel> SettleCleanupAsync(IServiceProvider services)
+    {
         var cleanup = services.GetRequiredService<CleanupViewModel>();
+
+        await Dispatcher.Yield(DispatcherPriority.Loaded);
 
         cleanup.CancelMeasureCommand.Execute(null);
         await QuiesceAsync(() => cleanup.IsBusy, "замер очистки").ConfigureAwait(true);
 
-        cleanup.ShowBusyForAutomation(CleanupMeasured);
+        return cleanup;
     }
 
     private static void ResetCleanup(IServiceProvider services)

@@ -55,6 +55,8 @@ public static class GalleryFixtures
         Write(Path.Combine(right, "docs", "README.md"), 12_000, Base.AddHours(-30));
         Write(Path.Combine(right, "архив", "прошлый-год.zip"), 3_400_000, Base.AddDays(-40));
 
+        Stamp(root);
+
         return new(root, left, right);
     }
 
@@ -125,6 +127,22 @@ public static class GalleryFixtures
         for (var index = 0; index < 40; index++)
         {
             Write(Path.Combine(root, "cache", $"chunk-{index:00}.bin"), 4_096 + (index * 512), Base.AddMinutes(-index));
+        }
+    }
+
+    private static void Stamp(string root)
+    {
+        foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        {
+            File.SetCreationTime(file, Base);
+            File.SetLastAccessTime(file, Base);
+        }
+
+        foreach (var directory in Directory.EnumerateDirectories(root, "*", SearchOption.AllDirectories).Append(root))
+        {
+            Directory.SetCreationTime(directory, Base);
+            Directory.SetLastWriteTime(directory, Base);
+            Directory.SetLastAccessTime(directory, Base);
         }
     }
 
