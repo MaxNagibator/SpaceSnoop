@@ -17,6 +17,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
     private readonly IClipboardService _clipboard;
     private readonly IShellLauncher _shell;
     private readonly ILogger<ChatViewModel> _logger;
+    private readonly IAppNavigator _navigator;
 
     private CancellationTokenSource? _cts;
 
@@ -42,7 +43,8 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         IClipboardService clipboard,
         IShellLauncher shell,
         IUiDispatcher uiDispatcher,
-        ILogger<ChatViewModel> logger)
+        ILogger<ChatViewModel> logger,
+        IAppNavigator navigator)
     {
         _backends = backends;
         _preferences = preferences;
@@ -53,6 +55,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         _clipboard = clipboard;
         _shell = shell;
         _logger = logger;
+        _navigator = navigator;
 
         History = new(
             history,
@@ -86,12 +89,10 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
                 History.SessionId = null;
             });
         Gates.PropertyChanged += OnGatesPropertyChanged;
-        Gates.NavigationRequested += RaiseNavigationRequested;
+        Gates.NavigationRequested += OnNavigationRequested;
     }
 
     public event Action? FocusRequested;
-
-    public event Action<string>? NavigationRequested;
 
     public static IReadOnlyList<ChatExample> Examples { get; } =
     [
@@ -153,9 +154,9 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         }
     }
 
-    private void RaiseNavigationRequested(string sectionKey)
+    private void OnNavigationRequested(string sectionKey)
     {
-        NavigationRequested?.Invoke(sectionKey);
+        _navigator.TryNavigate(sectionKey);
     }
 
     [RelayCommand]

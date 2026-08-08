@@ -87,7 +87,6 @@ public partial class App : Application
             var monitor = _services.GetRequiredService<PerformanceMonitor>();
             monitor.ReportStartup(Stopwatch.GetElapsedTime(startedAt));
 
-            _services.GetRequiredService<McpBridge>().Attach(_services.GetRequiredService<ShellViewModel>());
             _services.GetRequiredService<McpServerHost>().Apply();
             monitor.Start();
 
@@ -188,6 +187,9 @@ public partial class App : Application
         services.AddSingleton<CleanupProgressDialogFactory>();
 
         services.AddSingleton<DuplicateProgressDialogFactory>();
+
+        services.AddSingleton<AppNavigator>();
+        services.AddSingleton<IAppNavigator>(static provider => provider.GetRequiredService<AppNavigator>());
 
         services.AddSingleton<ScanViewModel>();
         services.AddSingleton<IScanAutomation>(static provider => provider.GetRequiredService<ScanViewModel>());

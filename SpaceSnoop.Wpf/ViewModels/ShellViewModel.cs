@@ -4,7 +4,7 @@ using System.Windows.Input;
 
 namespace SpaceSnoop.Wpf.ViewModels;
 
-public sealed partial class ShellViewModel : ShellViewModelBase
+public sealed partial class ShellViewModel : ShellViewModelBase, IAppNavigator
 {
     private static readonly Dictionary<string, string> LegacyTitleToKey = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -28,6 +28,12 @@ public sealed partial class ShellViewModel : ShellViewModelBase
 
     private readonly CleanupPageViewModel _cleanup;
 
+    private readonly SyncViewModel _sync;
+
+    private readonly ChatViewModel _chat;
+
+    private readonly NavigationItem _syncItem;
+
     [ObservableProperty]
     private bool _isTarkovBootPlaying;
 
@@ -49,11 +55,14 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         AppUpdateViewModel appUpdate,
         ToastHostViewModel toasts,
         PerformanceHudViewModel hud,
+        AppNavigator navigator,
         IApplicationLifetime lifetime)
         : base(modal)
     {
         _lifetime = lifetime;
         _cleanup = cleanup;
+        _sync = sync;
+        _chat = chat;
         Toasts = toasts;
         Hud = hud;
         Theme = theme;
@@ -73,6 +82,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
 
         _chatItem = new("Чат", PackIconLucideKind.MessageCircle, chat);
         _logsItem = logsItem;
+        _syncItem = syncItem;
 
         Sections.Add(scanItem);
         Sections.Add(syncItem);
@@ -100,18 +110,9 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         _agent.PropertyChanged += OnAgentPreferencesChanged;
         ApplyChatSection();
 
-        overview.OpenInSyncRequested += (profile, comparison) =>
-        {
-            sync.ApplyProfile(profile, comparison);
-            Selected = syncItem;
-        };
-
         sync.ProfileRunCompleted += overview.ApplyProfileRun;
 
-        scan.AskAgentRequested += question => OpenChatWith(chat, question);
-        sync.AskAgentRequested += question => OpenChatWith(chat, question);
-
-        chat.NavigationRequested += sectionKey => TryNavigate(sectionKey);
+        navigator.Attach(this);
 
         _settingsItem = new("Настройки", PackIconLucideKind.Settings, settingsPage);
         _sectionByKey[SectionKey.Settings] = _settingsItem;
@@ -214,7 +215,13 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         Sections.Remove(_chatItem);
     }
 
-    private void OpenChatWith(ChatViewModel chat, string question)
+    public void OpenSync(SyncProfile profile, ComparisonResult? comparison)
+    {
+        _sync.ApplyProfile(profile, comparison);
+        Selected = _syncItem;
+    }
+
+    public void AskAgent(string question)
     {
         if (!Sections.Contains(_chatItem))
         {
@@ -222,7 +229,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase
         }
 
         Selected = _chatItem;
-        chat.PrepareQuestion(question);
+        _chat.PrepareQuestion(question);
     }
 
     private void OnAgentPreferencesChanged(object? sender, PropertyChangedEventArgs e)

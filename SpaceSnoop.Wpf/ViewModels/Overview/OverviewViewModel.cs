@@ -7,11 +7,13 @@ namespace SpaceSnoop.Wpf.ViewModels.Overview;
 public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, IPageStatus, IPageRefresh
 {
     private readonly ISettingsStore _settings;
+    private readonly IAppNavigator _navigator;
     private bool _suppressReload;
 
-    public OverviewViewModel(ISettingsStore settings, IDialogService dialogs, ToastNotifier notifier, ILogger<OverviewViewModel> logger, CompareDirectoriesUseCase compare, ExecuteSyncUseCase sync)
+    public OverviewViewModel(ISettingsStore settings, IDialogService dialogs, ToastNotifier notifier, ILogger<OverviewViewModel> logger, CompareDirectoriesUseCase compare, ExecuteSyncUseCase sync, IAppNavigator navigator)
     {
         _settings = settings;
+        _navigator = navigator;
 
         Rows = new(settings, () => IsBusy, () => _suppressReload, ReloadRows);
 
@@ -20,8 +22,6 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
 
         ReloadRows();
     }
-
-    public event Action<SyncProfile, ComparisonResult?>? OpenInSyncRequested;
 
     public OverviewRowsViewModel Rows { get; }
 
@@ -157,6 +157,6 @@ public sealed partial class OverviewViewModel : ObservableObject, IPageHeader, I
 
     private void RaiseOpenInSync(SyncProfile profile, ComparisonResult? comparison)
     {
-        OpenInSyncRequested?.Invoke(profile, comparison);
+        _navigator.OpenSync(profile, comparison);
     }
 }

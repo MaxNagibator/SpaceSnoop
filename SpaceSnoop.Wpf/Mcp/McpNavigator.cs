@@ -1,19 +1,12 @@
 ﻿namespace SpaceSnoop.Wpf.Mcp;
 
-internal sealed class McpNavigator
+internal sealed class McpNavigator(IAppNavigator app)
 {
-    private ShellViewModel? _shell;
-
     public event Action<string>? NavigationDeferred;
 
     public bool DeferNavigation { get; set; }
 
-    public string? CurrentSectionKey => _shell?.CurrentSectionKey;
-
-    public void Attach(ShellViewModel shell)
-    {
-        _shell = shell;
-    }
+    public string? CurrentSectionKey => app.CurrentSectionKey;
 
     public bool DeferOrNavigate(string sectionKey)
     {
@@ -23,7 +16,7 @@ internal sealed class McpNavigator
             return true;
         }
 
-        _shell?.TryNavigate(sectionKey);
+        app.TryNavigate(sectionKey);
         return false;
     }
 }

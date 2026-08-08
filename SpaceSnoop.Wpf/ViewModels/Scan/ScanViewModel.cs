@@ -19,6 +19,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     private readonly ToastNotifier _notifier;
     private readonly PerformanceRunTracker _runs;
     private readonly IFilePicker _filePicker;
+    private readonly IAppNavigator _navigator;
 
     private CancellationTokenSource? _cts;
     private bool _suppressPersist;
@@ -78,8 +79,10 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         PerformanceMonitor performance,
         PerformanceRunTracker runs,
         IFilePicker filePicker,
-        IUiDispatcher uiDispatcher)
+        IUiDispatcher uiDispatcher,
+        IAppNavigator navigator)
     {
+        _navigator = navigator;
         _calculator = calculator;
         _runs = runs;
         _dialogs = dialogs;
@@ -146,8 +149,6 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         LoadSettings();
         Drives.LoadDriveLabels();
     }
-
-    public event Action<string>? AskAgentRequested;
 
     public DriveCatalog Drives { get; }
 
@@ -248,7 +249,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
             return;
         }
 
-        AskAgentRequested?.Invoke(ChatQuestion.ForScanNode(space.AbsolutePath, node.SizeText, node.IsDirectory));
+        _navigator.AskAgent(ChatQuestion.ForScanNode(space.AbsolutePath, node.SizeText, node.IsDirectory));
     }
 
     partial void OnIsScanningChanged(bool value)

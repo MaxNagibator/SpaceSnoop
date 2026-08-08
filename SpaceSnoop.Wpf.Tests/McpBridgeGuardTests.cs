@@ -56,6 +56,7 @@ public class McpBridgeGuardTests
             _monitor,
             new PerformanceRunTracker(),
             new CompareDirectoriesUseCase(NullLogger<DirectoryComparer>.Instance),
+            new FakeAppNavigator(),
             NullLogger<McpBridge>.Instance);
     }
 
@@ -371,7 +372,7 @@ public class McpBridgeGuardTests
             ],
             _preferences,
             _cleanup,
-            new McpNavigator(),
+            new McpNavigator(new FakeAppNavigator()),
             new ToastNotifier(new(), new ShellPreferences(settings)),
             NullLogger<McpBridge>.Instance);
     }

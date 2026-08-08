@@ -211,7 +211,8 @@ public class SyncQuickProfileTests
             notifier,
             new(NullLogger<PerformanceMonitor>.Instance),
             new(),
-            new FakeFilePicker());
+            new FakeFilePicker(),
+            new FakeAppNavigator());
     }
 
 }

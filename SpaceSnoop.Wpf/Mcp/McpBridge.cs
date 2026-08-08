@@ -2,7 +2,7 @@
 
 public sealed class McpBridge
 {
-    private readonly McpNavigator _navigator = new();
+    private readonly McpNavigator _navigator;
     private readonly McpStateReader _state;
 
     public McpBridge(
@@ -20,8 +20,10 @@ public sealed class McpBridge
         PerformanceMonitor performance,
         PerformanceRunTracker runs,
         CompareDirectoriesUseCase compare,
+        IAppNavigator navigator,
         ILogger<McpBridge> logger)
     {
+        _navigator = new(navigator);
         _state = new(scan, sync, _navigator);
 
         Scan = new(scan, scanPreferences, calculator, duplicates, preferences, notifier, _navigator, _state, performance, runs, logger);
@@ -52,11 +54,6 @@ public sealed class McpBridge
     internal McpCleanupTools Cleanup { get; }
 
     internal McpCaptureTools Capture { get; }
-
-    public void Attach(ShellViewModel shell)
-    {
-        _navigator.Attach(shell);
-    }
 
     public string DescribeContext()
     {

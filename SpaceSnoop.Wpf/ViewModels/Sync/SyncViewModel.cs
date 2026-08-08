@@ -7,6 +7,7 @@ namespace SpaceSnoop.Wpf.ViewModels.Sync;
 public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPageStatus
 {
     private readonly ISettingsStore _settings;
+    private readonly IAppNavigator _navigator;
 
     [ObservableProperty]
     private string _summaryText = "Сравнение не выполнялось.";
@@ -22,9 +23,11 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         ToastNotifier notifier,
         PerformanceMonitor performance,
         PerformanceRunTracker runs,
-        IFilePicker filePicker)
+        IFilePicker filePicker,
+        IAppNavigator navigator)
     {
         _settings = settings;
+        _navigator = navigator;
 
         Session = new(dialogs, logger, notifier, performance, runs, summary => SummaryText = summary);
         Session.PropertyChanged += OnSessionPropertyChanged;
@@ -51,8 +54,6 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
         _settings.Changed += OnSettingsChanged;
     }
-
-    public event Action<string>? AskAgentRequested;
 
     public event Action<SyncProfileRun>? ProfileRunCompleted;
 
@@ -120,7 +121,7 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
 
     private void AskAgentAbout(SyncNodeViewModel node)
     {
-        AskAgentRequested?.Invoke(ChatQuestion.ForSyncNode(node.RelativePath,
+        _navigator.AskAgent(ChatQuestion.ForSyncNode(node.RelativePath,
             node.Status,
             node.IsDirectory,
             node.LeftSizeText,
