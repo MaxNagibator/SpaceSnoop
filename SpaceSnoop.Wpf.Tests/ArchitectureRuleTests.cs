@@ -6,6 +6,8 @@ namespace SpaceSnoop.Wpf.Tests;
 [TestFixture]
 public class ArchitectureRuleTests
 {
+    private const int ThresholdLines = 500;
+
     private static readonly string[] PipelineTypes = ["DirectoryComparer", "SyncEngine"];
 
     private static readonly string[] PlatformTypes = ["DispatcherTimer", "OpenFolderDialog", "SaveFileDialog"];
@@ -62,6 +64,31 @@ public class ArchitectureRuleTests
         Assert.That(offenders,
             Is.Empty,
             () => $"WPF работает поверх SpaceSnoop.Core; ссылка на WinForms-проект вернула бы в него System.Windows.Forms и три WinForms-завязанных типа:{Environment.NewLine}{string.Join(Environment.NewLine, offenders)}");
+    }
+
+    [Test]
+    public void Модели_сценарии_и_разметка_держатся_под_порогом_в_500_строк()
+    {
+        var offenders = ThresholdFiles()
+            .Select(static path => (Path: path, Lines: File.ReadAllLines(path).Length))
+            .Where(static file => file.Lines > ThresholdLines)
+            .Select(file => $"{Path.GetRelativePath(RepositoryRoot(), file.Path)} – {file.Lines}")
+            .ToList();
+
+        Assert.That(offenders,
+            Is.Empty,
+            () => $"Порог в {ThresholdLines} строк держит декомпозицию от отката: следующая обязанность идёт в новую модель, а не в эти файлы:{Environment.NewLine}{string.Join(Environment.NewLine, offenders)}");
+    }
+
+    private static IEnumerable<string> ThresholdFiles()
+    {
+        var frontend = Path.Combine(RepositoryRoot(), "SpaceSnoop.Wpf");
+
+        return Directory.EnumerateFiles(Path.Combine(frontend, "ViewModels"), "*.cs", SearchOption.AllDirectories)
+            .Concat(Directory.EnumerateFiles(Path.Combine(frontend, "Mcp"), "*.cs", SearchOption.AllDirectories))
+            .Concat(Directory.EnumerateFiles(frontend, "*.xaml", SearchOption.AllDirectories))
+            .Where(static path => !IsBuildOutput(path))
+            .Order(StringComparer.Ordinal);
     }
 
     private static IEnumerable<string> BuildFilesOf(string project)
