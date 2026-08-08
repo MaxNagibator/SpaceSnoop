@@ -1,7 +1,7 @@
 ﻿using System.IO;
 using System.Security;
 
-namespace SpaceSnoop.Wpf.Bootstrap;
+namespace SpaceSnoop.Wpf.Bootstrap.Platform;
 
 public readonly record struct DriveCapacity(string Name, long TotalBytes, long UsedBytes)
 {

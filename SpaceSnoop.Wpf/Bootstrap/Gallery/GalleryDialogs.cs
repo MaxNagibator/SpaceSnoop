@@ -1,7 +1,7 @@
 ﻿using KeepShell.Services.Modal;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace SpaceSnoop.Wpf.Bootstrap;
+namespace SpaceSnoop.Wpf.Bootstrap.Gallery;
 
 public static class GalleryDialogs
 {

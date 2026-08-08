@@ -1,6 +1,6 @@
 ﻿using System.IO;
 
-namespace SpaceSnoop.Wpf.Bootstrap;
+namespace SpaceSnoop.Wpf.Bootstrap.Schedule;
 
 public sealed partial class BatchPairRow(
     string name,

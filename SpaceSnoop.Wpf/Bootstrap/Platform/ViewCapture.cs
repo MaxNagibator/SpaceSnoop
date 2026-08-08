@@ -3,7 +3,7 @@ using System.Text;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
-namespace SpaceSnoop.Wpf.Bootstrap;
+namespace SpaceSnoop.Wpf.Bootstrap.Platform;
 
 public static class ViewCapture
 {

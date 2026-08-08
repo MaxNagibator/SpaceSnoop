@@ -1,6 +1,7 @@
 ﻿using KeepShell.Bootstrap;
 using KeepShell.ViewModels;
 using SpaceSnoop.Wpf.Bootstrap;
+using SpaceSnoop.Wpf.Bootstrap.Storage;
 using SpaceSnoop.Wpf.ViewModels;
 
 namespace SpaceSnoop.Wpf.Tests;

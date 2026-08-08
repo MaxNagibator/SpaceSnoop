@@ -6,7 +6,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Windows.Threading;
 
-namespace SpaceSnoop.Wpf.Bootstrap;
+namespace SpaceSnoop.Wpf.Bootstrap.Gallery;
 
 internal sealed record GalleryFrame(string Kind, string Name, string State, string Theme, string File, int Width, int Height);
 

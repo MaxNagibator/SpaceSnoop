@@ -1,6 +1,6 @@
 ﻿using System.IO;
 
-namespace SpaceSnoop.Wpf.Bootstrap;
+namespace SpaceSnoop.Wpf.Bootstrap.Gallery;
 
 public sealed record GalleryFixture(string Root, string Left, string Right);
 

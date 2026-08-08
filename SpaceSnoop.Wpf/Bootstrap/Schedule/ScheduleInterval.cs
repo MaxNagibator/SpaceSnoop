@@ -1,4 +1,4 @@
-﻿namespace SpaceSnoop.Wpf.Bootstrap;
+﻿namespace SpaceSnoop.Wpf.Bootstrap.Schedule;
 
 public enum ScheduleInterval
 {

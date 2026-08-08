@@ -3,6 +3,8 @@ using KeepShell.ViewModels;
 using Microsoft.Extensions.Logging.Abstractions;
 using SpaceSnoop.Core.Domain;
 using SpaceSnoop.Wpf.Bootstrap;
+using SpaceSnoop.Wpf.Bootstrap.Schedule;
+using SpaceSnoop.Wpf.Bootstrap.Storage;
 using SpaceSnoop.Wpf.Diagnostics;
 using SpaceSnoop.Wpf.ViewModels;
 using SpaceSnoop.Wpf.ViewModels.Scan;

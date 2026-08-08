@@ -1,5 +1,6 @@
 ﻿using SpaceSnoop.Core.Domain;
 using SpaceSnoop.Wpf.Bootstrap;
+using SpaceSnoop.Wpf.Bootstrap.Schedule;
 
 namespace SpaceSnoop.Wpf.Tests;
 

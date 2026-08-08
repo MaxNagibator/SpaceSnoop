@@ -3,7 +3,7 @@ using System.IO;
 using System.Text;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
-namespace SpaceSnoop.Wpf.Bootstrap;
+namespace SpaceSnoop.Wpf.Bootstrap.Storage;
 
 public enum SyncLogOrigin
 {

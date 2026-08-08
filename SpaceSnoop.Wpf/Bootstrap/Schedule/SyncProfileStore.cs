@@ -1,6 +1,6 @@
 ﻿using System.Text.Json;
 
-namespace SpaceSnoop.Wpf.Bootstrap;
+namespace SpaceSnoop.Wpf.Bootstrap.Schedule;
 
 public static class SyncProfileStore
 {

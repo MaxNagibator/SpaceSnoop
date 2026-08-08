@@ -2,6 +2,7 @@
 using SpaceSnoop.Core.Domain;
 using SpaceSnoop.Core.Export;
 using SpaceSnoop.Wpf.Bootstrap;
+using SpaceSnoop.Wpf.Bootstrap.Schedule;
 using SpaceSnoop.Wpf.Diagnostics;
 using SpaceSnoop.Wpf.Mcp;
 using SpaceSnoop.Wpf.ViewModels.Sync;

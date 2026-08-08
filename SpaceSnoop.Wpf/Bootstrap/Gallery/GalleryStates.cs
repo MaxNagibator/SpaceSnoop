@@ -4,7 +4,7 @@ using System.IO;
 using System.Windows.Input;
 using System.Windows.Threading;
 
-namespace SpaceSnoop.Wpf.Bootstrap;
+namespace SpaceSnoop.Wpf.Bootstrap.Gallery;
 
 public static class GalleryStates
 {

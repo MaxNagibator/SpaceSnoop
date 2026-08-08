@@ -1,4 +1,5 @@
 ﻿using SpaceSnoop.Wpf.Bootstrap;
+using SpaceSnoop.Wpf.Bootstrap.Platform;
 
 namespace SpaceSnoop.Wpf.Tests;
 

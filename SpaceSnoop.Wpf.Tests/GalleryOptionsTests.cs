@@ -1,5 +1,6 @@
 ﻿using KeepShell.Bootstrap;
 using SpaceSnoop.Wpf.Bootstrap;
+using SpaceSnoop.Wpf.Bootstrap.Gallery;
 
 namespace SpaceSnoop.Wpf.Tests;
 

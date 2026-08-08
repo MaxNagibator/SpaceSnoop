@@ -1,6 +1,6 @@
 ﻿using System.Globalization;
 
-namespace SpaceSnoop.Wpf.Bootstrap;
+namespace SpaceSnoop.Wpf.Bootstrap.Schedule;
 
 public static class ScheduleReconciler
 {

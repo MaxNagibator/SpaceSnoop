@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 
-namespace SpaceSnoop.Wpf.Bootstrap;
+namespace SpaceSnoop.Wpf.Bootstrap.Platform;
 
 public static class NetworkShares
 {

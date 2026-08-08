@@ -1,4 +1,4 @@
-namespace SpaceSnoop.Wpf.Bootstrap;
+﻿namespace SpaceSnoop.Wpf.Bootstrap.Schedule;
 
 public readonly record struct ScheduleRequest(bool Enabled, string TaskName, ScheduleInterval Interval, TimeSpan Time, string Argument);
 

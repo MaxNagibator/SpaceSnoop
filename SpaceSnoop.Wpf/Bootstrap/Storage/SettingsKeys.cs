@@ -1,4 +1,4 @@
-﻿namespace SpaceSnoop.Wpf.Bootstrap;
+﻿namespace SpaceSnoop.Wpf.Bootstrap.Storage;
 
 public static class SettingsKeys
 {

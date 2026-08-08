@@ -1,6 +1,6 @@
 ﻿using System.IO;
 
-namespace SpaceSnoop.Wpf.Bootstrap;
+namespace SpaceSnoop.Wpf.Bootstrap.Platform;
 
 internal static class SystemExecutable
 {

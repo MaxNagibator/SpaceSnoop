@@ -4,6 +4,8 @@ using KeepShell.Services.Modal;
 using Microsoft.Extensions.Logging.Abstractions;
 using SpaceSnoop.Core;
 using SpaceSnoop.Wpf.Bootstrap;
+using SpaceSnoop.Wpf.Bootstrap.Schedule;
+using SpaceSnoop.Wpf.Bootstrap.Storage;
 using SpaceSnoop.Wpf.Diagnostics;
 using SpaceSnoop.Wpf.ViewModels.Sync;
 
