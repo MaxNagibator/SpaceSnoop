@@ -72,15 +72,15 @@
                             VerticalAlignment="Center"
                             Margin="12,0,10,0"
                             Visibility="{Binding TreeVisible, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
-                    <ComboBox ItemsSource="{Binding SortOptions}"
-                              SelectedItem="{Binding SelectedSortOption}"
+                    <ComboBox ItemsSource="{Binding Sort.Options}"
+                              SelectedItem="{Binding Sort.SelectedOption}"
                               DisplayMemberPath="Name"
                               Style="{StaticResource ComboBox.Toolbar}"
                               MinWidth="132"
                               Margin="0,0,6,0"
                               ToolTip="Поле сортировки строк дерева" />
                     <ToggleButton Style="{StaticResource ToggleButton.Toolbar}"
-                                  IsChecked="{Binding InvertSort}"
+                                  IsChecked="{Binding Sort.Invert}"
                                   MinWidth="34"
                                   Padding="0"
                                   ToolTip="Направление: отмечено – по убыванию, снято – по возрастанию"
@@ -93,7 +93,7 @@
                                     <Setter Property="Kind"
                                             Value="ArrowUpNarrowWide" />
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding InvertSort}"
+                                        <DataTrigger Binding="{Binding Sort.Invert}"
                                                      Value="True">
                                             <Setter Property="Kind"
                                                     Value="ArrowDownWideNarrow" />

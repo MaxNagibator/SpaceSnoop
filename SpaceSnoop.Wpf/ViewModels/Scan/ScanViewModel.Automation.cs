@@ -106,7 +106,7 @@ public sealed partial class ScanViewModel : IScanAutomation
     {
         ScanTreeEditor.RemoveRoot(Roots, result.AbsolutePath);
 
-        var node = _nodeFactory.CreateRoot(result, _sortState);
+        var node = _nodeFactory.CreateRoot(result, Sort.State);
         node.IsExpanded = true;
 
         Roots.Insert(0, node);

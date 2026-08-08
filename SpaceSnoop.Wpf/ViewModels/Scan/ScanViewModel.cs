@@ -20,20 +20,12 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     private readonly PerformanceRunTracker _runs;
     private readonly IFilePicker _filePicker;
 
-    private readonly ScanSortState _sortState = new();
-
     private CancellationTokenSource? _cts;
     private bool _suppressPersist;
     private ScanNodeViewModel? _highlighted;
 
     [ObservableProperty]
     private string _selectedDrive = string.Empty;
-
-    [ObservableProperty]
-    private ScanSortOption? _selectedSortOption;
-
-    [ObservableProperty]
-    private bool _invertSort = AppDefaults.ScanSortInvertDefault;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsBusy))]
@@ -101,6 +93,8 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         Preferences = preferences;
         Preferences.PropertyChanged += OnPreferencesChanged;
         Inspector.Intensity = Preferences.Intensity;
+
+        Sort = new(settings, ResortRoots);
 
         Progress = new(performance, uiDispatcher);
         Progress.PropertyChanged += OnProgressPropertyChanged;
@@ -171,14 +165,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
     public ScanDuplicatesViewModel Duplicates { get; }
 
-    public ObservableCollection<ScanSortOption> SortOptions { get; } =
-    [
-        new("По имени", ScanSortField.Name),
-        new("По размеру", ScanSortField.Size),
-        new("По дате создания", ScanSortField.CreationDate),
-        new("По времени последнего доступа", ScanSortField.LastAccessTime),
-        new("По количеству файлов", ScanSortField.FileCount),
-    ];
+    public ScanSortViewModel Sort { get; }
 
     public ScanPreferences Preferences { get; }
 
@@ -283,25 +270,6 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         Persist(() => _settings.SetValue(SettingsKeys.ScanLastDrive, value));
     }
 
-    partial void OnSelectedSortOptionChanged(ScanSortOption? value)
-    {
-        if (value is null)
-        {
-            return;
-        }
-
-        _sortState.Field = value.Field;
-        Persist(() => _settings.SetEnum(SettingsKeys.ScanSortMode, value.Field));
-        ResortRoots();
-    }
-
-    partial void OnInvertSortChanged(bool value)
-    {
-        _sortState.Invert = value;
-        Persist(() => _settings.SetBool(SettingsKeys.ScanSortInvert, value));
-        ResortRoots();
-    }
-
     partial void OnSelectedNodeChanged(ScanNodeViewModel? value)
     {
         _highlighted?.IsSelected = false;
@@ -357,14 +325,6 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     private void LoadSettings()
     {
         _suppressPersist = true;
-
-        var sortField = _settings.GetEnum(SettingsKeys.ScanSortMode, AppDefaults.ScanSortModeDefault);
-        var invertSort = _settings.GetBool(SettingsKeys.ScanSortInvert, AppDefaults.ScanSortInvertDefault);
-        _sortState.Field = sortField;
-        _sortState.Invert = invertSort;
-        InvertSort = invertSort;
-        SelectedSortOption = SortOptions.FirstOrDefault(option => option.Field == sortField)
-                             ?? SortOptions.First(option => option.Field == AppDefaults.ScanSortModeDefault);
 
         ViewMode = _settings.GetEnum(SettingsKeys.ScanView, AppDefaults.ScanViewDefault);
 
