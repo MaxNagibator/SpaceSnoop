@@ -1,5 +1,6 @@
 ﻿using KeepShell.Bootstrap;
 using KeepShell.Services.Platform;
+using KeepShell.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using SpaceSnoop.Core;
 using SpaceSnoop.Core.Duplicates;
@@ -13,15 +14,10 @@ using SpaceSnoop.Wpf.ViewModels.Cleanup;
 using SpaceSnoop.Wpf.ViewModels.Scan;
 using SpaceSnoop.Wpf.ViewModels.Sync;
 using SpaceSnoop.Wpf.Views;
-using System.Diagnostics;
-using System.Runtime.ExceptionServices;
-using System.Runtime.InteropServices;
 using System.Windows;
-using System.Windows.Interop;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
-using System.Windows.Threading;
 
 namespace SpaceSnoop.Wpf.Tests;
 
@@ -30,14 +26,10 @@ namespace SpaceSnoop.Wpf.Tests;
 [NonParallelizable]
 public class BindingSmokeTests
 {
-    private const double OffScreen = -32000;
-    private const double WindowWidth = 1440;
-    private const double WindowHeight = 900;
-
-    private readonly BindingErrorSink _sink = new();
-
+    private BindingErrorSink _sink = null!;
     private ServiceProvider _services = null!;
     private KeepShellLogging _logging = null!;
+    private VisualTestHost _host = null!;
     private MainWindow _window = null!;
     private ShellViewModel _shell = null!;
     private GalleryFixture _fixture = null!;
@@ -73,29 +65,18 @@ public class BindingSmokeTests
         _shell = _services.GetRequiredService<ShellViewModel>();
         _window = _services.GetRequiredService<MainWindow>();
 
-        _window.WindowStartupLocation = WindowStartupLocation.Manual;
-        _window.Left = OffScreen;
-        _window.Top = OffScreen;
-        _window.Width = WindowWidth;
-        _window.Height = WindowHeight;
-        _window.ShowInTaskbar = false;
-        _window.ShowActivated = false;
-        _window.Show();
-        HideFromScreen(_window);
+        _host = VisualTestHost.Show(_window);
 
-        Run(() => GalleryRun.ArrangeAsync(_services, _fixture));
+        VisualTestHost.Run(() => GalleryRun.ArrangeAsync(_services, _fixture));
 
-        PresentationTraceSources.Refresh();
-        PresentationTraceSources.DataBindingSource.Listeners.Add(_sink);
-        PresentationTraceSources.DataBindingSource.Switch.Level = SourceLevels.Error;
+        _sink = BindingErrorSink.Attach();
     }
 
     [OneTimeTearDown]
     public void OneTimeTearDown()
     {
-        PresentationTraceSources.DataBindingSource.Listeners.Remove(_sink);
-
-        _window?.Close();
+        _sink?.Dispose();
+        _host?.Dispose();
         _services?.Dispose();
         _logging?.Dispose();
 
@@ -297,65 +278,8 @@ public class BindingSmokeTests
         Assert.That(_sink.Errors, Is.Not.Empty, "Сенсор ошибок биндинга молчит – остальные проверки этого набора ничего не значат.");
     }
 
-    private static void Run(Func<Task> action)
-    {
-        var frame = new DispatcherFrame();
-        ExceptionDispatchInfo? failure = null;
-
-        _ = Dispatcher.CurrentDispatcher.InvokeAsync(async () =>
-        {
-            try
-            {
-                await action();
-            }
-            catch (Exception exception)
-            {
-                failure = ExceptionDispatchInfo.Capture(exception);
-            }
-            finally
-            {
-                frame.Continue = false;
-            }
-        });
-
-        Dispatcher.PushFrame(frame);
-        failure?.Throw();
-    }
-
-    private static void Pump()
-    {
-        var frame = new DispatcherFrame();
-        _ = Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(() => frame.Continue = false));
-        Dispatcher.PushFrame(frame);
-    }
-
     private void Settle()
     {
-        Pump();
-        _window.UpdateLayout();
-        Pump();
-    }
-
-    private static void HideFromScreen(Window window)
-    {
-        var handle = new WindowInteropHelper(window).Handle;
-
-        if (handle != IntPtr.Zero)
-        {
-            _ = NativeMethods.SetWindowPos(handle, IntPtr.Zero, 0, 0, 0, 0, NativeMethods.SwpHideWindow | NativeMethods.SwpNoMove | NativeMethods.SwpNoSize | NativeMethods.SwpNoZOrder | NativeMethods.SwpNoActivate);
-        }
-    }
-
-    private static class NativeMethods
-    {
-        public const uint SwpNoSize = 0x0001;
-        public const uint SwpNoMove = 0x0002;
-        public const uint SwpNoZOrder = 0x0004;
-        public const uint SwpNoActivate = 0x0010;
-        public const uint SwpHideWindow = 0x0080;
-
-        [DllImport("user32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
+        _host.Settle();
     }
 }

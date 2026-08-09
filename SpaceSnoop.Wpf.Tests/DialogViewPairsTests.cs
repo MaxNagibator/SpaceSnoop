@@ -1,21 +1,17 @@
-﻿using KeepShell.Bootstrap;
+﻿using KeepShell.Testing.Rules;
 using SpaceSnoop.Wpf.ViewModels.Dialogs;
 
 namespace SpaceSnoop.Wpf.Tests;
 
 public class DialogViewPairsTests
 {
-    public static IEnumerable<Type> DialogViewModels => typeof(ConfirmDialogViewModel).Assembly
-        .GetTypes()
-        .Where(x => !x.IsAbstract && x.Name.EndsWith("DialogViewModel", StringComparison.Ordinal));
-
-    [TestCaseSource(nameof(DialogViewModels))]
-    public void Каждой_модели_диалога_отвечает_представление(Type model)
+    [Test]
+    public void Каждой_модели_диалога_отвечает_представление()
     {
-        var contract = typeof(IView<>).MakeGenericType(model);
+        var offenders = ViewPairRule.MissingViews(typeof(ConfirmDialogViewModel).Assembly, ViewPairRule.IsDialogViewModel);
 
-        var view = model.Assembly.GetTypes().FirstOrDefault(x => !x.IsAbstract && contract.IsAssignableFrom(x));
-
-        Assert.That(view, Is.Not.Null, $"Для {model.Name} нет представления: окно покажет имя типа вместо диалога.");
+        Assert.That(offenders,
+            Is.Empty,
+            () => $"Без пары модальный хост покажет имя типа вместо диалога:{Environment.NewLine}{RuleViolation.Report(offenders)}");
     }
 }

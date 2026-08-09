@@ -1,6 +1,7 @@
 ﻿using KeepShell.Bootstrap;
 using KeepShell.Services;
 using KeepShell.Services.Modal;
+using KeepShell.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using SpaceSnoop.Core;
 using SpaceSnoop.Wpf.Bootstrap;

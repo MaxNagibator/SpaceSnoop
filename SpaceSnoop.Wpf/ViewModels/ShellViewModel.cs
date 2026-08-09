@@ -71,16 +71,17 @@ public sealed partial class ShellViewModel : ShellViewModelBase, IAppNavigator
         Preferences.PropertyChanged += OnPreferencesPropertyChanged;
         AppUpdate = appUpdate;
 
-        var scanItem = new NavigationItem("Сканирование", PackIconLucideKind.HardDrive, scan);
-        var syncItem = new NavigationItem("Синхронизация", PackIconLucideKind.FolderSync, sync);
-        var overviewItem = new NavigationItem("Обзор", PackIconLucideKind.LayoutGrid, overview);
-        var scheduleItem = new NavigationItem("Расписание", PackIconLucideKind.CalendarClock, schedule);
-        var cleanupItem = new NavigationItem("Очистка", PackIconLucideKind.Trash2, cleanup);
-        var logsItem = new NavigationItem("Логи", PackIconLucideKind.ScrollText, logs) { StartsGroup = true };
-        var performanceItem = new NavigationItem("Диагностика", PackIconLucideKind.Gauge, performance);
-        var aboutItem = new NavigationItem("О программе", PackIconLucideKind.Info, about);
+        var scanItem = new NavigationItem("Сканирование", PackIconLucideKind.HardDrive, scan, key: SectionKey.Scan);
+        var syncItem = new NavigationItem("Синхронизация", PackIconLucideKind.FolderSync, sync, key: SectionKey.Sync);
+        var overviewItem = new NavigationItem("Обзор", PackIconLucideKind.LayoutGrid, overview, key: SectionKey.Overview);
+        var scheduleItem = new NavigationItem("Расписание", PackIconLucideKind.CalendarClock, schedule, key: SectionKey.Schedule);
+        var cleanupItem = new NavigationItem("Очистка", PackIconLucideKind.Trash2, cleanup, key: SectionKey.Cleanup);
+        var logsItem = new NavigationItem("Логи", PackIconLucideKind.ScrollText, logs, key: SectionKey.Logs) { StartsGroup = true };
+        var performanceItem = new NavigationItem("Диагностика", PackIconLucideKind.Gauge, performance, key: SectionKey.Performance);
+        var aboutItem = new NavigationItem("О программе", PackIconLucideKind.Info, about, key: SectionKey.About);
 
-        _chatItem = new("Чат", PackIconLucideKind.MessageCircle, chat);
+        _chatItem = new("Чат", PackIconLucideKind.MessageCircle, chat, key: SectionKey.Chat);
+        _settingsItem = new("Настройки", PackIconLucideKind.Settings, settingsPage, key: SectionKey.Settings);
         _logsItem = logsItem;
         _syncItem = syncItem;
 
@@ -93,18 +94,15 @@ public sealed partial class ShellViewModel : ShellViewModelBase, IAppNavigator
         Sections.Add(performanceItem);
         Sections.Add(aboutItem);
 
-        _sectionByKey = new(StringComparer.OrdinalIgnoreCase)
-        {
-            [SectionKey.Scan] = scanItem,
-            [SectionKey.Sync] = syncItem,
-            [SectionKey.Overview] = overviewItem,
-            [SectionKey.Schedule] = scheduleItem,
-            [SectionKey.Cleanup] = cleanupItem,
-            [SectionKey.Chat] = _chatItem,
-            [SectionKey.Logs] = logsItem,
-            [SectionKey.Performance] = performanceItem,
-            [SectionKey.About] = aboutItem,
-        };
+        // Ключ лежит на самом пункте (KeepShell 0.1.87), поэтому индекс собирается обходом, а не
+        // вторым списком рядом с первым. Список пунктов здесь шире Sections: «Чат» выключается
+        // настройкой, а «Настройки» в рейл не входят вовсе – открывает их своя команда.
+        _sectionByKey = new NavigationItem[]
+            {
+                scanItem, syncItem, overviewItem, scheduleItem, cleanupItem,
+                _chatItem, logsItem, performanceItem, aboutItem, _settingsItem,
+            }
+            .ToDictionary(static item => item.Key, StringComparer.OrdinalIgnoreCase);
 
         _agent = agent;
         _agent.PropertyChanged += OnAgentPreferencesChanged;
@@ -113,9 +111,6 @@ public sealed partial class ShellViewModel : ShellViewModelBase, IAppNavigator
         sync.ProfileRunCompleted += overview.ApplyProfileRun;
 
         navigator.Attach(this);
-
-        _settingsItem = new("Настройки", PackIconLucideKind.Settings, settingsPage);
-        _sectionByKey[SectionKey.Settings] = _settingsItem;
 
         IsNavCollapsed = Preferences.NavCollapsed;
         Preferences.PropertyChanged += OnPreferencesChanged;
@@ -140,7 +135,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase, IAppNavigator
 
     public override IPageHeader? EffectivePageHeader => Preferences.ShowPageHeader ? CurrentPageHeader : null;
 
-    public string? CurrentSectionKey => _sectionByKey.FirstOrDefault(p => p.Value == Selected).Key;
+    public string? CurrentSectionKey => Selected?.Key is { Length: > 0 } key ? key : null;
 
     public ICommand? PageRefreshCommand => CurrentPageRefresh?.RefreshCommand;
 
@@ -160,13 +155,9 @@ public sealed partial class ShellViewModel : ShellViewModelBase, IAppNavigator
         StatusText = "Готов";
         OnPropertyChanged(nameof(PageRefreshCommand));
 
-        if (value is not null && Sections.Contains(value))
+        if (value?.Key is { Length: > 0 } key && Sections.Contains(value))
         {
-            var key = _sectionByKey.FirstOrDefault(p => p.Value == value).Key;
-            if (key is not null)
-            {
-                Preferences.LastPage = key;
-            }
+            Preferences.LastPage = key;
         }
     }
 

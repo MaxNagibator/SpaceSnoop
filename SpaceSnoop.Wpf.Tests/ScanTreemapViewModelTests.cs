@@ -1,4 +1,5 @@
-﻿using SpaceSnoop.Core.Domain;
+﻿using KeepShell.Testing;
+using SpaceSnoop.Core.Domain;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.ViewModels.Scan;
 using System.IO;

@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using KeepShell.Testing.Rules;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 
 namespace SpaceSnoop.Wpf.Tests;
@@ -10,21 +11,10 @@ public class ArchitectureRuleTests
 
     private static readonly string[] PipelineTypes = ["DirectoryComparer", "SyncEngine"];
 
-    private static readonly string[] PlatformTypes = ["DispatcherTimer", "OpenFolderDialog", "SaveFileDialog"];
-
-    private static readonly string[] PlatformMembers = ["Clipboard.", "Process.Start", "Application.Current", "StyledMessageBox"];
-
     private static readonly Regex[] PipelineConstruction =
     [
         .. PipelineTypes.Select(static type => new Regex($@"new\s+(?:[\w.]+\.)?{type}\s*[({{]", RegexOptions.Compiled)),
         .. PipelineTypes.Select(static type => new Regex($@"\b{type}\s+\w+\s*=\s*new\s*[({{]", RegexOptions.Compiled)),
-    ];
-
-    private static readonly Regex[] PlatformUse =
-    [
-        .. PlatformTypes.Select(static type => new Regex($@"new\s+(?:[\w.]+\.)?{type}\s*[({{]", RegexOptions.Compiled)),
-        .. PlatformTypes.Select(static type => new Regex($@"\b{type}\s+\w+\s*=\s*new\s*[({{]", RegexOptions.Compiled)),
-        .. PlatformMembers.Select(static member => new Regex(Regex.Escape(member), RegexOptions.Compiled)),
     ];
 
     [Test]
@@ -43,14 +33,12 @@ public class ArchitectureRuleTests
     [Test]
     public void Модели_не_зовут_платформу_мимо_шлюзов()
     {
-        var offenders = SourceFiles()
-            .Where(static file => file.Contains($"SpaceSnoop.Wpf{Path.DirectorySeparatorChar}ViewModels{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-            .SelectMany(file => Matches(file, PlatformUse))
-            .ToList();
+        var models = Path.Combine(RepositoryRoot(), "SpaceSnoop.Wpf", "ViewModels");
+        var offenders = PlatformCallRule.Check(ProjectFiles.Enumerate(models, "*.cs"), RepositoryRoot());
 
         Assert.That(offenders,
             Is.Empty,
-            () => $"Платформа доступна моделям только через шлюзы KeepShell.Services.Platform – прямой вызов не подменить дублем в тесте:{Environment.NewLine}{string.Join(Environment.NewLine, offenders)}");
+            () => $"Платформа доступна моделям только через шлюзы KeepShell.Services.Platform – прямой вызов не подменить дублем в тесте:{Environment.NewLine}{RuleViolation.Report(offenders)}");
     }
 
     [Test]

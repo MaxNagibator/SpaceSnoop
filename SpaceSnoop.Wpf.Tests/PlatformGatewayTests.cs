@@ -1,4 +1,5 @@
 ﻿using KeepShell.Bootstrap;
+using KeepShell.Testing;
 using KeepShell.ViewModels;
 using Microsoft.Extensions.Logging.Abstractions;
 using SpaceSnoop.Core.Domain;

@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging.Abstractions;
+﻿using KeepShell.Testing;
+using Microsoft.Extensions.Logging.Abstractions;
 using ModelContextProtocol;
 using SpaceSnoop.Core;
 using SpaceSnoop.Core.Cleanup;
