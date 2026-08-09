@@ -94,9 +94,6 @@ public sealed partial class ShellViewModel : ShellViewModelBase, IAppNavigator
         Sections.Add(performanceItem);
         Sections.Add(aboutItem);
 
-        // Ключ лежит на самом пункте (KeepShell 0.1.87), поэтому индекс собирается обходом, а не
-        // вторым списком рядом с первым. Список пунктов здесь шире Sections: «Чат» выключается
-        // настройкой, а «Настройки» в рейл не входят вовсе – открывает их своя команда.
         _sectionByKey = new NavigationItem[]
             {
                 scanItem, syncItem, overviewItem, scheduleItem, cleanupItem,

@@ -3,10 +3,6 @@ using SpaceSnoop.Wpf.Views;
 
 namespace SpaceSnoop.Wpf.Bootstrap.Gallery;
 
-/// <summary>
-/// SpaceSnoop глазами каркасной галереи: список кейсов и съёмка одного кадра. Цикл по темам, окно за
-/// экраном, пропуски, индекс и код возврата держит <see cref="GalleryRunner" />.
-/// </summary>
 internal sealed class GalleryHost : IGalleryHost
 {
     public const string DialogKind = "dialog";
@@ -44,10 +40,6 @@ internal sealed class GalleryHost : IGalleryHost
 
     public IReadOnlyDictionary<string, string>? Tags { get; }
 
-    /// <summary>
-    /// Отбирает кейсы, которые поддержаны выбранным состоянием, и докладывает отброшенное: иначе
-    /// «сняли всё» читалось бы по каталогу, где половины кейсов нет.
-    /// </summary>
     public static GalleryHost Create(IServiceProvider services, GalleryFixture fixture, GalleryOptions options, ILogger logger)
     {
         var pages = options.Pages.Where(page => GalleryStates.SupportsPage(page, options.State)).ToList();
@@ -78,7 +70,6 @@ internal sealed class GalleryHost : IGalleryHost
         return ArrangeAsync(_services, _fixture);
     }
 
-    /// <summary>Раскладка фикстур: те же данные, что видит человек. Зовут галерея и smoke-тесты биндингов.</summary>
     internal static async Task ArrangeAsync(IServiceProvider services, GalleryFixture fixture)
     {
         var scan = services.GetRequiredService<ScanViewModel>();
@@ -170,8 +161,6 @@ internal sealed class GalleryHost : IGalleryHost
         GalleryTips.Prepare(tip, _services);
         await context.SettleAsync().ConfigureAwait(true);
 
-        // Единственное место галереи, где окно видно человеку: за экраном Popup вытолкнулся бы на
-        // видимый монитор, и снятое смещение соврало бы.
         _window.Left = 0;
         _window.Top = 0;
         await context.SettleAsync().ConfigureAwait(true);
@@ -227,7 +216,6 @@ internal sealed class GalleryHost : IGalleryHost
     }
 }
 
-/// <summary>Прогон докладывает о себе в общий журнал приложения (`AppLog` 2200–2205).</summary>
 internal sealed class GalleryJournal(ILogger logger) : IGalleryJournal
 {
     public void Started(int cases, int themes, string directory)

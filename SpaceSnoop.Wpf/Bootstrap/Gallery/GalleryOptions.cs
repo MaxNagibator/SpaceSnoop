@@ -1,9 +1,5 @@
 ﻿namespace SpaceSnoop.Wpf.Bootstrap.Gallery;
 
-/// <summary>
-/// Прикладная часть строки запуска: диалоги, подсказки и состояние страниц. Общие ключи разбирает
-/// каркас, здесь остаётся то, о чём он знать не должен, – перечень наших кейсов.
-/// </summary>
 public sealed record GalleryOptions(
     GalleryArguments Arguments,
     IReadOnlyList<string> Dialogs,
@@ -23,7 +19,6 @@ public sealed record GalleryOptions(
 
     public IReadOnlyList<string> Themes => Arguments.Themes;
 
-    /// <summary>Темы прогона по умолчанию: Tarkov снимается только по явной просьбе.</summary>
     public static IReadOnlyList<string> DefaultThemes { get; } = [AppThemes.LightKey, AppThemes.DarkKey];
 
     public static GalleryOptions Parse(IEnumerable<string> args, string defaultDirectory)

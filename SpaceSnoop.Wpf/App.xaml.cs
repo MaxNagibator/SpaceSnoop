@@ -240,7 +240,6 @@ public partial class App : Application
     {
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-        // Темы регистрируются до разбора: ключ темы каркас проверяет по реестру, а не по списку имён.
         AppThemes.Register();
 
         var directory = Path.Combine(AppStorage.DataDirectory, GalleryRunner.FolderName);

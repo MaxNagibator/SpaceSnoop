@@ -4,11 +4,6 @@ using SpaceSnoop.Wpf.Bootstrap.Gallery;
 
 namespace SpaceSnoop.Wpf.Tests;
 
-/// <summary>
-/// Прикладная часть разбора строки запуска галереи: страницы, диалоги, подсказки, состояние и набор
-/// тем этого приложения. Общие ключи (размер, масштабы, позиционный каталог, неизвестный флаг)
-/// разбирает каркас, и кейсы на них живут там же – `KeepShell.Tests/GalleryArgumentsTests`.
-/// </summary>
 [TestFixture]
 public class GalleryOptionsTests
 {
@@ -17,8 +12,6 @@ public class GalleryOptionsTests
     [OneTimeSetUp]
     public void RegisterThemes()
     {
-        // Ключ темы каркас проверяет по реестру, а темы строятся на pack-URI: без схемы у них
-        // падает статический инициализатор.
         PackScheme.Ensure();
         AppThemes.Register();
     }
