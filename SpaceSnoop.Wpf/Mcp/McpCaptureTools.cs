@@ -10,7 +10,7 @@ internal sealed class McpCaptureTools(McpNavigator navigator, ILogger logger)
     {
         section = section?.Trim();
         element = element?.Trim();
-        scale = Math.Clamp(scale, AppDefaults.ViewCaptureScaleMin, AppDefaults.ViewCaptureScaleMax);
+        scale = Math.Clamp(scale, ViewCapture.ScaleMin, ViewCapture.ScaleMax);
 
         logger.McpToolInvoked("capture_view", $"страница {(section is { Length: > 0 } ? section : "текущая")}, элемент {(element is { Length: > 0 } ? element : "всё окно")}, масштаб {scale:0.##}");
 
@@ -48,9 +48,9 @@ internal sealed class McpCaptureTools(McpNavigator navigator, ILogger logger)
 
         var page = navigator.CurrentSectionKey ?? "-";
         var label = named ? $"{page}-{element}" : page;
-        var path = Path.Combine(ViewCapture.DirectoryPath, ViewCapture.FileName(label, DateTimeOffset.Now));
+        var path = Path.Combine(AppStorage.ShotsDirectory, ViewCapture.FileName(label, DateTimeOffset.Now));
 
-        ViewCapture.DropObsolete(ViewCapture.DirectoryPath, AppDefaults.ViewCaptureLimit - 1, logger.ViewCaptureFailed);
+        ViewCapture.DropObsolete(AppStorage.ShotsDirectory, AppDefaults.ViewCaptureLimit - 1, logger.ViewCaptureFailed);
 
         int width;
         int height;

@@ -26,6 +26,8 @@ public static class AppStorage
 
     public static string DataDirectory { get; } = EnsureExists(DirectoryFor(UseAppData));
 
+    public static string ShotsDirectory { get; } = Path.Combine(DataDirectory, ViewCapture.FolderName);
+
     public static string DirectoryFor(bool useAppData)
     {
         return useAppData ? AppDataDirectory : PortableDirectory;

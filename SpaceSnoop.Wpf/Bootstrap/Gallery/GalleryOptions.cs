@@ -136,7 +136,7 @@ public sealed record GalleryOptions(
     private static double ParseScale(string value, double scale)
     {
         return double.TryParse(value, System.Globalization.CultureInfo.InvariantCulture, out var parsed)
-            ? Math.Clamp(parsed, AppDefaults.ViewCaptureScaleMin, AppDefaults.ViewCaptureScaleMax)
+            ? Math.Clamp(parsed, ViewCapture.ScaleMin, ViewCapture.ScaleMax)
             : scale;
     }
 

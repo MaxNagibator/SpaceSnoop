@@ -4,7 +4,7 @@ namespace SpaceSnoop.Wpf.Tests;
 
 internal sealed class FakeUiTimer(TimeSpan interval, Action tick) : IUiTimer
 {
-    public TimeSpan Interval => interval;
+    public TimeSpan Interval { get; set; } = interval;
 
     public bool IsRunning { get; private set; }
 

@@ -1,4 +1,5 @@
 ﻿using KeepShell.Bootstrap;
+using KeepShell.Services.Platform;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Bootstrap.Gallery;
 
@@ -169,8 +170,8 @@ public class GalleryOptionsTests
     }
 
     [TestCase("2", 2d)]
-    [TestCase("0.1", AppDefaults.ViewCaptureScaleMin)]
-    [TestCase("10", AppDefaults.ViewCaptureScaleMax)]
+    [TestCase("0.1", ViewCapture.ScaleMin)]
+    [TestCase("10", ViewCapture.ScaleMax)]
     [TestCase("мусор", AppDefaults.ViewCaptureScaleDefault)]
     public void Масштаб_кадра_разбирается_и_зажимается(string value, double scale)
     {

@@ -8,6 +8,8 @@ internal sealed class FakeFilePicker : IFilePicker
 
     public string? SavePath { get; set; }
 
+    public string? OpenPath { get; set; }
+
     public List<string> Titles { get; } = [];
 
     public string? PickFolder(string title, string? initialDirectory = null)
@@ -15,6 +17,13 @@ internal sealed class FakeFilePicker : IFilePicker
         Titles.Add(title);
 
         return Folder;
+    }
+
+    public string? PickFile(FileOpenRequest request)
+    {
+        Titles.Add(request.Title);
+
+        return OpenPath;
     }
 
     public string? SaveFile(FileSaveRequest request)
