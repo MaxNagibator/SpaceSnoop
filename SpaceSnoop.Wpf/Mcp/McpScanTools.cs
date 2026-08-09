@@ -45,14 +45,11 @@ internal sealed class McpScanTools(
             });
         }
 
-        // Те же параметры обхода, что и у человека на странице «Сканирование».
         var parallelism = scanPreferences.ResolveParallelism(path);
         var multithreaded = parallelism > 1;
 
         var directory = new DirectoryInfo(path);
 
-        // Замер останавливается до сборки выгрузки: она обходит дерево ещё раз, и «время скана»
-        // в окне означало бы не то же, что «время скана» у агента.
         var phases = new ScanPhases();
 
         var (tree, model, run) = await Task.Run(() =>

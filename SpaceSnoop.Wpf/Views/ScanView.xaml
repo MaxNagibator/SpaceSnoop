@@ -26,7 +26,6 @@
         <controls:ScanProgressPanel Grid.Row="1"
                                     DataContext="{Binding Progress}" />
 
-        <!--  Плашка отмены: появляется когда сканирование прервано пользователем  -->
         <Border Grid.Row="2"
                 Style="{StaticResource Card.Inset}"
                 Padding="14,10"

@@ -176,10 +176,6 @@ public sealed partial class ShellViewModel : ShellViewModelBase, IAppNavigator
         Selected = _settingsItem;
     }
 
-    /// <summary>
-    /// Страница чата видна только при включённой настройке: обнаружение CLI стоит запуска процесса,
-    /// поэтому при старте оно не делается вовсе – страница сама проверяет наличие CLI при первом открытии.
-    /// </summary>
     private void ApplyChatSection()
     {
         var visible = Sections.Contains(_chatItem);
@@ -269,7 +265,6 @@ public sealed partial class ShellViewModel : ShellViewModelBase, IAppNavigator
             _ => null,
         };
 
-        // Последней страницей мог остаться выключенный с тех пор «Чат» – его в списке уже нет.
         return target is not null && Sections.Contains(target) ? target : Sections[0];
     }
 
