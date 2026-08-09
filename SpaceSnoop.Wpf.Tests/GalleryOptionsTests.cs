@@ -1,14 +1,27 @@
-﻿using KeepShell.Bootstrap;
-using KeepShell.Services.Platform;
+﻿using KeepShell.Testing;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Bootstrap.Gallery;
 
 namespace SpaceSnoop.Wpf.Tests;
 
+/// <summary>
+/// Прикладная часть разбора строки запуска галереи: страницы, диалоги, подсказки, состояние и набор
+/// тем этого приложения. Общие ключи (размер, масштабы, позиционный каталог, неизвестный флаг)
+/// разбирает каркас, и кейсы на них живут там же – `KeepShell.Tests/GalleryArgumentsTests`.
+/// </summary>
 [TestFixture]
 public class GalleryOptionsTests
 {
     private const string Default = @"C:\shots";
+
+    [OneTimeSetUp]
+    public void RegisterThemes()
+    {
+        // Ключ темы каркас проверяет по реестру, а темы строятся на pack-URI: без схемы у них
+        // падает статический инициализатор.
+        PackScheme.Ensure();
+        AppThemes.Register();
+    }
 
     [Test]
     public void Без_аргументов_снимаются_все_страницы_в_двух_темах()
@@ -21,24 +34,9 @@ public class GalleryOptionsTests
             Assert.That(options.Pages, Is.EqualTo(SectionKey.All));
             Assert.That(options.Dialogs, Is.EqualTo(GalleryDialogs.All));
             Assert.That(options.Tips, Is.EqualTo(GalleryTips.All));
-            Assert.That(options.Element, Is.Empty);
             Assert.That(options.State, Is.EqualTo(GalleryStates.Idle));
-            Assert.That(options.Themes, Is.EqualTo(new[] { AppTheme.Light, AppTheme.Dark }));
-            Assert.That(options.Width, Is.EqualTo(AppDefaults.GalleryWidthDefault));
-            Assert.That(options.Scale, Is.EqualTo(AppDefaults.ViewCaptureScaleDefault));
-            Assert.That(options.Unknown, Is.Empty);
-        });
-    }
-
-    [Test]
-    public void Первый_позиционный_аргумент_задаёт_каталог()
-    {
-        var options = GalleryOptions.Parse([@"D:\out", "--themes", "dark"], Default);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(options.Directory, Is.EqualTo(@"D:\out"));
-            Assert.That(options.Themes, Is.EqualTo(new[] { AppTheme.Dark }));
+            Assert.That(options.Themes, Is.EqualTo(new[] { AppThemes.LightKey, AppThemes.DarkKey }));
+            Assert.That(options.Arguments.Unknown, Is.Empty);
         });
     }
 
@@ -52,7 +50,7 @@ public class GalleryOptionsTests
         {
             Assert.That(picked.Dialogs, Is.EqualTo(new[] { GalleryDialogs.Diff, GalleryDialogs.Confirm }));
             Assert.That(off.Dialogs, Is.Empty);
-            Assert.That(off.Unknown, Is.Empty);
+            Assert.That(off.Arguments.Unknown, Is.Empty);
         });
     }
 
@@ -69,7 +67,7 @@ public class GalleryOptionsTests
             Assert.That(picked.Dialogs, Is.EqualTo(GalleryDialogs.All));
             Assert.That(off.Tips, Is.Empty);
             Assert.That(unknown.Tips, Is.EqualTo(new[] { GalleryTips.TreemapCenter }));
-            Assert.That(unknown.Unknown, Is.EqualTo(new[] { "всплывашка" }));
+            Assert.That(unknown.Arguments.Unknown, Is.EqualTo(new[] { "всплывашка" }));
         });
     }
 
@@ -81,14 +79,8 @@ public class GalleryOptionsTests
         Assert.Multiple(() =>
         {
             Assert.That(options.Dialogs, Is.EqualTo(new[] { GalleryDialogs.Diff }));
-            Assert.That(options.Unknown, Is.EqualTo(new[] { "вьюха" }));
+            Assert.That(options.Arguments.Unknown, Is.EqualTo(new[] { "вьюха" }));
         });
-    }
-
-    [Test]
-    public void Элемент_снимка_берётся_из_ключа_как_есть()
-    {
-        Assert.That(GalleryOptions.Parse(["--element", "Cleanup"], Default).Element, Is.EqualTo("Cleanup"));
     }
 
     [TestCase("busy", GalleryStates.Busy)]
@@ -101,7 +93,7 @@ public class GalleryOptionsTests
         Assert.Multiple(() =>
         {
             Assert.That(options.State, Is.EqualTo(state));
-            Assert.That(options.Unknown, Is.Empty);
+            Assert.That(options.Arguments.Unknown, Is.Empty);
         });
     }
 
@@ -113,7 +105,7 @@ public class GalleryOptionsTests
         Assert.Multiple(() =>
         {
             Assert.That(options.State, Is.EqualTo(GalleryStates.Idle));
-            Assert.That(options.Unknown, Is.EqualTo(new[] { "работает" }));
+            Assert.That(options.Arguments.Unknown, Is.EqualTo(new[] { "работает" }));
         });
     }
 
@@ -125,7 +117,7 @@ public class GalleryOptionsTests
         Assert.Multiple(() =>
         {
             Assert.That(options.Pages, Is.EqualTo(new[] { SectionKey.Sync, SectionKey.Scan }));
-            Assert.That(options.Themes, Is.EqualTo(new[] { AppTheme.Dark, AppTheme.Light }));
+            Assert.That(options.Themes, Is.EqualTo(new[] { AppThemes.DarkKey, AppThemes.LightKey }));
         });
     }
 
@@ -137,8 +129,8 @@ public class GalleryOptionsTests
         Assert.Multiple(() =>
         {
             Assert.That(options.Pages, Is.EqualTo(new[] { SectionKey.Scan }));
-            Assert.That(options.Themes, Is.EqualTo(new[] { AppTheme.Light }));
-            Assert.That(options.Unknown, Is.EqualTo(new[] { "тьма", "неон" }));
+            Assert.That(options.Themes, Is.EqualTo(new[] { AppThemes.LightKey }));
+            Assert.That(options.Arguments.Unknown, Is.EqualTo(new[] { "неон", "тьма" }));
         });
     }
 
@@ -150,52 +142,18 @@ public class GalleryOptionsTests
         Assert.Multiple(() =>
         {
             Assert.That(options.Pages, Is.EqualTo(SectionKey.All));
-            Assert.That(options.Themes, Is.EqualTo(new[] { AppTheme.Light, AppTheme.Dark }));
+            Assert.That(options.Themes, Is.EqualTo(GalleryOptions.DefaultThemes));
         });
-    }
-
-    [TestCase("1920x1080", 1920, 1080)]
-    [TestCase("1920X1080", 1920, 1080)]
-    [TestCase("99999x10", AppDefaults.GallerySizeMax, AppDefaults.GallerySizeMin)]
-    [TestCase("мусор", AppDefaults.GalleryWidthDefault, AppDefaults.GalleryHeightDefault)]
-    public void Размер_окна_разбирается_и_зажимается(string value, int width, int height)
-    {
-        var options = GalleryOptions.Parse(["--size", value], Default);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(options.Width, Is.EqualTo(width));
-            Assert.That(options.Height, Is.EqualTo(height));
-        });
-    }
-
-    [TestCase("2", 2d)]
-    [TestCase("0.1", ViewCapture.ScaleMin)]
-    [TestCase("10", ViewCapture.ScaleMax)]
-    [TestCase("мусор", AppDefaults.ViewCaptureScaleDefault)]
-    public void Масштаб_кадра_разбирается_и_зажимается(string value, double scale)
-    {
-        Assert.That(GalleryOptions.Parse(["--scale", value], Default).Scale, Is.EqualTo(scale));
-    }
-
-    [TestCase("1.6", 1.6)]
-    [TestCase("0.1", FontScaleManager.MinScale)]
-    [TestCase("10", FontScaleManager.MaxScale)]
-    [TestCase("мусор", FontScaleManager.DefaultScale)]
-    public void Масштаб_шрифта_разбирается_и_зажимается(string value, double fontScale)
-    {
-        Assert.That(GalleryOptions.Parse(["--font-scale", value], Default).FontScale, Is.EqualTo(fontScale));
     }
 
     [Test]
-    public void Неизвестный_флаг_не_считается_каталогом()
+    public void Тема_Tarkov_снимается_только_по_явной_просьбе()
     {
-        var options = GalleryOptions.Parse(["--depth", "3"], Default);
-
         Assert.Multiple(() =>
         {
-            Assert.That(options.Directory, Is.EqualTo(Default));
-            Assert.That(options.Unknown, Does.Contain("--depth"));
+            Assert.That(GalleryOptions.Parse([], Default).Themes, Does.Not.Contain(AppThemes.TarkovKey));
+            Assert.That(GalleryOptions.Parse(["--themes", AppThemes.TarkovKey], Default).Themes,
+                Is.EqualTo(new[] { AppThemes.TarkovKey }));
         });
     }
 }

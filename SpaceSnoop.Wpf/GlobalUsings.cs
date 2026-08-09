@@ -1,5 +1,6 @@
 ﻿global using CommunityToolkit.Mvvm.ComponentModel;
 global using CommunityToolkit.Mvvm.Input;
+global using KeepShell.Automation;
 global using KeepShell.Bootstrap;
 global using KeepShell.Services.Platform;
 global using KeepShell.ViewModels;

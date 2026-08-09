@@ -240,7 +240,10 @@ public partial class App : Application
     {
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-        var directory = Path.Combine(AppStorage.DataDirectory, GalleryRun.FolderName);
+        // Темы регистрируются до разбора: ключ темы каркас проверяет по реестру, а не по списку имён.
+        AppThemes.Register();
+
+        var directory = Path.Combine(AppStorage.DataDirectory, GalleryRunner.FolderName);
         var options = GalleryOptions.Parse(args, directory);
 
         _ = Dispatcher.InvokeAsync(async () =>
@@ -254,14 +257,16 @@ public partial class App : Application
                 ISettingsStore settings = new SettingsStore(settingsPath);
                 SyncProfileStore.Save(settings, GalleryFixtures.Profiles(fixture));
 
-                AppThemes.Register();
                 ThemeManager.Apply(AppThemes.LightKey);
-                FontScaleManager.Initialize(options.FontScale);
+                FontScaleManager.Initialize(options.Arguments.FontScale);
                 ViewLocator.InstallIntoApplication();
 
                 _services = ConfigureServices(settings, _logging!);
 
-                exitCode = await GalleryRun.RenderAsync(options, _services, fixture, _logging!.CreateLogger<App>());
+                var logger = _logging!.CreateLogger<App>();
+                var host = GalleryHost.Create(_services, fixture, options, logger);
+
+                exitCode = await GalleryRunner.RunAsync(host, options.Arguments, new GalleryJournal(logger));
             }
             catch (Exception ex)
             {

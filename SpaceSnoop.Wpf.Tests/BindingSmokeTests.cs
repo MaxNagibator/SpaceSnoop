@@ -67,7 +67,7 @@ public class BindingSmokeTests
 
         _host = VisualTestHost.Show(_window);
 
-        VisualTestHost.Run(() => GalleryRun.ArrangeAsync(_services, _fixture));
+        VisualTestHost.Run(() => GalleryHost.ArrangeAsync(_services, _fixture));
 
         _sink = BindingErrorSink.Attach();
     }
