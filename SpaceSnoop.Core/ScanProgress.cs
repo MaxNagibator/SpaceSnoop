@@ -83,6 +83,21 @@ public sealed class ScanProgress
     }
 
     /// <summary>
+    /// Обнуляет счётчики: обход, начатый и брошенный на полпути, не должен добавлять
+    /// свои числа к тому, который его заменяет.
+    /// </summary>
+    public void Reset()
+    {
+        Interlocked.Exchange(ref _directoriesScanned, 0);
+        Interlocked.Exchange(ref _directoriesFailed, 0);
+        Interlocked.Exchange(ref _filesScanned, 0);
+        Interlocked.Exchange(ref _bytesScanned, 0);
+        Interlocked.Exchange(ref _topLevelTotal, 0);
+        Interlocked.Exchange(ref _topLevelCompleted, 0);
+        _currentPath = string.Empty;
+    }
+
+    /// <summary>
     /// Снимает текущий срез прогресса. Поля читаются независимо, поэтому могут быть слегка
     /// рассогласованы между собой – для индикатора прогресса это допустимо.
     /// </summary>

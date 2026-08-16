@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using SpaceSnoop.Core.Cleanup;
+using SpaceSnoop.Core.Mft;
 
 namespace SpaceSnoop.Core;
 
@@ -50,4 +51,9 @@ internal static partial class CoreLog
 
     [LoggerMessage(EventId = 1244, Level = LogLevel.Warning, Message = "Очистка: цель «{TargetId}» недоступна ({Availability})")]
     public static partial void CleanupTargetUnavailable(this ILogger logger, string targetId, CleanupAvailability availability);
+
+    [LoggerMessage(EventId = 1260, Level = LogLevel.Information,
+        Message = "Обход по $MFT: «{Path}», записей {Records}, повторных имён {ExtraNames} на {ExtraNameBytes} Б")]
+    public static partial void MftScanCompleted(this ILogger logger, string path, int records, long extraNames, long extraNameBytes);
+
 }

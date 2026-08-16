@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="SpaceSnoop.Benchmarks" />
+    <InternalsVisibleTo Include="SpaceSnoop.Tests" />
   </ItemGroup>
 
   <ItemGroup>
