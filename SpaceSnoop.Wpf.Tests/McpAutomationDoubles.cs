@@ -48,6 +48,8 @@ internal sealed class ScanAutomationDouble : IScanAutomation
 
     public PerformanceTraversal? AppliedTraversal { get; private set; }
 
+    public long AppliedExtraNameBytes { get; private set; }
+
     public int ScanCalls { get; private set; }
 
     public int ArchiveCalls { get; private set; }
@@ -95,10 +97,11 @@ internal sealed class ScanAutomationDouble : IScanAutomation
         SelectCalls++;
     }
 
-    public void ApplyScanResult(DirectorySpace result, TimeSpan elapsed, PerformanceTraversal? traversal)
+    public void ApplyScanResult(DirectorySpace result, TimeSpan elapsed, PerformanceTraversal? traversal, long extraNameBytes)
     {
         ApplyCalls++;
         AppliedTraversal = traversal;
+        AppliedExtraNameBytes = extraNameBytes;
     }
 
     public Task ScanFromAutomationAsync(string path, CancellationToken cancellationToken)

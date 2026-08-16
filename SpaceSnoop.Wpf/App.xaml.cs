@@ -150,6 +150,8 @@ public partial class App : Application
         services.AddKeepShellLogging(logging);
 
         services.AddSingleton<DiskSpaceCalculator>();
+        services.AddSingleton<MftScanner>();
+        services.AddSingleton<ScanRunner>();
 
         services.AddSingleton<DuplicateFinder>();
         services.AddSingleton<DockerService>();

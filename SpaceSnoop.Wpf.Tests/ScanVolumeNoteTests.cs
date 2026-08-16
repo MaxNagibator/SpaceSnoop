@@ -4,6 +4,31 @@ using SpaceSnoop.Wpf.Bootstrap.Platform;
 namespace SpaceSnoop.Wpf.Tests;
 
 [TestFixture]
+public class ScanLinkNoteTests
+{
+    [Test]
+    public void Снятый_двойной_счёт_показывается_размером()
+    {
+        Assert.That(ScanLinkNote.Describe(13L * 1024 * 1024 * 1024), Does.Contain("13").And.Contain("ГБ"));
+    }
+
+    [TestCase(0L)]
+    [TestCase(-1L)]
+    public void Без_повторных_имён_примечания_нет(long extraNameBytes)
+    {
+        Assert.That(ScanLinkNote.Describe(extraNameBytes), Is.Null);
+    }
+
+    [Test]
+    public void Подсказка_называет_величину_и_причину()
+    {
+        var hint = ScanLinkNote.Explain("≈13 ГБ");
+
+        Assert.That(hint, Does.Contain("≈13 ГБ").And.Contain(ScanLinkNote.Hint));
+    }
+}
+
+[TestFixture]
 public class ScanVolumeNoteTests
 {
     private const long Total = 60L * 1024 * 1024 * 1024;

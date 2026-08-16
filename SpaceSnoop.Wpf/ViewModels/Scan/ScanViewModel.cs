@@ -3,6 +3,7 @@
 using MahApps.Metro.IconPacks;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Windows.Input;
 
@@ -10,7 +11,7 @@ namespace SpaceSnoop.Wpf.ViewModels.Scan;
 
 public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPageStatus
 {
-    private readonly DiskSpaceCalculator _calculator;
+    private readonly ScanRunner _runner;
     private readonly IDialogService _dialogs;
     private readonly ISettingsStore _settings;
     private readonly ScanNodeFactory _nodeFactory;
@@ -64,7 +65,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     private bool _scanWasCancelled;
 
     public ScanViewModel(
-        DiskSpaceCalculator calculator,
+        ScanRunner runner,
         IDialogService dialogs,
         ISettingsStore settings,
         OperationPreferences operations,
@@ -83,7 +84,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         IAppNavigator navigator)
     {
         _navigator = navigator;
-        _calculator = calculator;
+        _runner = runner;
         _runs = runs;
         _dialogs = dialogs;
         _settings = settings;
@@ -432,16 +433,16 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
             _logger.ScanStarted(path, parallelism > 1, parallelism);
 
-            var result = await Task.Run(() => parallelism > 1
-                    ? _calculator.CalculateMultithreaded(directory, parallelism, progress, token)
-                    : _calculator.Calculate(directory, progress, token),
-                token);
+            var outcome = await RunTraversalAsync(directory, parallelism, progress, token);
 
             var elapsed = Progress.Finish();
+            var applied = Stopwatch.StartNew();
 
-            ApplyScanResult(result, elapsed, Progress.Traversal);
+            ApplyScanResult(outcome.Root, elapsed, Progress.Traversal, outcome.ExtraNameBytes);
 
-            _notifier.Notify($"Сканирование завершено: {result.AbsolutePath} · {result.TotalSizeText}", StatusSeverity.Success);
+            _logger.ScanPhases((long)elapsed.TotalMilliseconds, (long)applied.Elapsed.TotalMilliseconds);
+
+            _notifier.Notify($"Сканирование завершено: {outcome.Root.AbsolutePath} · {outcome.Root.TotalSizeText}", StatusSeverity.Success);
         }
         catch (OperationCanceledException)
         {
@@ -466,4 +467,5 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
             _cts = null;
         }
     }
+
 }

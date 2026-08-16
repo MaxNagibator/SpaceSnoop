@@ -8,7 +8,7 @@ namespace SpaceSnoop.Wpf.Mcp;
 internal sealed class McpScanTools(
     IScanAutomation scan,
     ScanPreferences scanPreferences,
-    DiskSpaceCalculator calculator,
+    ScanRunner runner,
     DuplicateFinder duplicates,
     McpPreferences preferences,
     ToastNotifier notifier,
@@ -52,25 +52,23 @@ internal sealed class McpScanTools(
 
         var phases = new ScanPhases();
 
-        var (tree, model, run) = await Task.Run(() =>
+        var (tree, model, run, extraNameBytes) = await Task.Run(() =>
                 {
                     using var probe = new BackgroundScanProbe(performance,
                         runs,
                         ScanProgressViewModel.EstimateTotalBytes(directory),
                         parallelism);
 
-                    var root = parallelism > 1
-                        ? calculator.CalculateMultithreaded(directory, parallelism, probe.Progress, cancellationToken)
-                        : calculator.Calculate(directory, probe.Progress, cancellationToken);
+                    var outcome = runner.Run(directory, parallelism, probe.Progress, cancellationToken);
 
                     var walked = probe.Finish();
                     phases.WalkMs = (long)walked.Elapsed.TotalMilliseconds;
 
                     var stopwatch = Stopwatch.StartNew();
-                    var built = ScanExport.Build(root, directory.FullName, new(depth, multithreaded, parallelism), AppInfo.Version, entryLimit);
+                    var built = ScanExport.Build(outcome.Root, directory.FullName, new(depth, multithreaded, parallelism), AppInfo.Version, entryLimit);
                     phases.ExportMs = stopwatch.ElapsedMilliseconds;
 
-                    return (root, built, walked);
+                    return (outcome.Root, built, walked, outcome.ExtraNameBytes);
                 },
                 cancellationToken)
             .ConfigureAwait(false);
@@ -89,7 +87,7 @@ internal sealed class McpScanTools(
                     throw new McpException("Страница «Сканирование» занялась другой операцией, пока шёл обход – результат не показан. Повторите с show=false, чтобы получить данные без окна.");
                 }
 
-                scan.ApplyScanResult(tree, run.Elapsed, run.Traversal);
+                scan.ApplyScanResult(tree, run.Elapsed, run.Traversal, extraNameBytes);
                 scan.SelectPathForAutomation(tree.AbsolutePath);
                 navigator.DeferOrNavigate(SectionKey.Scan);
                 notifier.Notify($"Агент показал сканирование: {tree.AbsolutePath} · {tree.TotalSizeText}");

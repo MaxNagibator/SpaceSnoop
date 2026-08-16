@@ -43,12 +43,14 @@ public class McpBridgeGuardTests
         _cleanup = new();
         _monitor = new(NullLogger<PerformanceMonitor>.Instance);
 
+        var scanPreferences = new ScanPreferences(settings);
+
         _bridge = new(settings,
             _sync,
             _scan,
             _preferences,
-            new ScanPreferences(settings),
-            new DiskSpaceCalculator(),
+            scanPreferences,
+            new ScanRunner(new(), new(), scanPreferences, NullLogger<ScanRunner>.Instance),
             new DuplicateFinder(),
             new DockerService(),
             new CleanupService(),

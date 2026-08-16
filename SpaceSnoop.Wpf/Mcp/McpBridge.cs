@@ -11,7 +11,7 @@ public sealed class McpBridge
         IScanAutomation scan,
         McpPreferences preferences,
         ScanPreferences scanPreferences,
-        DiskSpaceCalculator calculator,
+        ScanRunner runner,
         DuplicateFinder duplicates,
         DockerService docker,
         CleanupService cleanup,
@@ -26,7 +26,7 @@ public sealed class McpBridge
         _navigator = new(navigator);
         _state = new(scan, sync, _navigator);
 
-        Scan = new(scan, scanPreferences, calculator, duplicates, preferences, notifier, _navigator, _state, performance, runs, logger);
+        Scan = new(scan, scanPreferences, runner, duplicates, preferences, notifier, _navigator, _state, performance, runs, logger);
         Sync = new(sync, compare, preferences, notifier, _navigator, _state, logger);
         Insight = new(settings, preferences, docker, performance, _navigator, _state, logger);
         Cleanup = new(settings, cleanup, static age => CleanupCatalog.BuildDefault(age), preferences, cleanupAutomation, _navigator, notifier, logger);

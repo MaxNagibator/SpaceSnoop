@@ -138,6 +138,23 @@
                                Style="{StaticResource StatValue}"
                                Foreground="{DynamicResource Fg.Secondary}" />
                 </StackPanel>
+
+                <StackPanel Style="{StaticResource Metric}"
+                            Visibility="{Binding HasLinkNote, Converter={StaticResource BoolToVisibility}}"
+                            ToolTip="{Binding LinkNoteHint}">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Link}"
+                                              Width="13"
+                                              Height="13"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,6,0"
+                                              Foreground="{DynamicResource Fg.Muted}" />
+                    <TextBlock Text="Не считано дважды"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding LinkNote}"
+                               Style="{StaticResource StatValue}"
+                               Foreground="{DynamicResource Fg.Secondary}" />
+                </StackPanel>
             </WrapPanel>
         </Grid>
     </Border>

@@ -33,16 +33,32 @@ public sealed partial class ScanSummaryViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(VolumeNoteHint))]
     private string _volumeNote = string.Empty;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasLinkNote))]
+    [NotifyPropertyChangedFor(nameof(LinkNoteHint))]
+    private string _linkNote = string.Empty;
+
     private DriveCapacity? _drive;
+    private long _extraNameBytes;
 
     public bool HasVolumeNote => VolumeNote.Length > 0;
 
     public string VolumeNoteHint => HasVolumeNote ? ScanVolumeNote.Explain(VolumeNote) : string.Empty;
 
-    public PerformanceOperation Apply(DirectorySpace result, TimeSpan elapsed, PerformanceTraversal? traversal = null, DriveCapacity? drive = null)
+    public bool HasLinkNote => LinkNote.Length > 0;
+
+    public string LinkNoteHint => HasLinkNote ? ScanLinkNote.Explain(LinkNote) : string.Empty;
+
+    public PerformanceOperation Apply(
+        DirectorySpace result,
+        TimeSpan elapsed,
+        PerformanceTraversal? traversal = null,
+        DriveCapacity? drive = null,
+        long extraNameBytes = 0)
     {
         ResultPath = result.AbsolutePath;
         _drive = drive;
+        _extraNameBytes = extraNameBytes;
         Refresh(result);
         ResultElapsedText = PerformanceFormat.Elapsed(elapsed);
 
@@ -58,5 +74,6 @@ public sealed partial class ScanSummaryViewModel : ObservableObject
         ResultFileCountText = result.TotalFileCount.ToString("N0");
         ResultDirCountText = result.TotalDirectoryCount.ToString("N0");
         VolumeNote = ScanVolumeNote.Describe(result.AbsolutePath, result.TotalSize, _drive) ?? string.Empty;
+        LinkNote = ScanLinkNote.Describe(_extraNameBytes) ?? string.Empty;
     }
 }
