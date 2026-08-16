@@ -47,6 +47,17 @@ internal static partial class AppLog
         Message = "Обход в один поток: {Path} лежит на диске со штрафом за позиционирование (запрошено потоков: {Requested})")]
     public static partial void ScanMediaLimited(this ILogger logger, string path, int requested);
 
+    [LoggerMessage(EventId = 1009, Level = LogLevel.Debug,
+        Message = "Скан по фазам: обход {WalkMs} мс, показ {ApplyMs} мс")]
+    public static partial void ScanPhases(this ILogger logger, long walkMs, long applyMs);
+
+    [LoggerMessage(EventId = 1010, Level = LogLevel.Information,
+        Message = "Обход по $MFT недоступен для «{Path}» ({Availability}), идём каталогами")]
+    public static partial void MftUnavailable(this ILogger logger, string path, MftAvailability availability);
+
+    [LoggerMessage(EventId = 1011, Level = LogLevel.Warning, Message = "Обход по $MFT для «{Path}» не удался, идём каталогами")]
+    public static partial void MftFailed(this ILogger logger, Exception exception, string path);
+
     [LoggerMessage(EventId = 1100, Level = LogLevel.Information,
         Message = "Старт удаления: {Count} элемент(ов), {BytesText} (безвозвратно: {Permanent})")]
     public static partial void DeletionStarted(this ILogger logger, int count, string bytesText, bool permanent);

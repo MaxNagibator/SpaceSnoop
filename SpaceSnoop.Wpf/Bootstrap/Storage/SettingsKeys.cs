@@ -33,6 +33,7 @@ public static class SettingsKeys
     public const string ScanView = "wpf.scan.view";
 
     public const string ScanDuplicatesEnabled = "wpf.scan.duplicates.enabled";
+    public const string ScanMftEnabled = "wpf.scan.mft.enabled";
     public const string ScanDuplicatesMinSize = "wpf.scan.duplicates.min_size_mb";
 
     public const string ScanInspectorCollapsed = "wpf.scan.inspector.collapsed";

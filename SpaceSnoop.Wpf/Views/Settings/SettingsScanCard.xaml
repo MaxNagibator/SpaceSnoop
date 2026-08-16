@@ -45,7 +45,7 @@
                             Margin="16,0,0,0"
                             VerticalAlignment="Center">
                     <Slider Minimum="1"
-                            Maximum="{Binding Scan.ProcessorCount}"
+                            Maximum="{Binding Scan.ParallelismCeiling}"
                             Value="{Binding Scan.MaxParallelism, Mode=TwoWay}"
                             TickFrequency="1"
                             IsSnapToTickEnabled="True"

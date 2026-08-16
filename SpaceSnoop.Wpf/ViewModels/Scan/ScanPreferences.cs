@@ -9,7 +9,7 @@ public sealed partial class ScanPreferences : ObservableObject
     private bool _useMultithreading = AppDefaults.ScanMultithreadingDefault;
 
     [ObservableProperty]
-    private int _maxParallelism = Environment.ProcessorCount;
+    private int _maxParallelism = Environment.ProcessorCount * AppDefaults.ScanParallelismPerCore;
 
     [ObservableProperty]
     private bool _mediaAware = AppDefaults.ScanMediaAwareDefault;
@@ -26,18 +26,23 @@ public sealed partial class ScanPreferences : ObservableObject
 
         _suppressPersist = true;
         UseMultithreading = _settings.GetBool(SettingsKeys.ScanMultithreading, AppDefaults.ScanMultithreadingDefault);
-        MaxParallelism = Math.Clamp(_settings.GetInt(SettingsKeys.ScanParallelism, ProcessorCount), 1, ProcessorCount);
+        MaxParallelism = Math.Clamp(_settings.GetInt(SettingsKeys.ScanParallelism, ParallelismCeiling), 1, ParallelismCeiling);
         MediaAware = _settings.GetBool(SettingsKeys.ScanMediaAware, AppDefaults.ScanMediaAwareDefault);
         Intensity = _settings.GetDouble(SettingsKeys.ScanIntensity, AppDefaults.IntensityDefault);
         RevealFiles = _settings.GetBool(SettingsKeys.ScanRevealFiles, AppDefaults.ScanRevealFilesDefault);
         _suppressPersist = false;
 
         DuplicatesEnabled = settings.GetBool(SettingsKeys.ScanDuplicatesEnabled, AppDefaults.ScanDuplicatesEnabledDefault);
+        MftEnabled = settings.GetBool(SettingsKeys.ScanMftEnabled, AppDefaults.ScanMftEnabledDefault);
     }
 
     public int ProcessorCount { get; } = Environment.ProcessorCount;
 
+    public int ParallelismCeiling => ProcessorCount * AppDefaults.ScanParallelismPerCore;
+
     public bool DuplicatesEnabled { get; }
+
+    public bool MftEnabled { get; }
 
     public int ResolveParallelism(string path)
     {
@@ -59,7 +64,8 @@ public sealed partial class ScanPreferences : ObservableObject
 
     public string ParallelismHint =>
         $"Сколько каталогов обходить одновременно. "
-        + $"Максимум и значение по умолчанию – число логических процессоров ({ProcessorCount}). "
+        + $"Максимум и значение по умолчанию – вдвое больше числа логических процессоров ({ParallelismCeiling} при {ProcessorCount} ядрах): "
+        + $"обход ждёт ответа файловой системы, а не считает, поэтому потоков нужно больше, чем ядер. "
         + $"Меньше потоков – ниже нагрузка и расход памяти.";
 
     partial void OnUseMultithreadingChanged(bool value)
