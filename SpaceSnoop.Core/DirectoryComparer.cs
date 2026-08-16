@@ -17,13 +17,19 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         return (left.LastWriteTime - right.LastWriteTime).Duration() <= FatTimestampTolerance;
     }
 
-    public ComparisonResult Compare(string leftPath, string rightPath, CancellationToken cancel, IProgress<OperationProgress>? progress = null)
+    public ComparisonResult Compare(
+        string leftPath,
+        string rightPath,
+        CancellationToken cancel,
+        IProgress<OperationProgress>? progress = null,
+        PathCaseRules? caseRules = null)
     {
         var leftDir = new DirectoryInfo(leftPath);
         var rightDir = new DirectoryInfo(rightPath);
+        var rules = caseRules ?? PathCaseRules.For(leftPath, rightPath);
 
         var processed = 0;
-        var root = CompareDirectories(leftDir, rightDir, "", progress, ref processed, cancel);
+        var root = CompareDirectories(leftDir, rightDir, "", rules, progress, ref processed, cancel);
 
         return new(leftPath, rightPath, root);
     }
@@ -58,6 +64,7 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         DirectoryInfo? leftDir,
         DirectoryInfo? rightDir,
         string relativePath,
+        PathCaseRules rules,
         IProgress<OperationProgress>? progress,
         ref int processed,
         CancellationToken cancel)
@@ -71,22 +78,22 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
             RightModified = rightDir is { Exists: true } ? rightDir.LastWriteTime : null,
         };
 
-        var leftLinks = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var rightLinks = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var leftLinks = new HashSet<string>(rules.Left);
+        var rightLinks = new HashSet<string>(rules.Right);
 
-        var leftFiles = GetFilteredFiles(leftDir, leftLinks, out var leftFilesIncomplete);
-        var rightFiles = GetFilteredFiles(rightDir, rightLinks, out var rightFilesIncomplete);
-        var leftDirs = GetFilteredDirectories(leftDir, leftLinks, out var leftDirsIncomplete);
-        var rightDirs = GetFilteredDirectories(rightDir, rightLinks, out var rightDirsIncomplete);
+        var leftFiles = GetFilteredFiles(leftDir, leftLinks, rules.Left, out var leftFilesIncomplete);
+        var rightFiles = GetFilteredFiles(rightDir, rightLinks, rules.Right, out var rightFilesIncomplete);
+        var leftDirs = GetFilteredDirectories(leftDir, leftLinks, rules.Left, out var leftDirsIncomplete);
+        var rightDirs = GetFilteredDirectories(rightDir, rightLinks, rules.Right, out var rightDirsIncomplete);
 
         comparison.LeftIncomplete = leftFilesIncomplete || leftDirsIncomplete;
         comparison.RightIncomplete = rightFilesIncomplete || rightDirsIncomplete;
-        comparison.SkippedLinks.AddRange(leftLinks.Union(rightLinks, StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase));
+        comparison.SkippedLinks.AddRange(leftLinks.Union(rightLinks, rules.Match).Order(rules.Match));
 
-        var typeConflicts = CollectTypeConflicts(leftFiles, rightFiles, leftDirs, rightDirs, leftLinks, rightLinks);
+        var typeConflicts = CollectTypeConflicts(leftFiles, rightFiles, leftDirs, rightDirs, leftLinks, rightLinks, rules);
 
-        CompareFiles(comparison, leftFiles, rightFiles, typeConflicts, relativePath);
-        CompareSubDirectories(comparison, leftDirs, rightDirs, typeConflicts, relativePath, progress, ref processed, cancel);
+        CompareFiles(comparison, leftFiles, rightFiles, typeConflicts, relativePath, rules);
+        CompareSubDirectories(comparison, leftDirs, rightDirs, typeConflicts, relativePath, rules, progress, ref processed, cancel);
 
         comparison.Status = DetermineDirectoryStatus(comparison, leftDir, rightDir);
 
@@ -101,9 +108,15 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         Dictionary<string, DirectoryInfo> leftDirs,
         Dictionary<string, DirectoryInfo> rightDirs,
         HashSet<string> leftLinks,
-        HashSet<string> rightLinks)
+        HashSet<string> rightLinks,
+        PathCaseRules rules)
     {
-        var conflicts = new Dictionary<string, FileTypeConflict>(StringComparer.OrdinalIgnoreCase);
+        var conflicts = new Dictionary<string, FileTypeConflict>(rules.Match);
+
+        foreach (var name in CollectCaseCollisions(leftFiles, rightFiles, leftDirs, rightDirs, leftLinks, rightLinks, rules))
+        {
+            conflicts[name] = FileTypeConflict.CaseCollision;
+        }
 
         foreach (var name in leftFiles.Keys.Where(rightDirs.ContainsKey))
         {
@@ -128,18 +141,46 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         return conflicts;
     }
 
+    private static IEnumerable<string> CollectCaseCollisions(
+        Dictionary<string, FileInfo> leftFiles,
+        Dictionary<string, FileInfo> rightFiles,
+        Dictionary<string, DirectoryInfo> leftDirs,
+        Dictionary<string, DirectoryInfo> rightDirs,
+        HashSet<string> leftLinks,
+        HashSet<string> rightLinks,
+        PathCaseRules rules)
+    {
+        if (!rules.MatchIsSensitive || PathCase.IsSensitive(rules.Left) == PathCase.IsSensitive(rules.Right))
+        {
+            return [];
+        }
+
+        return leftFiles.Keys
+            .Concat(rightFiles.Keys)
+            .Concat(leftDirs.Keys)
+            .Concat(rightDirs.Keys)
+            .Concat(leftLinks)
+            .Concat(rightLinks)
+            .Distinct(StringComparer.Ordinal)
+            .GroupBy(x => x, StringComparer.OrdinalIgnoreCase)
+            .Where(x => x.Skip(1).Any())
+            .SelectMany(x => x)
+            .ToArray();
+    }
+
     private static void CompareFiles(
         DirectoryComparison comparison,
         Dictionary<string, FileInfo> leftFiles,
         Dictionary<string, FileInfo> rightFiles,
         Dictionary<string, FileTypeConflict> typeConflicts,
-        string relativePath)
+        string relativePath,
+        PathCaseRules rules)
     {
-        var allNames = new HashSet<string>(leftFiles.Keys, StringComparer.OrdinalIgnoreCase);
+        var allNames = new HashSet<string>(leftFiles.Keys, rules.Match);
         allNames.UnionWith(rightFiles.Keys);
         allNames.UnionWith(typeConflicts.Keys);
 
-        foreach (var fileName in allNames.Order(StringComparer.OrdinalIgnoreCase))
+        foreach (var fileName in allNames.Order(rules.Match))
         {
             var fileRelativePath = string.IsNullOrEmpty(relativePath)
                 ? fileName
@@ -213,15 +254,16 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         Dictionary<string, DirectoryInfo> rightDirs,
         Dictionary<string, FileTypeConflict> typeConflicts,
         string relativePath,
+        PathCaseRules rules,
         IProgress<OperationProgress>? progress,
         ref int processed,
         CancellationToken cancel)
     {
-        var allNames = new HashSet<string>(leftDirs.Keys, StringComparer.OrdinalIgnoreCase);
+        var allNames = new HashSet<string>(leftDirs.Keys, rules.Match);
         allNames.UnionWith(rightDirs.Keys);
         allNames.ExceptWith(typeConflicts.Keys);
 
-        foreach (var dirName in allNames.Order(StringComparer.OrdinalIgnoreCase))
+        foreach (var dirName in allNames.Order(rules.Match))
         {
             var dirRelativePath = string.IsNullOrEmpty(relativePath)
                 ? dirName
@@ -230,21 +272,21 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
             leftDirs.TryGetValue(dirName, out var leftSub);
             rightDirs.TryGetValue(dirName, out var rightSub);
 
-            var subComparison = CompareDirectories(leftSub, rightSub, dirRelativePath, progress, ref processed, cancel);
+            var subComparison = CompareDirectories(leftSub, rightSub, dirRelativePath, rules, progress, ref processed, cancel);
             comparison.SubDirectories.Add(subComparison);
         }
     }
 
-    private Dictionary<string, FileInfo> GetFilteredFiles(DirectoryInfo? dir, ICollection<string> links, out bool incomplete)
+    private Dictionary<string, FileInfo> GetFilteredFiles(DirectoryInfo? dir, ICollection<string> links, StringComparer names, out bool incomplete)
     {
         if (dir is not { Exists: true })
         {
             incomplete = dir is not null;
-            return new(StringComparer.OrdinalIgnoreCase);
+            return new(names);
         }
 
         incomplete = false;
-        var result = new Dictionary<string, FileInfo>(StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, FileInfo>(names);
 
         try
         {
@@ -269,16 +311,16 @@ public sealed class DirectoryComparer(ExclusionFilter exclusionFilter, ILogger<D
         return result;
     }
 
-    private Dictionary<string, DirectoryInfo> GetFilteredDirectories(DirectoryInfo? dir, ICollection<string> links, out bool incomplete)
+    private Dictionary<string, DirectoryInfo> GetFilteredDirectories(DirectoryInfo? dir, ICollection<string> links, StringComparer names, out bool incomplete)
     {
         if (dir is not { Exists: true })
         {
             incomplete = dir is not null;
-            return new(StringComparer.OrdinalIgnoreCase);
+            return new(names);
         }
 
         incomplete = false;
-        var result = new Dictionary<string, DirectoryInfo>(StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, DirectoryInfo>(names);
 
         try
         {

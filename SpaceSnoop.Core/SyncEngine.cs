@@ -207,6 +207,7 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
             FileTypeConflict.LeftLinkRightObject => "слева ссылка, справа настоящий объект – разрешается вручную",
             FileTypeConflict.RightLinkLeftObject => "справа ссылка, слева настоящий объект – разрешается вручную",
             FileTypeConflict.LeftFileRightDirectory => "слева файл, справа каталог – разрешается вручную",
+            FileTypeConflict.CaseCollision => "имена различаются только регистром, приёмник их не различит – разрешается вручную",
             _ => "справа файл, слева каталог – разрешается вручную",
         };
 

@@ -13,6 +13,7 @@ internal static class SyncNodeText
                 FileTypeConflict.LeftFileRightDirectory => "слева файл, справа каталог",
                 FileTypeConflict.LeftLinkRightObject => "слева ссылка, справа настоящий объект",
                 FileTypeConflict.RightLinkLeftObject => "справа ссылка, слева настоящий объект",
+                FileTypeConflict.CaseCollision => "имена различаются только регистром",
                 _ => "слева каталог, справа файл",
             };
         }

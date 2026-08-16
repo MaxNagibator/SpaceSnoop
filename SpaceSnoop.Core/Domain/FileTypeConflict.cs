@@ -7,4 +7,5 @@ public enum FileTypeConflict
     RightFileLeftDirectory = 2,
     LeftLinkRightObject = 3,
     RightLinkLeftObject = 4,
+    CaseCollision = 5,
 }

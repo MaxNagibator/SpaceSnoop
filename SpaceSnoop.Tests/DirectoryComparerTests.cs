@@ -405,6 +405,112 @@ public class DirectoryComparerTests
     }
 
     [Test]
+    public void CrossCaseNames_OnInsensitiveVolumes_AreOneFile()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "foo.txt"), "left");
+        File.WriteAllText(Path.Combine(_rightDir, "Foo.txt"), "right side");
+
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
+        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None, caseRules: PathCaseRules.Insensitive);
+
+        var file = result.Root.Files.Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(file.Status, Is.EqualTo(ComparisonStatus.Modified));
+            Assert.That(file.TypeConflict, Is.EqualTo(FileTypeConflict.None));
+            Assert.That(file.LeftSize, Is.EqualTo(4));
+            Assert.That(file.RightSize, Is.EqualTo(10));
+        }
+    }
+
+    [Test]
+    public void CrossCaseNames_OnSensitiveVolumes_AreTwoOneSidedFiles()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "foo.txt"), "left");
+        File.WriteAllText(Path.Combine(_rightDir, "Foo.txt"), "right");
+
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
+        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None, caseRules: PathCaseRules.Sensitive);
+        result.ApplyMode(SyncMode.LeftToRight, true);
+
+        var left = result.Root.Files.Single(x => x.Name == "foo.txt");
+        var right = result.Root.Files.Single(x => x.Name == "Foo.txt");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Root.Files, Has.Count.EqualTo(2));
+            Assert.That(left.Status, Is.EqualTo(ComparisonStatus.LeftOnly));
+            Assert.That(right.Status, Is.EqualTo(ComparisonStatus.RightOnly));
+            Assert.That(left.Action, Is.EqualTo(SyncAction.CopyToRight));
+            Assert.That(right.Action, Is.EqualTo(SyncAction.DeleteRight));
+        }
+    }
+
+    [Test]
+    public void CrossCaseNames_OnMixedVolumes_AreConflictWithoutActions()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "foo.txt"), "left");
+        File.WriteAllText(Path.Combine(_rightDir, "Foo.txt"), "right");
+
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
+        var mixed = new PathCaseRules(StringComparer.Ordinal, StringComparer.OrdinalIgnoreCase);
+        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None, caseRules: mixed);
+        result.ApplyMode(SyncMode.LeftToRight, true);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Root.Files, Has.Count.EqualTo(2));
+            Assert.That(result.Root.Files.Select(x => x.TypeConflict),
+                Is.All.EqualTo(FileTypeConflict.CaseCollision));
+            Assert.That(result.Root.Files.Select(x => x.Status), Is.All.EqualTo(ComparisonStatus.Conflict));
+            Assert.That(result.Root.Files.Select(x => x.Action), Is.All.EqualTo(SyncAction.None));
+        }
+    }
+
+    [Test]
+    public void CrossCaseDirectories_OnMixedVolumes_AreConflictAndLeaveTreeAlone()
+    {
+        Directory.CreateDirectory(Path.Combine(_leftDir, "data"));
+        Directory.CreateDirectory(Path.Combine(_rightDir, "Data"));
+        File.WriteAllText(Path.Combine(_leftDir, "data", "a.txt"), "left");
+
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
+        var mixed = new PathCaseRules(StringComparer.Ordinal, StringComparer.OrdinalIgnoreCase);
+        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None, caseRules: mixed);
+        result.ApplyMode(SyncMode.LeftToRight, true);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Root.SubDirectories, Is.Empty);
+            Assert.That(result.Root.Files.Select(x => x.Name), Is.EquivalentTo(new[] { "Data", "data" }));
+            Assert.That(result.Root.Files.Select(x => x.TypeConflict),
+                Is.All.EqualTo(FileTypeConflict.CaseCollision));
+            Assert.That(result.Root.Files.Select(x => x.Action), Is.All.EqualTo(SyncAction.None));
+        }
+    }
+
+    [Test]
+    public void CaseCollision_MassResolveCopiesSkipsIt()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "foo.txt"), "left");
+        File.WriteAllText(Path.Combine(_rightDir, "Foo.txt"), "right");
+
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
+        var mixed = new PathCaseRules(StringComparer.Ordinal, StringComparer.OrdinalIgnoreCase);
+        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None, caseRules: mixed);
+        result.ApplyMode(SyncMode.LeftToRight);
+
+        var copied = result.ResolveAllConflicts(SyncAction.CopyToRight);
+        var skipped = result.ResolveAllConflicts(SyncAction.Skip);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(copied, Is.EqualTo(0));
+            Assert.That(skipped, Is.EqualTo(2));
+            Assert.That(result.Root.Files.Select(x => x.Action), Is.All.EqualTo(SyncAction.Skip));
+        }
+    }
+
+    [Test]
     public void FileComparison_ContainsMetadata()
     {
         File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "hello");
