@@ -1,4 +1,4 @@
-namespace SpaceSnoop.Core.Domain;
+﻿namespace SpaceSnoop.Core.Domain;
 
 public enum SyncMode
 {

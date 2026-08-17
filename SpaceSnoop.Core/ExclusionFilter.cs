@@ -1,4 +1,4 @@
-using System.IO.Enumeration;
+﻿using System.IO.Enumeration;
 
 namespace SpaceSnoop.Core;
 

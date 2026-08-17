@@ -12,41 +12,6 @@ concurrency:
 
 jobs:
   build:
-    runs-on: windows-2022
+    uses: ./.github/workflows/build-test.yml
     permissions:
       contents: read
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          global-json-file: global.json
-          cache: true
-          cache-dependency-path: "**/packages.lock.json"
-
-      - name: Restore
-        run: dotnet restore SpaceSnoop.sln --locked-mode
-
-      - name: Build
-        run: dotnet build SpaceSnoop.sln --configuration Release --no-restore
-
-      - name: Test
-        run: >
-          dotnet test SpaceSnoop.sln
-          --configuration Release
-          --no-build
-          --logger trx
-          --results-directory TestResults
-          --blame-hang
-          --blame-hang-timeout 60s
-
-      - name: Upload test results
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: TestResults/**
-          retention-days: 5

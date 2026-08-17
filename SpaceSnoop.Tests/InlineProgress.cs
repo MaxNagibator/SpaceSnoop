@@ -1,4 +1,4 @@
-using SpaceSnoop.Core;
+﻿using SpaceSnoop.Core;
 
 namespace SpaceSnoop.Tests;
 

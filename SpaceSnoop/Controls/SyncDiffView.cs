@@ -89,7 +89,7 @@ public sealed class SyncDiffView : UserControl
         _strikeoutFont = new(Font, FontStyle.Strikeout);
 
         _scrollBar = new()
-            { Dock = DockStyle.Right };
+        { Dock = DockStyle.Right };
 
         _scrollBar.Scroll += (_, _) => Invalidate();
         Controls.Add(_scrollBar);

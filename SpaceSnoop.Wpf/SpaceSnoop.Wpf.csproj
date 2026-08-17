@@ -11,6 +11,7 @@
     <AssemblyName>SpaceSnoop.Wpf</AssemblyName>
     <ApplicationIcon>icon.ico</ApplicationIcon>
     <DisableMicrosoftExtensionsLoggingSourceGenerator>true</DisableMicrosoftExtensionsLoggingSourceGenerator>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,0 +1,63 @@
+﻿name: Build and test
+
+on:
+  workflow_call:
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: |
+            **/packages.lock.json
+            **/*.csproj
+            packages/**/*.nupkg
+
+      - name: Restore
+        run: dotnet restore SpaceSnoop.sln --locked-mode
+
+      - name: Format check
+        run: dotnet format whitespace SpaceSnoop.sln --verify-no-changes --no-restore
+
+      - name: Build
+        run: dotnet build SpaceSnoop.sln --configuration Release --no-restore
+
+      - name: Test
+        run: >
+          dotnet test SpaceSnoop.sln
+          --configuration Release
+          --no-build
+          --logger trx
+          --results-directory TestResults
+          --collect "XPlat Code Coverage"
+          --blame-hang
+          --blame-hang-timeout 60s
+
+      - name: Publish smoke
+        run: >
+          dotnet publish SpaceSnoop.Wpf/SpaceSnoop.Wpf.csproj
+          --configuration Release
+          --runtime win-x64
+          --no-self-contained
+          --output publish-smoke
+          -p:PublishSingleFile=true
+          -p:PublishReadyToRun=true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-results
+          path: TestResults/**
+          retention-days: 5
