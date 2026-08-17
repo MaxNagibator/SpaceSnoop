@@ -25,6 +25,22 @@ internal sealed class MftStatistics
     public long OrphanBytes { get; set; }
 
     public long SkippedLinks { get; set; }
+
+    public void Add(MftStatistics other)
+    {
+        RecordsScanned += other.RecordsScanned;
+        RecordsInUse += other.RecordsInUse;
+        Extensions += other.Extensions;
+        Nameless += other.Nameless;
+        Detached += other.Detached;
+        Damaged += other.Damaged;
+        StaleParents += other.StaleParents;
+        Rehomed += other.Rehomed;
+        HardLinkedFiles += other.HardLinkedFiles;
+        OrphanFiles += other.OrphanFiles;
+        OrphanBytes += other.OrphanBytes;
+        SkippedLinks += other.SkippedLinks;
+    }
 }
 
 internal sealed record MftTable(MftEntry[] Entries, MftStatistics Statistics, Dictionary<int, List<MftName>> Alternates);

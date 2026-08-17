@@ -3,12 +3,14 @@ using System.Runtime.InteropServices;
 
 namespace SpaceSnoop.Core.Mft;
 
-internal interface IMftVolume
+internal interface IMftVolume : IDisposable
 {
+    IMftVolume Reopen();
+
     void ReadAt(long offset, Span<byte> buffer);
 }
 
-internal sealed class MftFileVolume : IMftVolume, IDisposable
+internal sealed class MftFileVolume : IMftVolume
 {
     private const uint GenericRead = 0x80000000;
     private const uint ShareReadWrite = 0x00000001 | 0x00000002;
@@ -16,10 +18,12 @@ internal sealed class MftFileVolume : IMftVolume, IDisposable
     private const int ErrorAccessDenied = 5;
 
     private readonly SafeFileHandle _handle;
+    private readonly char _letter;
 
-    private MftFileVolume(SafeFileHandle handle)
+    private MftFileVolume(SafeFileHandle handle, char letter)
     {
         _handle = handle;
+        _letter = letter;
     }
 
     public static MftFileVolume Open(char letter)
@@ -28,7 +32,7 @@ internal sealed class MftFileVolume : IMftVolume, IDisposable
 
         if (!handle.IsInvalid)
         {
-            return new(handle);
+            return new(handle, letter);
         }
 
         var error = Marshal.GetLastWin32Error();
@@ -37,6 +41,11 @@ internal sealed class MftFileVolume : IMftVolume, IDisposable
         throw error == ErrorAccessDenied
             ? new UnauthorizedAccessException($"Чтение $MFT тома {letter}: требует прав администратора")
             : new IOException($"Не удалось открыть том {letter}:, код {error}");
+    }
+
+    public IMftVolume Reopen()
+    {
+        return Open(_letter);
     }
 
     public void ReadAt(long offset, Span<byte> buffer)

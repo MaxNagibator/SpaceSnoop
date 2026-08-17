@@ -281,6 +281,11 @@ internal sealed class MftVolumeBuilder(int bytesPerSector = 512, int sectorsPerC
 
 internal sealed class MftMemoryVolume(byte[] image) : IMftVolume
 {
+    public IMftVolume Reopen()
+    {
+        return new MftMemoryVolume(image);
+    }
+
     public void ReadAt(long offset, Span<byte> buffer)
     {
         if (offset < 0 || offset + buffer.Length > image.Length)
@@ -289,5 +294,9 @@ internal sealed class MftMemoryVolume(byte[] image) : IMftVolume
         }
 
         image.AsSpan((int)offset, buffer.Length).CopyTo(buffer);
+    }
+
+    public void Dispose()
+    {
     }
 }

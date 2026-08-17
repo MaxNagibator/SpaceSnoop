@@ -46,7 +46,7 @@ public sealed class ScanRunner(
             }
 
             return new(scan.Root,
-                new(true, 1, scan.ExtraNameBytes, scan.DroppedObjects, scan.OrphanBytes, scan.UnknownSizeFiles));
+                new(true, scan.Threads, scan.ExtraNameBytes, scan.DroppedObjects, scan.OrphanBytes, scan.UnknownSizeFiles));
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {

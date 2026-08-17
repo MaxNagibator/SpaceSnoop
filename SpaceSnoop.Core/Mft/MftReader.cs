@@ -1,12 +1,14 @@
 ﻿using System.Buffers;
 using System.Buffers.Binary;
+using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 
 namespace SpaceSnoop.Core.Mft;
 
 internal static class MftReader
 {
-    private const int ReadBufferBytes = 8 * 1024 * 1024;
+    private const int BlockBytes = 4 * 1024 * 1024;
+    private const int ReadThreadCeiling = 8;
 
     private const int ResidentHeaderBytes = 0x16;
     private const int NonResidentHeaderBytes = 0x38;
@@ -74,14 +76,29 @@ internal static class MftReader
     // участка, приезжает в устаревшем виде, а выросший за время чтения $MFT остаётся недочитанным.
     // Триггер апгрейда: расхождения начнут попадаться в отчётах – тогда снимать VSS-снимок (`IVssBackupComponents`)
     // и читать его, ценой прав и времени на создание снимка.
+    // TODO: таблица читается через системный кэш, поэтому её объём вытесняет оттуда рабочий набор
+    // пользователя, а число потоков упирается в путь тома, а не в счёт (замер – 1,6…1,8 ГБ/с при
+    // любом их числе). Триггер апгрейда: чтение перестанет упираться в том – тогда переходить на
+    // `FILE_FLAG_NO_BUFFERING` с выровненными буферами, в один поток он дал 1,75 против 1,60 ГБ/с.
     public static MftTable Read(char letter, ScanProgress? progress, CancellationToken cancel)
     {
         using var volume = MftFileVolume.Open(letter);
 
-        return Read(volume, letter, progress, cancel);
+        return Read(volume, letter, ResolveThreads(letter), BlockBytes, progress, cancel);
     }
 
-    internal static MftTable Read(IMftVolume volume, char letter, ScanProgress? progress, CancellationToken cancel)
+    public static int ResolveThreads(char letter)
+    {
+        return StorageMedia.LimitParallelism($@"{letter}:\", Math.Min(Environment.ProcessorCount, ReadThreadCeiling));
+    }
+
+    internal static MftTable Read(
+        IMftVolume volume,
+        char letter,
+        int threads,
+        int blockBytes,
+        ScanProgress? progress,
+        CancellationToken cancel)
     {
         var boot = new byte[512];
         volume.ReadAt(0, boot);
@@ -104,7 +121,7 @@ internal static class MftReader
         var recordSizeRaw = (sbyte)boot[0x40];
         var recordSize = recordSizeRaw > 0 ? recordSizeRaw * bytesPerCluster : 1 << -recordSizeRaw;
 
-        if (recordSize < bytesPerSector || recordSize > ReadBufferBytes)
+        if (recordSize < bytesPerSector || recordSize > BlockBytes)
         {
             throw new InvalidDataException($"Том {letter}: непригодный размер записи $MFT ({recordSize})");
         }
@@ -114,15 +131,15 @@ internal static class MftReader
             throw new InvalidDataException($"Том {letter}: непригодное положение $MFT ({mftCluster})");
         }
 
-        var first = new byte[recordSize];
-        volume.ReadAt(mftCluster * bytesPerCluster, first);
+        var self = new byte[recordSize];
+        volume.ReadAt(mftCluster * bytesPerCluster, self);
 
-        if (!"FILE"u8.SequenceEqual(first.AsSpan(0, 4)) || !MftLayout.ApplyFixup(first, bytesPerSector))
+        if (!"FILE"u8.SequenceEqual(self.AsSpan(0, 4)) || !MftLayout.ApplyFixup(self, bytesPerSector))
         {
             throw new InvalidDataException($"Том {letter}: собственная запись $MFT не читается как запись NTFS");
         }
 
-        var (runs, mftBytes) = ReadSelfRuns(first, letter);
+        var (runs, mftBytes) = ReadSelfRuns(self, letter);
 
         if (mftBytes <= 0)
         {
@@ -137,81 +154,70 @@ internal static class MftReader
         }
 
         var records = (int)total;
-        var entries = new MftEntry[records];
-        var pending = new MftPending();
-        var statistics = new MftStatistics();
+        var map = new MftMap(runs, bytesPerCluster);
+        var needed = (long)records * recordSize;
 
-        var capacity = ReadBufferBytes / recordSize * recordSize;
-        var buffer = ArrayPool<byte>.Shared.Rent(capacity);
-        var carry = new byte[recordSize];
-        var carried = 0;
+        if (map.Length < needed)
+        {
+            throw new InvalidDataException(
+                $"Том {letter}: отрезки $MFT покрывают {map.Length:N0} Б из {needed:N0} Б, разметка неполна");
+        }
+
+        var entries = new MftEntry[records];
+        var blockRecords = Math.Max(1, blockBytes / recordSize);
+        var blocks = (records + blockRecords - 1) / blockRecords;
+        var parts = new MftPart[blocks];
+        var completed = 0;
+
+        var options = new ParallelOptions
+        {
+            CancellationToken = cancel,
+            MaxDegreeOfParallelism = Math.Max(1, threads),
+        };
 
         try
         {
-            var index = 0;
-
-            foreach (var run in runs)
-            {
-                var offset = run.Cluster * bytesPerCluster;
-                var remaining = run.Count * (long)bytesPerCluster;
-
-                while (remaining > 0 && index < records)
+            Parallel.For(
+                0,
+                blocks,
+                options,
+                () => new MftWorker(volume.Reopen(), blockRecords * recordSize),
+                (block, _, worker) =>
                 {
-                    cancel.ThrowIfCancellationRequested();
-                    progress?.Announce($"Чтение $MFT тома {letter}: {(long)index * 100 / records} %");
+                    var start = block * blockRecords;
+                    var count = Math.Min(blockRecords, records - start);
+                    var part = new MftPart();
+                    var buffer = worker.Buffer.AsSpan(0, count * recordSize);
 
-                    var take = (int)Math.Min(remaining, capacity);
-                    var chunk = buffer.AsSpan(0, take);
-                    volume.ReadAt(offset, chunk);
+                    map.Read(worker.Volume, (long)start * recordSize, buffer);
 
-                    offset += take;
-                    remaining -= take;
-
-                    var position = 0;
-
-                    if (carried > 0)
+                    for (var offset = 0; offset < count; offset++)
                     {
-                        var need = recordSize - carried;
-
-                        if (take < need)
-                        {
-                            chunk.CopyTo(carry.AsSpan(carried));
-                            carried += take;
-                            continue;
-                        }
-
-                        chunk[..need].CopyTo(carry.AsSpan(carried));
-                        carried = 0;
-                        position = need;
-                        Parse(carry, bytesPerSector, index++, entries, pending, statistics);
+                        Parse(
+                            buffer.Slice(offset * recordSize, recordSize),
+                            bytesPerSector,
+                            start + offset,
+                            entries,
+                            part.Pending,
+                            part.Statistics);
                     }
 
-                    for (; position + recordSize <= take && index < records; position += recordSize, index++)
-                    {
-                        Parse(chunk.Slice(position, recordSize), bytesPerSector, index, entries, pending, statistics);
-                    }
+                    parts[block] = part;
+                    progress?.Announce($"Чтение $MFT тома {letter}: {Interlocked.Increment(ref completed) * 100L / blocks} %");
 
-                    if (index >= records)
-                    {
-                        break;
-                    }
-
-                    carried = take - position;
-                    chunk[position..].CopyTo(carry);
-                }
-            }
-
-            if (index < records)
-            {
-                throw new InvalidDataException(
-                    $"Том {letter}: прочитано {index:N0} записей $MFT из {records:N0}, разметка неполна");
-            }
+                    return worker;
+                },
+                x => x.Dispose());
         }
-        finally
+        catch (AggregateException exception)
         {
-            ArrayPool<byte>.Shared.Return(buffer);
+            ExceptionDispatchInfo.Capture(exception.Flatten().InnerExceptions[0]).Throw();
         }
 
+        var pending = new MftPending();
+        var statistics = new MftStatistics();
+
+        Merge(parts, pending, statistics);
         ApplyPending(entries, pending, statistics);
 
         return new(entries, statistics, pending.Alternates);
@@ -372,6 +378,31 @@ internal static class MftReader
         }
 
         entries[index] = entry;
+    }
+
+    private static void Merge(MftPart[] parts, MftPending pending, MftStatistics statistics)
+    {
+        foreach (var part in parts)
+        {
+            statistics.Add(part.Statistics);
+
+            foreach (var (index, size) in part.Pending.Sizes)
+            {
+                pending.Sizes[index] = size;
+            }
+
+            foreach (var (index, names) in part.Pending.Alternates)
+            {
+                if (pending.Alternates.TryGetValue(index, out var existing))
+                {
+                    existing.AddRange(names);
+                }
+                else
+                {
+                    pending.Alternates[index] = names;
+                }
+            }
+        }
     }
 
     private static void ReadDataSize(Span<byte> attribute, bool nonResident, ref MftEntry entry, MftStatistics statistics)
@@ -640,4 +671,78 @@ internal sealed class MftPending
     public Dictionary<int, long> Sizes { get; } = [];
 
     public Dictionary<int, List<MftName>> Alternates { get; } = [];
+}
+
+internal sealed class MftPart
+{
+    public MftPending Pending { get; } = new();
+
+    public MftStatistics Statistics { get; } = new();
+}
+
+internal sealed class MftWorker(IMftVolume volume, int bytes) : IDisposable
+{
+    public IMftVolume Volume { get; } = volume;
+
+    public byte[] Buffer { get; } = ArrayPool<byte>.Shared.Rent(bytes);
+
+    public void Dispose()
+    {
+        ArrayPool<byte>.Shared.Return(Buffer);
+        Volume.Dispose();
+    }
+}
+
+internal sealed class MftMap
+{
+    private readonly int _bytesPerCluster;
+    private readonly MftRun[] _runs;
+    private readonly long[] _starts;
+
+    public long Length { get; }
+
+    public MftMap(List<MftRun> runs, int bytesPerCluster)
+    {
+        _bytesPerCluster = bytesPerCluster;
+        _runs = [.. runs];
+        _starts = new long[_runs.Length];
+
+        var total = 0L;
+
+        for (var index = 0; index < _runs.Length; index++)
+        {
+            _starts[index] = total;
+            total += _runs[index].Count * bytesPerCluster;
+        }
+
+        Length = total;
+    }
+
+    public void Read(IMftVolume volume, long logical, Span<byte> buffer)
+    {
+        if (logical < 0 || logical + buffer.Length > Length)
+        {
+            throw new EndOfStreamException($"Чтение $MFT вышло за разметку: {logical:N0} + {buffer.Length:N0} Б при длине {Length:N0} Б");
+        }
+
+        var written = 0;
+
+        while (written < buffer.Length)
+        {
+            var position = logical + written;
+            var index = Find(position);
+            var inside = position - _starts[index];
+            var take = (int)Math.Min(buffer.Length - written, _runs[index].Count * _bytesPerCluster - inside);
+
+            volume.ReadAt(_runs[index].Cluster * _bytesPerCluster + inside, buffer.Slice(written, take));
+            written += take;
+        }
+    }
+
+    private int Find(long position)
+    {
+        var index = Array.BinarySearch(_starts, position);
+
+        return index >= 0 ? index : ~index - 1;
+    }
 }

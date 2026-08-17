@@ -77,8 +77,93 @@ public class MftReaderVolumeTests
         Assert.Throws<InvalidDataException>(() => Read(image));
     }
 
-    private static MftTable Read(byte[] image)
+    [Test]
+    public void Номера_записей_не_разъезжаются_при_нарезке_на_блоки()
     {
-        return MftReader.Read(new MftMemoryVolume(image), Letter, null, CancellationToken.None);
+        var builder = new MftVolumeBuilder();
+        var expected = new string[Records];
+
+        for (var index = MftLayout.FirstUserRecord; index < Records; index++)
+        {
+            expected[index] = $"файл-{index}.bin";
+            builder.Record(index, new MftRecordBuilder().FileName(MftLayout.RootRecord, 1, expected[index]).ResidentData(index));
+        }
+
+        var table = Read(builder.Build(Records), threads: 4, blockBytes: 1024);
+        var names = table.Entries.Select(x => x.Name).ToArray()[MftLayout.FirstUserRecord..];
+        var sizes = table.Entries.Select(x => x.Size).ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(names, Is.EqualTo(expected[MftLayout.FirstUserRecord..]));
+            Assert.That(sizes[MftLayout.FirstUserRecord], Is.EqualTo(MftLayout.FirstUserRecord));
+            Assert.That(sizes[Records - 1], Is.EqualTo(Records - 1));
+            Assert.That(table.Statistics.RecordsScanned, Is.EqualTo(Records));
+            Assert.That(table.Statistics.Damaged, Is.Zero);
+        }
+    }
+
+    [TestCase(1, TestName = "Расширение доезжает до базовой записи в один поток")]
+    [TestCase(4, TestName = "Расширение доезжает до базовой записи в четыре потока")]
+    public void Имя_и_размер_из_расширения_склеиваются_через_границу_блоков(int threads)
+    {
+        var extension = new MftRecordBuilder()
+            .ExtensionOf(20)
+            .FileName(MftLayout.RootRecord, 1, "огромный.iso")
+            .NonResidentData(9_000_000_000);
+
+        var image = new MftVolumeBuilder()
+            .Record(20, new MftRecordBuilder())
+            .Record(28, extension)
+            .Build(Records);
+
+        var table = Read(image, threads, blockBytes: 1024);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(table.Entries[20].Name, Is.EqualTo("огромный.iso"));
+            Assert.That(table.Entries[20].Size, Is.EqualTo(9_000_000_000));
+            Assert.That(table.Entries[20].SizeKnown, Is.True);
+            Assert.That(table.Statistics.Extensions, Is.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public void Повторные_имена_из_разных_блоков_складываются_в_одну_запись()
+    {
+        var second = new MftRecordBuilder().ExtensionOf(20).FileName(60, 1, "второе.dll");
+        var third = new MftRecordBuilder().ExtensionOf(20).FileName(70, 1, "третье.dll");
+
+        var image = new MftVolumeBuilder()
+            .Record(20, new MftRecordBuilder().FileName(MftLayout.RootRecord, 1, "первое.dll").ResidentData(64))
+            .Record(24, second)
+            .Record(28, third)
+            .Build(Records);
+
+        var table = Read(image, threads: 4, blockBytes: 1024);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(table.Entries[20].Name, Is.EqualTo("первое.dll"));
+            Assert.That(table.Entries[20].Names, Is.EqualTo(3));
+            Assert.That(table.Alternates[20].Select(x => x.Name), Is.EqualTo(new[] { "второе.dll", "третье.dll" }));
+            Assert.That(table.Statistics.HardLinkedFiles, Is.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public void Отмена_чтения_не_выглядит_порчей_разметки()
+    {
+        var image = new MftVolumeBuilder().Build(Records);
+        using var cancel = new CancellationTokenSource();
+        cancel.Cancel();
+
+        Assert.Catch<OperationCanceledException>(
+            () => MftReader.Read(new MftMemoryVolume(image), Letter, 4, 1024, null, cancel.Token));
+    }
+
+    private static MftTable Read(byte[] image, int threads = 1, int blockBytes = 4096)
+    {
+        return MftReader.Read(new MftMemoryVolume(image), Letter, threads, blockBytes, null, CancellationToken.None);
     }
 }

@@ -46,7 +46,6 @@ internal sealed class McpScanTools(
         }
 
         var parallelism = scanPreferences.ResolveParallelism(path);
-        var multithreaded = parallelism > 1;
 
         var directory = new DirectoryInfo(path);
 
@@ -67,7 +66,7 @@ internal sealed class McpScanTools(
                     var stopwatch = Stopwatch.StartNew();
 
                     var options = new ScanExportOptions(depth,
-                        multithreaded && !outcome.Notes.UsedMft,
+                        outcome.Notes.Parallelism > 1,
                         outcome.Notes.Parallelism,
                         outcome.Notes.Engine);
 

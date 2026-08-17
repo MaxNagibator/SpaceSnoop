@@ -54,6 +54,7 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
             statistics.Damaged,
             statistics.StaleParents,
             statistics.Rehomed,
+            MftReader.ResolveThreads(letter),
             $"записей {statistics.RecordsScanned:N0}, занято {statistics.RecordsInUse:N0}, расширений {statistics.Extensions:N0}, " +
             $"с несколькими именами {statistics.HardLinkedFiles:N0}, пропущено ссылок {statistics.SkippedLinks:N0}, " +
             $"безымянных {statistics.Nameless:N0}, оторванных {statistics.Detached:N0}, повреждённых {statistics.Damaged:N0}, " +
@@ -232,6 +233,7 @@ public sealed record MftScanResult(
     long DamagedRecords,
     long StaleParents,
     long Rehomed,
+    int Threads,
     string Report)
 {
     public long DroppedObjects => DetachedRecords + NamelessRecords + DamagedRecords;
