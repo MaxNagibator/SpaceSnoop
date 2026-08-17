@@ -36,7 +36,7 @@
                                        VerticalAlignment="Center" />
                         </StackPanel>
                         <TextBlock
-                            Text="Дерево занятого места, где жирные папки краснеют от стыда по доле размера, или карта-treemap – те же тяжёлые ветки плитками по площади. Помечаешь хлам – и он улетает в корзину, без членовредительства."
+                            Text="Дерево занятого места, где жирные папки краснеют от стыда по доле размера, или карта-treemap – те же тяжёлые ветки плитками по площади. Диск целиком читается ещё и по таблице NTFS: вдвое быстрее и без двойного счёта жёстких ссылок. Помечаешь хлам – и он улетает в корзину, без членовредительства."
                             Style="{StaticResource TextBlock.Subtle}"
                             TextWrapping="Wrap"
                             Margin="0,6,0,0" />
@@ -54,7 +54,25 @@
                                        VerticalAlignment="Center" />
                         </StackPanel>
                         <TextBlock
-                            Text="Сводит две папки лицом к лицу: цветом видно, кто где лишний, изменённые сверяются по хешу, а перенос – в любую из трёх сторон."
+                            Text="Сводит две папки лицом к лицу: цветом видно, кто где лишний, изменённые сверяются по хешу, а перенос – в любую из трёх сторон. Файл отличается – двойной клик покажет содержимое рядом, строка к строке; а если папки под git, сверху появится полоска с ветками и коммитами."
+                            Style="{StaticResource TextBlock.Subtle}"
+                            TextWrapping="Wrap"
+                            Margin="0,6,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource About.FeatureCard}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.CalendarClock}"
+                                                      Style="{StaticResource About.FeatureIcon}"
+                                                      Margin="0,0,10,0" />
+                            <TextBlock Text="Расписание и обзор"
+                                       Style="{StaticResource About.SectionTitle}"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock
+                            Text="Настроил пары папок один раз – дальше Планировщик Windows гоняет синхронизацию сам, тихо и без окна. На «Обзоре» все профили лежат пачкой: видно, где что разъехалось, оттуда же и запускается прогон."
                             Style="{StaticResource TextBlock.Subtle}"
                             TextWrapping="Wrap"
                             Margin="0,6,0,0" />
@@ -73,6 +91,60 @@
                         </StackPanel>
                         <TextBlock
                             Text="Системные корзины Windows – временные файлы, кэши обновлений и эскизов, дампы – и всё, что отъел Docker: образы, контейнеры, тома, кэш сборки. Тут удаление безвозвратное, мимо корзины: перенос временного файла в корзину не вернул бы ни байта."
+                            Style="{StaticResource TextBlock.Subtle}"
+                            TextWrapping="Wrap"
+                            Margin="0,6,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource About.FeatureCard}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FileArchive}"
+                                                      Style="{StaticResource About.FeatureIcon}"
+                                                      Margin="0,0,10,0" />
+                            <TextBlock Text="Архив и дубликаты"
+                                       Style="{StaticResource About.SectionTitle}"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock
+                            Text="Папку выкинуть жалко, а место держит – упакуй её в .zip: архив сперва проверяется, и только потом оригинал уходит в корзину. Поиск одинаковых файлов покажет, сколько держат три копии одного и того же."
+                            Style="{StaticResource TextBlock.Subtle}"
+                            TextWrapping="Wrap"
+                            Margin="0,6,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource About.FeatureCard}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.MessageCircle}"
+                                                      Style="{StaticResource About.FeatureIcon}"
+                                                      Margin="0,0,10,0" />
+                            <TextBlock Text="Чат и MCP"
+                                       Style="{StaticResource About.SectionTitle}"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock
+                            Text="На странице «Чат» сидит Шнырь – агент поверх твоего же CLI, спрашивать можно словами. Снаружи то же самое видит любой MCP-клиент: то же дерево, то же сравнение, тот же профиль."
+                            Style="{StaticResource TextBlock.Subtle}"
+                            TextWrapping="Wrap"
+                            Margin="0,6,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource About.FeatureCard}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Gauge}"
+                                                      Style="{StaticResource About.FeatureIcon}"
+                                                      Margin="0,0,10,0" />
+                            <TextBlock Text="Диагностика"
+                                       Style="{StaticResource About.SectionTitle}"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock
+                            Text="Отклик интерфейса, память, сборки мусора и график за последние минуты – ответ на «а не тормозит ли оно». «Скопировать сводку» готовит из этого текст для issue."
                             Style="{StaticResource TextBlock.Subtle}"
                             TextWrapping="Wrap"
                             Margin="0,6,0,0" />
