@@ -79,9 +79,38 @@ internal sealed class MftRecordBuilder(int size = 1024, int bytesPerSector = 512
         return NonResident(MftLayout.AttributeData, realSize, startVcn, []);
     }
 
-    public MftRecordBuilder DataRuns(long realSize, ReadOnlySpan<byte> runs)
+    public MftRecordBuilder DataRuns(long realSize, ReadOnlySpan<byte> runs, long startVcn = 0)
     {
-        return NonResident(MftLayout.AttributeData, realSize, 0, runs);
+        return NonResident(MftLayout.AttributeData, realSize, startVcn, runs);
+    }
+
+    public MftRecordBuilder AttributeList(params MftListEntry[] entries)
+    {
+        return Resident(MftLayout.AttributeList, BuildAttributeList(entries));
+    }
+
+    public MftRecordBuilder AttributeListRuns(long realSize, ReadOnlySpan<byte> runs)
+    {
+        return NonResident(MftLayout.AttributeList, realSize, 0, runs);
+    }
+
+    public static byte[] BuildAttributeList(params MftListEntry[] entries)
+    {
+        var value = new byte[entries.Length * MftListEntry.Bytes];
+
+        for (var index = 0; index < entries.Length; index++)
+        {
+            var entry = value.AsSpan(index * MftListEntry.Bytes, MftListEntry.Bytes);
+            var reference = ((ulong)entries[index].Record & MftLayout.ReferenceMask) | (1UL << MftLayout.ReferenceMaskBits);
+
+            BinaryPrimitives.WriteUInt32LittleEndian(entry, entries[index].Type);
+            BinaryPrimitives.WriteUInt16LittleEndian(entry[4..], MftListEntry.Bytes);
+            entry[0x07] = 0x1A;
+            BinaryPrimitives.WriteInt64LittleEndian(entry[0x08..], entries[index].Vcn);
+            BinaryPrimitives.WriteUInt64LittleEndian(entry[0x10..], reference);
+        }
+
+        return value;
     }
 
     public MftRecordBuilder Reparse(uint tag)
@@ -188,6 +217,11 @@ internal sealed class MftVolumeBuilder(int bytesPerSector = 512, int sectorsPerC
     private readonly List<MftRun> _runs = [];
     private readonly Dictionary<int, byte[]> _records = [];
 
+    private int _splitRuns;
+    private int _splitRecord;
+    private bool _listOutside;
+    private long _selfStartVcn;
+
     private int ClusterSize => bytesPerSector * sectorsPerCluster;
 
     public long MftOffset => _runs[0].Cluster * ClusterSize;
@@ -196,6 +230,20 @@ internal sealed class MftVolumeBuilder(int bytesPerSector = 512, int sectorsPerC
     {
         var start = _runs.Count == 0 ? FirstCluster : _runs[^1].Cluster + _runs[^1].Count + GapClusters;
         _runs.Add(new(start, clusters));
+        return this;
+    }
+
+    public MftVolumeBuilder SplitSelf(int runsInBase, int extensionRecord, bool listOutside = false)
+    {
+        _splitRuns = runsInBase;
+        _splitRecord = extensionRecord;
+        _listOutside = listOutside;
+        return this;
+    }
+
+    public MftVolumeBuilder SelfStartVcn(long vcn)
+    {
+        _selfStartVcn = vcn;
         return this;
     }
 
@@ -216,7 +264,7 @@ internal sealed class MftVolumeBuilder(int bytesPerSector = 512, int sectorsPerC
         var image = new byte[(last.Cluster + last.Count + GapClusters) * ClusterSize];
 
         WriteBoot(image);
-        WriteLogical(image, 0, SelfRecord(declaredBytes ?? records * (long)recordSize));
+        WriteLogical(image, 0, SelfRecord(declaredBytes ?? records * (long)recordSize, image));
 
         foreach (var (index, record) in _records)
         {
@@ -226,24 +274,74 @@ internal sealed class MftVolumeBuilder(int bytesPerSector = 512, int sectorsPerC
         return image;
     }
 
-    private byte[] SelfRecord(long declaredBytes)
+    private static byte[] EncodeRuns(List<MftRun> runs)
     {
-        var runs = new List<byte>();
+        var data = new List<byte>();
         long previous = 0;
 
-        foreach (var run in _runs)
+        foreach (var run in runs)
         {
-            runs.Add(0x44);
-            runs.AddRange(BitConverter.GetBytes((int)run.Count));
-            runs.AddRange(BitConverter.GetBytes((int)(run.Cluster - previous)));
+            data.Add(0x44);
+            data.AddRange(BitConverter.GetBytes((int)run.Count));
+            data.AddRange(BitConverter.GetBytes((int)(run.Cluster - previous)));
             previous = run.Cluster;
         }
 
-        runs.Add(0);
+        data.Add(0);
 
-        return new MftRecordBuilder(recordSize, bytesPerSector)
-            .FileName(MftLayout.RootRecord, 1, "$MFT")
-            .DataRuns(declaredBytes, CollectionsMarshal.AsSpan(runs))
+        return [.. data];
+    }
+
+    private byte[] SelfRecord(long declaredBytes, byte[] image)
+    {
+        if (_splitRuns <= 0 || _splitRuns >= _runs.Count)
+        {
+            return new MftRecordBuilder(recordSize, bytesPerSector)
+                .FileName(MftLayout.RootRecord, 1, "$MFT")
+                .DataRuns(declaredBytes, EncodeRuns(_runs), _selfStartVcn)
+                .Build();
+        }
+
+        var head = _runs.GetRange(0, _splitRuns);
+        var tail = _runs.GetRange(_splitRuns, _runs.Count - _splitRuns);
+        var vcn = 0L;
+
+        foreach (var run in head)
+        {
+            vcn += run.Count;
+        }
+
+        WriteLogical(
+            image,
+            _splitRecord * (long)recordSize,
+            new MftRecordBuilder(recordSize, bytesPerSector)
+                .ExtensionOf(0)
+                .DataRuns(0, EncodeRuns(tail), vcn)
+                .Build());
+
+        var entries = new MftListEntry[]
+        {
+            new(MftLayout.AttributeData, 0, 0),
+            new(MftLayout.AttributeData, vcn, _splitRecord),
+        };
+
+        var self = new MftRecordBuilder(recordSize, bytesPerSector).FileName(MftLayout.RootRecord, 1, "$MFT");
+
+        if (!_listOutside)
+        {
+            return self
+                .AttributeList(entries)
+                .DataRuns(declaredBytes, EncodeRuns(head))
+                .Build();
+        }
+
+        var value = MftRecordBuilder.BuildAttributeList(entries);
+        var cluster = _runs[^1].Cluster + _runs[^1].Count;
+        value.CopyTo(image.AsSpan((int)(cluster * ClusterSize)));
+
+        return self
+            .AttributeListRuns(value.Length, EncodeRuns([new(cluster, 1)]))
+            .DataRuns(declaredBytes, EncodeRuns(head))
             .Build();
     }
 
@@ -277,6 +375,11 @@ internal sealed class MftVolumeBuilder(int bytesPerSector = 512, int sectorsPerC
             position += runBytes;
         }
     }
+}
+
+internal readonly record struct MftListEntry(uint Type, long Vcn, int Record)
+{
+    public const int Bytes = 0x20;
 }
 
 internal sealed class MftMemoryVolume(byte[] image) : IMftVolume

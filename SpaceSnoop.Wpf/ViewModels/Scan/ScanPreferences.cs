@@ -20,6 +20,10 @@ public sealed partial class ScanPreferences : ObservableObject
     [ObservableProperty]
     private bool _revealFiles = AppDefaults.ScanRevealFilesDefault;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MftNeedsElevation))]
+    private bool _mftEnabled = AppDefaults.ScanMftEnabledDefault;
+
     public ScanPreferences(ISettingsStore settings)
     {
         _settings = settings;
@@ -30,10 +34,10 @@ public sealed partial class ScanPreferences : ObservableObject
         MediaAware = _settings.GetBool(SettingsKeys.ScanMediaAware, AppDefaults.ScanMediaAwareDefault);
         Intensity = _settings.GetDouble(SettingsKeys.ScanIntensity, AppDefaults.IntensityDefault);
         RevealFiles = _settings.GetBool(SettingsKeys.ScanRevealFiles, AppDefaults.ScanRevealFilesDefault);
+        MftEnabled = _settings.GetBool(SettingsKeys.ScanMftEnabled, AppDefaults.ScanMftEnabledDefault);
         _suppressPersist = false;
 
         DuplicatesEnabled = settings.GetBool(SettingsKeys.ScanDuplicatesEnabled, AppDefaults.ScanDuplicatesEnabledDefault);
-        MftEnabled = settings.GetBool(SettingsKeys.ScanMftEnabled, AppDefaults.ScanMftEnabledDefault);
     }
 
     public int ProcessorCount { get; } = Environment.ProcessorCount;
@@ -42,7 +46,7 @@ public sealed partial class ScanPreferences : ObservableObject
 
     public bool DuplicatesEnabled { get; }
 
-    public bool MftEnabled { get; }
+    public bool MftNeedsElevation => MftEnabled && !AdminElevation.IsElevated;
 
     public int ResolveParallelism(string path)
     {
@@ -105,6 +109,14 @@ public sealed partial class ScanPreferences : ObservableObject
         if (!_suppressPersist)
         {
             _settings.SetBool(SettingsKeys.ScanRevealFiles, value);
+        }
+    }
+
+    partial void OnMftEnabledChanged(bool value)
+    {
+        if (!_suppressPersist)
+        {
+            _settings.SetBool(SettingsKeys.ScanMftEnabled, value);
         }
     }
 }

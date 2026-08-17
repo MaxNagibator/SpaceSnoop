@@ -151,6 +151,51 @@ public class MftReaderVolumeTests
         }
     }
 
+    [TestCase(false, TestName = "Резидентный $ATTRIBUTE_LIST дочитывает таблицу целиком")]
+    [TestCase(true, TestName = "Нерезидентный $ATTRIBUTE_LIST дочитывает таблицу целиком")]
+    public void Экстенты_из_списка_атрибутов_дочитывают_таблицу(bool listOutside)
+    {
+        var image = new MftVolumeBuilder()
+            .Fragment(4)
+            .Fragment(4)
+            .SplitSelf(1, 15, listOutside)
+            .Record(20, new MftRecordBuilder().FileName(MftLayout.RootRecord, 1, "во-втором-экстенте.bin").ResidentData(48))
+            .Record(Records - 1, new MftRecordBuilder().FileName(MftLayout.RootRecord, 1, "последняя.bin").ResidentData(64))
+            .Build(Records);
+
+        var table = Read(image);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(table.Entries, Has.Length.EqualTo(Records));
+            Assert.That(table.Entries[20].Name, Is.EqualTo("во-втором-экстенте.bin"));
+            Assert.That(table.Entries[20].Size, Is.EqualTo(48));
+            Assert.That(table.Entries[Records - 1].Name, Is.EqualTo("последняя.bin"));
+            Assert.That(table.Statistics.RecordsScanned, Is.EqualTo(Records));
+            Assert.That(table.Statistics.Damaged, Is.Zero);
+        }
+    }
+
+    [Test]
+    public void Запись_расширение_вне_первого_экстента_роняет_разбор()
+    {
+        var image = new MftVolumeBuilder()
+            .Fragment(4)
+            .Fragment(4)
+            .SplitSelf(1, 20)
+            .Build(Records);
+
+        Assert.Throws<InvalidDataException>(() => Read(image));
+    }
+
+    [Test]
+    public void Не_первый_экстент_в_собственной_записи_роняет_разбор()
+    {
+        var image = new MftVolumeBuilder().SelfStartVcn(4).Build(Records);
+
+        Assert.Throws<InvalidDataException>(() => Read(image));
+    }
+
     [Test]
     public void Отмена_чтения_не_выглядит_порчей_разметки()
     {

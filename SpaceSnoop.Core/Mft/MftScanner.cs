@@ -13,7 +13,7 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
     }
 
     // TODO: $MFT читается целиком независимо от цели скана, поэтому на подкаталоге движок проигрывает
-    // обходу каталогами (`C:\Windows` – 2,77 с против 4,26 с) и выбор по цели не сделан. Триггер апгрейда:
+    // обходу каталогами (`C:\Windows` – 2,77 с против 3,18 с) и выбор по цели не сделан. Триггер апгрейда:
     // появится сценарий, где сканируют один подкаталог часто – тогда решать по доле цели в томе.
     public MftScanResult Calculate(DirectoryInfo directory, ScanProgress? progress, CancellationToken cancel = default)
     {

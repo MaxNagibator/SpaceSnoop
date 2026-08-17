@@ -10,6 +10,7 @@ internal static class MftLayout
     public const int FirstUserRecord = 16;
 
     public const uint AttributeStandardInformation = 0x10;
+    public const uint AttributeList = 0x20;
     public const uint AttributeFileName = 0x30;
     public const uint AttributeData = 0x80;
     public const uint AttributeReparsePoint = 0xC0;
