@@ -60,12 +60,13 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 1012, Level = LogLevel.Warning,
         Message = "Обход по $MFT для «{Path}» неполон: в дерево не попало {Dropped} объект(ов) на {DroppedBytes} Б, "
-                  + "без известного размера {UnknownSize}; {Report}")]
+                  + "прочитано не полностью {Partial} запись(ей), без известного размера {UnknownSize}; {Report}")]
     public static partial void MftScanIncomplete(
         this ILogger logger,
         string path,
         long dropped,
         long droppedBytes,
+        long partial,
         long unknownSize,
         string report);
 

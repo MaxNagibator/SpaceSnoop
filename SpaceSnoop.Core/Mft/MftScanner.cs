@@ -51,15 +51,17 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
             statistics.OrphanFiles,
             statistics.OrphanBytes,
             statistics.Nameless,
+            statistics.NamelessBytes,
             statistics.Damaged,
+            statistics.Partial,
             statistics.StaleParents,
             statistics.Rehomed,
             MftReader.ResolveThreads(letter),
             $"записей {statistics.RecordsScanned:N0}, занято {statistics.RecordsInUse:N0}, расширений {statistics.Extensions:N0}, " +
             $"с несколькими именами {statistics.HardLinkedFiles:N0}, пропущено ссылок {statistics.SkippedLinks:N0}, " +
             $"безымянных {statistics.Nameless:N0}, оторванных {statistics.Detached:N0}, повреждённых {statistics.Damaged:N0}, " +
-            $"без размера {totals.UnknownSizeFiles:N0}, устаревших ссылок на родителя {statistics.StaleParents:N0}, " +
-            $"переподвешено {statistics.Rehomed:N0}");
+            $"неполных {statistics.Partial:N0}, без размера {totals.UnknownSizeFiles:N0}, " +
+            $"устаревших ссылок на родителя {statistics.StaleParents:N0}, переподвешено {statistics.Rehomed:N0}");
 
         _log.MftScanCompleted(directory.FullName, table.Entries.Length, result.ExtraNames, result.ExtraNameBytes, result.Report);
 
@@ -87,27 +89,42 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
             return current;
         }
 
+        // TODO: чувствительность к регистру снимается один раз с корня тома, поэтому каталог с пофайловым
+        // режимом NTFS (`fsutil file setCaseSensitiveInfo`) получает политику корня; точное совпадение имени
+        // предпочитается нечувствительному, и этого хватает, пока обе формы имени существуют рядом.
+        // Триггер апгрейда: понадобится отличать `foo` от `Foo`, когда лежит только одна из них.
         var comparer = PathCase.ComparerFor(root);
 
         foreach (var segment in relative.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
         {
             var found = -1;
+            var exact = -1;
 
             for (var child = links.FirstChild[current]; child >= 0; child = links.NextSibling[child])
             {
-                if (entries[child].IsDirectory && comparer.Equals(entries[child].Name, segment))
+                if (!entries[child].IsDirectory)
+                {
+                    continue;
+                }
+
+                if (string.Equals(entries[child].Name, segment, StringComparison.Ordinal))
+                {
+                    exact = child;
+                    break;
+                }
+
+                if (found < 0 && comparer.Equals(entries[child].Name, segment))
                 {
                     found = child;
-                    break;
                 }
             }
 
-            if (found < 0)
+            current = exact >= 0 ? exact : found;
+
+            if (current < 0)
             {
                 return -1;
             }
-
-            current = found;
         }
 
         return current;
@@ -230,7 +247,9 @@ public sealed record MftScanResult(
     long OrphanFiles,
     long OrphanBytes,
     long NamelessRecords,
+    long NamelessBytes,
     long DamagedRecords,
+    long PartialRecords,
     long StaleParents,
     long Rehomed,
     int Threads,
@@ -238,5 +257,7 @@ public sealed record MftScanResult(
 {
     public long DroppedObjects => DetachedRecords + NamelessRecords + DamagedRecords;
 
-    public bool IsComplete => DroppedObjects == 0 && UnknownSizeFiles == 0;
+    public long DroppedBytes => OrphanBytes + NamelessBytes;
+
+    public bool IsComplete => DroppedObjects == 0 && PartialRecords == 0 && UnknownSizeFiles == 0;
 }

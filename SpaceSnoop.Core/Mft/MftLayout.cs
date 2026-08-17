@@ -23,6 +23,8 @@ internal static class MftLayout
     public const int ReferenceMaskBits = 48;
     public const long ReferenceMask = (1L << ReferenceMaskBits) - 1;
 
+    public const int UpdateSequenceMinOffset = 0x2A;
+
     public const byte NamespaceDos = 2;
 
     public static bool IsNtfs(ReadOnlySpan<byte> boot)
@@ -30,12 +32,18 @@ internal static class MftLayout
         return boot.Length >= 11 && "NTFS    "u8.SequenceEqual(boot.Slice(3, 8));
     }
 
+    public static bool SameGeneration(ushort sequence, ushort reference)
+    {
+        return sequence == 0 || reference == 0 || sequence == reference;
+    }
+
     public static bool ApplyFixup(Span<byte> record, int bytesPerSector)
     {
         var offset = BinaryPrimitives.ReadUInt16LittleEndian(record[4..]);
         var count = BinaryPrimitives.ReadUInt16LittleEndian(record[6..]);
+        var sectors = record.Length / bytesPerSector;
 
-        if (count == 0 || offset + count * 2 > record.Length)
+        if (count != sectors + 1 || offset < UpdateSequenceMinOffset || offset + count * 2 > record.Length)
         {
             return false;
         }
@@ -74,10 +82,17 @@ internal static class MftLayout
         var runs = new List<MftRun>();
         var position = 0;
         long cluster = 0;
+        var terminated = false;
         truncated = false;
 
-        while (position < data.Length && data[position] != 0)
+        while (position < data.Length)
         {
+            if (data[position] == 0)
+            {
+                terminated = true;
+                break;
+            }
+
             var header = data[position++];
             var countSize = header & 0x0F;
             var offsetSize = (header >> 4) & 0x0F;
@@ -107,6 +122,8 @@ internal static class MftLayout
 
             runs.Add(new(cluster, count));
         }
+
+        truncated |= !terminated;
 
         return runs;
     }

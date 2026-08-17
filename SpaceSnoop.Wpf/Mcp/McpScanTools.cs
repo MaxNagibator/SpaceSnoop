@@ -75,7 +75,8 @@ internal sealed class McpScanTools(
                         Notes = ScanExportNotes.From(outcome.Notes.ExtraNameBytes,
                             outcome.Notes.DroppedObjects,
                             outcome.Notes.DroppedBytes,
-                            outcome.Notes.UnknownSizeFiles),
+                            outcome.Notes.UnknownSizeFiles,
+                            outcome.Notes.PartialRecords),
                     };
 
                     phases.ExportMs = stopwatch.ElapsedMilliseconds;

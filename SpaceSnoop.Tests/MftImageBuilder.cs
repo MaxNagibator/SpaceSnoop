@@ -133,6 +133,28 @@ internal sealed class MftRecordBuilder(int size = 1024, int bytesPerSector = 512
         return this;
     }
 
+    public MftRecordBuilder OverflowingAttribute()
+    {
+        BinaryPrimitives.WriteUInt32LittleEndian(_record.AsSpan(_position), MftLayout.AttributeData);
+        BinaryPrimitives.WriteUInt32LittleEndian(_record.AsSpan(_position + 4), int.MaxValue);
+        _position += 8;
+        return this;
+    }
+
+    public MftRecordBuilder OversizedResidentData(uint declaredValueBytes)
+    {
+        var length = Align(ResidentValueOffset);
+        var attribute = _record.AsSpan(_position, length);
+
+        BinaryPrimitives.WriteUInt32LittleEndian(attribute, MftLayout.AttributeData);
+        BinaryPrimitives.WriteUInt32LittleEndian(attribute[4..], (uint)length);
+        BinaryPrimitives.WriteUInt32LittleEndian(attribute[0x10..], declaredValueBytes);
+        BinaryPrimitives.WriteUInt16LittleEndian(attribute[0x14..], ResidentValueOffset);
+
+        _position += length;
+        return this;
+    }
+
     public byte[] Build()
     {
         var record = (byte[])_record.Clone();

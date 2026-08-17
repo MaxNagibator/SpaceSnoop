@@ -10,9 +10,13 @@ internal sealed class MftStatistics
 
     public long Nameless { get; set; }
 
+    public long NamelessBytes { get; set; }
+
     public long Detached { get; set; }
 
     public long Damaged { get; set; }
+
+    public long Partial { get; set; }
 
     public long StaleParents { get; set; }
 
@@ -32,8 +36,10 @@ internal sealed class MftStatistics
         RecordsInUse += other.RecordsInUse;
         Extensions += other.Extensions;
         Nameless += other.Nameless;
+        NamelessBytes += other.NamelessBytes;
         Detached += other.Detached;
         Damaged += other.Damaged;
+        Partial += other.Partial;
         StaleParents += other.StaleParents;
         Rehomed += other.Rehomed;
         HardLinkedFiles += other.HardLinkedFiles;

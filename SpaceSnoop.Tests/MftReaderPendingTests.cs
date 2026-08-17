@@ -31,7 +31,7 @@ public class MftReaderPendingTests
     {
         var entries = Entries(name: null);
         var pending = new MftPending();
-        pending.Sizes[Record] = 4096;
+        pending.Sizes[Record] = new(4096);
         pending.Alternates[Record] = [new(20, 7, "большой.vhdx")];
 
         MftReader.ApplyPending(entries, pending, new());
@@ -83,11 +83,63 @@ public class MftReaderPendingTests
         entries[Record].Size = 100;
         entries[Record].SizeKnown = true;
         var pending = new MftPending();
-        pending.Sizes[Record] = 999;
+        pending.Sizes[Record] = new(999);
 
         MftReader.ApplyPending(entries, pending, new());
 
         Assert.That(entries[Record].Size, Is.EqualTo(100));
+    }
+
+    [Test]
+    public void Размер_из_чужого_поколения_записи_не_применяется()
+    {
+        var entries = Entries(name: "данные.bin");
+        var pending = new MftPending();
+        pending.Sizes[Record] = new(4096, 9);
+        var statistics = new MftStatistics();
+
+        MftReader.ApplyPending(entries, pending, statistics);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(entries[Record].SizeKnown, Is.False);
+            Assert.That(statistics.Partial, Is.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public void Имя_из_чужого_поколения_записи_не_применяется()
+    {
+        var entries = Entries(name: null);
+        var pending = new MftPending();
+        pending.Alternates[Record] = [new(20, 7, "чужое.vhdx", 9)];
+        var statistics = new MftStatistics();
+
+        MftReader.ApplyPending(entries, pending, statistics);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(entries[Record].Name, Is.Null);
+            Assert.That(statistics.Partial, Is.EqualTo(1));
+            Assert.That(statistics.Nameless, Is.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public void Байты_безымянной_записи_попадают_в_счётчик()
+    {
+        var entries = Entries(name: null);
+        entries[Record].Size = 8192;
+
+        var statistics = new MftStatistics();
+
+        MftReader.ApplyPending(entries, new(), statistics);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(statistics.Nameless, Is.EqualTo(1));
+            Assert.That(statistics.NamelessBytes, Is.EqualTo(8192));
+        }
     }
 
     private static MftEntry[] Entries(string? name)

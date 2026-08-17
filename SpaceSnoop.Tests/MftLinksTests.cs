@@ -73,6 +73,61 @@ public class MftLinksTests
     }
 
     [Test]
+    public void Имя_под_корнем_скана_спасает_запись_с_недоступным_основным_родителем()
+    {
+        var table = Table();
+        table.Entries[File] = Leaf(name: "снаружи.bin", parent: Outside, parentSequence: 3, size: 100);
+        table.Alternates[File] = [new(Target, 7, "внутри.bin")];
+
+        var links = MftLinks.Build(table, CancellationToken.None);
+        links.Rehome(table, Target, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(links.FirstChild[Target], Is.EqualTo(File));
+            Assert.That(table.Entries[File].Name, Is.EqualTo("внутри.bin"));
+            Assert.That(table.Statistics.Rehomed, Is.EqualTo(1));
+            Assert.That(table.Statistics.Detached, Is.Zero);
+            Assert.That(table.Statistics.OrphanFiles, Is.Zero);
+            Assert.That(table.Statistics.OrphanBytes, Is.Zero);
+        }
+    }
+
+    [Test]
+    public void Пропущенная_ссылка_переподвесом_не_воскресает()
+    {
+        var table = Table();
+
+        table.Entries[File] = Leaf(name: "ссылка", parent: Outside, parentSequence: 9, size: 100);
+        table.Entries[File].ReparseTag = MftLayout.ReparseNameSurrogate | 0x03;
+        table.Alternates[File] = [new(Target, 7, "внутри.bin")];
+
+        var links = MftLinks.Build(table, CancellationToken.None);
+        links.Rehome(table, Target, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(links.FirstChild[Target], Is.EqualTo(-1));
+            Assert.That(table.Statistics.SkippedLinks, Is.EqualTo(1));
+            Assert.That(table.Statistics.Rehomed, Is.Zero);
+        }
+    }
+
+    [Test]
+    public void Точное_совпадение_имени_побеждает_совпадение_без_учёта_регистра()
+    {
+        var table = Table();
+        table.Entries[22] = Folder(name: "Данные", parent: Root, parentSequence: 1, sequence: 11);
+        table.Entries[23] = Folder(name: "данные", parent: Root, parentSequence: 1, sequence: 12);
+
+        var links = MftLinks.Build(table, CancellationToken.None);
+
+        var start = MftScanner.Locate(table, links, new(@"C:\данные"), 'C');
+
+        Assert.That(start, Is.EqualTo(23));
+    }
+
+    [Test]
     public void Достижимая_из_корня_скана_запись_остаётся_на_своём_месте()
     {
         var table = Table();

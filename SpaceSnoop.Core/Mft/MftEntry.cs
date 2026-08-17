@@ -21,4 +21,6 @@ internal struct MftEntry
     public readonly bool IsLink => (ReparseTag & MftLayout.ReparseNameSurrogate) != 0 || (ReparseUnknown && IsDirectory);
 }
 
-internal readonly record struct MftName(int Parent, ushort ParentSequence, string Name);
+internal readonly record struct MftName(int Parent, ushort ParentSequence, string Name, ushort BaseSequence = 0);
+
+internal readonly record struct MftPendingSize(long Size, ushort BaseSequence = 0);

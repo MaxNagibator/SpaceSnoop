@@ -90,6 +90,37 @@ public class MftLayoutTests
         Assert.That(MftLayout.ApplyFixup(record, 512), Is.False);
     }
 
+    [TestCase((ushort)1, TestName = "Массив короче числа секторов отвергается")]
+    [TestCase((ushort)4, TestName = "Массив длиннее числа секторов отвергается")]
+    public void Число_элементов_массива_подписей_сверяется_с_числом_секторов(ushort count)
+    {
+        var record = BuildRecord(out _, out _);
+        record[6] = (byte)count;
+
+        Assert.That(MftLayout.ApplyFixup(record, 512), Is.False);
+    }
+
+    [Test]
+    public void Массив_подписей_внутри_заголовка_отвергается()
+    {
+        var record = BuildRecord(out _, out _);
+        record[4] = 0x10;
+
+        Assert.That(MftLayout.ApplyFixup(record, 512), Is.False);
+    }
+
+    [Test]
+    public void Runlist_без_терминатора_считается_обрезанным()
+    {
+        var runs = MftLayout.DecodeRuns([0x11, 0x10, 0x20], out var truncated);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(runs, Has.Count.EqualTo(1));
+            Assert.That(truncated, Is.True);
+        }
+    }
+
     [Test]
     public void Дата_вне_диапазона_даёт_пустое_значение()
     {

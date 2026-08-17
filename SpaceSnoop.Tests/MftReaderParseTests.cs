@@ -88,8 +88,8 @@ public class MftReaderParseTests
 
     [TestCase(0L, 5_000_000L, 5_000_000L, true, 0L, TestName = "Первый экстент нерезидентного data задаёт размер")]
     [TestCase(8L, 5_000_000L, 0L, false, 0L, TestName = "Не первый экстент нерезидентного data размер не задаёт")]
-    [TestCase(0L, -1L, 0L, false, 1L, TestName = "Отрицательный размер считается повреждением записи")]
-    public void Размер_из_нерезидентного_data(long startVcn, long realSize, long expected, bool known, long damaged)
+    [TestCase(0L, -1L, 0L, false, 1L, TestName = "Отрицательный размер делает запись неполной")]
+    public void Размер_из_нерезидентного_data(long startVcn, long realSize, long expected, bool known, long partial)
     {
         var statistics = new MftStatistics();
 
@@ -103,12 +103,13 @@ public class MftReaderParseTests
         {
             Assert.That(entry.Size, Is.EqualTo(expected));
             Assert.That(entry.SizeKnown, Is.EqualTo(known));
-            Assert.That(statistics.Damaged, Is.EqualTo(damaged));
+            Assert.That(statistics.Partial, Is.EqualTo(partial));
+            Assert.That(statistics.Damaged, Is.Zero);
         }
     }
 
     [Test]
-    public void Атрибут_с_непригодной_длиной_считается_повреждением()
+    public void Атрибут_с_непригодной_длиной_оставляет_запись_в_дереве_и_считается_неполной()
     {
         var statistics = new MftStatistics();
 
@@ -120,8 +121,63 @@ public class MftReaderParseTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(statistics.Damaged, Is.EqualTo(1));
+            Assert.That(statistics.Partial, Is.EqualTo(1));
+            Assert.That(statistics.Damaged, Is.Zero);
             Assert.That(entry.Name, Is.EqualTo("битый.bin"));
+        }
+    }
+
+    [Test]
+    public void Длина_атрибута_у_края_int_не_роняет_разбор()
+    {
+        var statistics = new MftStatistics();
+
+        var record = new MftRecordBuilder()
+            .FileName(Parent, 1, "переполнение.bin")
+            .OverflowingAttribute();
+
+        var entry = Parse(record, statistics);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(statistics.Partial, Is.EqualTo(1));
+            Assert.That(statistics.Damaged, Is.Zero);
+            Assert.That(entry.Name, Is.EqualTo("переполнение.bin"));
+        }
+    }
+
+    [Test]
+    public void Резидентный_data_за_границей_атрибута_размер_не_задаёт()
+    {
+        var statistics = new MftStatistics();
+
+        var record = new MftRecordBuilder()
+            .FileName(Parent, 1, "враньё.bin")
+            .OversizedResidentData(4096);
+
+        var entry = Parse(record, statistics);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(entry.SizeKnown, Is.False);
+            Assert.That(entry.Size, Is.Zero);
+            Assert.That(statistics.Partial, Is.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public void Имя_нулевой_длины_записью_не_принимается()
+    {
+        var record = new MftRecordBuilder()
+            .FileName(Parent, 1, string.Empty)
+            .ResidentData(16);
+
+        var entry = Parse(record);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(entry.Name, Is.Null);
+            Assert.That(entry.Exists, Is.False);
         }
     }
 
@@ -226,7 +282,7 @@ public class MftReaderParseTests
         {
             Assert.That(entry.Present, Is.False);
             Assert.That(statistics.Extensions, Is.EqualTo(1));
-            Assert.That(pending.Sizes[12], Is.EqualTo(9_000_000_000));
+            Assert.That(pending.Sizes[12].Size, Is.EqualTo(9_000_000_000));
             Assert.That(pending.Alternates[12][0].Name, Is.EqualTo("огромный.iso"));
         }
     }

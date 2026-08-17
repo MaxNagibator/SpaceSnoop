@@ -40,13 +40,20 @@ public sealed class ScanRunner(
             {
                 logger.MftScanIncomplete(directory.FullName,
                     scan.DroppedObjects,
-                    scan.OrphanBytes,
+                    scan.DroppedBytes,
+                    scan.PartialRecords,
                     scan.UnknownSizeFiles,
                     scan.Report);
             }
 
             return new(scan.Root,
-                new(true, scan.Threads, scan.ExtraNameBytes, scan.DroppedObjects, scan.OrphanBytes, scan.UnknownSizeFiles));
+                new(true,
+                    scan.Threads,
+                    scan.ExtraNameBytes,
+                    scan.DroppedObjects,
+                    scan.DroppedBytes,
+                    scan.UnknownSizeFiles,
+                    scan.PartialRecords));
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -65,14 +72,15 @@ public readonly record struct ScanNotes(
     long ExtraNameBytes,
     long DroppedObjects,
     long DroppedBytes,
-    long UnknownSizeFiles)
+    long UnknownSizeFiles,
+    long PartialRecords)
 {
     public static ScanNotes ForTraversal(int parallelism)
     {
-        return new(false, Math.Max(1, parallelism), 0, 0, 0, 0);
+        return new(false, Math.Max(1, parallelism), 0, 0, 0, 0, 0);
     }
 
-    public bool HasDrops => DroppedObjects > 0 || UnknownSizeFiles > 0;
+    public bool HasDrops => DroppedObjects > 0 || UnknownSizeFiles > 0 || PartialRecords > 0;
 
     public string Engine => UsedMft ? "mft" : "directories";
 }

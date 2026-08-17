@@ -57,7 +57,7 @@ public sealed partial class ScanSummaryViewModel : ObservableObject
     public bool HasDropNote => DropNote.Length > 0;
 
     public string DropNoteHint => HasDropNote
-        ? ScanDropNote.Explain(_notes.DroppedObjects, _notes.DroppedBytes, _notes.UnknownSizeFiles)
+        ? ScanDropNote.Explain(_notes.DroppedObjects, _notes.DroppedBytes, _notes.UnknownSizeFiles, _notes.PartialRecords)
         : string.Empty;
 
     public PerformanceOperation Apply(
@@ -86,6 +86,6 @@ public sealed partial class ScanSummaryViewModel : ObservableObject
         ResultDirCountText = result.TotalDirectoryCount.ToString("N0");
         VolumeNote = ScanVolumeNote.Describe(result.AbsolutePath, result.TotalSize, _drive) ?? string.Empty;
         LinkNote = ScanLinkNote.Describe(_notes.ExtraNameBytes) ?? string.Empty;
-        DropNote = ScanDropNote.Describe(_notes.DroppedObjects, _notes.UnknownSizeFiles) ?? string.Empty;
+        DropNote = ScanDropNote.Describe(_notes.DroppedObjects, _notes.UnknownSizeFiles, _notes.PartialRecords) ?? string.Empty;
     }
 }

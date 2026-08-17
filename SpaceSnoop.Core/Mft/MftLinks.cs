@@ -68,7 +68,14 @@ internal sealed class MftLinks(int[] firstChild, int[] nextSibling)
         {
             cancel.ThrowIfCancellationRequested();
 
-            if (index < 0 || index >= entries.Length || !entries[index].Exists || IsUnder(entries, index, start))
+            if (index < 0 || index >= entries.Length || !entries[index].Present || entries[index].IsLink)
+            {
+                continue;
+            }
+
+            var dropped = !entries[index].Exists;
+
+            if (!dropped && IsUnder(entries, index, start))
             {
                 continue;
             }
@@ -82,6 +89,12 @@ internal sealed class MftLinks(int[] firstChild, int[] nextSibling)
                 }
 
                 ref var entry = ref entries[index];
+
+                if (dropped)
+                {
+                    Restore(table.Statistics, in entry);
+                }
+
                 Detach(index, entry.Parent);
                 entry.Parent = candidate.Parent;
                 entry.ParentSequence = candidate.ParentSequence;
@@ -137,6 +150,19 @@ internal sealed class MftLinks(int[] firstChild, int[] nextSibling)
         }
     }
 
+    private static void Restore(MftStatistics statistics, in MftEntry entry)
+    {
+        statistics.Detached--;
+
+        if (entry.IsDirectory)
+        {
+            return;
+        }
+
+        statistics.OrphanFiles--;
+        statistics.OrphanBytes -= entry.Size;
+    }
+
     private static bool IsValidParent(MftEntry[] entries, int parent, ushort parentSequence, MftStatistics? statistics)
     {
         if (parent < 0 || parent >= entries.Length || !entries[parent].Exists || !entries[parent].IsDirectory)
@@ -144,9 +170,7 @@ internal sealed class MftLinks(int[] firstChild, int[] nextSibling)
             return false;
         }
 
-        var sequence = entries[parent].Sequence;
-
-        if (parentSequence == 0 || sequence == 0 || parentSequence == sequence)
+        if (MftLayout.SameGeneration(entries[parent].Sequence, parentSequence))
         {
             return true;
         }

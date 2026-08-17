@@ -129,7 +129,8 @@ public sealed partial class ScanViewModel : IScanAutomation
         if (notes.HasDrops)
         {
             _notifier.Notify(
-                $"Скан неполон: {ScanDropNote.Explain(notes.DroppedObjects, notes.DroppedBytes, notes.UnknownSizeFiles)}",
+                "Скан неполон: "
+                + ScanDropNote.Explain(notes.DroppedObjects, notes.DroppedBytes, notes.UnknownSizeFiles, notes.PartialRecords),
                 StatusSeverity.Warning);
         }
     }

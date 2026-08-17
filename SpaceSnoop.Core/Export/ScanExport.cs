@@ -9,12 +9,22 @@ public sealed record ScanExportOptions(int Depth, bool Multithreaded, int Parall
 }
 
 /// <summary>Поправки к итогу скана: не сосчитанное повторно и не попавшее в дерево.</summary>
-public sealed record ScanExportNotes(long ExtraNameBytes, long DroppedObjects, long DroppedBytes, long UnknownSizeFiles)
+public sealed record ScanExportNotes(
+    long ExtraNameBytes,
+    long DroppedObjects,
+    long DroppedBytes,
+    long UnknownSizeFiles,
+    long PartialRecords)
 {
-    public static ScanExportNotes? From(long extraNameBytes, long droppedObjects, long droppedBytes, long unknownSizeFiles)
+    public static ScanExportNotes? From(
+        long extraNameBytes,
+        long droppedObjects,
+        long droppedBytes,
+        long unknownSizeFiles,
+        long partialRecords)
     {
-        return extraNameBytes > 0 || droppedObjects > 0 || droppedBytes > 0 || unknownSizeFiles > 0
-            ? new(extraNameBytes, droppedObjects, droppedBytes, unknownSizeFiles)
+        return extraNameBytes > 0 || droppedObjects > 0 || droppedBytes > 0 || unknownSizeFiles > 0 || partialRecords > 0
+            ? new(extraNameBytes, droppedObjects, droppedBytes, unknownSizeFiles, partialRecords)
             : null;
     }
 }

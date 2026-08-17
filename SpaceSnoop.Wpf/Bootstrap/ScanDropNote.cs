@@ -4,23 +4,31 @@ public static class ScanDropNote
 {
     public const string Hint = "Чтение $MFT разбирает разметку тома напрямую, и часть записей в дерево не попадает: "
         + "запись повреждена, её родительский каталог недоступен либо ссылка на него устарела. "
-        + "Итог скана на эти объекты занижен, поэтому они названы числом, а не пропущены молча.";
+        + "Итог скана на эти объекты занижен, поэтому они названы числом, а не пропущены молча. "
+        + "Таблица читается целиком, поэтому при скане подкаталога числа относятся ко всему тому, "
+        + "а не только к выбранной ветке.";
 
-    public static string? Describe(long droppedObjects, long unknownSizeFiles)
+    public static string? Describe(long droppedObjects, long unknownSizeFiles, long partialRecords)
     {
-        var total = droppedObjects + unknownSizeFiles;
+        var total = droppedObjects + unknownSizeFiles + partialRecords;
 
         return total > 0 ? Count(total, "объект", "объекта", "объектов") : null;
     }
 
-    public static string Explain(long droppedObjects, long droppedBytes, long unknownSizeFiles)
+    public static string Explain(long droppedObjects, long droppedBytes, long unknownSizeFiles, long partialRecords)
     {
-        var parts = new List<string>(2);
+        var parts = new List<string>(3);
 
         if (droppedObjects > 0)
         {
             parts.Add($"нет в дереве: {Count(droppedObjects, "объект", "объекта", "объектов")}"
                       + (droppedBytes > 0 ? $" на ≈{SizeFormatter.Format(droppedBytes)}" : string.Empty));
+        }
+
+        if (partialRecords > 0)
+        {
+            parts.Add($"прочитаны не полностью: {Count(partialRecords, "запись", "записи", "записей")}, "
+                      + "они остались в дереве без части своих данных");
         }
 
         if (unknownSizeFiles > 0)
