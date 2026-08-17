@@ -113,6 +113,11 @@ internal sealed class MftLinks(int[] firstChild, int[] nextSibling)
 
         for (var index = MftLayout.FirstUserRecord; index < entries.Length; index++)
         {
+            if ((index & 0xFFFF) == 0)
+            {
+                cancel.ThrowIfCancellationRequested();
+            }
+
             ref var entry = ref entries[index];
 
             if (!entry.Exists || reachable[index])

@@ -16,15 +16,9 @@ internal sealed class MftStatistics
 
     public long StaleParents { get; set; }
 
-    public long UnknownSize { get; set; }
-
     public long Rehomed { get; set; }
 
     public long HardLinkedFiles { get; set; }
-
-    public long ExtraNames { get; set; }
-
-    public long ExtraNameBytes { get; set; }
 
     public long OrphanFiles { get; set; }
 

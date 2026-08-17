@@ -21,6 +21,9 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
                      ?? throw new InvalidOperationException($"Путь {directory.FullName} не лежит на локальном томе с буквой");
 
         var table = MftReader.Read(letter, progress, cancel);
+
+        progress?.Announce($"Разбор связей тома {letter}:");
+
         var links = MftLinks.Build(table, cancel);
         var start = Locate(table, links, directory, letter);
 
@@ -52,8 +55,10 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
             statistics.StaleParents,
             statistics.Rehomed,
             $"записей {statistics.RecordsScanned:N0}, занято {statistics.RecordsInUse:N0}, расширений {statistics.Extensions:N0}, " +
+            $"с несколькими именами {statistics.HardLinkedFiles:N0}, пропущено ссылок {statistics.SkippedLinks:N0}, " +
             $"безымянных {statistics.Nameless:N0}, оторванных {statistics.Detached:N0}, повреждённых {statistics.Damaged:N0}, " +
-            $"устаревших ссылок на родителя {statistics.StaleParents:N0}, переподвешено {statistics.Rehomed:N0}");
+            $"без размера {totals.UnknownSizeFiles:N0}, устаревших ссылок на родителя {statistics.StaleParents:N0}, " +
+            $"переподвешено {statistics.Rehomed:N0}");
 
         _log.MftScanCompleted(directory.FullName, table.Entries.Length, result.ExtraNames, result.ExtraNameBytes, result.Report);
 

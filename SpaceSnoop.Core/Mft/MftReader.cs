@@ -1,5 +1,4 @@
-﻿using Microsoft.Win32.SafeHandles;
-using System.Buffers;
+﻿using System.Buffers;
 using System.Buffers.Binary;
 using System.Runtime.InteropServices;
 
@@ -7,11 +6,6 @@ namespace SpaceSnoop.Core.Mft;
 
 internal static class MftReader
 {
-    private const uint GenericRead = 0x80000000;
-    private const uint ShareReadWrite = 0x00000001 | 0x00000002;
-    private const uint OpenExisting = 3;
-    private const int ErrorAccessDenied = 5;
-
     private const int ReadBufferBytes = 8 * 1024 * 1024;
 
     private const int ResidentHeaderBytes = 0x16;
@@ -48,9 +42,9 @@ internal static class MftReader
 
         try
         {
-            using var volume = OpenVolume(letter.Value);
+            using var volume = MftFileVolume.Open(letter.Value);
             var boot = new byte[512];
-            ReadAt(volume, 0, boot);
+            volume.ReadAt(0, boot);
             return MftLayout.IsNtfs(boot) ? MftAvailability.Available : MftAvailability.NotNtfs;
         }
         catch (UnauthorizedAccessException)
@@ -82,10 +76,15 @@ internal static class MftReader
     // и читать его, ценой прав и времени на создание снимка.
     public static MftTable Read(char letter, ScanProgress? progress, CancellationToken cancel)
     {
-        using var volume = OpenVolume(letter);
+        using var volume = MftFileVolume.Open(letter);
 
+        return Read(volume, letter, progress, cancel);
+    }
+
+    internal static MftTable Read(IMftVolume volume, char letter, ScanProgress? progress, CancellationToken cancel)
+    {
         var boot = new byte[512];
-        ReadAt(volume, 0, boot);
+        volume.ReadAt(0, boot);
 
         if (!MftLayout.IsNtfs(boot))
         {
@@ -116,8 +115,12 @@ internal static class MftReader
         }
 
         var first = new byte[recordSize];
-        ReadAt(volume, mftCluster * bytesPerCluster, first);
-        MftLayout.ApplyFixup(first, bytesPerSector);
+        volume.ReadAt(mftCluster * bytesPerCluster, first);
+
+        if (!"FILE"u8.SequenceEqual(first.AsSpan(0, 4)) || !MftLayout.ApplyFixup(first, bytesPerSector))
+        {
+            throw new InvalidDataException($"Том {letter}: собственная запись $MFT не читается как запись NTFS");
+        }
 
         var (runs, mftBytes) = ReadSelfRuns(first, letter);
 
@@ -138,7 +141,10 @@ internal static class MftReader
         var pending = new MftPending();
         var statistics = new MftStatistics();
 
-        var buffer = ArrayPool<byte>.Shared.Rent(ReadBufferBytes / recordSize * recordSize);
+        var capacity = ReadBufferBytes / recordSize * recordSize;
+        var buffer = ArrayPool<byte>.Shared.Rent(capacity);
+        var carry = new byte[recordSize];
+        var carried = 0;
 
         try
         {
@@ -154,16 +160,44 @@ internal static class MftReader
                     cancel.ThrowIfCancellationRequested();
                     progress?.Announce($"Чтение $MFT тома {letter}: {(long)index * 100 / records} %");
 
-                    var take = (int)Math.Min(remaining, buffer.Length);
-                    ReadAt(volume, offset, buffer.AsSpan(0, take));
-
-                    for (var position = 0; position + recordSize <= take && index < records; position += recordSize, index++)
-                    {
-                        Parse(buffer.AsSpan(position, recordSize), bytesPerSector, index, entries, pending, statistics);
-                    }
+                    var take = (int)Math.Min(remaining, capacity);
+                    var chunk = buffer.AsSpan(0, take);
+                    volume.ReadAt(offset, chunk);
 
                     offset += take;
                     remaining -= take;
+
+                    var position = 0;
+
+                    if (carried > 0)
+                    {
+                        var need = recordSize - carried;
+
+                        if (take < need)
+                        {
+                            chunk.CopyTo(carry.AsSpan(carried));
+                            carried += take;
+                            continue;
+                        }
+
+                        chunk[..need].CopyTo(carry.AsSpan(carried));
+                        carried = 0;
+                        position = need;
+                        Parse(carry, bytesPerSector, index++, entries, pending, statistics);
+                    }
+
+                    for (; position + recordSize <= take && index < records; position += recordSize, index++)
+                    {
+                        Parse(chunk.Slice(position, recordSize), bytesPerSector, index, entries, pending, statistics);
+                    }
+
+                    if (index >= records)
+                    {
+                        break;
+                    }
+
+                    carried = take - position;
+                    chunk[position..].CopyTo(carry);
                 }
             }
 
@@ -229,7 +263,7 @@ internal static class MftReader
         }
     }
 
-    private static void Parse(
+    internal static void Parse(
         Span<byte> record,
         int bytesPerSector,
         int index,
@@ -342,15 +376,27 @@ internal static class MftReader
 
     private static void ReadDataSize(Span<byte> attribute, bool nonResident, ref MftEntry entry, MftStatistics statistics)
     {
-        if (nonResident && attribute.Length < NonResidentHeaderBytes)
-        {
-            statistics.Damaged++;
-            return;
-        }
+        long size;
 
-        var size = nonResident
-            ? BinaryPrimitives.ReadInt64LittleEndian(attribute[0x30..])
-            : BinaryPrimitives.ReadUInt32LittleEndian(attribute[0x10..]);
+        if (nonResident)
+        {
+            if (attribute.Length < NonResidentHeaderBytes)
+            {
+                statistics.Damaged++;
+                return;
+            }
+
+            if (BinaryPrimitives.ReadInt64LittleEndian(attribute[0x10..]) != 0)
+            {
+                return;
+            }
+
+            size = BinaryPrimitives.ReadInt64LittleEndian(attribute[0x30..]);
+        }
+        else
+        {
+            size = BinaryPrimitives.ReadUInt32LittleEndian(attribute[0x10..]);
+        }
 
         if (size < 0)
         {
@@ -587,49 +633,6 @@ internal static class MftReader
         throw new InvalidDataException($"Том {letter}: в записи $MFT нет нерезидентного $DATA");
     }
 
-    private static SafeFileHandle OpenVolume(char letter)
-    {
-        var handle = CreateFileW($@"\\.\{letter}:", GenericRead, ShareReadWrite, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
-
-        if (!handle.IsInvalid)
-        {
-            return handle;
-        }
-
-        var error = Marshal.GetLastWin32Error();
-        handle.Dispose();
-
-        throw error == ErrorAccessDenied
-            ? new UnauthorizedAccessException($"Чтение $MFT тома {letter}: требует прав администратора")
-            : new IOException($"Не удалось открыть том {letter}:, код {error}");
-    }
-
-    private static void ReadAt(SafeFileHandle handle, long offset, Span<byte> buffer)
-    {
-        var read = 0;
-
-        while (read < buffer.Length)
-        {
-            var more = RandomAccess.Read(handle, buffer[read..], offset + read);
-
-            if (more == 0)
-            {
-                throw new EndOfStreamException($"Чтение тома оборвалось на смещении {offset + read}");
-            }
-
-            read += more;
-        }
-    }
-
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern SafeFileHandle CreateFileW(
-        string path,
-        uint access,
-        uint share,
-        IntPtr security,
-        uint disposition,
-        uint flags,
-        IntPtr template);
 }
 
 internal sealed class MftPending
