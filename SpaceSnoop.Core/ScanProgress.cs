@@ -41,6 +41,13 @@ public sealed class ScanProgress
         _currentPath = fullName;
     }
 
+    /// <summary>Отмечает текущую фазу обхода, не трогая счётчики.</summary>
+    /// <param name="stage">Строка для индикатора текущего пути.</param>
+    public void Announce(string stage)
+    {
+        _currentPath = stage;
+    }
+
     /// <summary>
     /// Отмечает каталог, содержимое которого прочитать не удалось: обход продолжается,
     /// но поддерево в итог не попадёт.

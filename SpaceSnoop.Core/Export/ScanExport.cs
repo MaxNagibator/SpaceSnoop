@@ -2,7 +2,22 @@
 
 namespace SpaceSnoop.Core.Export;
 
-public sealed record ScanExportOptions(int Depth, bool Multithreaded, int Parallelism);
+public sealed record ScanExportOptions(int Depth, bool Multithreaded, int Parallelism, string Engine = ScanExportOptions.DirectoryEngine)
+{
+    public const string DirectoryEngine = "directories";
+    public const string MftEngine = "mft";
+}
+
+/// <summary>Поправки к итогу скана: не сосчитанное повторно и не попавшее в дерево.</summary>
+public sealed record ScanExportNotes(long ExtraNameBytes, long DroppedObjects, long DroppedBytes, long UnknownSizeFiles)
+{
+    public static ScanExportNotes? From(long extraNameBytes, long droppedObjects, long droppedBytes, long unknownSizeFiles)
+    {
+        return extraNameBytes > 0 || droppedObjects > 0 || droppedBytes > 0 || unknownSizeFiles > 0
+            ? new(extraNameBytes, droppedObjects, droppedBytes, unknownSizeFiles)
+            : null;
+    }
+}
 
 public sealed record ScanExportDirectory(
     string Path,
@@ -29,6 +44,7 @@ public sealed record ScanExportModel
     public IReadOnlyList<ScanExportDirectory> Directories { get; init; } = [];
     public IReadOnlyList<ScanExportFile> Files { get; init; } = [];
     public IReadOnlyList<string> ErrorPaths { get; init; } = [];
+    public ScanExportNotes? Notes { get; init; }
     public int OmittedDirectories { get; init; }
     public int OmittedFiles { get; init; }
 }

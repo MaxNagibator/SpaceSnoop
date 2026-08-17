@@ -50,6 +50,26 @@ public class MftLayoutTests
     }
 
     [Test]
+    public void Обрубленный_список_отрезков_объявляется_неполным()
+    {
+        MftLayout.DecodeRuns([0x11, 0x10, 0x20, 0x22, 0x10], out var truncated);
+
+        Assert.That(truncated, Is.True);
+    }
+
+    [Test]
+    public void Целый_список_отрезков_неполным_не_объявляется()
+    {
+        var runs = MftLayout.DecodeRuns([0x11, 0x10, 0x20, 0x11, 0x08, 0x10, 0x00], out var truncated);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(truncated, Is.False);
+            Assert.That(runs, Has.Count.EqualTo(2));
+        }
+    }
+
+    [Test]
     public void Подпись_секторов_возвращается_на_место()
     {
         var record = BuildRecord(out var expectedFirst, out var expectedSecond);

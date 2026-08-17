@@ -18,6 +18,10 @@ internal static class MftLayout
     public const ushort RecordInUse = 0x0001;
     public const ushort RecordIsDirectory = 0x0002;
 
+    public const int RecordSequenceOffset = 0x10;
+    public const int ReferenceMaskBits = 48;
+    public const long ReferenceMask = (1L << ReferenceMaskBits) - 1;
+
     public const byte NamespaceDos = 2;
 
     public static bool IsNtfs(ReadOnlySpan<byte> boot)
@@ -61,9 +65,15 @@ internal static class MftLayout
 
     public static List<MftRun> DecodeRuns(ReadOnlySpan<byte> data)
     {
+        return DecodeRuns(data, out _);
+    }
+
+    public static List<MftRun> DecodeRuns(ReadOnlySpan<byte> data, out bool truncated)
+    {
         var runs = new List<MftRun>();
         var position = 0;
         long cluster = 0;
+        truncated = false;
 
         while (position < data.Length && data[position] != 0)
         {
@@ -73,6 +83,7 @@ internal static class MftLayout
 
             if (countSize == 0 || position + countSize + offsetSize > data.Length)
             {
+                truncated = true;
                 break;
             }
 
@@ -89,6 +100,7 @@ internal static class MftLayout
 
             if (cluster < 0 || count <= 0)
             {
+                truncated = true;
                 break;
             }
 

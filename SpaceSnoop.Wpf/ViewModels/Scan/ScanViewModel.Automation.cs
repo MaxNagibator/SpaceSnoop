@@ -56,9 +56,9 @@ public sealed partial class ScanViewModel : IScanAutomation
         SelectPathForAutomation(path);
     }
 
-    void IScanAutomation.ApplyScanResult(DirectorySpace result, TimeSpan elapsed, PerformanceTraversal? traversal, long extraNameBytes)
+    void IScanAutomation.ApplyScanResult(DirectorySpace result, TimeSpan elapsed, PerformanceTraversal? traversal, ScanNotes notes)
     {
-        ApplyScanResult(result, elapsed, traversal, extraNameBytes);
+        ApplyScanResult(result, elapsed, traversal, notes);
     }
 
     Task IScanAutomation.ScanFromAutomationAsync(string path, CancellationToken cancellationToken)
@@ -102,7 +102,7 @@ public sealed partial class ScanViewModel : IScanAutomation
         return ScanAsync(path, cancellationToken);
     }
 
-    internal void ApplyScanResult(DirectorySpace result, TimeSpan elapsed, PerformanceTraversal? traversal, long extraNameBytes)
+    internal void ApplyScanResult(DirectorySpace result, TimeSpan elapsed, PerformanceTraversal? traversal, ScanNotes notes)
     {
         ScanTreeEditor.RemoveRoot(Roots, result.AbsolutePath);
 
@@ -113,8 +113,8 @@ public sealed partial class ScanViewModel : IScanAutomation
         Treemap.SetRoot(node);
 
         LastScanElapsed = elapsed;
-        LastScanParallelism = Math.Max(1, traversal?.Parallelism ?? 1);
-        _runs.Report(Summary.Apply(result, elapsed, traversal, node.Drive, extraNameBytes));
+        LastScanParallelism = Math.Max(1, notes.Parallelism);
+        _runs.Report(Summary.Apply(result, elapsed, traversal, node.Drive, notes));
         HasResult = true;
         Duplicates.Clear();
         Marks.RecountMarked();
@@ -125,6 +125,13 @@ public sealed partial class ScanViewModel : IScanAutomation
             result.TotalFileCount,
             result.TotalDirectoryCount,
             (long)elapsed.TotalMilliseconds);
+
+        if (notes.HasDrops)
+        {
+            _notifier.Notify(
+                $"Скан неполон: {ScanDropNote.Explain(notes.DroppedObjects, notes.DroppedBytes, notes.UnknownSizeFiles)}",
+                StatusSeverity.Warning);
+        }
     }
 
     internal SpaceBase? FindForAutomation(string path)

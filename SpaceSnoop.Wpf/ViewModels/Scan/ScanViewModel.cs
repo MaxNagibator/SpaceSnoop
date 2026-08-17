@@ -438,7 +438,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
             var elapsed = Progress.Finish();
             var applied = Stopwatch.StartNew();
 
-            ApplyScanResult(outcome.Root, elapsed, Progress.Traversal, outcome.ExtraNameBytes);
+            ApplyScanResult(outcome.Root, elapsed, Progress.Traversal, outcome.Notes);
 
             _logger.ScanPhases((long)elapsed.TotalMilliseconds, (long)applied.Elapsed.TotalMilliseconds);
 

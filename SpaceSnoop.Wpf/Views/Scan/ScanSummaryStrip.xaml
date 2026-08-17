@@ -155,6 +155,23 @@
                                Style="{StaticResource StatValue}"
                                Foreground="{DynamicResource Fg.Secondary}" />
                 </StackPanel>
+
+                <StackPanel Style="{StaticResource Metric}"
+                            Visibility="{Binding HasDropNote, Converter={StaticResource BoolToVisibility}}"
+                            ToolTip="{Binding DropNoteHint}">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
+                                              Width="13"
+                                              Height="13"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,6,0"
+                                              Foreground="{DynamicResource State.Error}" />
+                    <TextBlock Text="Нет в дереве"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding DropNote}"
+                               Style="{StaticResource StatValue}"
+                               Foreground="{DynamicResource State.Error}" />
+                </StackPanel>
             </WrapPanel>
         </Grid>
     </Border>

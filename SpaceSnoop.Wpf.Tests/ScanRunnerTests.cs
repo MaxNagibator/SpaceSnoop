@@ -36,9 +36,22 @@ public class ScanRunnerTests
     {
         var outcome = Runner(mftEnabled: false).Run(new(_tempDir), 1, new(), CancellationToken.None);
 
-        Assert.That(outcome.UsedMft, Is.False);
-        Assert.That(outcome.ExtraNameBytes, Is.Zero);
-        Assert.That(outcome.Root.TotalSize, Is.EqualTo(2048));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(outcome.Notes.UsedMft, Is.False);
+            Assert.That(outcome.Notes.Engine, Is.EqualTo("directories"));
+            Assert.That(outcome.Notes.ExtraNameBytes, Is.Zero);
+            Assert.That(outcome.Notes.HasDrops, Is.False);
+            Assert.That(outcome.Root.TotalSize, Is.EqualTo(2048));
+        }
+    }
+
+    [Test]
+    public void Обход_каталогами_докладывает_свой_параллелизм()
+    {
+        var outcome = Runner(mftEnabled: false).Run(new(_tempDir), 4, new(), CancellationToken.None);
+
+        Assert.That(outcome.Notes.Parallelism, Is.EqualTo(4));
     }
 
     [Test]

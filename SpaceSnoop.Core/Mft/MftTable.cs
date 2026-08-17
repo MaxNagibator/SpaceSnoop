@@ -12,6 +12,14 @@ internal sealed class MftStatistics
 
     public long Detached { get; set; }
 
+    public long Damaged { get; set; }
+
+    public long StaleParents { get; set; }
+
+    public long UnknownSize { get; set; }
+
+    public long Rehomed { get; set; }
+
     public long HardLinkedFiles { get; set; }
 
     public long ExtraNames { get; set; }
@@ -25,4 +33,4 @@ internal sealed class MftStatistics
     public long SkippedLinks { get; set; }
 }
 
-internal sealed record MftTable(MftEntry[] Entries, MftStatistics Statistics);
+internal sealed record MftTable(MftEntry[] Entries, MftStatistics Statistics, Dictionary<int, List<MftName>> Alternates);

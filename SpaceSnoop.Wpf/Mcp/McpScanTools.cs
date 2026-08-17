@@ -52,7 +52,7 @@ internal sealed class McpScanTools(
 
         var phases = new ScanPhases();
 
-        var (tree, model, run, extraNameBytes) = await Task.Run(() =>
+        var (tree, model, run, notes) = await Task.Run(() =>
                 {
                     using var probe = new BackgroundScanProbe(performance,
                         runs,
@@ -65,10 +65,23 @@ internal sealed class McpScanTools(
                     phases.WalkMs = (long)walked.Elapsed.TotalMilliseconds;
 
                     var stopwatch = Stopwatch.StartNew();
-                    var built = ScanExport.Build(outcome.Root, directory.FullName, new(depth, multithreaded, parallelism), AppInfo.Version, entryLimit);
+
+                    var options = new ScanExportOptions(depth,
+                        multithreaded && !outcome.Notes.UsedMft,
+                        outcome.Notes.Parallelism,
+                        outcome.Notes.Engine);
+
+                    var built = ScanExport.Build(outcome.Root, directory.FullName, options, AppInfo.Version, entryLimit) with
+                    {
+                        Notes = ScanExportNotes.From(outcome.Notes.ExtraNameBytes,
+                            outcome.Notes.DroppedObjects,
+                            outcome.Notes.DroppedBytes,
+                            outcome.Notes.UnknownSizeFiles),
+                    };
+
                     phases.ExportMs = stopwatch.ElapsedMilliseconds;
 
-                    return (outcome.Root, built, walked, outcome.ExtraNameBytes);
+                    return (outcome.Root, built, walked, outcome.Notes);
                 },
                 cancellationToken)
             .ConfigureAwait(false);
@@ -87,7 +100,7 @@ internal sealed class McpScanTools(
                     throw new McpException("Страница «Сканирование» занялась другой операцией, пока шёл обход – результат не показан. Повторите с show=false, чтобы получить данные без окна.");
                 }
 
-                scan.ApplyScanResult(tree, run.Elapsed, run.Traversal, extraNameBytes);
+                scan.ApplyScanResult(tree, run.Elapsed, run.Traversal, notes);
                 scan.SelectPathForAutomation(tree.AbsolutePath);
                 navigator.DeferOrNavigate(SectionKey.Scan);
                 notifier.Notify($"Агент показал сканирование: {tree.AbsolutePath} · {tree.TotalSizeText}");

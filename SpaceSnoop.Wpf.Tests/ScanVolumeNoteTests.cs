@@ -92,3 +92,37 @@ public class ScanVolumeNoteTests
         Assert.That(note, Is.Null);
     }
 }
+
+[TestFixture]
+public class ScanDropNoteTests
+{
+    [Test]
+    public void Полный_скан_о_потерях_молчит()
+    {
+        Assert.That(ScanDropNote.Describe(0, 0), Is.Null);
+    }
+
+    [TestCase(3L, 0L, "3")]
+    [TestCase(0L, 4L, "4")]
+    [TestCase(2L, 5L, "7")]
+    public void Отброшенное_называется_числом(long dropped, long unknownSize, string expected)
+    {
+        Assert.That(ScanDropNote.Describe(dropped, unknownSize), Does.StartWith(expected));
+    }
+
+    [Test]
+    public void Подсказка_разделяет_пропавшее_и_непрочитанный_размер()
+    {
+        var hint = ScanDropNote.Explain(2, 4096, 3);
+
+        Assert.That(hint, Does.Contain("нет в дереве").And.Contain("размер не прочитан").And.Contain(ScanDropNote.Hint));
+    }
+
+    [Test]
+    public void Подсказка_без_потерянных_байт_их_не_называет()
+    {
+        var hint = ScanDropNote.Explain(2, 0, 0);
+
+        Assert.That(hint, Does.Contain("нет в дереве").And.Not.Contain("на ≈"));
+    }
+}

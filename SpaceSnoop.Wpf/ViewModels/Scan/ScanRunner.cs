@@ -19,7 +19,7 @@ public sealed class ScanRunner(
             ? calculator.CalculateMultithreaded(directory, parallelism, progress, cancel)
             : calculator.Calculate(directory, progress, cancel);
 
-        return new(root, 0, false);
+        return new(root, ScanNotes.ForTraversal(parallelism));
     }
 
     private ScanOutcome? TryReadMft(DirectoryInfo directory, ScanProgress progress, CancellationToken cancel)
@@ -35,7 +35,18 @@ public sealed class ScanRunner(
         try
         {
             var scan = mftScanner.Calculate(directory, progress, cancel);
-            return new(scan.Root, scan.ExtraNameBytes, true);
+
+            if (!scan.IsComplete)
+            {
+                logger.MftScanIncomplete(directory.FullName,
+                    scan.DroppedObjects,
+                    scan.OrphanBytes,
+                    scan.UnknownSizeFiles,
+                    scan.Report);
+            }
+
+            return new(scan.Root,
+                new(true, 1, scan.ExtraNameBytes, scan.DroppedObjects, scan.OrphanBytes, scan.UnknownSizeFiles));
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -46,4 +57,22 @@ public sealed class ScanRunner(
     }
 }
 
-public readonly record struct ScanOutcome(DirectorySpace Root, long ExtraNameBytes, bool UsedMft);
+public readonly record struct ScanOutcome(DirectorySpace Root, ScanNotes Notes);
+
+public readonly record struct ScanNotes(
+    bool UsedMft,
+    int Parallelism,
+    long ExtraNameBytes,
+    long DroppedObjects,
+    long DroppedBytes,
+    long UnknownSizeFiles)
+{
+    public static ScanNotes ForTraversal(int parallelism)
+    {
+        return new(false, Math.Max(1, parallelism), 0, 0, 0, 0);
+    }
+
+    public bool HasDrops => DroppedObjects > 0 || UnknownSizeFiles > 0;
+
+    public string Engine => UsedMft ? "mft" : "directories";
+}

@@ -53,7 +53,13 @@ internal static partial class CoreLog
     public static partial void CleanupTargetUnavailable(this ILogger logger, string targetId, CleanupAvailability availability);
 
     [LoggerMessage(EventId = 1260, Level = LogLevel.Information,
-        Message = "Обход по $MFT: «{Path}», записей {Records}, повторных имён {ExtraNames} на {ExtraNameBytes} Б")]
-    public static partial void MftScanCompleted(this ILogger logger, string path, int records, long extraNames, long extraNameBytes);
+        Message = "Обход по $MFT: «{Path}», записей {Records}, повторных имён {ExtraNames} на {ExtraNameBytes} Б ({Report})")]
+    public static partial void MftScanCompleted(
+        this ILogger logger,
+        string path,
+        int records,
+        long extraNames,
+        long extraNameBytes,
+        string report);
 
 }

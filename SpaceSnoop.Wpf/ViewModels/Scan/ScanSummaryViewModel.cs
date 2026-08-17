@@ -38,8 +38,13 @@ public sealed partial class ScanSummaryViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(LinkNoteHint))]
     private string _linkNote = string.Empty;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasDropNote))]
+    [NotifyPropertyChangedFor(nameof(DropNoteHint))]
+    private string _dropNote = string.Empty;
+
     private DriveCapacity? _drive;
-    private long _extraNameBytes;
+    private ScanNotes _notes;
 
     public bool HasVolumeNote => VolumeNote.Length > 0;
 
@@ -49,16 +54,22 @@ public sealed partial class ScanSummaryViewModel : ObservableObject
 
     public string LinkNoteHint => HasLinkNote ? ScanLinkNote.Explain(LinkNote) : string.Empty;
 
+    public bool HasDropNote => DropNote.Length > 0;
+
+    public string DropNoteHint => HasDropNote
+        ? ScanDropNote.Explain(_notes.DroppedObjects, _notes.DroppedBytes, _notes.UnknownSizeFiles)
+        : string.Empty;
+
     public PerformanceOperation Apply(
         DirectorySpace result,
         TimeSpan elapsed,
         PerformanceTraversal? traversal = null,
         DriveCapacity? drive = null,
-        long extraNameBytes = 0)
+        ScanNotes notes = default)
     {
         ResultPath = result.AbsolutePath;
         _drive = drive;
-        _extraNameBytes = extraNameBytes;
+        _notes = notes;
         Refresh(result);
         ResultElapsedText = PerformanceFormat.Elapsed(elapsed);
 
@@ -74,6 +85,7 @@ public sealed partial class ScanSummaryViewModel : ObservableObject
         ResultFileCountText = result.TotalFileCount.ToString("N0");
         ResultDirCountText = result.TotalDirectoryCount.ToString("N0");
         VolumeNote = ScanVolumeNote.Describe(result.AbsolutePath, result.TotalSize, _drive) ?? string.Empty;
-        LinkNote = ScanLinkNote.Describe(_extraNameBytes) ?? string.Empty;
+        LinkNote = ScanLinkNote.Describe(_notes.ExtraNameBytes) ?? string.Empty;
+        DropNote = ScanDropNote.Describe(_notes.DroppedObjects, _notes.UnknownSizeFiles) ?? string.Empty;
     }
 }

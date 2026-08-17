@@ -3,6 +3,7 @@ using SpaceSnoop.Core.Export;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Diagnostics;
 using SpaceSnoop.Wpf.Mcp;
+using SpaceSnoop.Wpf.ViewModels.Scan;
 using SpaceSnoop.Wpf.ViewModels.Sync;
 using System.IO.Compression;
 
@@ -49,6 +50,8 @@ internal sealed class ScanAutomationDouble : IScanAutomation
     public PerformanceTraversal? AppliedTraversal { get; private set; }
 
     public long AppliedExtraNameBytes { get; private set; }
+
+    public ScanNotes AppliedNotes { get; private set; }
 
     public int ScanCalls { get; private set; }
 
@@ -97,11 +100,12 @@ internal sealed class ScanAutomationDouble : IScanAutomation
         SelectCalls++;
     }
 
-    public void ApplyScanResult(DirectorySpace result, TimeSpan elapsed, PerformanceTraversal? traversal, long extraNameBytes)
+    public void ApplyScanResult(DirectorySpace result, TimeSpan elapsed, PerformanceTraversal? traversal, ScanNotes notes)
     {
         ApplyCalls++;
         AppliedTraversal = traversal;
-        AppliedExtraNameBytes = extraNameBytes;
+        AppliedNotes = notes;
+        AppliedExtraNameBytes = notes.ExtraNameBytes;
     }
 
     public Task ScanFromAutomationAsync(string path, CancellationToken cancellationToken)

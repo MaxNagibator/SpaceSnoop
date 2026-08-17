@@ -58,6 +58,17 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1011, Level = LogLevel.Warning, Message = "Обход по $MFT для «{Path}» не удался, идём каталогами")]
     public static partial void MftFailed(this ILogger logger, Exception exception, string path);
 
+    [LoggerMessage(EventId = 1012, Level = LogLevel.Warning,
+        Message = "Обход по $MFT для «{Path}» неполон: в дерево не попало {Dropped} объект(ов) на {DroppedBytes} Б, "
+                  + "без известного размера {UnknownSize}; {Report}")]
+    public static partial void MftScanIncomplete(
+        this ILogger logger,
+        string path,
+        long dropped,
+        long droppedBytes,
+        long unknownSize,
+        string report);
+
     [LoggerMessage(EventId = 1100, Level = LogLevel.Information,
         Message = "Старт удаления: {Count} элемент(ов), {BytesText} (безвозвратно: {Permanent})")]
     public static partial void DeletionStarted(this ILogger logger, int count, string bytesText, bool permanent);
