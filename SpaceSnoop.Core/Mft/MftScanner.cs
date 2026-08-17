@@ -13,8 +13,8 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
     }
 
     // TODO: $MFT читается целиком независимо от цели скана, поэтому на подкаталоге движок проигрывает
-    // обходу каталогами (`C:\Windows` – 2,77 с против 3,18 с) и выбор по цели не сделан. Триггер апгрейда:
-    // появится сценарий, где сканируют один подкаталог часто – тогда решать по доле цели в томе.
+    // обходу каталогами (`C:\Windows` – 2,77 с против 3,18 с); сам выбор отдан вызывающему (в WPF – настройкой),
+    // здесь по цели не решают. Триггер апгрейда: понадобится автоматика – решать по доле цели в томе.
     public MftScanResult Calculate(DirectoryInfo directory, ScanProgress? progress, CancellationToken cancel = default)
     {
         var letter = MftReader.VolumeLetter(directory.FullName)

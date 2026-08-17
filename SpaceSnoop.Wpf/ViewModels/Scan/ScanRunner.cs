@@ -22,8 +22,19 @@ public sealed class ScanRunner(
         return new(root, ScanNotes.ForTraversal(parallelism));
     }
 
+    internal static bool IsVolumeRoot(DirectoryInfo directory)
+    {
+        return directory.Parent is null;
+    }
+
     private ScanOutcome? TryReadMft(DirectoryInfo directory, ScanProgress progress, CancellationToken cancel)
     {
+        if (preferences.MftRootOnly && !IsVolumeRoot(directory))
+        {
+            logger.MftSkippedForSubdirectory(directory.FullName);
+            return null;
+        }
+
         var availability = MftScanner.Probe(directory.FullName);
 
         if (availability != MftAvailability.Available)

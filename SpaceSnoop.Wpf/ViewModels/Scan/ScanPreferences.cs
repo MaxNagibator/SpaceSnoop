@@ -24,6 +24,9 @@ public sealed partial class ScanPreferences : ObservableObject
     [NotifyPropertyChangedFor(nameof(MftNeedsElevation))]
     private bool _mftEnabled = AppDefaults.ScanMftEnabledDefault;
 
+    [ObservableProperty]
+    private bool _mftRootOnly = AppDefaults.ScanMftRootOnlyDefault;
+
     public ScanPreferences(ISettingsStore settings)
     {
         _settings = settings;
@@ -35,6 +38,7 @@ public sealed partial class ScanPreferences : ObservableObject
         Intensity = _settings.GetDouble(SettingsKeys.ScanIntensity, AppDefaults.IntensityDefault);
         RevealFiles = _settings.GetBool(SettingsKeys.ScanRevealFiles, AppDefaults.ScanRevealFilesDefault);
         MftEnabled = _settings.GetBool(SettingsKeys.ScanMftEnabled, AppDefaults.ScanMftEnabledDefault);
+        MftRootOnly = _settings.GetBool(SettingsKeys.ScanMftRootOnly, AppDefaults.ScanMftRootOnlyDefault);
         _suppressPersist = false;
 
         DuplicatesEnabled = settings.GetBool(SettingsKeys.ScanDuplicatesEnabled, AppDefaults.ScanDuplicatesEnabledDefault);
@@ -117,6 +121,14 @@ public sealed partial class ScanPreferences : ObservableObject
         if (!_suppressPersist)
         {
             _settings.SetBool(SettingsKeys.ScanMftEnabled, value);
+        }
+    }
+
+    partial void OnMftRootOnlyChanged(bool value)
+    {
+        if (!_suppressPersist)
+        {
+            _settings.SetBool(SettingsKeys.ScanMftRootOnly, value);
         }
     }
 }

@@ -34,6 +34,7 @@ public static class SettingsKeys
 
     public const string ScanDuplicatesEnabled = "wpf.scan.duplicates.enabled";
     public const string ScanMftEnabled = "wpf.scan.mft.enabled";
+    public const string ScanMftRootOnly = "wpf.scan.mft.root_only";
     public const string ScanDuplicatesMinSize = "wpf.scan.duplicates.min_size_mb";
 
     public const string ScanInspectorCollapsed = "wpf.scan.inspector.collapsed";

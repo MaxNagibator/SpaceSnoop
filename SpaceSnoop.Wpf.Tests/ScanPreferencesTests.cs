@@ -42,6 +42,26 @@ public class ScanPreferencesTests
     }
 
     [Test]
+    public void Чтение_таблицы_NTFS_по_умолчанию_ограничено_диском_целиком()
+    {
+        var preferences = new ScanPreferences(new MemorySettings());
+
+        Assert.That(preferences.MftRootOnly, Is.EqualTo(AppDefaults.ScanMftRootOnlyDefault));
+    }
+
+    [TestCase("false", false)]
+    [TestCase("true", true)]
+    public void Сохранённое_ограничение_диском_целиком_переживает_чтение(string stored, bool expected)
+    {
+        var settings = new MemorySettings();
+        settings.SetValue(SettingsKeys.ScanMftRootOnly, stored);
+
+        var preferences = new ScanPreferences(settings);
+
+        Assert.That(preferences.MftRootOnly, Is.EqualTo(expected));
+    }
+
+    [Test]
     public void Число_потоков_выше_потолка_урезается()
     {
         var settings = new MemorySettings();

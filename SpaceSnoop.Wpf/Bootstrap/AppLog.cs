@@ -70,6 +70,10 @@ internal static partial class AppLog
         long unknownSize,
         string report);
 
+    [LoggerMessage(EventId = 1013, Level = LogLevel.Information,
+        Message = "Обход по $MFT настройкой разрешён только для диска целиком, «{Path}» идёт каталогами")]
+    public static partial void MftSkippedForSubdirectory(this ILogger logger, string path);
+
     [LoggerMessage(EventId = 1100, Level = LogLevel.Information,
         Message = "Старт удаления: {Count} элемент(ов), {BytesText} (безвозвратно: {Permanent})")]
     public static partial void DeletionStarted(this ILogger logger, int count, string bytesText, bool permanent);
