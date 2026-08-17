@@ -47,8 +47,9 @@
             <TextBlock Style="{StaticResource Setting.Hint}"
                        Margin="0"
                        Text="Даёт агенту доступ к запущенному приложению. Слушает только 127.0.0.1 и требует токен." />
-            <Expander Style="{StaticResource Setting.Details}">
-                <TextBlock Style="{StaticResource Setting.Hint}"
+            <Expander Style="{StaticResource Setting.Details}"
+                      Header="Что агент может через сервер">
+                <TextBlock Style="{StaticResource Setting.DetailsBody}"
                            Text="Через сервер агент читает состояние приложения и профили, сравнивает каталоги и открывает страницу «Синхронизация» с нужными путями. Подключаются любые MCP-клиенты – формат строки подключения ниже." />
             </Expander>
 
@@ -63,8 +64,9 @@
                       VerticalAlignment="Center" />
             <TextBlock Style="{StaticResource Setting.CheckHint}"
                        Text="Без галки агент только читает и открывает страницы." />
-            <Expander Style="{StaticResource Setting.CheckDetails}">
-                <TextBlock Style="{StaticResource Setting.Hint}"
+            <Expander Style="{StaticResource Setting.Details}"
+                      Header="Какие операции разрешает галка">
+                <TextBlock Style="{StaticResource Setting.DetailsBody}"
                            Text="С галкой агент может запускать синхронизацию (копировать файлы и удалять лишние в корзину), упаковывать каталоги в архив и ставить пометки на удаление. Само удаление помеченного остаётся за вами." />
             </Expander>
 
@@ -168,8 +170,10 @@
                                    Style="{StaticResource Mcp.NoticeText}"
                                    Text="Приложение запущено от администратора – с теми же правами работает и сервер." />
                     </Grid>
-                    <Expander Style="{StaticResource Setting.Details}">
+                    <Expander Style="{StaticResource Setting.Details}"
+                              Header="Чем рискует токен">
                         <TextBlock Style="{StaticResource Mcp.NoticeText}"
+                                   Margin="6,0,0,0"
                                    Text="Токен лежит в settings.toml вашего профиля – любая программа, запущенная от вашего имени, может его прочитать и обратиться к серверу с правами администратора. Держите сервер выключенным, когда он не нужен." />
                     </Expander>
                 </StackPanel>

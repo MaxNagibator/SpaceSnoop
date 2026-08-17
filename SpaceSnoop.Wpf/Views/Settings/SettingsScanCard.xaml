@@ -63,8 +63,9 @@
                       VerticalAlignment="Center" />
             <TextBlock Style="{StaticResource Setting.CheckHint}"
                        Text="На диске со штрафом за позиционирование обход идёт в один поток." />
-            <Expander Style="{StaticResource Setting.CheckDetails}">
-                <TextBlock Style="{StaticResource Setting.Hint}"
+            <Expander Style="{StaticResource Setting.Details}"
+                      Header="Когда обход идёт в один поток">
+                <TextBlock Style="{StaticResource Setting.DetailsBody}"
                            Text="У вращающегося диска параллельный обход заставляет головку метаться между каталогами и отнимает больше, чем даёт. Тип носителя спрашивается у драйвера один раз на том, поэтому внешний диск, подменённый под той же буквой, до перезапуска отвечает прежним типом. Сетевые пути и носители, о которых драйвер молчит, считаются неизвестными, и для них настройка ничего не меняет." />
             </Expander>
 
@@ -78,8 +79,9 @@
                        Foreground="{DynamicResource State.Warning}"
                        Text="Сейчас прав администратора нет, поэтому скан пойдёт обходом каталогов."
                        Visibility="{Binding Scan.MftNeedsElevation, Converter={StaticResource BoolToVisibility}}" />
-            <Expander Style="{StaticResource Setting.CheckDetails}">
-                <TextBlock Style="{StaticResource Setting.Hint}"
+            <Expander Style="{StaticResource Setting.Details}"
+                      Header="Что нужно движку NTFS">
+                <TextBlock Style="{StaticResource Setting.DetailsBody}"
                            Text="Движок читает служебную таблицу тома напрямую, поэтому ему нужны права администратора и локальный том NTFS. Сетевой диск, флешка с exFAT, отсутствие прав или сбой разбора дают тихий откат на обычный обход – итог получится прежним, о причине скажет журнал. Таблица читается целиком независимо от того, что сканируют, поэтому на одном подкаталоге движок проигрывает обходу, а на диске целиком выигрывает вдвое. Часть записей в дерево не попадает по устройству формата (оторванные, повреждённые, без имени) – их число показывает полоса итогов, а не умалчивает." />
             </Expander>
 
@@ -91,9 +93,10 @@
             <TextBlock Style="{StaticResource Setting.CheckHint}"
                        Margin="52,6,0,0"
                        Text="Выбран каталог – скан пойдёт обходом, потому что таблица читается вся, сколько бы ни было в цели." />
-            <Expander Style="{StaticResource Setting.CheckDetails}"
-                      Margin="52,2,0,0">
-                <TextBlock Style="{StaticResource Setting.Hint}"
+            <Expander Style="{StaticResource Setting.Details}"
+                      Header="Когда галку стоит снять"
+                      Margin="26,2,0,0">
+                <TextBlock Style="{StaticResource Setting.DetailsBody}"
                            Text="На подкаталоге чтение тома целиком стоит дороже обхода, а числа неполноты в полосе итогов всё равно считаются по всему тому, а не по выбранной ветке. Выключите, если счёт жёстких ссылок один раз нужен и внутри каталога – например, в папке Windows, которая почти целиком из них состоит." />
             </Expander>
 
@@ -131,8 +134,9 @@
                       VerticalAlignment="Center" />
             <TextBlock Style="{StaticResource Setting.CheckHint}"
                        Text="Выключите, чтобы файл из дерева открывался программой по умолчанию." />
-            <Expander Style="{StaticResource Setting.CheckDetails}">
-                <TextBlock Style="{StaticResource Setting.Hint}"
+            <Expander Style="{StaticResource Setting.Details}"
+                      Header="Что будет, если выключить">
+                <TextBlock Style="{StaticResource Setting.DetailsBody}"
                            Text="При включённой настройке проводник подсвечивает файл в папке и ничего не выполняет. При выключенной исполняемые файлы запускаются." />
             </Expander>
         </StackPanel>

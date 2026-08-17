@@ -31,8 +31,9 @@
                     <TextBlock Text="Применяется при «Упаковать в архив»."
                                Style="{StaticResource Setting.Hint}"
                                Margin="0,2,0,0" />
-                    <Expander Style="{StaticResource Setting.Details}">
-                        <TextBlock Style="{StaticResource Setting.Hint}"
+                    <Expander Style="{StaticResource Setting.Details}"
+                              Header="Когда сжатие не помогает">
+                        <TextBlock Style="{StaticResource Setting.DetailsBody}"
                                    Text="Уже сжатые данные – видео, фото, архивы – почти не уменьшаются, для них выигрыш даёт только упаковка множества файлов в один." />
                     </Expander>
                 </StackPanel>

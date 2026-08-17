@@ -24,8 +24,9 @@
             <TextBlock Style="{StaticResource Setting.Hint}"
                        Margin="0"
                        Text="Страница «Чат» говорит с установленным на этой машине CLI по вашей подписке." />
-            <Expander Style="{StaticResource Setting.Details}">
-                <TextBlock Style="{StaticResource Setting.Hint}"
+            <Expander Style="{StaticResource Setting.Details}"
+                      Header="Что уходит в CLI">
+                <TextBlock Style="{StaticResource Setting.DetailsBody}"
                            Text="Ключи и токены поставщика модели в настройках приложения не хранятся. Сообщение и то, что агент запрашивает у инструментов – пути, размеры, результаты сравнения, – уходит в CLI и дальше поставщику модели под вашей подпиской." />
             </Expander>
 
@@ -47,8 +48,9 @@
                       VerticalAlignment="Center" />
             <TextBlock Style="{StaticResource Setting.CheckHint}"
                        Text="Для разбора странных ответов: ход целиком ложится в logs/chat." />
-            <Expander Style="{StaticResource Setting.CheckDetails}">
-                <TextBlock Style="{StaticResource Setting.Hint}"
+            <Expander Style="{StaticResource Setting.Details}"
+                      Header="Что попадает в транскрипт">
+                <TextBlock Style="{StaticResource Setting.DetailsBody}"
                            Text="Всё, что уходит в CLI и приходит от него, пишется отдельным файлом на ход, кнопка на сообщении его открывает. Токен доступа затирается, остальное сохраняется как есть – вопрос, состояние окна и ответы инструментов. Хранятся последние 20 ходов." />
             </Expander>
 
@@ -67,8 +69,9 @@
                 <TextBlock Style="{StaticResource Setting.Hint}"
                            Foreground="{DynamicResource State.Warning}"
                            Text="У codex есть собственная оболочка системы, отключить её нечем: агент может выполнять команды с правами приложения." />
-                <Expander Style="{StaticResource Setting.Details}">
-                    <TextBlock Style="{StaticResource Setting.Hint}"
+                <Expander Style="{StaticResource Setting.Details}"
+                          Header="Чем ограничен codex">
+                    <TextBlock Style="{StaticResource Setting.DetailsBody}"
                                Foreground="{DynamicResource State.Warning}"
                                Text="Приложение обычно запущено от администратора, значит команды выполняются с его правами. Инструменты приложения при этом работают только с полным доступом – в песочнице codex не может дозваться разрешения и гасит вызов сам. Из-за оболочки запрет отдельных инструментов для codex остаётся подсказкой, а не преградой: настоящий барьер один для обоих CLI – галка «Разрешить изменяющие операции» в разделе «MCP-сервер», её проверяет сам сервер." />
                 </Expander>

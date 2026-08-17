@@ -29,8 +29,9 @@
                       VerticalAlignment="Center" />
             <TextBlock Style="{StaticResource Setting.CheckHint}"
                        Text="Смена расположения перезапустит приложение." />
-            <Expander Style="{StaticResource Setting.CheckDetails}">
-                <TextBlock Style="{StaticResource Setting.Hint}"
+            <Expander Style="{StaticResource Setting.Details}"
+                      Header="Где лежат файлы">
+                <TextBlock Style="{StaticResource Setting.DetailsBody}"
                            Text="По умолчанию настройки, логи и журналы лежат в %LOCALAPPDATA%\SpaceSnoop. Выключите, чтобы держать их рядом с программой – portable-режим. Файлы можно перенести на новое место или оставить на старом, об этом спросит диалог." />
             </Expander>
             <TextBlock Text="{Binding DataDirectory}"

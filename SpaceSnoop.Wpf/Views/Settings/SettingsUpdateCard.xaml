@@ -61,8 +61,9 @@
                       VerticalAlignment="Center" />
             <TextBlock Style="{StaticResource Setting.CheckHint}"
                        Text="Файл не запускается – установка остаётся за вами." />
-            <Expander Style="{StaticResource Setting.CheckDetails}">
-                <TextBlock Style="{StaticResource Setting.Hint}"
+            <Expander Style="{StaticResource Setting.Details}"
+                      Header="Что именно скачивается">
+                <TextBlock Style="{StaticResource Setting.DetailsBody}"
                            Text="Скачивается ассет той же редакции, что и запущенная программа (exe или portable), в её папку. Проверка идёт по релизам указанного выше репозитория на GitHub." />
             </Expander>
 

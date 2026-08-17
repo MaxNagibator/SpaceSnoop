@@ -139,9 +139,14 @@
                        Style="{StaticResource TextBlock.Subtle}"
                        Text="Очистка освобождает место внутри образа данных Docker, но сам файл VHDX не уменьшается. Кнопка остановит Docker Desktop и вернёт освободившееся системе." />
             <Expander Style="{StaticResource Expander.Section}"
-                      Header="Подробнее"
                       Margin="0,4,0,0">
+                <Expander.Header>
+                    <TextBlock Text="Что нужно знать до запуска"
+                               Style="{StaticResource TextBlock.Subtle}"
+                               FontWeight="{DynamicResource Font.Weight.Regular}" />
+                </Expander.Header>
                 <TextBlock TextWrapping="Wrap"
+                           Margin="6,0,0,0"
                            Style="{StaticResource TextBlock.Subtle}"
                            Text="Операция экспериментальная и может занять много времени. После запуска diskpart безопасная отмена недоступна – дождитесь конца и запустите Docker заново. Если штатная остановка не сработает, приложение отдельно спросит про остановку всего WSL." />
             </Expander>

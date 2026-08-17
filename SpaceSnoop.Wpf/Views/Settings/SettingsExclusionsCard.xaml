@@ -32,8 +32,9 @@
                       Margin="0,16,0,0" />
             <TextBlock Style="{StaticResource Setting.CheckHint}"
                        Text="Перед перезаписью прежняя версия файла на приёмнике уходит в корзину – её можно вернуть." />
-            <Expander Style="{StaticResource Setting.CheckDetails}">
-                <TextBlock Style="{StaticResource Setting.Hint}"
+            <Expander Style="{StaticResource Setting.Details}"
+                      Header="Что будет с прежним файлом">
+                <TextBlock Style="{StaticResource Setting.DetailsBody}"
                            Text="Выключено – перезапись необратима, прежний файл пропадает без следа. Включено – каждая перезапись добавляет файл в корзину, и на больших прогонах она заметно растёт; место освободится после её очистки." />
             </Expander>
 
@@ -48,8 +49,9 @@
                     <TextBlock Text="Что делать, если при сравнении найден служебный каталог репозитория."
                                Style="{StaticResource Setting.Hint}"
                                Margin="0,2,0,0" />
-                    <Expander Style="{StaticResource Setting.Details}">
-                        <TextBlock Style="{StaticResource Setting.Hint}"
+                    <Expander Style="{StaticResource Setting.Details}"
+                              Header="Что настройка не меняет">
+                        <TextBlock Style="{StaticResource Setting.DetailsBody}"
                                    Text="Настройка решает только, копировать ли сам каталог .git. Состояние репозитория – ветка, коммит, изменения – показывается над списком в любом случае." />
                     </Expander>
                 </StackPanel>
@@ -78,8 +80,9 @@
                        Margin="0,16,0,0" />
             <TextBlock Style="{StaticResource Setting.Hint}"
                        Text="Имена каталогов через запятую (напр. .git,bin,obj). Пусто – без группировки." />
-            <Expander Style="{StaticResource Setting.Details}">
-                <TextBlock Style="{StaticResource Setting.Hint}"
+            <Expander Style="{StaticResource Setting.Details}"
+                      Header="Как это выглядит в списке">
+                <TextBlock Style="{StaticResource Setting.DetailsBody}"
                            Text="В плоском виде «Синхронизации» файлы перечисленных каталогов собираются в свёрнутую группу «Служебные файлы» внизу списка. Из сравнения они при этом не исключаются – это делают исключения выше." />
             </Expander>
             <TextBox Style="{StaticResource TextBox.Form}"
