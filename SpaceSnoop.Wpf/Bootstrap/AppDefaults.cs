@@ -37,6 +37,7 @@ public static class AppDefaults
 
     public const bool DeleteConfirmDefault = true;
     public const DeleteMode DeleteModeDefault = DeleteMode.RecycleBin;
+    public const int DeleteRecycleChunkSize = 100;
 
     public const bool ArchiveDeleteOriginalDefault = true;
     public const CompressionLevel ArchiveCompressionDefault = CompressionLevel.Optimal;

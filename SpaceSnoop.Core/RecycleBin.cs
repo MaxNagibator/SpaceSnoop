@@ -1,10 +1,11 @@
 ﻿using System.Runtime.InteropServices;
+using System.Text;
 
 namespace SpaceSnoop.Core;
 
 internal readonly record struct RecycleBinContent(bool Ok, long Bytes, long Items);
 
-internal static class RecycleBin
+public static class RecycleBin
 {
     private const uint FO_DELETE = 0x0003;
     private const ushort FOF_SILENT = 0x0004;
@@ -26,20 +27,58 @@ internal static class RecycleBin
 
         var result = SHFileOperation(ref op);
 
-        if (result != 0)
+        if (result != 0 || op.fAnyOperationsAborted != 0)
         {
             throw new IOException($"Не удалось удалить в корзину «{path}» (код {result}).");
         }
     }
 
-    public static RecycleBinContent Query()
+    public static void DeleteSilent(IReadOnlyList<string> paths)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+
+        if (paths.Count == 0)
+        {
+            return;
+        }
+
+        var builder = new StringBuilder();
+
+        foreach (var path in paths)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                throw new ArgumentException("Пустой путь в списке на удаление.", nameof(paths));
+            }
+
+            builder.Append(path).Append('\0');
+        }
+
+        builder.Append('\0');
+
+        var op = new ShFileOpStruct
+        {
+            wFunc = FO_DELETE,
+            pFrom = builder.ToString(),
+            fFlags = (ushort)(FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI),
+        };
+
+        var result = SHFileOperation(ref op);
+
+        if (result != 0 || op.fAnyOperationsAborted != 0)
+        {
+            throw new IOException($"Не удалось удалить в корзину пачку из {paths.Count} объект(ов) (код {result}).");
+        }
+    }
+
+    internal static RecycleBinContent Query()
     {
         var info = new ShQueryRbInfo { cbSize = Marshal.SizeOf<ShQueryRbInfo>() };
 
         return SHQueryRecycleBin(null, ref info) == 0 ? new(true, info.i64Size, info.i64NumItems) : new(false, 0, 0);
     }
 
-    public static void Empty()
+    internal static void Empty()
     {
         var result = SHEmptyRecycleBin(IntPtr.Zero, null, SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND);
 

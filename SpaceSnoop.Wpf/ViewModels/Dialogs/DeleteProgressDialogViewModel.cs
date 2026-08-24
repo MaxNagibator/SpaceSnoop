@@ -1,5 +1,4 @@
 ﻿using KeepShell.ViewModels;
-using Microsoft.VisualBasic.FileIO;
 using System.Collections.ObjectModel;
 using System.IO;
 
@@ -28,10 +27,13 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
         ActionVerb = permanent ? "удалены безвозвратно" : "перемещены в корзину";
         IntroText = $"Будут {ActionVerb}: {Plural.Format(Items.Count, "объект", "объекта", "объектов")} · {SizeFormatter.Format(_totalBytes)}";
         CountText = $"0 / {Items.Count}";
+        WidestSizeText = Items.Select(static row => row.SizeText).MaxBy(static text => text.Length) ?? string.Empty;
         _freedText = SizeFormatter.Format(0);
     }
 
     public ObservableCollection<DeleteRowViewModel> Items { get; }
+
+    public string WidestSizeText { get; }
 
     public IReadOnlyList<SpaceBase> DeletedItems { get; private set; } = [];
 
@@ -47,11 +49,15 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
 
     protected override bool HasFailedItems => _failed > 0;
 
+    private int ChunkSize => _permanent ? 1 : AppDefaults.DeleteRecycleChunkSize;
+
     protected override async Task ExecuteAsync(CancellationToken token)
     {
         var progress = new Progress<DeleteTick>(OnTick);
+        var deletedItems = new List<SpaceBase>(Items.Count);
+        DeletedItems = deletedItems;
 
-        DeletedItems = await Task.Run(() => RunDeletion(progress, token), token);
+        await Task.Run(() => RunDeletion(deletedItems, progress, token), token);
     }
 
     protected override void OnStarting()
@@ -139,107 +145,149 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
         ProgressValue = _totalBytes > 0 ? Math.Clamp((double)tick.Freed / _totalBytes, 0d, 1d) : 0d;
     }
 
-    private List<SpaceBase> RunDeletion(IProgress<DeleteTick> progress, CancellationToken token)
+    private static bool PathExists(string path)
+    {
+        return Directory.Exists(path) || File.Exists(path);
+    }
+
+    private static void DeletePermanent(string path)
+    {
+        if (Directory.Exists(path))
+        {
+            Directory.Delete(path, true);
+            return;
+        }
+
+        if (!File.Exists(path))
+        {
+            throw new FileNotFoundException("Путь не найден", path);
+        }
+
+        File.Delete(path);
+    }
+
+    private static void DeletePermanentChunk(IReadOnlyList<string> chunk)
+    {
+        foreach (var path in chunk)
+        {
+            DeletePermanent(path);
+        }
+    }
+
+    private void RunDeletion(List<SpaceBase> deletedItems, IProgress<DeleteTick> progress, CancellationToken token)
     {
         var logPath = Path.Combine(AppStorage.DataDirectory, AppInfo.DeletionLogFileName);
         long freed = 0;
         var completed = 0;
         var failed = 0;
-        var deletedItems = new List<SpaceBase>(Items.Count);
+        var journalBroken = false;
+        var paths = new string[Items.Count];
 
-        using var writer = new StreamWriter(logPath, true);
-        var buffer = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Удаление {Items.Count} элемент(ов) ({(_permanent ? "безвозвратно" : "в корзину")})";
-        writer.WriteLine(buffer);
-
-        for (var i = 0; i < Items.Count; i++)
+        for (var i = 0; i < paths.Length; i++)
         {
-            token.ThrowIfCancellationRequested();
-
-            var space = Items[i].Space;
-            progress.Report(new(i, DeleteRowState.Deleting, null, freed, completed, failed));
-
-            var result = DeleteItem(space, writer);
-
-            if (result.Removed)
-            {
-                completed++;
-                freed += space.TotalSize;
-                deletedItems.Add(space);
-                progress.Report(new(i, DeleteRowState.Done, null, freed, completed, failed));
-            }
-            else
-            {
-                failed++;
-                progress.Report(new(i, DeleteRowState.Failed, result.Error, freed, completed, failed));
-            }
+            paths[i] = Items[i].Path;
         }
 
-        return deletedItems;
-    }
-
-    private DeleteResult DeleteItem(SpaceBase space, TextWriter writer)
-    {
-        var path = space.AbsolutePath;
+        var writer = new StreamWriter(logPath, true);
 
         try
         {
-            if (!DeletePath(path))
+            Journal($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Удаление {Items.Count} элемент(ов) ({(_permanent ? "безвозвратно" : "в корзину")})");
+
+            DeleteBatch.Run(paths, ChunkSize, BuildCallbacks(), OnStarting, OnResult, token);
+        }
+        finally
+        {
+            try
             {
-                writer.WriteLine($"ПРОПУЩЕНО (не найден) {path}");
-                _logger.DeleteItemMissing(path);
-                return new(false, "Путь не найден");
+                writer.Dispose();
+            }
+            catch (Exception exception)
+            {
+                ReportJournalFailure(exception);
+            }
+        }
+
+        void Journal(string line)
+        {
+            if (journalBroken)
+            {
+                return;
             }
 
-            writer.WriteLine(path);
-            return new(true, null);
+            try
+            {
+                writer.WriteLine(line);
+            }
+            catch (Exception exception)
+            {
+                ReportJournalFailure(exception);
+            }
         }
-        catch (Exception exception)
+
+        void ReportJournalFailure(Exception exception)
         {
-            writer.WriteLine($"ОШИБКА {path}: {exception.Message}");
-            _logger.DeleteItemFailed(exception, path);
-            return new(false, exception.Message);
+            if (journalBroken)
+            {
+                return;
+            }
+
+            journalBroken = true;
+
+            try
+            {
+                _logger.DeletionLogWriteFailed(exception, logPath);
+            }
+            catch (Exception)
+            {
+            }
+        }
+
+        void OnStarting(int index)
+        {
+            progress.Report(new(index, DeleteRowState.Deleting, null, freed, completed, failed));
+        }
+
+        void OnResult(DeleteItemResult result)
+        {
+            var path = paths[result.Index];
+
+            switch (result.Status)
+            {
+                case DeleteItemStatus.Removed:
+                    Journal(path);
+                    completed++;
+                    freed += Items[result.Index].Space.TotalSize;
+                    deletedItems.Add(Items[result.Index].Space);
+                    progress.Report(new(result.Index, DeleteRowState.Done, null, freed, completed, failed));
+                    break;
+
+                case DeleteItemStatus.Missing:
+                    Journal($"ПРОПУЩЕНО (не найден) {path}");
+                    _logger.DeleteItemMissing(path);
+                    failed++;
+                    progress.Report(new(result.Index, DeleteRowState.Failed, "Путь не найден", freed, completed, failed));
+                    break;
+
+                case DeleteItemStatus.Failed when result.Failure is { } failure:
+                    Journal($"ОШИБКА {path}: {failure.Message}");
+                    _logger.DeleteItemFailed(failure, path);
+                    failed++;
+                    progress.Report(new(result.Index, DeleteRowState.Failed, failure.Message, freed, completed, failed));
+                    break;
+
+                default:
+                    progress.Report(new(result.Index, DeleteRowState.Pending, null, freed, completed, failed));
+                    break;
+            }
         }
     }
 
-    private bool DeletePath(string path)
+    private DeleteBatchCallbacks BuildCallbacks()
     {
-        if (Directory.Exists(path))
-        {
-            DeleteDirectoryPath(path);
-            return true;
-        }
-
-        if (File.Exists(path))
-        {
-            DeleteFilePath(path);
-            return true;
-        }
-
-        return false;
-    }
-
-    private void DeleteDirectoryPath(string path)
-    {
-        if (_permanent)
-        {
-            Directory.Delete(path, true);
-        }
-        else
-        {
-            FileSystem.DeleteDirectory(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
-        }
-    }
-
-    private void DeleteFilePath(string path)
-    {
-        if (_permanent)
-        {
-            File.Delete(path);
-        }
-        else
-        {
-            FileSystem.DeleteFile(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
-        }
+        return _permanent
+            ? new(PathExists, DeletePermanentChunk, DeletePermanent)
+            : new(PathExists, RecycleBin.DeleteSilent, RecycleBin.DeleteSilent);
     }
 
     private readonly record struct DeleteTick(
@@ -249,6 +297,4 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
         long Freed,
         int Completed,
         int Failed);
-
-    private readonly record struct DeleteResult(bool Removed, string? Error);
 }

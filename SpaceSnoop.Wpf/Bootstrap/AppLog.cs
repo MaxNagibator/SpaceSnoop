@@ -88,6 +88,9 @@ internal static partial class AppLog
         Message = "Удаление завершено (отменено: {Cancelled}): успешно {Deleted}, ошибок {Failed}, освобождено {FreedText}")]
     public static partial void DeletionFinished(this ILogger logger, bool cancelled, int deleted, int failed, string freedText);
 
+    [LoggerMessage(EventId = 1104, Level = LogLevel.Warning, Message = "Журнал удаления не пишется: {Path}")]
+    public static partial void DeletionLogWriteFailed(this ILogger logger, Exception exception, string path);
+
     [LoggerMessage(EventId = 1200, Level = LogLevel.Information, Message = "Сравнение начато: «{Left}» ↔ «{Right}»")]
     public static partial void CompareStarted(this ILogger logger, string left, string right);
 

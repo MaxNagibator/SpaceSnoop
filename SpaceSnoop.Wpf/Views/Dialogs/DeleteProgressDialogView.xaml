@@ -140,48 +140,66 @@
                 Padding="6"
                 Margin="0,14,0,0"
                 MinHeight="88">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <ItemsControl ItemsSource="{Binding Items}"
-                              Grid.IsSharedSizeScope="True"
-                              AutomationProperties.Name="Помеченные объекты">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Grid Margin="6,3"
-                                  ToolTip="{Binding Path}">
+            <ItemsControl ItemsSource="{Binding Items}"
+                          AutomationProperties.Name="Помеченные объекты"
+                          VirtualizingPanel.IsVirtualizing="True"
+                          VirtualizingPanel.VirtualizationMode="Recycling">
+                <ItemsControl.Template>
+                    <ControlTemplate TargetType="ItemsControl">
+                        <ScrollViewer Focusable="False"
+                                      CanContentScroll="True"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <ItemsPresenter />
+                        </ScrollViewer>
+                    </ControlTemplate>
+                </ItemsControl.Template>
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <VirtualizingStackPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="6,3"
+                              ToolTip="{Binding Path}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <iconPacks:PackIconLucide Grid.Column="0"
+                                                      Style="{StaticResource RowGlyph}" />
+
+                            <Grid Grid.Column="1">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto"
-                                                      SharedSizeGroup="RowSize" />
                                 </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding Name}"
+                                           Style="{StaticResource RowPath}" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding ParentPath}"
+                                           Style="{StaticResource RowParent}" />
+                            </Grid>
 
-                                <iconPacks:PackIconLucide Grid.Column="0"
-                                                          Style="{StaticResource RowGlyph}" />
-
-                                <Grid Grid.Column="1">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0"
-                                               Text="{Binding Name}"
-                                               Style="{StaticResource RowPath}" />
-                                    <TextBlock Grid.Column="1"
-                                               Text="{Binding ParentPath}"
-                                               Style="{StaticResource RowParent}" />
-                                </Grid>
-
-                                <TextBlock Grid.Column="2"
-                                           Text="{Binding SizeText}"
-                                           VerticalAlignment="Center"
-                                           Margin="14,0,2,0"
+                            <Grid Grid.Column="2"
+                                  Margin="14,0,2,0"
+                                  VerticalAlignment="Center">
+                                <TextBlock Text="{Binding DataContext.WidestSizeText, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                           Visibility="Hidden"
+                                           FontSize="{DynamicResource Font.Size.Caption}" />
+                                <TextBlock Text="{Binding SizeText}"
+                                           HorizontalAlignment="Right"
                                            FontSize="{DynamicResource Font.Size.Caption}"
                                            Foreground="{DynamicResource Fg.Muted}" />
                             </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
         </Border>
 
         <StackPanel Grid.Row="3"
