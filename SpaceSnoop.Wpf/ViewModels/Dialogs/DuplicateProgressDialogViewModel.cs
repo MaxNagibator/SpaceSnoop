@@ -1,4 +1,5 @@
-﻿using KeepShell.ViewModels;
+﻿using KeepShell.Services.Platform;
+using KeepShell.ViewModels;
 using SpaceSnoop.Core.Duplicates;
 
 namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
@@ -10,15 +11,22 @@ public readonly record struct DuplicateRequest(
 
 public sealed partial class DuplicateProgressDialogViewModel : OperationDialogViewModelBase
 {
+    internal const int ProgressPollIntervalMs = 120;
+
+    internal static readonly TimeSpan ProgressPollInterval = TimeSpan.FromMilliseconds(ProgressPollIntervalMs);
+
     private readonly DuplicateRequest _request;
     private readonly DuplicateFinder _finder;
     private readonly ILogger _logger;
+    private readonly OperationProgressState _progress = new();
+    private readonly IUiTimer _progressTimer;
 
-    public DuplicateProgressDialogViewModel(DuplicateRequest request, DuplicateFinder finder, ILogger logger)
+    public DuplicateProgressDialogViewModel(DuplicateRequest request, DuplicateFinder finder, IUiDispatcher uiDispatcher, ILogger logger)
     {
         _request = request;
         _finder = finder;
         _logger = logger;
+        _progressTimer = uiDispatcher.CreateTimer(ProgressPollInterval, OnProgressTick);
 
         RootPath = request.Root.AbsolutePath;
         ThresholdText = $"от {SizeFormatter.Format(request.Options.MinSize)}";
@@ -51,9 +59,18 @@ public sealed partial class DuplicateProgressDialogViewModel : OperationDialogVi
     {
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, _request.External);
 
-        var progress = new Progress<OperationProgress>(OnTick);
+        _progress.Reset();
+        _progressTimer.Start();
 
-        Report = await _finder.FindAsync(_request.Root, _request.Options, progress, linked.Token);
+        try
+        {
+            Report = await _finder.FindAsync(_request.Root, _request.Options, _progress, linked.Token);
+        }
+        finally
+        {
+            _progressTimer.Stop();
+            Apply(_progress.CreateSnapshot());
+        }
     }
 
     protected override void OnStarting()
@@ -110,7 +127,12 @@ public sealed partial class DuplicateProgressDialogViewModel : OperationDialogVi
             : $"Готово: {summary}.";
     }
 
-    private void OnTick(OperationProgress update)
+    private void OnProgressTick()
+    {
+        Apply(_progress.CreateSnapshot());
+    }
+
+    private void Apply(OperationProgress update)
     {
         if (IsFinished)
         {
