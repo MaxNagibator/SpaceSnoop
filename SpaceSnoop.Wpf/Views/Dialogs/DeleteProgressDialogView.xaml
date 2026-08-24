@@ -140,7 +140,8 @@
                 Padding="6"
                 Margin="0,14,0,0"
                 MinHeight="88">
-            <ItemsControl ItemsSource="{Binding Items}"
+            <ItemsControl x:Name="MarkedItems"
+                          ItemsSource="{Binding Items}"
                           AutomationProperties.Name="Помеченные объекты"
                           VirtualizingPanel.IsVirtualizing="True"
                           VirtualizingPanel.VirtualizationMode="Recycling">
