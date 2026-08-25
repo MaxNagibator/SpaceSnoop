@@ -156,6 +156,8 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
             case SyncComparisonChange.Applied:
                 Rows.Update(Operations.Result, Operations.Outcomes, Operations.DirSizeCache);
                 Ledger.RefreshAfterSync(Operations.Outcomes);
+                Operations.RefreshPending();
+                UpdateSummaryText();
                 break;
 
             default:
@@ -197,6 +199,11 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         Operations.RefreshPending();
         Ledger.Update(Operations.Result, Operations.HashesCompared);
 
+        UpdateSummaryText();
+    }
+
+    private void UpdateSummaryText()
+    {
         SummaryText = Operations.Result is null
             ? "Сравнение не выполнялось."
             : $"Одинаковых: {Ledger.IdenticalCount}, "

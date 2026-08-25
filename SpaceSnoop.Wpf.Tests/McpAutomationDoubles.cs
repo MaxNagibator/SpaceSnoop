@@ -160,6 +160,8 @@ internal sealed class SyncAutomationDouble : ISyncAutomation
 
     public bool HasComparison { get; set; }
 
+    public SyncPlanFreshness PlanFreshness { get; set; } = SyncPlanFreshness.Fresh;
+
     public IReadOnlyList<string> IncompleteDirectories { get; set; } = [];
 
     public IReadOnlyList<string> SkippedLinks { get; set; } = [];
@@ -184,6 +186,8 @@ internal sealed class SyncAutomationDouble : ISyncAutomation
 
     public SyncRunResult? RunResult { get; set; }
 
+    public Exception? SyncException { get; set; }
+
     public int CompareCalls { get; private set; }
 
     public int SyncCalls { get; private set; }
@@ -207,6 +211,12 @@ internal sealed class SyncAutomationDouble : ISyncAutomation
     public Task<SyncRunResult?> SyncFromAutomationAsync(CancellationToken cancellationToken)
     {
         SyncCalls++;
+
+        if (SyncException is { } exception)
+        {
+            throw exception;
+        }
+
         return Task.FromResult(RunResult);
     }
 }

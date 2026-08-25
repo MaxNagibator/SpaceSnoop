@@ -82,44 +82,61 @@ internal sealed class McpSyncTools(
         {
             logger.McpToolInvoked("sync_current", $"план, записей до {entryLimit}");
 
-            var plan = McpDispatch.Run(() => sync.CapturePlanBuilder(entryLimit));
+            var captured = McpDispatch.Run(() => (Plan: sync.CapturePlanBuilder(entryLimit), Freshness: sync.PlanFreshness));
 
-            if (plan is null)
+            if (captured.Plan is null)
             {
                 throw new McpException("На странице «Синхронизация» сравнение ещё не выполнялось. Запустите open_sync с compare=true или compare_directories.");
             }
 
-            var model = await Task.Run(plan, cancellationToken).ConfigureAwait(false);
+            var model = await Task.Run(captured.Plan, cancellationToken).ConfigureAwait(false);
 
-            return SyncPlanExport.ToJson(model);
+            return SyncPlanExport.ToJson(model with { PlanFreshness = captured.Freshness.ToString() });
         }
 
         McpGuards.RequireMutations(preferences, logger, "sync_current");
 
-        var run = McpDispatch.Run(() =>
+        SyncRunResult? outcome;
+
+        try
         {
-            if (!sync.HasComparison)
+            var run = McpDispatch.Run(() =>
             {
-                throw new McpException("Сначала выполните сравнение: open_sync с compare=true.");
-            }
+                if (!sync.HasComparison)
+                {
+                    throw new McpException("Сначала выполните сравнение: open_sync с compare=true.");
+                }
 
-            if (sync.IsBusy)
-            {
-                throw new McpException("Страница «Синхронизация» сейчас занята другой операцией.");
-            }
+                if (sync.IsBusy)
+                {
+                    throw new McpException("Страница «Синхронизация» сейчас занята другой операцией.");
+                }
 
-            if (sync.HasPendingConflicts)
-            {
-                throw new McpException("Есть неразрешённые спорные элементы – разрешите их в приложении.");
-            }
+                if (sync.HasPendingConflicts)
+                {
+                    throw new McpException("Есть неразрешённые спорные элементы – разрешите их в приложении.");
+                }
 
-            logger.McpMutationRequested("sync_current", $"«{sync.LeftPath}» → «{sync.RightPath}», режим {sync.Mode}, зеркало {sync.Mirror}");
-            notifier.Notify("Агент запустил синхронизацию", StatusSeverity.Warning);
+                if (sync.PlanFreshness != SyncPlanFreshness.Fresh)
+                {
+                    logger.McpToolRejected("sync_current", "план уже исполнен");
 
-            return sync.SyncFromAutomationAsync(cancellationToken);
-        });
+                    throw new McpException("План уже исполнен – выполните сравнение заново: open_sync с compare=true.");
+                }
 
-        var outcome = await run.ConfigureAwait(false);
+                logger.McpMutationRequested("sync_current", $"«{sync.LeftPath}» → «{sync.RightPath}», режим {sync.Mode}, зеркало {sync.Mirror}");
+                notifier.Notify("Агент запустил синхронизацию", StatusSeverity.Warning);
+
+                return sync.SyncFromAutomationAsync(cancellationToken);
+            });
+
+            outcome = await run.ConfigureAwait(false);
+        }
+        catch (SyncPlanStaleException exception)
+        {
+            throw new McpException(exception.Message);
+        }
+
         cancellationToken.ThrowIfCancellationRequested();
 
         if (outcome is null)

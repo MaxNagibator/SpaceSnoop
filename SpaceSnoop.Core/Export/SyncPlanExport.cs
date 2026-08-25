@@ -14,6 +14,7 @@ public sealed record SyncPlanExportModel
 {
     public string Tool { get; init; } = "SpaceSnoop";
     public int Schema { get; init; } = 1;
+    public string? PlanFreshness { get; init; }
     public string? Version { get; init; }
     public DateTimeOffset GeneratedAt { get; init; }
     public required string LeftPath { get; init; }

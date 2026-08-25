@@ -5,6 +5,8 @@ using SpaceSnoop.Core;
 using SpaceSnoop.Core.Cleanup;
 using SpaceSnoop.Core.Docker;
 using SpaceSnoop.Core.Duplicates;
+using SpaceSnoop.Core.Domain;
+using SpaceSnoop.Core.Export;
 using SpaceSnoop.Core.UseCases;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Diagnostics;
@@ -12,6 +14,7 @@ using SpaceSnoop.Wpf.Mcp;
 using SpaceSnoop.Wpf.ViewModels;
 using SpaceSnoop.Wpf.ViewModels.Scan;
 using SpaceSnoop.Wpf.ViewModels.Settings;
+using SpaceSnoop.Wpf.ViewModels.Sync;
 
 namespace SpaceSnoop.Wpf.Tests;
 
@@ -172,6 +175,49 @@ public class McpBridgeGuardTests
     {
         Assert.That(Assert.ThrowsAsync<McpException>(() => _bridge.Sync.SyncCurrentAsync(true, 20, CancellationToken.None))?.Message,
             Does.Contain("сравнение ещё не выполнялось"));
+    }
+
+    [Test]
+    public void Состояние_MCP_помечает_исполненный_план()
+    {
+        _sync.HasComparison = true;
+        _sync.PlanFreshness = SyncPlanFreshness.PartiallyApplied;
+
+        var state = new McpStateReader(_scan, _sync, new McpNavigator(new FakeAppNavigator())).ReadSyncState();
+
+        Assert.That(state.PlanFreshness, Is.EqualTo(SyncPlanFreshness.PartiallyApplied));
+    }
+
+    [Test]
+    public async Task Сухой_прогон_помечает_исполненный_план_устаревшим()
+    {
+        _sync.HasComparison = true;
+        _sync.PlanFreshness = SyncPlanFreshness.Applied;
+        _sync.PlanBuilder = () => new SyncPlanExportModel
+        {
+            LeftPath = _root,
+            RightPath = _root,
+            Options = new(SyncMode.LeftToRight, SyncWinner.None, false, string.Empty),
+            Actions = PlannedActions.Empty,
+        };
+
+        var json = await _bridge.Sync.SyncCurrentAsync(true, 20, CancellationToken.None);
+
+        Assert.That(json, Does.Contain("\"planFreshness\": \"Applied\""));
+    }
+
+    [Test]
+    public void MCP_переводит_отказ_устаревшего_плана_в_ошибку_с_тем_же_текстом()
+    {
+        const string message = "план уже исполнен, выполните сравнение заново.";
+
+        AllowMutations(true);
+        _sync.HasComparison = true;
+        _sync.SyncException = new SyncPlanStaleException(message);
+
+        var exception = Assert.ThrowsAsync<McpException>(() => _bridge.Sync.SyncCurrentAsync(false, 20, CancellationToken.None));
+
+        Assert.That(exception?.Message, Is.EqualTo(message));
     }
 
     [Test]

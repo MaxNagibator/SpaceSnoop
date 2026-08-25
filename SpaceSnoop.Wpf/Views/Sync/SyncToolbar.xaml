@@ -137,6 +137,7 @@
                         VerticalAlignment="Center"
                         Margin="0,0,16,8"
                         ToolTip="{Binding Ledger.SyncCommandHint}"
+                        ToolTipService.ShowOnDisabled="True"
                         AutomationProperties.Name="Синхронизировать каталоги">
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Kind="{Binding Setup.DirectionIconKind}"

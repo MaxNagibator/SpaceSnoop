@@ -13,6 +13,7 @@ public sealed class SyncLedgerViewModel : ObservableObject
     private Dictionary<ComparisonStatus, int> _dirStats = SyncPlanNarrative.NewZeroStats();
     private FreshnessSummary _freshness;
     private PlannedActions _plan = PlannedActions.Empty;
+    private SyncPlanFreshnessState _planState = new(SyncPlanFreshness.Fresh);
     private int _total;
 
     internal SyncLedgerViewModel(SyncGitViewModel git, Func<SyncDirection> direction)
@@ -120,7 +121,14 @@ public sealed class SyncLedgerViewModel : ObservableObject
 
     internal bool HasActionableChanges()
     {
-        return _result is not null && _result.CountPlannedActions().Total > 0;
+        return _planState.IsExecutable && _result is not null && _result.CountPlannedActions().Total > 0;
+    }
+
+    internal void SetPlanState(SyncPlanFreshnessState state)
+    {
+        _planState = state;
+        OnPropertyChanged(nameof(SyncIsPrimary));
+        OnPropertyChanged(nameof(SyncCommandHint));
     }
 
     internal void Update(ComparisonResult? result, bool hashesCompared)
@@ -214,6 +222,11 @@ public sealed class SyncLedgerViewModel : ObservableObject
         if (_result is null)
         {
             return "Сначала выполните сравнение.";
+        }
+
+        if (_planState.RefusalMessage is { } refusal)
+        {
+            return refusal;
         }
 
         var direction = _direction();

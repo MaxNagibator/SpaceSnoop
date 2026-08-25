@@ -20,6 +20,8 @@ public interface ISyncAutomation
 
     bool HasComparison { get; }
 
+    SyncPlanFreshness PlanFreshness { get; }
+
     IReadOnlyList<string> IncompleteDirectories { get; }
 
     IReadOnlyList<string> SkippedLinks { get; }

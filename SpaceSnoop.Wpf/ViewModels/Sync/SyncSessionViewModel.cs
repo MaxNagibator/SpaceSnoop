@@ -82,6 +82,8 @@ public sealed partial class SyncSessionViewModel : ObservableObject
         return PerformanceFormat.Rate(finished) is { } rate ? $" Скорость: {rate}." : string.Empty;
     }
 
+    internal bool LastOperationCancelled { get; private set; }
+
     internal void ShowBusyForAutomation(string caption, OperationProgress update, TimeSpan elapsed, int total = 0, long totalBytes = 0)
     {
         IsBusy = true;
@@ -119,6 +121,7 @@ public sealed partial class SyncSessionViewModel : ObservableObject
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(external);
         var token = _cts.Token;
+        LastOperationCancelled = false;
 
         ProgressRateText = string.Empty;
         ProgressRemainingText = string.Empty;
@@ -163,12 +166,14 @@ public sealed partial class SyncSessionViewModel : ObservableObject
         try
         {
             var result = await Task.Run(() => work(token, progress), token);
+            LastOperationCancelled = token.IsCancellationRequested;
             _runs.Report(Finished(operation, measured, stopwatch.Elapsed));
 
             return result;
         }
         catch (OperationCanceledException)
         {
+            LastOperationCancelled = true;
             _logger.SyncOperationCancelled(operation);
             Report("Операция отменена.");
             return null;

@@ -28,6 +28,7 @@ internal sealed class McpStateReader(IScanAutomation scan, ISyncAutomation sync,
             sync.Exclusions,
             sync.IsBusy,
             sync.HasComparison,
+            sync.PlanFreshness,
             new Dictionary<string, int>
             {
                 ["Identical"] = sync.IdenticalCount,

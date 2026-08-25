@@ -42,6 +42,8 @@ public sealed partial class SyncViewModel : ISyncAutomation
 
     bool ISyncAutomation.HasComparison => Ledger.HasResult;
 
+    SyncPlanFreshness ISyncAutomation.PlanFreshness => Operations.PlanFreshness;
+
     IReadOnlyList<string> ISyncAutomation.IncompleteDirectories => Operations.Result?.IncompleteDirectories() ?? [];
 
     IReadOnlyList<string> ISyncAutomation.SkippedLinks => Operations.Result?.SkippedLinks() ?? [];
