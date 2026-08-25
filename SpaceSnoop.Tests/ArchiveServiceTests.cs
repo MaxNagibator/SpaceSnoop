@@ -356,6 +356,99 @@ public class ArchiveServiceTests
         Assert.That(service.VerifyCoverage(_sourceDir, _zipPath, CancellationToken.None).Ok, Is.True);
     }
 
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    public void CheckCoverage_EntryDiffersFromFileOnlyInCase_CoveredOnlyUnderCaseInsensitivePolicy(bool caseSensitive, bool covered)
+    {
+        var service = new ArchiveService();
+        var file = Path.Combine(_sourceDir, "Foo.txt");
+        File.WriteAllText(file, "alpha");
+        WriteSingleEntryArchive("foo.txt", "alpha", File.GetLastWriteTime(file));
+
+        var index = ArchiveIndex.Read(_zipPath, caseSensitive ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase);
+        var coverage = service.CheckCoverage(_sourceDir, Content(file), index);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(coverage.Ok, Is.EqualTo(covered));
+            Assert.That(coverage.Detail, Is.EqualTo(covered ? string.Empty : $"в архив не попал файл «{file}»"));
+        }
+    }
+
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    public void CheckCoverage_EntryDiffersFromEmptyDirectoryOnlyInCase_CoveredOnlyUnderCaseInsensitivePolicy(bool caseSensitive, bool covered)
+    {
+        var service = new ArchiveService();
+        var hollow = Path.Combine(_sourceDir, "Hollow");
+        Directory.CreateDirectory(hollow);
+        WriteSingleEntryArchive("hollow/", string.Empty, DateTime.Now);
+
+        var index = ArchiveIndex.Read(_zipPath, caseSensitive ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase);
+        var coverage = service.CheckCoverage(_sourceDir, new([], [hollow], [], 0), index);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(coverage.Ok, Is.EqualTo(covered));
+            Assert.That(coverage.Detail, Is.EqualTo(covered ? string.Empty : $"в архив не попал пустой каталог «{hollow}»"));
+        }
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void CheckCoverage_CollectedFilesDifferOnlyInCase_RefusesCoverage(bool caseSensitive)
+    {
+        var service = new ArchiveService();
+        var file = Path.Combine(_sourceDir, "Foo.txt");
+        var twin = Path.Combine(_sourceDir, "foo.txt");
+        File.WriteAllText(file, "alpha");
+        WriteSingleEntryArchive("foo.txt", "alpha", File.GetLastWriteTime(file));
+
+        var index = ArchiveIndex.Read(_zipPath, caseSensitive ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase);
+        var coverage = service.CheckCoverage(_sourceDir, Content(file, twin), index);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(coverage.Ok, Is.False);
+            Assert.That(coverage.Detail, Is.EqualTo(caseSensitive
+                ? $"в архив не попал файл «{file}»"
+                : $"в архиве не отличить по регистру путь «{twin}»"));
+        }
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void CheckCoverage_CollectedEmptyDirectoriesDifferOnlyInCase_RefusesCoverage(bool caseSensitive)
+    {
+        var service = new ArchiveService();
+        var hollow = Path.Combine(_sourceDir, "Hollow");
+        var twin = Path.Combine(_sourceDir, "hollow");
+        Directory.CreateDirectory(hollow);
+        WriteSingleEntryArchive("hollow/", string.Empty, DateTime.Now);
+
+        var index = ArchiveIndex.Read(_zipPath, caseSensitive ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase);
+        var coverage = service.CheckCoverage(_sourceDir, new([], [hollow, twin], [], 0), index);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(coverage.Ok, Is.False);
+            Assert.That(coverage.Detail, Is.EqualTo(caseSensitive
+                ? $"в архив не попал пустой каталог «{hollow}»"
+                : $"в архиве не отличить по регистру путь «{twin}»"));
+        }
+    }
+
+    private void WriteSingleEntryArchive(string entryName, string text, DateTime modified)
+    {
+        using var zip = ZipFile.Open(_zipPath, ZipArchiveMode.Create);
+
+        var entry = zip.CreateEntry(entryName, CompressionLevel.NoCompression);
+        entry.LastWriteTime = modified;
+
+        using var stream = entry.Open();
+        stream.Write(Encoding.UTF8.GetBytes(text));
+    }
+
     private static bool Readable(string path)
     {
         try

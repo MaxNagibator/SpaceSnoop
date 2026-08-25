@@ -13,15 +13,14 @@ internal static class ScanLookup
             return null;
         }
 
+        List<SpaceBase> reachable = [];
+
         foreach (var root in roots)
         {
-            if (Find(root, target) is { } found)
-            {
-                return found;
-            }
+            Collect(root, target, reachable);
         }
 
-        return null;
+        return Pick(reachable, target);
     }
 
     public static string Normalize(string path)
@@ -29,29 +28,48 @@ internal static class ScanLookup
         return path.Trim().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
     }
 
-    private static SpaceBase? Find(SpaceBase space, string target)
+    private static void Collect(SpaceBase space, string target, List<SpaceBase> reachable)
     {
         var current = Normalize(space.AbsolutePath);
 
         if (string.Equals(current, target, StringComparison.OrdinalIgnoreCase))
         {
-            return space;
+            reachable.Add(space);
+            return;
         }
 
         if (space is not DirectorySpace dir || !IsInside(current, target))
         {
-            return null;
+            return;
         }
 
         foreach (var sub in dir.SubDirectories)
         {
-            if (Find(sub, target) is { } found)
-            {
-                return found;
-            }
+            Collect(sub, target, reachable);
         }
 
-        return dir.Files.FirstOrDefault(file => string.Equals(Normalize(file.AbsolutePath), target, StringComparison.OrdinalIgnoreCase));
+        reachable.AddRange(dir.Files.Where(file => string.Equals(Normalize(file.AbsolutePath), target, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private static SpaceBase? Pick(List<SpaceBase> reachable, string target)
+    {
+        SpaceBase? loose = null;
+        var ambiguous = false;
+
+        foreach (var space in reachable)
+        {
+            var current = Normalize(space.AbsolutePath);
+
+            if (string.Equals(current, target, StringComparison.Ordinal))
+            {
+                return space;
+            }
+
+            ambiguous |= loose is not null && !string.Equals(Normalize(loose.AbsolutePath), current, StringComparison.Ordinal);
+            loose ??= space;
+        }
+
+        return ambiguous ? null : loose;
     }
 
     private static bool IsInside(string directory, string target)

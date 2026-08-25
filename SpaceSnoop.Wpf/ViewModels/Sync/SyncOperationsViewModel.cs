@@ -108,8 +108,8 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
             return;
         }
 
-        if (!string.Equals(_setup.LeftPath.Trim(), _result.LeftPath, StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(_setup.RightPath.Trim(), _result.RightPath, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(_setup.LeftPath.Trim(), _result.LeftPath, StringComparison.Ordinal)
+            || !string.Equals(_setup.RightPath.Trim(), _result.RightPath, StringComparison.Ordinal))
         {
             ClearComparison();
         }

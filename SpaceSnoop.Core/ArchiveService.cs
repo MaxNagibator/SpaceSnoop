@@ -19,11 +19,62 @@ public readonly record struct ArchiveContent(
     IReadOnlyList<string> Unreadable,
     long Bytes);
 
+internal sealed class ArchiveIndex
+{
+    private readonly Dictionary<string, ZipEntryStamp> _entries;
+    private readonly HashSet<string> _directories;
+
+    private ArchiveIndex(StringComparer names)
+    {
+        _entries = new(names);
+        _directories = new(names);
+    }
+
+    internal IEqualityComparer<string> Names => _entries.Comparer;
+
+    internal static ArchiveIndex Read(string zipPath, StringComparer names)
+    {
+        ArgumentNullException.ThrowIfNull(names);
+
+        var index = new ArchiveIndex(names);
+
+        using var zip = ZipFile.OpenRead(zipPath);
+
+        foreach (var entry in zip.Entries)
+        {
+            index._entries[entry.FullName] = new(entry.Length, entry.LastWriteTime.DateTime);
+
+            for (var slash = entry.FullName.IndexOf('/'); slash >= 0; slash = entry.FullName.IndexOf('/', slash + 1))
+            {
+                index._directories.Add(entry.FullName[..(slash + 1)]);
+            }
+        }
+
+        return index;
+    }
+
+    internal bool HasEntry(string name)
+    {
+        return _entries.ContainsKey(name);
+    }
+
+    internal bool HasDirectory(string name)
+    {
+        return _directories.Contains(name);
+    }
+
+    internal ZipEntryStamp Stamp(string name)
+    {
+        return _entries[name];
+    }
+}
+
 public sealed class ArchiveService
 {
     private const int BufferSize = 80 * 1024;
     private const int ZipMinYear = 1980;
     private const int ZipMaxYear = 2107;
+    private const string CaseCollision = "в архиве не отличить по регистру путь";
 
     public ArchiveContent Collect(string root, CancellationToken token)
     {
@@ -175,47 +226,14 @@ public sealed class ArchiveService
     {
         token.ThrowIfCancellationRequested();
 
-        var entries = new Dictionary<string, ZipEntryStamp>(StringComparer.OrdinalIgnoreCase);
-        var directories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        using (var zip = ZipFile.OpenRead(zipPath))
-        {
-            foreach (var entry in zip.Entries)
-            {
-                entries[entry.FullName] = new(entry.Length, entry.LastWriteTime.DateTime);
-
-                for (var slash = entry.FullName.IndexOf('/'); slash >= 0; slash = entry.FullName.IndexOf('/', slash + 1))
-                {
-                    directories.Add(entry.FullName[..(slash + 1)]);
-                }
-            }
-        }
-
+        // TODO: чувствительность снимается с корня упаковки и наследуется поддеревом, поэтому у
+        // подкаталога с включённой per-directory чувствительностью (fsutil file setCaseSensitiveInfo)
+        // имена, различающиеся только регистром, дают отказ в покрытии вместо разбора – снимать политику
+        // на каждый каталог, когда в упаковку пойдут деревья WSL.
+        var index = ArchiveIndex.Read(zipPath, PathCase.ComparerFor(root));
         var content = Collect(root, token);
 
-        if (content.Unreadable.Count > 0)
-        {
-            return new(false, Detail("каталог не читается", content.Unreadable[0], content.Unreadable.Count));
-        }
-
-        var prefix = Prefix(root);
-
-        if (Missing(content.Files, x => entries.ContainsKey(Relative(prefix, x)), "в архив не попал файл") is { } file)
-        {
-            return new(false, file);
-        }
-
-        if (Missing(content.Files, x => Unchanged(entries[Relative(prefix, x)], x), "после упаковки изменился файл") is { } changed)
-        {
-            return new(false, changed);
-        }
-
-        if (Missing(content.EmptyDirectories, x => directories.Contains(Relative(prefix, x) + "/"), "в архив не попал пустой каталог") is { } empty)
-        {
-            return new(false, empty);
-        }
-
-        return new(true, string.Empty);
+        return CheckCoverage(root, content, index);
     }
 
     public VerifyResult VerifyZip(
@@ -247,6 +265,46 @@ public sealed class ArchiveService
         }
 
         return checkContent ? VerifyContent(zip, progress, token) : new(true, string.Empty);
+    }
+
+    internal VerifyResult CheckCoverage(string root, ArchiveContent content, ArchiveIndex index)
+    {
+        ArgumentNullException.ThrowIfNull(index);
+
+        if (content.Unreadable.Count > 0)
+        {
+            return new(false, Detail("каталог не читается", content.Unreadable[0], content.Unreadable.Count));
+        }
+
+        var prefix = Prefix(root);
+        var keys = new HashSet<string>(index.Names);
+
+        if (Missing(content.Files, x => keys.Add(Relative(prefix, x)), CaseCollision) is { } ambiguousFile)
+        {
+            return new(false, ambiguousFile);
+        }
+
+        if (Missing(content.EmptyDirectories, x => keys.Add(Relative(prefix, x) + "/"), CaseCollision) is { } ambiguousDirectory)
+        {
+            return new(false, ambiguousDirectory);
+        }
+
+        if (Missing(content.Files, x => index.HasEntry(Relative(prefix, x)), "в архив не попал файл") is { } file)
+        {
+            return new(false, file);
+        }
+
+        if (Missing(content.Files, x => Unchanged(index.Stamp(Relative(prefix, x)), x), "после упаковки изменился файл") is { } changed)
+        {
+            return new(false, changed);
+        }
+
+        if (Missing(content.EmptyDirectories, x => index.HasDirectory(Relative(prefix, x) + "/"), "в архив не попал пустой каталог") is { } empty)
+        {
+            return new(false, empty);
+        }
+
+        return new(true, string.Empty);
     }
 
     private static string Prefix(string root)
