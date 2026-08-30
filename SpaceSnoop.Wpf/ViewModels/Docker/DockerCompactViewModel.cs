@@ -8,16 +8,23 @@ public sealed partial class DockerCompactViewModel : ObservableObject
     private readonly DockerViewModel _owner;
     private readonly DockerService _docker;
     private readonly IDialogService _dialogs;
+    private readonly IUiDispatcher _uiDispatcher;
     private readonly ILogger _logger;
 
     private CancellationTokenSource? _cts;
     private bool _cancellationAllowed;
 
-    internal DockerCompactViewModel(DockerViewModel owner, DockerService docker, IDialogService dialogs, ILogger logger)
+    internal DockerCompactViewModel(
+        DockerViewModel owner,
+        DockerService docker,
+        IDialogService dialogs,
+        IUiDispatcher uiDispatcher,
+        ILogger logger)
     {
         _owner = owner;
         _docker = docker;
         _dialogs = dialogs;
+        _uiDispatcher = uiDispatcher;
         _logger = logger;
     }
 
@@ -103,7 +110,7 @@ public sealed partial class DockerCompactViewModel : ObservableObject
         catch (Exception ex)
         {
             _logger.DockerCompactFailed(ex);
-            _dialogs.Error("Сжатие диска Docker", ex.Message);
+            _uiDispatcher.Invoke(() => _dialogs.Error("Сжатие диска Docker", ex.Message));
 
             run.Settle(run.DockerStopped
                 ? "Сжатие не выполнено. Docker остановлен – запустите его заново."
@@ -161,7 +168,7 @@ public sealed partial class DockerCompactViewModel : ObservableObject
         if (!result.Succeeded)
         {
             _logger.DockerCompactFailed(new InvalidOperationException(result.Summary));
-            _dialogs.Error("Сжатие диска Docker", result.ToDisplayText());
+            _uiDispatcher.Invoke(() => _dialogs.Error("Сжатие диска Docker", result.ToDisplayText()));
 
             run.Settle(result.DockerStopped
                 ? "Сжатие не выполнено. Docker остановлен – запустите его заново."
@@ -171,9 +178,13 @@ public sealed partial class DockerCompactViewModel : ObservableObject
         }
 
         _logger.DockerCompactFinished(result.Summary);
-        _dialogs.Info("Сжатие диска Docker", result.ToDisplayText());
         run.Settle("Готово. Запустите Docker заново.");
-        _owner.ForgetSnapshot();
+
+        _uiDispatcher.Invoke(() =>
+        {
+            _dialogs.Info("Сжатие диска Docker", result.ToDisplayText());
+            _owner.ForgetSnapshot();
+        });
     }
 
     private async Task<bool> ConfirmWslShutdownFallbackAsync(DockerCompactResult result)
@@ -203,8 +214,6 @@ public sealed partial class DockerCompactViewModel : ObservableObject
 
     private sealed class CompactRun(DockerCompactViewModel view)
     {
-        private readonly SynchronizationContext? _uiContext = SynchronizationContext.Current;
-
         private int _settled;
 
         public bool DockerStopped { get; set; }
@@ -225,14 +234,7 @@ public sealed partial class DockerCompactViewModel : ObservableObject
             DockerStopped = true;
             view._cancellationAllowed = false;
 
-            if (_uiContext is null)
-            {
-                Announce();
-            }
-            else
-            {
-                _uiContext.Post(_ => Announce(), null);
-            }
+            view._uiDispatcher.Invoke(Announce);
         }
 
         private void Announce()

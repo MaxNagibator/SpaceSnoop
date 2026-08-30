@@ -1,4 +1,5 @@
 ﻿using KeepShell.Services.Modal;
+using KeepShell.Services.Platform;
 using Microsoft.Extensions.Logging.Abstractions;
 using SpaceSnoop.Core.Docker;
 using SpaceSnoop.Wpf.ViewModels.Docker;
@@ -25,21 +26,12 @@ public sealed class DockerViewModelTests
     [Test]
     public async Task Запоздавший_доклад_о_стадии_не_перетирает_итог()
     {
-        var vm = CreateViewModel(diskpart: Success("DiskPart successfully compacted the virtual disk file."));
-        var context = new DeferringSynchronizationContext();
-        var previous = SynchronizationContext.Current;
-        SynchronizationContext.SetSynchronizationContext(context);
+        var dispatcher = new DeferringUiDispatcher();
+        var vm = CreateViewModel(diskpart: Success("DiskPart successfully compacted the virtual disk file."), dispatcher: dispatcher);
 
-        try
-        {
-            await vm.Compact.RunCommand.ExecuteAsync(null);
-        }
-        finally
-        {
-            SynchronizationContext.SetSynchronizationContext(previous);
-        }
+        await vm.Compact.RunCommand.ExecuteAsync(null);
 
-        context.RunPending();
+        dispatcher.RunPending();
 
         Assert.That(vm.StatusText, Is.EqualTo("Готово. Запустите Docker заново."));
     }
@@ -64,7 +56,10 @@ public sealed class DockerViewModelTests
         Assert.That(vm.StatusText, Is.EqualTo("Готово. Запустите Docker заново."));
     }
 
-    private static DockerViewModel CreateViewModel(DockerProcessResult diskpart, TimeSpan? stopTimeout = null)
+    private static DockerViewModel CreateViewModel(
+        DockerProcessResult diskpart,
+        TimeSpan? stopTimeout = null,
+        IUiDispatcher? dispatcher = null)
     {
         var runner = new ScriptedProcessRunner((fileName, arguments) => (fileName, arguments) switch
         {
@@ -87,7 +82,7 @@ public sealed class DockerViewModelTests
             },
             administratorCheck: () => true);
 
-        return new(service, new NoopDialogs(showResult: true), NullLogger<DockerViewModel>.Instance);
+        return new(service, new NoopDialogs(showResult: true), dispatcher ?? new FakeUiDispatcher(), NullLogger<DockerViewModel>.Instance);
     }
 
     private static DockerProcessResult Success(string output = "")
@@ -95,13 +90,20 @@ public sealed class DockerViewModelTests
         return new(0, output, string.Empty);
     }
 
-    private sealed class DeferringSynchronizationContext : SynchronizationContext
+    private sealed class DeferringUiDispatcher : IUiDispatcher
     {
-        private readonly List<(SendOrPostCallback Callback, object? State)> _pending = [];
+        private readonly List<Action> _pending = [];
 
-        public override void Post(SendOrPostCallback callback, object? state)
+        public bool HasAccess => false;
+
+        public void Invoke(Action action)
         {
-            _pending.Add((callback, state));
+            _pending.Add(action);
+        }
+
+        public IUiTimer CreateTimer(TimeSpan interval, Action tick)
+        {
+            return new FakeUiTimer(interval, tick);
         }
 
         public void RunPending()
@@ -109,9 +111,9 @@ public sealed class DockerViewModelTests
             var pending = _pending.ToArray();
             _pending.Clear();
 
-            foreach (var (callback, state) in pending)
+            foreach (var action in pending)
             {
-                callback(state);
+                action();
             }
         }
     }

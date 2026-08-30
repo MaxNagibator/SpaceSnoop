@@ -11,6 +11,7 @@ public sealed partial class DockerViewModel : ObservableObject, IPageHeader, IPa
 
     private readonly DockerService _docker;
     private readonly IDialogService _dialogs;
+    private readonly IUiDispatcher _uiDispatcher;
     private readonly ILogger<DockerViewModel> _logger;
 
     private bool _loadedOnce;
@@ -34,13 +35,14 @@ public sealed partial class DockerViewModel : ObservableObject, IPageHeader, IPa
     [ObservableProperty]
     private bool _pruneAllVolumes;
 
-    public DockerViewModel(DockerService docker, IDialogService dialogs, ILogger<DockerViewModel> logger)
+    public DockerViewModel(DockerService docker, IDialogService dialogs, IUiDispatcher uiDispatcher, ILogger<DockerViewModel> logger)
     {
         _docker = docker;
         _dialogs = dialogs;
+        _uiDispatcher = uiDispatcher;
         _logger = logger;
 
-        Compact = new(this, docker, dialogs, logger);
+        Compact = new(this, docker, dialogs, uiDispatcher, logger);
     }
 
     public DockerCompactViewModel Compact { get; }
@@ -114,35 +116,16 @@ public sealed partial class DockerViewModel : ObservableObject, IPageHeader, IPa
         {
             var snapshot = await _docker.GetSnapshotAsync(CancellationToken.None);
 
-            Buckets.Clear();
-            IsAvailable = snapshot.Available;
-            UnavailableReason = snapshot.Error;
+            IReadOnlyList<DockerObject> inventory = snapshot.Available
+                ? await _docker.GetInventoryAsync(CancellationToken.None)
+                : [];
 
-            Groups.Clear();
-
-            if (snapshot.Available)
-            {
-                FillBuckets(snapshot.Buckets);
-
-                await LoadObjectsAsync();
-
-                _logger.DockerSnapshotLoaded(snapshot.Buckets.Count);
-                StatusText = $"Обновлено: категорий – {snapshot.Buckets.Count}.";
-            }
-            else
-            {
-                _logger.DockerUnavailable(snapshot.Error ?? "неизвестно");
-                StatusText = "Docker недоступен.";
-            }
+            _uiDispatcher.Invoke(() => ApplySnapshot(snapshot, inventory));
         }
         catch (Exception ex)
         {
             _logger.DockerUnavailable(ex.Message);
-            IsAvailable = false;
-            UnavailableReason = ex.Message;
-            Buckets.Clear();
-            Groups.Clear();
-            StatusText = "Docker недоступен.";
+            _uiDispatcher.Invoke(() => ApplyUnavailable(ex.Message));
         }
         finally
         {
@@ -150,10 +133,40 @@ public sealed partial class DockerViewModel : ObservableObject, IPageHeader, IPa
         }
     }
 
-    private async Task LoadObjectsAsync()
+    private void ApplySnapshot(DockerSnapshot snapshot, IReadOnlyList<DockerObject> inventory)
     {
-        var inventory = await _docker.GetInventoryAsync(CancellationToken.None);
+        Buckets.Clear();
+        IsAvailable = snapshot.Available;
+        UnavailableReason = snapshot.Error;
 
+        Groups.Clear();
+
+        if (!snapshot.Available)
+        {
+            _logger.DockerUnavailable(snapshot.Error ?? "неизвестно");
+            StatusText = "Docker недоступен.";
+
+            return;
+        }
+
+        FillBuckets(snapshot.Buckets);
+        FillGroups(inventory);
+
+        _logger.DockerSnapshotLoaded(snapshot.Buckets.Count);
+        StatusText = $"Обновлено: категорий – {snapshot.Buckets.Count}.";
+    }
+
+    private void ApplyUnavailable(string reason)
+    {
+        IsAvailable = false;
+        UnavailableReason = reason;
+        Buckets.Clear();
+        Groups.Clear();
+        StatusText = "Docker недоступен.";
+    }
+
+    private void FillGroups(IReadOnlyList<DockerObject> inventory)
+    {
         var groups = inventory
             .GroupBy(o => o.Kind)
             .Select(g => new DockerGroupViewModel(g.Key, g.ToList()))
@@ -196,11 +209,22 @@ public sealed partial class DockerViewModel : ObservableObject, IPageHeader, IPa
         catch (Exception ex)
         {
             _logger.DockerObjectRemoveFailed(ex, target.Kind.ToString(), target.Name);
-            _dialogs.Error($"Удалить {kind}", ex.Message);
-            IsBusy = false;
+            _uiDispatcher.Invoke(() =>
+            {
+                _dialogs.Error($"Удалить {kind}", ex.Message);
+                IsBusy = false;
+            });
+
             return;
         }
 
+        _uiDispatcher.Invoke(() => ApplyRemoved(row, kind, target.Name));
+
+        await RefreshBucketsAsync();
+    }
+
+    private void ApplyRemoved(DockerObjectViewModel row, string kind, string name)
+    {
         foreach (var group in Groups)
         {
             if (group.Remove(row))
@@ -215,8 +239,7 @@ public sealed partial class DockerViewModel : ObservableObject, IPageHeader, IPa
         }
 
         IsBusy = false;
-        StatusText = $"Удалён {kind} «{target.Name}».";
-        await RefreshBucketsAsync();
+        StatusText = $"Удалён {kind} «{name}».";
     }
 
     private async Task RefreshBucketsAsync()
@@ -229,7 +252,7 @@ public sealed partial class DockerViewModel : ObservableObject, IPageHeader, IPa
                 return;
             }
 
-            FillBuckets(snapshot.Buckets);
+            _uiDispatcher.Invoke(() => FillBuckets(snapshot.Buckets));
         }
         catch (Exception ex)
         {
@@ -354,13 +377,17 @@ public sealed partial class DockerViewModel : ObservableObject, IPageHeader, IPa
             _logger.DockerCleanupStarted(target.ToString());
             var result = await _docker.PruneAsync(target, allUnused, CancellationToken.None);
             _logger.DockerCleanupFinished(target.ToString(), Summarize(result));
-            _dialogs.Info(title, string.IsNullOrWhiteSpace(result) ? "Готово. Освобождать было нечего." : result);
+            _uiDispatcher.Invoke(() => _dialogs.Info(title, string.IsNullOrWhiteSpace(result) ? "Готово. Освобождать было нечего." : result));
         }
         catch (Exception ex)
         {
             _logger.DockerCleanupFailed(ex, target.ToString());
-            _dialogs.Error(title, ex.Message);
-            IsBusy = false;
+            _uiDispatcher.Invoke(() =>
+            {
+                _dialogs.Error(title, ex.Message);
+                IsBusy = false;
+            });
+
             return;
         }
 

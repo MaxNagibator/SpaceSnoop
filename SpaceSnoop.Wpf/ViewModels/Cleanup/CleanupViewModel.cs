@@ -16,6 +16,7 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
     private readonly ModalHostViewModel _modals;
     private readonly IShellLauncher _shell;
     private readonly ISettingsStore _settings;
+    private readonly IUiDispatcher _uiDispatcher;
     private readonly ToastNotifier _notifier;
     private readonly ILogger<CleanupViewModel> _logger;
 
@@ -64,6 +65,7 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
         ModalHostViewModel modals,
         IShellLauncher shell,
         ISettingsStore settings,
+        IUiDispatcher uiDispatcher,
         ToastNotifier notifier,
         ILogger<CleanupViewModel> logger)
     {
@@ -73,6 +75,7 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
         _modals = modals;
         _shell = shell;
         _settings = settings;
+        _uiDispatcher = uiDispatcher;
         _notifier = notifier;
         _logger = logger;
 
@@ -270,7 +273,7 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
         }
 
         _rebuildPending = false;
-        BuildTargets();
+        _uiDispatcher.Invoke(BuildTargets);
 
         return true;
     }
@@ -437,9 +440,10 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
             IsBusy = false;
         }
 
-        _notifier.Notify(
+        _uiDispatcher.Invoke(() => _notifier.Notify(
             dialog.StatusText,
-            dialog.HasErrors || dialog.WasCancelled || dialog.FreedBytes == 0 ? StatusSeverity.Warning : StatusSeverity.Success);
+            dialog.HasErrors || dialog.WasCancelled || dialog.FreedBytes == 0 ? StatusSeverity.Warning : StatusSeverity.Success));
+
         StatusText = dialog.StatusText;
 
         IsBusy = true;
