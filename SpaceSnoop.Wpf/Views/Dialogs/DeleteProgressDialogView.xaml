@@ -263,6 +263,14 @@
                                Foreground="{DynamicResource Accent.Primary}" />
                 </StackPanel>
             </Grid>
+
+            <TextBlock Text="{Binding DiagnosticsText}"
+                       AutomationProperties.Name="Диагностика удаления"
+                       TextWrapping="Wrap"
+                       Margin="0,8,0,0"
+                       FontSize="{DynamicResource Font.Size.XS}"
+                       Foreground="{DynamicResource Fg.Muted}"
+                       Visibility="{Binding DiagnosticsText, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
         </StackPanel>
 
         <Grid Grid.Row="4"

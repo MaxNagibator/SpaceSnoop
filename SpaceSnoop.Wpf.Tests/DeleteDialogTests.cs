@@ -1,4 +1,10 @@
-﻿using SpaceSnoop.Wpf.ViewModels.Dialogs;
+﻿using KeepShell.Testing;
+using Microsoft.Extensions.Logging.Abstractions;
+using SpaceSnoop.Core.Domain;
+using SpaceSnoop.Wpf.Diagnostics;
+using SpaceSnoop.Wpf.ViewModels;
+using SpaceSnoop.Wpf.ViewModels.Dialogs;
+using System.IO;
 using System.Runtime.CompilerServices;
 
 namespace SpaceSnoop.Wpf.Tests;
@@ -6,7 +12,29 @@ namespace SpaceSnoop.Wpf.Tests;
 [TestFixture]
 public class DeleteDialogTests
 {
+    private const int Rows = 4314;
+
+    private const int RunRows = 120;
+
     private static readonly string[] Paths = [@"C:\a", @"C:\b", @"C:\c", @"C:\d", @"C:\e"];
+
+    private string _root = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _root = Path.Combine(Path.GetTempPath(), $"spacesnoop-delete-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(_root);
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        if (Directory.Exists(_root))
+        {
+            Directory.Delete(_root, true);
+        }
+    }
 
     [Test]
     public void Пачка_уходит_одним_вызовом_и_закрывает_все_строки()
@@ -312,6 +340,52 @@ public class DeleteDialogTests
     }
 
     [Test]
+    public void Прогресс_сливает_повторные_обновления_строки_и_не_теряет_ошибку()
+    {
+        var progress = new DeleteProgressState(2);
+
+        progress.Report(new(0, DeleteRowState.Deleting, null, 0, 0, 0));
+        progress.Report(new(0, DeleteRowState.Failed, "занят", 0, 0, 1));
+        progress.Report(new(1, DeleteRowState.Done, null, 200, 1, 1));
+
+        var snapshot = progress.CreateSnapshot();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(snapshot.Updates, Has.Count.EqualTo(2));
+            Assert.That(snapshot.Updates.Single(update => update.Index == 0), Is.EqualTo(new DeleteTick(0, DeleteRowState.Failed, "занят", 0, 0, 1)));
+            Assert.That(snapshot.Updates.Single(update => update.Index == 1), Is.EqualTo(new DeleteTick(1, DeleteRowState.Done, null, 200, 1, 1)));
+            Assert.That(snapshot.CurrentIndex, Is.EqualTo(1));
+            Assert.That(snapshot.Completed, Is.EqualTo(1));
+            Assert.That(snapshot.Failed, Is.EqualTo(1));
+            Assert.That(progress.CreateSnapshot().Updates, Is.Empty);
+        }
+    }
+
+    [Test]
+    public void Прогресс_держит_только_последнее_состояние_каждой_строки()
+    {
+        var progress = new DeleteProgressState(Rows);
+
+        for (var index = 0; index < Rows; index++)
+        {
+            progress.Report(new(index, DeleteRowState.Deleting, null, index, index, 0));
+            progress.Report(new(index, DeleteRowState.Done, null, index + 1, index + 1, 0));
+        }
+
+        var snapshot = progress.CreateSnapshot();
+        var updates = snapshot.Updates.ToDictionary(static update => update.Index);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(snapshot.Updates, Has.Count.EqualTo(Rows));
+            Assert.That(updates[0], Is.EqualTo(new DeleteTick(0, DeleteRowState.Done, null, 1, 1, 0)));
+            Assert.That(updates[Rows - 1], Is.EqualTo(new DeleteTick(Rows - 1, DeleteRowState.Done, null, Rows, Rows, 0)));
+            Assert.That(snapshot.CurrentIndex, Is.EqualTo(Rows - 1));
+        }
+    }
+
+    [Test]
     public void Список_диалога_удаления_виртуализирован()
     {
         var markup = File.ReadAllText(Path.Combine(RepositoryRoot(), "SpaceSnoop.Wpf", "Views", "Dialogs", "DeleteProgressDialogView.xaml"));
@@ -322,9 +396,137 @@ public class DeleteDialogTests
             Assert.That(markup, Does.Contain("VirtualizingPanel.IsVirtualizing=\"True\""));
             Assert.That(markup, Does.Contain("VirtualizingPanel.VirtualizationMode=\"Recycling\""));
             Assert.That(markup, Does.Contain("CanContentScroll=\"True\""), "Без CanContentScroll панель получает бесконечную высоту и виртуализация не включается.");
+            Assert.That(markup, Does.Contain("DiagnosticsText"));
+            Assert.That(markup, Does.Contain("AutomationProperties.Name=\"Диагностика удаления\""));
             Assert.That(markup, Does.Not.Contain("IsSharedSizeScope"), "SharedSizeScope связывает пере-измерение всех строк списка.");
             Assert.That(markup, Does.Not.Contain("SharedSizeGroup"));
         }
+    }
+
+    [Test]
+    public async Task Экран_удаления_обновляется_тиком_таймера_а_не_каждым_объектом()
+    {
+        var dispatcher = new FakeUiDispatcher();
+        var dialog = Dialog(dispatcher, Items(RunRows, static index => index % 2 == 0));
+        var updates = Watch(dialog);
+
+        await dialog.StartCommand.ExecuteAsync(null);
+
+        var done = dialog.Items.Where(static (_, index) => index % 2 == 0).ToList();
+        var failed = dialog.Items.Where(static (_, index) => index % 2 != 0).ToList();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                updates.Value,
+                Is.EqualTo(1),
+                $"Экран обновился {updates.Value} раз на {RunRows} объектах – прогресс снова пушится на каждую строку.");
+
+            Assert.That(dispatcher.Timers[0].IsRunning, Is.False, "Таймер опроса пережил операцию.");
+            Assert.That(dialog.CountText, Is.EqualTo($"{RunRows / 2} / {RunRows}"), "Итоговый счёт до экрана не доехал.");
+            Assert.That(done.Select(static row => row.State), Is.All.EqualTo(DeleteRowState.Done), "Единственный слив потерял удалённые строки.");
+            Assert.That(failed.Select(static row => row.State), Is.All.EqualTo(DeleteRowState.Failed), "Единственный слив потерял отказавшие строки.");
+            Assert.That(failed.Select(static row => row.Error), Is.All.EqualTo("Путь не найден"), "Единственный слив потерял текст ошибки строки.");
+        }
+    }
+
+    [Test]
+    public async Task Отменённое_удаление_оставляет_экран_согласованным()
+    {
+        const int stopAt = 3;
+
+        var dispatcher = new FakeUiDispatcher();
+        DeleteProgressDialogViewModel? started = null;
+        var items = Items(RunRows, static _ => true).ToList();
+        var trigger = new CancelOnSizeRead(items[stopAt].Name, items[stopAt].Parent!, () => started!.RequestStop());
+        items[stopAt] = trigger;
+
+        var dialog = Dialog(dispatcher, items);
+        started = dialog;
+        trigger.Armed = true;
+
+        await dialog.StartCommand.ExecuteAsync(null);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(dispatcher.Timers[0].IsRunning, Is.False, "Таймер опроса пережил отмену.");
+            Assert.That(dialog.StatusText, Does.StartWith("Отменено."), "Отмена не доехала до итога – проверять нечего.");
+            Assert.That(dialog.CountText, Is.EqualTo($"{stopAt + 1} / {RunRows}"), "Счётчик разошёлся с числом закрытых строк.");
+
+            Assert.That(
+                dialog.Items.Take(stopAt + 1).Select(static row => row.State),
+                Is.All.EqualTo(DeleteRowState.Done),
+                "Оборванный слив потерял строки, которые успели удалиться.");
+
+            Assert.That(
+                dialog.Items.Skip(stopAt + 1).Select(static row => row.State),
+                Is.All.EqualTo(DeleteRowState.Pending),
+                "Нетронутые отменой строки показаны закрытыми.");
+        }
+    }
+
+    [Test]
+    public async Task Отказ_каждого_объекта_не_надувает_счётчик_удалённого()
+    {
+        var dispatcher = new FakeUiDispatcher();
+        var dialog = Dialog(dispatcher, Items(RunRows, static _ => false));
+
+        await dialog.StartCommand.ExecuteAsync(null);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(dialog.CountText, Is.EqualTo($"0 / {RunRows}"), "Отказы посчитаны удалёнными.");
+            Assert.That(dialog.ProgressValue, Is.EqualTo(1d), "Полоса не дошла до конца, хотя обработаны все объекты.");
+            Assert.That(dialog.HasErrors, Is.True);
+            Assert.That(dialog.Items.Select(static row => row.State), Is.All.EqualTo(DeleteRowState.Failed));
+        }
+    }
+
+    private static StrongBox<int> Watch(DeleteProgressDialogViewModel dialog)
+    {
+        var updates = new StrongBox<int>(0);
+
+        dialog.PropertyChanged += (_, arguments) =>
+        {
+            if (arguments.PropertyName == nameof(dialog.CountText))
+            {
+                updates.Value++;
+            }
+        };
+
+        return updates;
+    }
+
+    private static DeleteProgressDialogViewModel Dialog(FakeUiDispatcher dispatcher, IReadOnlyList<SpaceBase> items)
+    {
+        return new(
+            items,
+            permanent: true,
+            new PerformanceMonitor(NullLogger<PerformanceMonitor>.Instance),
+            new PerformanceRunTracker(),
+            new ShellPreferences(new MemorySettings()),
+            dispatcher,
+            NullLogger.Instance);
+    }
+
+    private IReadOnlyList<SpaceBase> Items(int count, Func<int, bool> create)
+    {
+        var root = new DirectorySpace(_root, null, DateTime.Now, DateTime.Now);
+        var items = new List<SpaceBase>(count);
+
+        for (var index = 0; index < count; index++)
+        {
+            var name = $"объект-{index:D4}";
+
+            if (create(index))
+            {
+                Directory.CreateDirectory(Path.Combine(_root, name));
+            }
+
+            items.Add(new DirectorySpace(name, root, DateTime.Now, DateTime.Now));
+        }
+
+        return items;
     }
 
     private static string RepositoryRoot([CallerFilePath] string caller = "")
@@ -344,5 +546,25 @@ public class DeleteDialogTests
         DeleteBatch.Run(Paths, chunkSize, callbacks, static _ => { }, results.Add, CancellationToken.None);
 
         return results;
+    }
+
+    private sealed class CancelOnSizeRead(string name, SpaceBase parent, Action stop)
+        : DirectorySpace(name, parent, DateTime.Now, DateTime.Now)
+    {
+        public bool Armed { get; set; }
+
+        public override long TotalSize
+        {
+            get
+            {
+                if (Armed)
+                {
+                    Armed = false;
+                    stop();
+                }
+
+                return base.TotalSize;
+            }
+        }
     }
 }

@@ -6,23 +6,43 @@ namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
 
 public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewModelBase
 {
+    internal const int ProgressPollIntervalMs = 120;
+
+    internal static readonly TimeSpan ProgressPollInterval = TimeSpan.FromMilliseconds(ProgressPollIntervalMs);
+
     private readonly bool _permanent;
     private readonly long _totalBytes;
+    private readonly DeleteOperationDiagnostics _diagnostics;
+    private readonly IUiTimer _progressTimer;
     private readonly ILogger _logger;
 
+    private DeleteProgressState? _progress;
     private long _freedBytes;
     private int _deleted;
     private int _failed;
+    private int _processed;
 
     [ObservableProperty]
     private string _freedText;
 
-    public DeleteProgressDialogViewModel(IReadOnlyList<SpaceBase> items, bool permanent, ILogger logger)
+    [ObservableProperty]
+    private string? _diagnosticsText;
+
+    public DeleteProgressDialogViewModel(
+        IReadOnlyList<SpaceBase> items,
+        bool permanent,
+        PerformanceMonitor performance,
+        PerformanceRunTracker runs,
+        ShellPreferences preferences,
+        IUiDispatcher uiDispatcher,
+        ILogger logger)
     {
         _permanent = permanent;
+        _progressTimer = uiDispatcher.CreateTimer(ProgressPollInterval, OnProgressTick);
         _logger = logger;
         Items = new(items.Select(static item => new DeleteRowViewModel(item)));
         _totalBytes = items.Sum(static item => item.TotalSize);
+        _diagnostics = new(permanent, Items.Count, _totalBytes, performance, runs, preferences);
 
         ActionVerb = permanent ? "удалены безвозвратно" : "перемещены в корзину";
         IntroText = $"Будут {ActionVerb}: {Plural.Format(Items.Count, "объект", "объекта", "объектов")} · {SizeFormatter.Format(_totalBytes)}";
@@ -53,20 +73,38 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
 
     protected override async Task ExecuteAsync(CancellationToken token)
     {
-        var progress = new Progress<DeleteTick>(OnTick);
+        var progress = new DeleteProgressState(Items.Count);
+        _progress = progress;
         var deletedItems = new List<SpaceBase>(Items.Count);
         DeletedItems = deletedItems;
 
-        await Task.Run(() => RunDeletion(deletedItems, progress, token), token);
+        try
+        {
+            await Task.Run(() => RunDeletion(deletedItems, progress, token), token);
+        }
+        finally
+        {
+            _progressTimer.Stop();
+            OnProgressTick();
+            _progress = null;
+        }
     }
 
     protected override void OnStarting()
     {
+        _diagnostics.Start();
+        _progressTimer.Start();
         _logger.DeletionStarted(Items.Count, SizeFormatter.Format(_totalBytes), _permanent);
     }
 
     protected override void OnFinished()
     {
+        _progressTimer.Stop();
+        OnProgressTick();
+
+        _diagnostics.Finish(_processed, _freedBytes, !Cancelled && Failure is null);
+        DiagnosticsText = null;
+
         if (Failure is { } failure)
         {
             _logger.DeleteItemFailed(failure, CurrentPath);
@@ -97,16 +135,20 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
     {
         IsRunning = true;
         StatusText = RunningStatus;
+        DiagnosticsText = "отклик 6 мс · пик 18 мс · 118 файлов/с · осталось 31 с";
 
         for (var index = 0; index < Items.Count && index < done; index++)
         {
             _freedBytes += Items[index].Space.TotalSize;
-            OnTick(new(index, DeleteRowState.Done, null, _freedBytes, index + 1, 0));
+            ApplyTick(new(index, DeleteRowState.Done, null, 0, 0, 0));
         }
+
+        ApplyAggregate(_freedBytes, done, 0);
 
         if (done < Items.Count)
         {
-            OnTick(new(done, DeleteRowState.Deleting, null, _freedBytes, done, 0));
+            ApplyTick(new(done, DeleteRowState.Deleting, null, 0, 0, 0));
+            CurrentPath = Items[done].Path;
         }
     }
 
@@ -118,15 +160,41 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
         IsFinished = true;
         HasErrors = HasFailedItems;
         StatusText = BuildSummary();
+        DiagnosticsText = null;
     }
 
     internal void ClearForAutomation()
     {
         IsRunning = false;
         IsFinished = false;
+        DiagnosticsText = null;
     }
 
-    private void OnTick(DeleteTick tick)
+    private void OnProgressTick()
+    {
+        if (_progress is not { } progress)
+        {
+            return;
+        }
+
+        var snapshot = progress.CreateSnapshot();
+
+        foreach (var tick in snapshot.Updates)
+        {
+            ApplyTick(tick);
+        }
+
+        if ((uint)snapshot.CurrentIndex < (uint)Items.Count)
+        {
+            CurrentPath = Items[snapshot.CurrentIndex].Path;
+        }
+
+        ApplyAggregate(snapshot.Freed, snapshot.Completed, snapshot.Failed);
+
+        DiagnosticsText = _diagnostics.Report(_processed, _freedBytes);
+    }
+
+    private void ApplyTick(DeleteTick tick)
     {
         var row = Items[tick.Index];
         row.State = tick.State;
@@ -135,46 +203,20 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
         {
             row.Error = tick.Error;
         }
-
-        CurrentPath = row.Path;
-        _freedBytes = tick.Freed;
-        _deleted = tick.Completed;
-        _failed = tick.Failed;
-        CountText = $"{tick.Completed} / {Items.Count}";
-        FreedText = SizeFormatter.Format(tick.Freed);
-        ProgressValue = _totalBytes > 0 ? Math.Clamp((double)tick.Freed / _totalBytes, 0d, 1d) : 0d;
     }
 
-    private static bool PathExists(string path)
+    private void ApplyAggregate(long freed, int completed, int failed)
     {
-        return Directory.Exists(path) || File.Exists(path);
+        _freedBytes = freed;
+        _deleted = completed;
+        _failed = failed;
+        _processed = completed + failed;
+        CountText = $"{completed} / {Items.Count}";
+        FreedText = SizeFormatter.Format(freed);
+        ProgressValue = Items.Count > 0 ? Math.Clamp((double)_processed / Items.Count, 0d, 1d) : 0d;
     }
 
-    private static void DeletePermanent(string path)
-    {
-        if (Directory.Exists(path))
-        {
-            Directory.Delete(path, true);
-            return;
-        }
-
-        if (!File.Exists(path))
-        {
-            throw new FileNotFoundException("Путь не найден", path);
-        }
-
-        File.Delete(path);
-    }
-
-    private static void DeletePermanentChunk(IReadOnlyList<string> chunk)
-    {
-        foreach (var path in chunk)
-        {
-            DeletePermanent(path);
-        }
-    }
-
-    private void RunDeletion(List<SpaceBase> deletedItems, IProgress<DeleteTick> progress, CancellationToken token)
+    private void RunDeletion(List<SpaceBase> deletedItems, DeleteProgressState progress, CancellationToken token)
     {
         var logPath = Path.Combine(AppStorage.DataDirectory, AppInfo.DeletionLogFileName);
         long freed = 0;
@@ -194,7 +236,7 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
         {
             Journal($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Удаление {Items.Count} элемент(ов) ({(_permanent ? "безвозвратно" : "в корзину")})");
 
-            DeleteBatch.Run(paths, ChunkSize, BuildCallbacks(), OnStarting, OnResult, token);
+            DeleteBatch.Run(paths, ChunkSize, _diagnostics.BuildCallbacks(), OnStarting, OnResult, token);
         }
         finally
         {
@@ -282,19 +324,4 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
             }
         }
     }
-
-    private DeleteBatchCallbacks BuildCallbacks()
-    {
-        return _permanent
-            ? new(PathExists, DeletePermanentChunk, DeletePermanent)
-            : new(PathExists, RecycleBin.DeleteSilent, RecycleBin.DeleteSilent);
-    }
-
-    private readonly record struct DeleteTick(
-        int Index,
-        DeleteRowState State,
-        string? Error,
-        long Freed,
-        int Completed,
-        int Failed);
 }
