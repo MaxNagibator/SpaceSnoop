@@ -1,14 +1,23 @@
-﻿using KeepShell.ViewModels;
+﻿using KeepShell.Services.Platform;
+using KeepShell.ViewModels;
 using System.IO;
 
 namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
 
 public sealed partial class ArchiveProgressDialogViewModel : OperationDialogViewModelBase
 {
+    internal const int ProgressPollIntervalMs = 120;
+
+    internal static readonly TimeSpan ProgressPollInterval = TimeSpan.FromMilliseconds(ProgressPollIntervalMs);
+
     private readonly ArchiveRequest _request;
     private readonly ArchiveService _service;
     private readonly ILogger _logger;
+    private readonly OperationProgressState _packProgress = new();
+    private readonly OperationProgressState _verifyProgress = new();
+    private readonly IUiTimer _progressTimer;
 
+    private volatile ArchivePhase _phase;
     private bool _packed;
     private int _packTotal;
     private int _verifyTotal;
@@ -23,11 +32,12 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
     [ObservableProperty]
     private string _sourceSize;
 
-    public ArchiveProgressDialogViewModel(ArchiveRequest request, ArchiveService service, ILogger logger)
+    public ArchiveProgressDialogViewModel(ArchiveRequest request, ArchiveService service, IUiDispatcher uiDispatcher, ILogger logger)
     {
         _request = request;
         _service = service;
         _logger = logger;
+        _progressTimer = uiDispatcher.CreateTimer(ProgressPollInterval, OnProgressTick);
 
         SourceName = Path.GetFileName(request.SourcePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
         SourceSize = $"≈ {SizeFormatter.Format(request.TotalBytes)} · ≈ {request.EstimatedFiles:N0} {Plural.Word(request.EstimatedFiles, "файл", "файла", "файлов")}";
@@ -62,10 +72,20 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
     protected override async Task ExecuteAsync(CancellationToken token)
     {
         var stage = new Progress<ArchiveStageUpdate>(OnStage);
-        var packProgress = new Progress<OperationProgress>(update => OnTick(update, false));
-        var verifyProgress = new Progress<OperationProgress>(update => OnTick(update, true));
 
-        await Task.Run(() => ExecuteZip(stage, packProgress, verifyProgress, token), token);
+        _packProgress.Reset();
+        _verifyProgress.Reset();
+        _progressTimer.Start();
+
+        try
+        {
+            await Task.Run(() => ExecuteZip(stage, token), token);
+        }
+        finally
+        {
+            _progressTimer.Stop();
+            OnProgressTick();
+        }
     }
 
     protected override void OnStarting()
@@ -165,13 +185,10 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
         return $"{SizeFormatter.Format(compressed)} (было {SizeFormatter.Format(original)}, −{ratio:F0} %)";
     }
 
-    private void ExecuteZip(
-        IProgress<ArchiveStageUpdate> stage,
-        IProgress<OperationProgress> packProgress,
-        IProgress<OperationProgress> verifyProgress,
-        CancellationToken token)
+    private void ExecuteZip(IProgress<ArchiveStageUpdate> stage, CancellationToken token)
     {
         var content = _service.Collect(_request.SourcePath, token);
+        _phase = ArchivePhase.Packing;
         stage.Report(new(ArchiveStage.Packing, content.Files.Count, content.Files.Count + content.EmptyDirectories.Count, content.Bytes));
 
         if (content.Unreadable.Count > 0)
@@ -181,12 +198,17 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
                 : $"не прочитан каталог «{content.Unreadable[0]}»";
         }
 
-        var stats = _service.ZipFiles(_request.SourcePath, content, _request.TargetPath, _request.Level, packProgress, token);
+        var stats = _service.ZipFiles(_request.SourcePath, content, _request.TargetPath, _request.Level, _packProgress, token);
 
         _packed = true;
         _verifyTotal = stats.Count;
 
-        var (ok, detail) = _service.VerifyZip(_request.TargetPath, stats, _request.DeleteOriginal, verifyProgress, token);
+        if (_request.DeleteOriginal)
+        {
+            _phase = ArchivePhase.Verifying;
+        }
+
+        var (ok, detail) = _service.VerifyZip(_request.TargetPath, stats, _request.DeleteOriginal, _verifyProgress, token);
 
         if (!ok)
         {
@@ -199,6 +221,7 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
 
         if (_request.DeleteOriginal)
         {
+            _phase = ArchivePhase.Coverage;
             stage.Report(new(ArchiveStage.Coverage, 0, 0, 0));
             var coverage = _service.VerifyCoverage(_request.SourcePath, _request.TargetPath, token);
 
@@ -240,6 +263,23 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
         SetPhaseTotal(update.Entries);
     }
 
+    private void OnProgressTick()
+    {
+        switch (_phase)
+        {
+            case ArchivePhase.Packing:
+                OnTick(_packProgress.CreateSnapshot(), false);
+                break;
+
+            case ArchivePhase.Verifying:
+                OnTick(_verifyProgress.CreateSnapshot(), true);
+                break;
+
+            default:
+                return;
+        }
+    }
+
     private void OnTick(OperationProgress update, bool verifying)
     {
         if (IsFinished)
@@ -274,6 +314,14 @@ public enum ArchiveStage
     None = 0,
     Packing = 1,
     Coverage = 2,
+}
+
+internal enum ArchivePhase
+{
+    None = 0,
+    Packing = 1,
+    Verifying = 2,
+    Coverage = 3,
 }
 
 public readonly record struct ArchiveStageUpdate(ArchiveStage Stage, int Files, int Entries, long Bytes);

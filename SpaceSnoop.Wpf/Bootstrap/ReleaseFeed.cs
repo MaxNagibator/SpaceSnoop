@@ -27,8 +27,14 @@ internal static class ReleaseFeed
         await using var source = await response.Content.ReadAsStreamAsync();
         await using var destination = File.Create(path);
 
+        await CopyAsync(source, destination, total, progress);
+    }
+
+    internal static async Task CopyAsync(Stream source, Stream destination, long total, IProgress<int> progress)
+    {
         var buffer = new byte[81920];
         long received = 0;
+        var reported = -1;
         int read;
 
         while ((read = await source.ReadAsync(buffer)) > 0)
@@ -36,10 +42,20 @@ internal static class ReleaseFeed
             await destination.WriteAsync(buffer.AsMemory(0, read));
             received += read;
 
-            if (total > 0)
+            if (total <= 0)
             {
-                progress.Report((int)(received * 100 / total));
+                continue;
             }
+
+            var percent = (int)(received * 100 / total);
+
+            if (percent == reported)
+            {
+                continue;
+            }
+
+            reported = percent;
+            progress.Report(percent);
         }
     }
 

@@ -6,17 +6,29 @@ namespace SpaceSnoop.Wpf.ViewModels.Sync;
 
 public sealed partial class SyncSessionViewModel : ObservableObject
 {
+    internal const int ProgressPollIntervalMs = 120;
+
+    internal static readonly TimeSpan ProgressPollInterval = TimeSpan.FromMilliseconds(ProgressPollIntervalMs);
+
     private readonly IDialogService _dialogs;
     private readonly ILogger _logger;
     private readonly ToastNotifier _notifier;
     private readonly PerformanceMonitor _performance;
     private readonly PerformanceRunTracker _runs;
     private readonly Action<string> _reportSummary;
+    private readonly OperationProgressState _progress = new();
+    private readonly IUiTimer _progressTimer;
 
     private CancellationTokenSource? _cts;
     private bool _isIndeterminate = true;
     private double _progressValue;
     private double _progressMax = 1;
+
+    private readonly Stopwatch _clock = new();
+
+    private RunShape _shape;
+    private PerformanceOperation? _measured;
+    private PerformanceOperation? _reported;
 
     [ObservableProperty]
     private bool _isBusy;
@@ -42,6 +54,7 @@ public sealed partial class SyncSessionViewModel : ObservableObject
         ToastNotifier notifier,
         PerformanceMonitor performance,
         PerformanceRunTracker runs,
+        IUiDispatcher uiDispatcher,
         Action<string> reportSummary)
     {
         _dialogs = dialogs;
@@ -50,6 +63,7 @@ public sealed partial class SyncSessionViewModel : ObservableObject
         _performance = performance;
         _runs = runs;
         _reportSummary = reportSummary;
+        _progressTimer = uiDispatcher.CreateTimer(ProgressPollInterval, OnProgressTick);
     }
 
     public bool IsIndeterminate
@@ -116,7 +130,8 @@ public sealed partial class SyncSessionViewModel : ObservableObject
         Func<CancellationToken, IProgress<OperationProgress>, T> work,
         int total = 0,
         CancellationToken external = default,
-        long totalBytes = 0)
+        long totalBytes = 0,
+        bool selfThrottled = false)
         where T : class
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(external);
@@ -129,10 +144,10 @@ public sealed partial class SyncSessionViewModel : ObservableObject
 
         IsBusy = true;
 
-        var shape = new RunShape(caption, caption.TrimEnd(' ', ':'), total, totalBytes);
-        var operation = shape.Operation;
+        _shape = new(caption, caption.TrimEnd(' ', ':'), total, totalBytes);
+        var operation = _shape.Operation;
 
-        if (shape.Determinate)
+        if (_shape.Determinate)
         {
             ProgressMax = total;
             ProgressValue = 0;
@@ -147,27 +162,42 @@ public sealed partial class SyncSessionViewModel : ObservableObject
 
         ProgressDetail = StatusCaption;
 
-        var stopwatch = Stopwatch.StartNew();
-        PerformanceOperation? measured = null;
-        PerformanceOperation? reported = null;
+        _clock.Restart();
+        _measured = null;
+        _reported = null;
+        _progress.Reset();
 
-        var progress = new Progress<OperationProgress>(update =>
+        IProgress<OperationProgress> progress = _progress;
+
+        if (selfThrottled)
         {
-            var current = Advance(shape, update, stopwatch.Elapsed);
-
-            measured = current;
-
-            if (_performance.TryReportOperation(current, reported))
-            {
-                reported = current;
-            }
-        });
+            progress = new Progress<OperationProgress>(Observe);
+        }
+        else
+        {
+            _progressTimer.Start();
+        }
 
         try
         {
-            var result = await Task.Run(() => work(token, progress), token);
+            T result;
+
+            try
+            {
+                result = await Task.Run(() => work(token, progress), token);
+            }
+            finally
+            {
+                _progressTimer.Stop();
+
+                if (!selfThrottled)
+                {
+                    Observe(_progress.CreateSnapshot());
+                }
+            }
+
             LastOperationCancelled = token.IsCancellationRequested;
-            _runs.Report(Finished(operation, measured, stopwatch.Elapsed));
+            _runs.Report(Finished(operation, _measured, _clock.Elapsed));
 
             return result;
         }
@@ -192,9 +222,26 @@ public sealed partial class SyncSessionViewModel : ObservableObject
             IsBusy = false;
             IsIndeterminate = true;
             ProgressValue = 0;
-            _performance.ClearOperation(reported);
+            _performance.ClearOperation(_reported);
             _cts?.Dispose();
             _cts = null;
+        }
+    }
+
+    private void OnProgressTick()
+    {
+        Observe(_progress.CreateSnapshot());
+    }
+
+    private void Observe(OperationProgress update)
+    {
+        var current = Advance(_shape, update, _clock.Elapsed);
+
+        _measured = current;
+
+        if (_performance.TryReportOperation(current, _reported))
+        {
+            _reported = current;
         }
     }
 

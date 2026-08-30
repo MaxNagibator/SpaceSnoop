@@ -1,4 +1,5 @@
-﻿using KeepShell.ViewModels;
+﻿using KeepShell.Services.Platform;
+using KeepShell.ViewModels;
 using SpaceSnoop.Core.Cleanup;
 
 namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
@@ -9,13 +10,17 @@ public readonly record struct CleanupRequest(
     int EstimatedFiles,
     CancellationToken External = default);
 
-internal readonly record struct CleanupTick(int Start, OperationProgress Update);
-
 public sealed partial class CleanupProgressDialogViewModel : OperationDialogViewModelBase
 {
+    internal const int ProgressPollIntervalMs = 120;
+
+    internal static readonly TimeSpan ProgressPollInterval = TimeSpan.FromMilliseconds(ProgressPollIntervalMs);
+
     private readonly CleanupRequest _request;
     private readonly CleanupService _service;
     private readonly ILogger _logger;
+    private readonly OperationProgressState _progress = new();
+    private readonly IUiTimer _progressTimer;
 
     private long _freed;
     private int _deleted;
@@ -25,11 +30,12 @@ public sealed partial class CleanupProgressDialogViewModel : OperationDialogView
     [ObservableProperty]
     private string _targetName = string.Empty;
 
-    public CleanupProgressDialogViewModel(CleanupRequest request, CleanupService service, ILogger logger)
+    public CleanupProgressDialogViewModel(CleanupRequest request, CleanupService service, IUiDispatcher uiDispatcher, ILogger logger)
     {
         _request = request;
         _service = service;
         _logger = logger;
+        _progressTimer = uiDispatcher.CreateTimer(ProgressPollInterval, OnProgressTick);
 
         TargetName = request.Targets.Count == 1
             ? request.Targets[0].Name
@@ -70,9 +76,18 @@ public sealed partial class CleanupProgressDialogViewModel : OperationDialogView
     {
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, _request.External);
 
-        var progress = new Progress<CleanupTick>(tick => OnTick(tick.Start, tick.Update));
+        _progress.Reset();
+        _progressTimer.Start();
 
-        await Task.Run(() => Execute(progress, linked.Token), linked.Token);
+        try
+        {
+            await Task.Run(() => Execute(linked.Token), linked.Token);
+        }
+        finally
+        {
+            _progressTimer.Stop();
+            Apply(_progress.CreateSnapshot());
+        }
     }
 
     protected override void OnStarting()
@@ -124,16 +139,13 @@ public sealed partial class CleanupProgressDialogViewModel : OperationDialogView
         return $"Готово: {done}.";
     }
 
-    private void Execute(IProgress<CleanupTick> progress, CancellationToken token)
+    private void Execute(CancellationToken token)
     {
         foreach (var target in _request.Targets)
         {
             token.ThrowIfCancellationRequested();
 
-            var start = _deleted;
-            var forwarder = new Progress<OperationProgress>(update => progress.Report(new(start, update)));
-
-            var report = _service.Clean(target, forwarder, token);
+            var report = _service.Clean(target, new OffsetProgress(_progress, _deleted, _freed), token);
 
             _freed += report.FreedBytes;
             _deleted += report.Deleted;
@@ -151,18 +163,31 @@ public sealed partial class CleanupProgressDialogViewModel : OperationDialogView
         }
     }
 
-    private void OnTick(int start, OperationProgress update)
+    private void OnProgressTick()
+    {
+        Apply(_progress.CreateSnapshot());
+    }
+
+    private void Apply(OperationProgress update)
     {
         if (IsFinished)
         {
             return;
         }
 
-        var done = start + update.Completed;
+        var done = update.Completed;
         var total = _request.EstimatedFiles;
 
         CurrentPath = update.Current;
         CountText = total > 0 ? $"{done:N0} / {total:N0}" : done.ToString("N0");
         ProgressValue = total > 0 ? Math.Clamp((double)done / total, 0d, 1d) : 0d;
+    }
+
+    private sealed class OffsetProgress(OperationProgressState state, int completed, long bytes) : IProgress<OperationProgress>
+    {
+        public void Report(OperationProgress value)
+        {
+            state.Report(new(completed + value.Completed, value.Current, bytes + value.Bytes));
+        }
     }
 }

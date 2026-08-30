@@ -1,5 +1,6 @@
 ﻿using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.ViewModels.Settings;
+using System.IO;
 using System.Text.Json;
 
 namespace SpaceSnoop.Wpf.Tests;
@@ -7,6 +8,33 @@ namespace SpaceSnoop.Wpf.Tests;
 [TestFixture]
 public class UpdateCheckTests
 {
+    [Test]
+    public async Task Скачивание_докладывает_только_смену_целого_процента()
+    {
+        const int megabytes = 16;
+        var payload = new byte[megabytes * 1024 * 1024];
+        var reports = new List<int>();
+
+        await ReleaseFeed.CopyAsync(new MemoryStream(payload), Stream.Null, payload.Length, new PercentCollector(reports));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(reports, Has.Count.LessThanOrEqualTo(101), $"Докладов {reports.Count} на 101 значение процента – отчёт снова идёт на каждый блок.");
+            Assert.That(reports, Is.Ordered.Ascending.And.Unique);
+            Assert.That(reports[^1], Is.EqualTo(100), "Последний процент до экрана не доехал.");
+        }
+    }
+
+    [Test]
+    public async Task Скачивание_без_известного_размера_молчит()
+    {
+        var reports = new List<int>();
+
+        await ReleaseFeed.CopyAsync(new MemoryStream(new byte[1024 * 1024]), Stream.Null, -1, new PercentCollector(reports));
+
+        Assert.That(reports, Is.Empty);
+    }
+
     [TestCase("v2.9.0", "2.8.16", true)]
     [TestCase("2.9.0", "2.8.16", true)]
     [TestCase("v2.8.17", "2.8.16", true)]
@@ -248,6 +276,14 @@ public class UpdateCheckTests
         {
             Assert.That(notes, Does.Contain("v99.9.0"));
             Assert.That(notes, Does.Contain("v99.8.0"));
+        }
+    }
+
+    private sealed class PercentCollector(List<int> sink) : IProgress<int>
+    {
+        public void Report(int value)
+        {
+            sink.Add(value);
         }
     }
 }

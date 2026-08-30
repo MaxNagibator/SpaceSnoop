@@ -90,7 +90,8 @@ public sealed partial class SyncOperationsViewModel
             (token, progress) => _sync.Execute(request, token, progress),
             planned.Total,
             external,
-            planned.CopyBytes);
+            planned.CopyBytes,
+            selfThrottled: true);
 
         stopwatch.Stop();
 

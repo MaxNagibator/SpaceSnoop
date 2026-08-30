@@ -207,6 +207,7 @@ public class SyncPlanFreshnessTests
             new PerformanceMonitor(NullLogger<PerformanceMonitor>.Instance),
             new PerformanceRunTracker(),
             new FakeFilePicker(),
+            new FakeUiDispatcher(),
             new FakeAppNavigator());
     }
 }

@@ -1,10 +1,12 @@
-﻿using System.IO;
+﻿using KeepShell.Services.Platform;
+using System.IO;
 
 namespace SpaceSnoop.Wpf.Bootstrap;
 
 public sealed class ArchiveProgressDialogFactory(
     ArchiveService service,
     OperationPreferences operations,
+    IUiDispatcher uiDispatcher,
     ILogger<ArchiveProgressDialogViewModel> logger)
 {
     public ArchiveProgressDialogViewModel Create(DirectorySpace dir)
@@ -14,7 +16,7 @@ public sealed class ArchiveProgressDialogFactory(
 
     public ArchiveProgressDialogViewModel Create(ArchiveRequest request)
     {
-        return new(request, service, logger);
+        return new(request, service, uiDispatcher, logger);
     }
 
     public ArchiveRequest CreateRequest(DirectorySpace dir, bool deleteOriginal, bool interactive)

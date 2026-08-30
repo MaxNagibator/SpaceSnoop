@@ -24,12 +24,13 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         PerformanceMonitor performance,
         PerformanceRunTracker runs,
         IFilePicker filePicker,
+        IUiDispatcher uiDispatcher,
         IAppNavigator navigator)
     {
         _settings = settings;
         _navigator = navigator;
 
-        Session = new(dialogs, logger, notifier, performance, runs, summary => SummaryText = summary);
+        Session = new(dialogs, logger, notifier, performance, runs, uiDispatcher, summary => SummaryText = summary);
         Session.PropertyChanged += OnSessionPropertyChanged;
 
         Git = new(settings, dialogs, logger);

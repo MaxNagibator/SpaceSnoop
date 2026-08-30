@@ -8,9 +8,12 @@ internal sealed class FakeUiTimer(TimeSpan interval, Action tick) : IUiTimer
 
     public bool IsRunning { get; private set; }
 
+    public int Starts { get; private set; }
+
     public void Start()
     {
         IsRunning = true;
+        Starts++;
     }
 
     public void Stop()
