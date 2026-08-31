@@ -1,4 +1,6 @@
-﻿namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
+﻿using System.Diagnostics;
+
+namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
 
 internal readonly record struct DeleteTick(
     int Index,
@@ -8,12 +10,21 @@ internal readonly record struct DeleteTick(
     int Completed,
     int Failed);
 
+internal readonly record struct DeleteChunkProgress(
+    bool Running,
+    int Ordinal,
+    int Total,
+    int FirstIndex,
+    int LastIndex,
+    long StartedTimestamp);
+
 internal readonly record struct DeleteProgressSnapshot(
     IReadOnlyList<DeleteTick> Updates,
     int CurrentIndex,
     long Freed,
     int Completed,
-    int Failed);
+    int Failed,
+    DeleteChunkProgress Chunk);
 
 internal sealed class DeleteProgressState
 {
@@ -26,6 +37,7 @@ internal sealed class DeleteProgressState
     private long _freed;
     private int _completed;
     private int _failed;
+    private DeleteChunkProgress _chunk;
 
     public DeleteProgressState(int capacity)
     {
@@ -60,13 +72,34 @@ internal sealed class DeleteProgressState
         }
     }
 
+    public void ReportChunkStarted(DeleteChunkInfo chunk)
+    {
+        if ((uint)chunk.FirstIndex >= (uint)_pending.Length || (uint)chunk.LastIndex >= (uint)_pending.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(chunk));
+        }
+
+        lock (_gate)
+        {
+            _chunk = new(true, chunk.Ordinal, chunk.Total, chunk.FirstIndex, chunk.LastIndex, Stopwatch.GetTimestamp());
+        }
+    }
+
+    public void ReportChunkFinished()
+    {
+        lock (_gate)
+        {
+            _chunk = _chunk with { Running = false };
+        }
+    }
+
     public DeleteProgressSnapshot CreateSnapshot()
     {
         lock (_gate)
         {
             if (_queue.Count == 0)
             {
-                return new([], _currentIndex, _freed, _completed, _failed);
+                return new([], _currentIndex, _freed, _completed, _failed, _chunk);
             }
 
             var updates = new DeleteTick[_queue.Count];
@@ -78,7 +111,7 @@ internal sealed class DeleteProgressState
                 updates[position++] = _pending[index];
             }
 
-            return new(updates, _currentIndex, _freed, _completed, _failed);
+            return new(updates, _currentIndex, _freed, _completed, _failed, _chunk);
         }
     }
 }

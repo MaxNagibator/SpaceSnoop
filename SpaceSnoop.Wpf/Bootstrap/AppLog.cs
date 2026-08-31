@@ -75,8 +75,8 @@ internal static partial class AppLog
     public static partial void MftSkippedForSubdirectory(this ILogger logger, string path);
 
     [LoggerMessage(EventId = 1100, Level = LogLevel.Information,
-        Message = "Старт удаления: {Count} элемент(ов), {BytesText} (безвозвратно: {Permanent})")]
-    public static partial void DeletionStarted(this ILogger logger, int count, string bytesText, bool permanent);
+        Message = "Старт удаления {Run}: {Count} элемент(ов), {BytesText} (безвозвратно: {Permanent})")]
+    public static partial void DeletionStarted(this ILogger logger, string run, int count, string bytesText, bool permanent);
 
     [LoggerMessage(EventId = 1101, Level = LogLevel.Warning, Message = "Не удалось удалить: {Path}")]
     public static partial void DeleteItemFailed(this ILogger logger, Exception exception, string path);
@@ -85,11 +85,27 @@ internal static partial class AppLog
     public static partial void DeleteItemMissing(this ILogger logger, string path);
 
     [LoggerMessage(EventId = 1103, Level = LogLevel.Information,
-        Message = "Удаление завершено (отменено: {Cancelled}): успешно {Deleted}, ошибок {Failed}, освобождено {FreedText}")]
-    public static partial void DeletionFinished(this ILogger logger, bool cancelled, int deleted, int failed, string freedText);
+        Message = "Удаление {Run} завершено (отменено: {Cancelled}): успешно {Deleted}, ошибок {Failed}, освобождено {FreedText}")]
+    public static partial void DeletionFinished(this ILogger logger, string run, bool cancelled, int deleted, int failed, string freedText);
 
     [LoggerMessage(EventId = 1104, Level = LogLevel.Warning, Message = "Журнал удаления не пишется: {Path}")]
     public static partial void DeletionLogWriteFailed(this ILogger logger, Exception exception, string path);
+
+    [LoggerMessage(EventId = 1105, Level = LogLevel.Debug,
+        Message = "Удаление {Run}: пачка {Ordinal} из {Total} начата, объекты {Range}")]
+    public static partial void DeleteChunkStarted(this ILogger logger, string run, int ordinal, int total, string range);
+
+    [LoggerMessage(EventId = 1106, Level = LogLevel.Debug,
+        Message = "Удаление {Run}: пачка {Ordinal} из {Total} закончена за {ElapsedMs} мс, объекты {Range} (по одному: {Retried})")]
+    public static partial void DeleteChunkFinished(this ILogger logger, string run, int ordinal, int total, string range, long elapsedMs, bool retried);
+
+    [LoggerMessage(EventId = 1107, Level = LogLevel.Warning,
+        Message = "Удаление {Run}: пачка {Ordinal} из {Total} шла {ElapsedMs} мс при пороге {ThresholdMs} мс, объекты {Range}")]
+    public static partial void DeleteChunkSlow(this ILogger logger, string run, int ordinal, int total, string range, long elapsedMs, int thresholdMs);
+
+    [LoggerMessage(EventId = 1108, Level = LogLevel.Error,
+        Message = "Удаление {Run} прервано ошибкой на {Processed} из {Count} объект(ов)")]
+    public static partial void DeletionFailed(this ILogger logger, Exception exception, string run, int processed, int count);
 
     [LoggerMessage(EventId = 1200, Level = LogLevel.Information, Message = "Сравнение начато: «{Left}» ↔ «{Right}»")]
     public static partial void CompareStarted(this ILogger logger, string left, string right);

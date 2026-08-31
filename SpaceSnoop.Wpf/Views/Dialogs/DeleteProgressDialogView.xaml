@@ -42,6 +42,28 @@
                     <Setter Property="Foreground"
                             Value="{DynamicResource Accent.Primary}" />
                 </DataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding State}"
+                                   Value="Deleting" />
+                        <Condition Binding="{Binding Source={x:Static SystemParameters.ClientAreaAnimation}}"
+                                   Value="True" />
+                    </MultiDataTrigger.Conditions>
+                    <MultiDataTrigger.EnterActions>
+                        <BeginStoryboard x:Name="RowGlyphSpin">
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetProperty="(RenderTransform).(RotateTransform.Angle)"
+                                                 From="0"
+                                                 To="360"
+                                                 Duration="0:0:1.1"
+                                                 RepeatBehavior="Forever" />
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </MultiDataTrigger.EnterActions>
+                    <MultiDataTrigger.ExitActions>
+                        <StopStoryboard BeginStoryboardName="RowGlyphSpin" />
+                    </MultiDataTrigger.ExitActions>
+                </MultiDataTrigger>
                 <DataTrigger Binding="{Binding State}"
                              Value="Done">
                     <Setter Property="Kind"
@@ -98,6 +120,18 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+
+        <Style x:Key="RowError"
+               TargetType="TextBlock">
+            <Setter Property="Margin"
+                    Value="0,1,0,0" />
+            <Setter Property="TextTrimming"
+                    Value="CharacterEllipsis" />
+            <Setter Property="FontSize"
+                    Value="{DynamicResource Font.Size.Caption}" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource State.Error}" />
+        </Style>
     </UserControl.Resources>
 
     <Grid Margin="22">
@@ -143,6 +177,9 @@
             <ItemsControl x:Name="MarkedItems"
                           ItemsSource="{Binding Items}"
                           AutomationProperties.Name="Помеченные объекты"
+                          Focusable="True"
+                          behaviors:ListNavigation.Enabled="True"
+                          behaviors:ListNavigation.FollowIndex="{Binding FollowIndex}"
                           VirtualizingPanel.IsVirtualizing="True"
                           VirtualizingPanel.VirtualizationMode="Recycling">
                 <ItemsControl.Template>
@@ -163,7 +200,7 @@
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <Grid Margin="6,3"
-                              ToolTip="{Binding Path}">
+                              ToolTip="{Binding ToolTipText}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
@@ -171,19 +208,36 @@
                             </Grid.ColumnDefinitions>
 
                             <iconPacks:PackIconLucide Grid.Column="0"
-                                                      Style="{StaticResource RowGlyph}" />
+                                                      Style="{StaticResource RowGlyph}"
+                                                      RenderTransformOrigin="0.5,0.5">
+                                <iconPacks:PackIconLucide.RenderTransform>
+                                    <RotateTransform />
+                                </iconPacks:PackIconLucide.RenderTransform>
+                            </iconPacks:PackIconLucide>
 
                             <Grid Grid.Column="1">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0"
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0"
+                                           Grid.Column="0"
                                            Text="{Binding Name}"
                                            Style="{StaticResource RowPath}" />
-                                <TextBlock Grid.Column="1"
+                                <TextBlock Grid.Row="0"
+                                           Grid.Column="1"
                                            Text="{Binding ParentPath}"
                                            Style="{StaticResource RowParent}" />
+                                <TextBlock Grid.Row="1"
+                                           Grid.Column="0"
+                                           Grid.ColumnSpan="2"
+                                           Text="{Binding ErrorSummary}"
+                                           Style="{StaticResource RowError}"
+                                           Visibility="{Binding ErrorSummary, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
                             </Grid>
 
                             <Grid Grid.Column="2"
@@ -217,7 +271,8 @@
                              Minimum="0"
                              Maximum="1"
                              AutomationProperties.Name="Ход удаления"
-                             Value="{Binding ProgressValue, Mode=OneWay}" />
+                             Value="{Binding ProgressValue, Mode=OneWay}"
+                             IsIndeterminate="{Binding IsChunkStalled, FallbackValue=False}" />
                 <TextBlock Grid.Column="1"
                            Text="{Binding CountText}"
                            AutomationProperties.Name="Удалено объектов"
@@ -233,21 +288,49 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Column="0"
-                           behaviors:PathTrimmer.FullPath="{Binding CurrentPath}"
-                           AutomationProperties.Name="Текущий объект"
-                           TextWrapping="NoWrap"
-                           VerticalAlignment="Center"
-                           Margin="0,0,12,0"
-                           FontFamily="{DynamicResource Font.Mono}"
-                           FontSize="{DynamicResource Font.Size.S}"
-                           Foreground="{DynamicResource Fg.Muted}"
-                           ToolTip="{Binding CurrentPath}"
-                           Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+                <Grid Grid.Column="0"
+                      Margin="0,0,12,0"
+                      Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                    <TextBlock behaviors:PathTrimmer.FullPath="{Binding CurrentPath}"
+                               AutomationProperties.Name="Текущий объект"
+                               TextWrapping="NoWrap"
+                               VerticalAlignment="Center"
+                               FontFamily="{DynamicResource Font.Mono}"
+                               FontSize="{DynamicResource Font.Size.S}"
+                               Foreground="{DynamicResource Fg.Muted}"
+                               ToolTip="{Binding CurrentPath}"
+                               Visibility="{Binding BatchCaption, Converter={StaticResource NullToVisibility}, ConverterParameter=Inverse}" />
+                    <TextBlock Text="{Binding BatchCaption}"
+                               AutomationProperties.Name="Текущая пачка"
+                               AutomationProperties.LiveSetting="Polite"
+                               TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center"
+                               FontFamily="{DynamicResource Font.Sans}"
+                               FontSize="{DynamicResource Font.Size.S}"
+                               Typography.NumeralAlignment="Tabular"
+                               Foreground="{DynamicResource Fg.Muted}"
+                               Visibility="{Binding BatchCaption, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
+                </Grid>
 
-                <StackPanel Grid.Column="1"
+                <TextBlock Grid.Column="1"
+                           Text="{Binding ChunkElapsedText}"
+                           AutomationProperties.Name="Время текущей операции"
+                           AutomationProperties.LiveSetting="Polite"
+                           MinWidth="104"
+                           Margin="0,0,16,0"
+                           TextAlignment="Right"
+                           VerticalAlignment="Center"
+                           FontFamily="{DynamicResource Font.Sans}"
+                           FontSize="{DynamicResource Font.Size.M}"
+                           FontWeight="SemiBold"
+                           Typography.NumeralAlignment="Tabular"
+                           Foreground="{DynamicResource Accent.Primary}"
+                           Visibility="{Binding ChunkElapsedText, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
+
+                <StackPanel Grid.Column="2"
                             Orientation="Horizontal">
                     <TextBlock Text="Освобождено"
                                VerticalAlignment="Center"
@@ -307,7 +390,8 @@
                         Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
                 <Button Style="{StaticResource Button.Secondary}"
                         Command="{Binding CancelRunCommand}"
-                        Content="Отменить удаление"
+                        Content="{Binding CancelCaption}"
+                        ToolTip="{Binding CancelHint}"
                         MinWidth="96"
                         MinHeight="{DynamicResource Control.Height.Default}"
                         Padding="14,6" />

@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System.Diagnostics;
+using System.IO;
 
 namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
 
@@ -6,6 +7,16 @@ internal readonly record struct DeleteBatchCallbacks(
     Func<string, bool> Exists,
     Action<IReadOnlyList<string>> DeleteChunk,
     Action<string> DeleteSingle);
+
+internal readonly record struct DeleteChunkInfo(int Ordinal, int Total, int FirstIndex, int LastIndex);
+
+internal readonly record struct DeleteChunkOutcome(DeleteChunkInfo Chunk, long ElapsedMs, bool RetriedOneByOne);
+
+internal readonly record struct DeleteBatchProgress(
+    Action<int> Starting,
+    Action<DeleteItemResult> Result,
+    Action<DeleteChunkInfo> ChunkStarting,
+    Action<DeleteChunkOutcome> ChunkFinished);
 
 internal readonly record struct DeleteItemResult(int Index, DeleteItemStatus Status, Exception? Failure);
 
@@ -15,12 +26,13 @@ internal static class DeleteBatch
         IReadOnlyList<string> paths,
         int chunkSize,
         in DeleteBatchCallbacks callbacks,
-        Action<int> onStarting,
-        Action<DeleteItemResult> onResult,
+        in DeleteBatchProgress progress,
         CancellationToken token)
     {
         var size = Math.Max(1, chunkSize);
+        var total = (paths.Count + size - 1) / size;
         var pending = new List<int>(size);
+        var ordinal = 0;
 
         for (var start = 0; start < paths.Count; start += size)
         {
@@ -28,27 +40,42 @@ internal static class DeleteBatch
 
             pending.Clear();
             var end = Math.Min(start + size, paths.Count);
+            var chunk = new DeleteChunkInfo(++ordinal, total, start, end - 1);
+            var timestamp = Stopwatch.GetTimestamp();
+            var retried = false;
+            var announced = false;
 
-            for (var index = start; index < end; index++)
+            try
             {
-                onStarting(index);
+                progress.ChunkStarting(chunk);
+                announced = true;
 
-                if (callbacks.Exists(paths[index]))
+                for (var index = start; index < end; index++)
                 {
-                    pending.Add(index);
+                    progress.Starting(index);
+
+                    if (callbacks.Exists(paths[index]))
+                    {
+                        pending.Add(index);
+                    }
+                    else
+                    {
+                        progress.Result(new(index, DeleteItemStatus.Missing, null));
+                    }
                 }
-                else
+
+                if (pending.Count > 0)
                 {
-                    onResult(new(index, DeleteItemStatus.Missing, null));
+                    RunChunk(paths, pending, callbacks, progress.Result, ref retried, token);
                 }
             }
-
-            if (pending.Count == 0)
+            finally
             {
-                continue;
+                if (announced)
+                {
+                    progress.ChunkFinished(new(chunk, ElapsedMilliseconds(timestamp), retried));
+                }
             }
-
-            RunChunk(paths, pending, callbacks, onResult, token);
         }
 
         token.ThrowIfCancellationRequested();
@@ -59,6 +86,7 @@ internal static class DeleteBatch
         List<int> pending,
         in DeleteBatchCallbacks callbacks,
         Action<DeleteItemResult> onResult,
+        ref bool retried,
         CancellationToken token)
     {
         try
@@ -73,6 +101,7 @@ internal static class DeleteBatch
                 return;
             }
 
+            retried = true;
             RetryOneByOne(paths, pending, callbacks, onResult, token);
             return;
         }
@@ -159,5 +188,10 @@ internal static class DeleteBatch
         }
 
         return chunk;
+    }
+
+    private static long ElapsedMilliseconds(long timestamp)
+    {
+        return (long)Stopwatch.GetElapsedTime(timestamp).TotalMilliseconds;
     }
 }
