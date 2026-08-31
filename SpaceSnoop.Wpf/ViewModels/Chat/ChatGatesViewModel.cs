@@ -24,6 +24,10 @@ public sealed partial class ChatGatesViewModel : ObservableObject
     private bool _isDetectingCli;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CliMissingTitle), nameof(CliMissingText), nameof(HasAlternativeCli), nameof(AlternativeCliText), nameof(SwitchToAlternativeText), nameof(ShowInstallHints))]
+    private AgentBackendChoice? _backendChoice;
+
+    [ObservableProperty]
     private ChatPendingNavigation? _pendingNavigation;
 
     internal ChatGatesViewModel(
@@ -49,6 +53,7 @@ public sealed partial class ChatGatesViewModel : ObservableObject
         AgentModel = agentModel;
         Mcp = mcp;
         McpServer = mcpServer;
+        BackendOptions = [.. backends.All.Select(item => new AgentBackendOption(item.Kind, item.DisplayName, DescribeBackend(item)))];
 
         _preferences.PropertyChanged += OnGateSourceChanged;
         Mcp.PropertyChanged += OnGateSourceChanged;
@@ -78,9 +83,42 @@ public sealed partial class ChatGatesViewModel : ObservableObject
 
     public string DetectingCliText => $"Проверяю, установлен ли {Backend.DisplayName}…";
 
-    public string CliMissingTitle => $"{Backend.DisplayName} не найден";
+    public string CliMissingTitle => BackendChoice is { NothingFound: true }
+        ? "CLI агента не найден"
+        : $"{Backend.DisplayName} не найден";
 
-    public string CliMissingText => $"Чат работает через уже установленный на этой машине CLI {Backend.DisplayName} – по вашей подписке, без ключей в настройках. Установите CLI и войдите в свою подписку, затем проверьте снова: {Backend.MissingCliHint}";
+    public string CliMissingText => BackendChoice is { NothingFound: true }
+        ? "Чат работает через уже установленный на этой машине CLI агента – по вашей подписке, без ключей в настройках. Приложение поддерживает три таких CLI и не нашло ни одного. Поставьте любой из них, войдите в свою подписку и проверьте снова:"
+        : $"Чат работает через уже установленный на этой машине CLI {Backend.DisplayName} – по вашей подписке, без ключей в настройках. Установите CLI и войдите в свою подписку, затем проверьте снова: {Backend.MissingCliHint}";
+
+    public bool ShowInstallHints => BackendChoice is { NothingFound: true };
+
+    public string InstallHintsText => string.Join(Environment.NewLine, _backends.All.Select(item => $"{item.DisplayName}: {item.MissingCliHint}"));
+
+    public bool HasAlternativeCli => SuggestedBackend is not null;
+
+    public string AlternativeCliText => SuggestedBackend is { } suggested
+        ? $"На этой машине найден {suggested.DisplayName}. Переключение сменит поставщика модели и начнёт разговор заново.{DescribeShell(suggested)}"
+        : string.Empty;
+
+    public string SwitchToAlternativeText => SuggestedBackend is { } suggested ? $"Переключиться на {suggested.DisplayName}" : string.Empty;
+
+    public IReadOnlyList<AgentBackendOption> BackendOptions { get; }
+
+    public AgentBackendOption SelectedBackendOption
+    {
+        get => BackendOptions.FirstOrDefault(option => option.Kind == _preferences.Backend) ?? BackendOptions[0];
+
+        set
+        {
+            if (value is null || value.Kind == _preferences.Backend)
+            {
+                return;
+            }
+
+            _preferences.Backend = value.Kind;
+        }
+    }
 
     public string ConsentText => $"Текст сообщения и то, что агент запрашивает у инструментов приложения (пути, размеры, результаты сравнения), уходит в CLI {Backend.DisplayName} и дальше поставщику модели – под вашей собственной подпиской, не по ключу приложения.";
 
@@ -97,6 +135,10 @@ public sealed partial class ChatGatesViewModel : ObservableObject
     public string EmptyStateHint => MutationsAllowed ? AgentPersona.MutationsNote : AgentPersona.ReadOnlyNote;
 
     private IAgentBackend Backend => _backends.Current;
+
+    private IAgentBackend? SuggestedBackend => BackendChoice?.Suggested is { } kind
+        ? _backends.All.FirstOrDefault(item => item.Kind == kind)
+        : null;
 
     private bool McpReady => Mcp.Enabled && McpServer.IsRunning && !string.IsNullOrWhiteSpace(Mcp.Token);
 
@@ -149,7 +191,23 @@ public sealed partial class ChatGatesViewModel : ObservableObject
     [RelayCommand]
     private async Task RecheckCliAsync()
     {
+        foreach (var item in _backends.All)
+        {
+            item.InvalidateDetection();
+        }
+
         await DetectCliAsync();
+    }
+
+    [RelayCommand]
+    private void SwitchToAlternative()
+    {
+        if (BackendChoice?.Suggested is not { } suggested)
+        {
+            return;
+        }
+
+        _preferences.Backend = suggested;
     }
 
     [RelayCommand]
@@ -179,21 +237,12 @@ public sealed partial class ChatGatesViewModel : ObservableObject
 
         try
         {
-            AgentCliInfo? info;
-
-            try
-            {
-                info = await Task.Run(backend.Detect, CancellationToken.None);
-            }
-            catch (Exception exception)
-            {
-                _logger.AgentCliDetectionFailed(exception, backend.DisplayName);
-                info = null;
-            }
+            var (info, choice) = await ProbeAsync(backend);
 
             if (generation == _detectGeneration)
             {
                 CliInfo = info;
+                BackendChoice = choice;
             }
 
             if (info is not null && generation == _detectGeneration)
@@ -207,6 +256,37 @@ public sealed partial class ChatGatesViewModel : ObservableObject
             {
                 IsDetectingCli = false;
             }
+        }
+    }
+
+    private async Task<(AgentCliInfo? Cli, AgentBackendChoice? Choice)> ProbeAsync(IAgentBackend backend)
+    {
+        var cli = await Task.Run(() => Detect(backend), CancellationToken.None);
+
+        if (cli is not null)
+        {
+            return (cli, null);
+        }
+
+        var others = _backends.All
+            .Where(item => item.Kind != backend.Kind)
+            .Select(item => Task.Run(() => new AgentBackendProbe(item.Kind, Detect(item)), CancellationToken.None));
+
+        var probes = await Task.WhenAll(others);
+
+        return (null, AgentBackendChoice.From(backend.Kind, [new(backend.Kind, null), .. probes]));
+    }
+
+    private AgentCliInfo? Detect(IAgentBackend backend)
+    {
+        try
+        {
+            return backend.Detect();
+        }
+        catch (Exception exception)
+        {
+            _logger.AgentCliDetectionFailed(exception, backend.DisplayName);
+            return null;
         }
     }
 
@@ -252,6 +332,14 @@ public sealed partial class ChatGatesViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowShellBanner));
         OnPropertyChanged(nameof(ShellNotice));
         OnPropertyChanged(nameof(ShellNoticeShort));
+        OnPropertyChanged(nameof(SelectedBackendOption));
+    }
+
+    private static string DescribeShell(IAgentBackend backend)
+    {
+        return backend.HasBuiltInShell
+            ? $" У CLI {backend.DisplayName} есть собственная оболочка операционной системы, и отключить её нечем: {AgentPersona.Name} может выполнять команды с правами SpaceSnoop."
+            : string.Empty;
     }
 
     private void NotifyGatesChanged()
@@ -262,5 +350,10 @@ public sealed partial class ChatGatesViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowShellBanner));
         OnPropertyChanged(nameof(MutationsAllowed));
         OnPropertyChanged(nameof(EmptyStateHint));
+    }
+
+    private static string DescribeBackend(IAgentBackend backend)
+    {
+        return $"CLI {backend.CliName}. Переключение начнёт разговор заново: идентификатор сессии выдаёт сам CLI, и другому он не подходит.{DescribeShell(backend)}";
     }
 }

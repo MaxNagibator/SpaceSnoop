@@ -71,6 +71,13 @@ public sealed partial class ChatHistoryViewModel : ObservableObject
         ClearHistoryCommand.NotifyCanExecuteChanged();
     }
 
+    internal void DropSession(bool busy)
+    {
+        SessionId = null;
+        SessionDropped = busy;
+        ResumedFromDisk = false;
+    }
+
     internal void LoadHistory()
     {
         if (_historyLoaded)

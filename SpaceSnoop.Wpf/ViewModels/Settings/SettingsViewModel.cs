@@ -15,8 +15,6 @@ public sealed record EnumOption<T>(T Value, string Label) where T : struct, Enum
 
 public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
 {
-    private static readonly AgentBackendKind[] AgentBackendOrder = [AgentBackendKind.Claude, AgentBackendKind.Codex, AgentBackendKind.OpenCode];
-
     private readonly ISettingsStore _settings;
     private readonly IDialogService _dialogs;
     private readonly AgentBackends _agentBackends;
@@ -120,23 +118,29 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
 
     public int SelectedAgentBackendIndex
     {
-        get => Array.IndexOf(AgentBackendOrder, Agent.Backend);
+        get => AgentBackendChoice.Order.IndexOf(Agent.Backend);
         set
         {
-            if (value < 0 || value >= AgentBackendOrder.Length || AgentBackendOrder[value] == Agent.Backend)
+            if (value < 0 || value >= AgentBackendChoice.Order.Length || AgentBackendChoice.Order[value] == Agent.Backend)
             {
                 return;
             }
 
-            Agent.Backend = AgentBackendOrder[value];
+            Agent.Backend = AgentBackendChoice.Order[value];
             OnPropertyChanged();
             OnPropertyChanged(nameof(AgentCliPathLabel));
             OnPropertyChanged(nameof(AgentShellWarning));
             OnPropertyChanged(nameof(AgentModelHint));
+            OnPropertyChanged(nameof(AgentConsentLabel));
+            OnPropertyChanged(nameof(AgentConsentHint));
         }
     }
 
     public string AgentCliPathLabel => $"Путь к {_agentBackends.Current.CliName}.exe";
+
+    public string AgentConsentLabel => $"Согласие на отправку данных в {_agentBackends.Current.DisplayName} дано";
+
+    public string AgentConsentHint => $"Согласие даётся каждому CLI отдельно. Снимите галку, чтобы отозвать его для {_agentBackends.Current.DisplayName} – чат спросит согласие перед следующим сообщением.";
 
     public string AgentModelHint => _agentBackends.Current.ModelHint;
 
@@ -147,18 +151,15 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     public IReadOnlyList<SegmentOption> McpConnectFormats { get; } =
     [
         new(PackIconLucideKind.Braces, "JSON", "Фрагмент конфигурации MCP-клиента (mcpServers)"),
-        new(PackIconLucideKind.Terminal, "CLI", "Команда Claude Code для добавления сервера"),
+        new(PackIconLucideKind.Bot, "Claude Code", "Команда claude mcp add"),
+        new(PackIconLucideKind.SquareTerminal, "Codex", "Блок для ~/.codex/config.toml"),
+        new(PackIconLucideKind.SquareCode, "OpenCode", "Блок для opencode.json"),
         new(PackIconLucideKind.Link, "Адрес", "Адрес и заголовок для клиента, который спрашивает их формой"),
     ];
 
     public string McpEndpointUrl => $"http://127.0.0.1:{Mcp.Port}{AppDefaults.McpEndpointPath}";
 
-    public string McpConnectSnippet => SelectedMcpFormatIndex switch
-    {
-        1 => $"claude mcp add --transport http spacesnoop {McpEndpointUrl} --header \"Authorization: Bearer {Mcp.Token}\"",
-        2 => $"Адрес: {McpEndpointUrl}{Environment.NewLine}Транспорт: Streamable HTTP{Environment.NewLine}Заголовок: Authorization: Bearer {Mcp.Token}",
-        _ => BuildMcpJson(),
-    };
+    public string McpConnectSnippet => McpConnectSnippets.For(SelectedMcpFormatIndex, McpEndpointUrl, Mcp.Token);
 
     public IReadOnlyList<string> UpdateRepositoryPresets { get; } =
     [
@@ -420,23 +421,6 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     private void CopyMcpConnection()
     {
         _clipboard.TrySetText(McpConnectSnippet);
-    }
-
-    private string BuildMcpJson()
-    {
-        return $$"""
-                 {
-                   "mcpServers": {
-                     "spacesnoop": {
-                       "type": "http",
-                       "url": "{{McpEndpointUrl}}",
-                       "headers": {
-                         "Authorization": "Bearer {{Mcp.Token}}"
-                       }
-                     }
-                   }
-                 }
-                 """;
     }
 
     [RelayCommand]

@@ -146,6 +146,105 @@ public class AgentPreferencesTests
     }
 
     [Test]
+    public void Согласие_одного_бэкенда_не_распространяется_на_другие()
+    {
+        var store = Open();
+
+        _ = new AgentPreferences(store) { Consent = true };
+
+        store.Flush();
+
+        var reopened = new AgentPreferences(Open());
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(reopened.ConsentFor(AgentBackendKind.Claude), Is.True);
+            Assert.That(reopened.ConsentFor(AgentBackendKind.Codex), Is.False);
+            Assert.That(reopened.ConsentFor(AgentBackendKind.OpenCode), Is.False);
+        }
+    }
+
+    [Test]
+    public void Смена_бэкенда_подставляет_его_собственное_согласие()
+    {
+        var store = Open();
+
+        var preferences = new AgentPreferences(store) { Consent = true };
+
+        preferences.Backend = AgentBackendKind.Codex;
+
+        Assert.That(preferences.Consent, Is.False);
+
+        preferences.Consent = true;
+        preferences.Backend = AgentBackendKind.OpenCode;
+
+        Assert.That(preferences.Consent, Is.False);
+
+        preferences.Backend = AgentBackendKind.Claude;
+
+        Assert.That(preferences.Consent, Is.True);
+    }
+
+    [Test]
+    public void Согласие_известно_уже_к_объявлению_смены_бэкенда()
+    {
+        var store = Open();
+
+        var preferences = new AgentPreferences(store) { Consent = true };
+
+        bool? consentAtBackendNotice = null;
+
+        preferences.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(AgentPreferences.Backend))
+            {
+                consentAtBackendNotice = preferences.Consent;
+            }
+        };
+
+        preferences.Backend = AgentBackendKind.Codex;
+
+        Assert.That(consentAtBackendNotice, Is.False);
+    }
+
+    [Test]
+    public void Прежнее_общее_согласие_достаётся_только_Claude()
+    {
+        Seed(store => store.SetValue(SettingsKeys.AgentConsentShared, "true"));
+
+        var first = Open();
+        var preferences = new AgentPreferences(first);
+
+        first.Flush();
+
+        var second = Open();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(preferences.ConsentFor(AgentBackendKind.Claude), Is.True);
+            Assert.That(preferences.ConsentFor(AgentBackendKind.Codex), Is.False);
+            Assert.That(preferences.ConsentFor(AgentBackendKind.OpenCode), Is.False);
+            Assert.That(second.GetStringValue(SettingsKeys.AgentConsentShared), Is.Empty);
+            Assert.That(new AgentPreferences(second).ConsentFor(AgentBackendKind.Claude), Is.True);
+        }
+    }
+
+    [TestCase("true", "true", ExpectedResult = true)]
+    [TestCase("true", "false", ExpectedResult = false)]
+    [TestCase("false", "true", ExpectedResult = false)]
+    [TestCase("false", "false", ExpectedResult = false)]
+    public bool Отзыв_согласия_переживает_встречу_общего_ключа_с_ключом_бэкенда(string shared, string backend)
+    {
+        Seed(store =>
+        {
+            store.SetValue(SettingsKeys.AgentConsentShared, shared);
+            store.SetValue(SettingsKeys.AgentConsent(AgentBackendKind.Claude), backend);
+        });
+
+        return new AgentPreferences(Open()).ConsentFor(AgentBackendKind.Claude);
+    }
+
+    [Test]
     public void Очищенная_модель_не_воскресает_из_прежнего_общего_ключа()
     {
         Seed(store => store.SetValue(SettingsKeys.AgentModelShared, "sonnet"));

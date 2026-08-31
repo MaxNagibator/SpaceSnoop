@@ -78,15 +78,11 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
             uiDispatcher,
             logger,
             () => _cts?.Cancel(),
-            () =>
-            {
-                History.SessionId = null;
-                History.SessionDropped = IsBusy;
-            },
+            () => History.DropSession(IsBusy),
             () =>
             {
                 _cts?.Cancel();
-                History.SessionId = null;
+                History.DropSession(IsBusy);
             });
         Gates.PropertyChanged += OnGatesPropertyChanged;
         Gates.NavigationRequested += OnNavigationRequested;

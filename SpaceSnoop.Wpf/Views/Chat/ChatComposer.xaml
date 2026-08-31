@@ -152,15 +152,16 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
                 <ComboBox Grid.Column="0"
                           Style="{StaticResource Chat.Selector}"
-                          ItemsSource="{Binding Gates.AgentModel.ModelOptions}"
-                          SelectedItem="{Binding Gates.AgentModel.SelectedModel, Mode=TwoWay}"
-                          ToolTip="Модель агента – применяется со следующего сообщения"
-                          AutomationProperties.Name="Модель агента">
+                          ItemsSource="{Binding Gates.BackendOptions}"
+                          SelectedItem="{Binding Gates.SelectedBackendOption, Mode=TwoWay}"
+                          ToolTip="CLI, через который идёт разговор – переключение начнёт его заново"
+                          AutomationProperties.Name="CLI агента">
                     <ComboBox.ItemTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Title}"
@@ -171,13 +172,28 @@
 
                 <ComboBox Grid.Column="1"
                           Style="{StaticResource Chat.Selector}"
+                          ItemsSource="{Binding Gates.AgentModel.ModelOptions}"
+                          SelectedItem="{Binding Gates.AgentModel.SelectedModel, Mode=TwoWay}"
+                          Margin="4,0,0,0"
+                          ToolTip="Модель агента – применяется со следующего сообщения"
+                          AutomationProperties.Name="Модель агента">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Title}"
+                                       ToolTip="{Binding Hint}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+
+                <ComboBox Grid.Column="2"
+                          Style="{StaticResource Chat.Selector}"
                           ItemsSource="{Binding Gates.AgentModel.EffortOptions}"
                           SelectedItem="{Binding Gates.AgentModel.SelectedEffort, Mode=TwoWay}"
                           Margin="4,0,0,0"
                           ToolTip="Глубина рассуждений – чем выше, тем дольше и дороже ответ"
                           AutomationProperties.Name="Глубина рассуждений" />
 
-                <TextBlock Grid.Column="2"
+                <TextBlock Grid.Column="3"
                            Style="{StaticResource TextBlock.Subtle}"
                            FontSize="{DynamicResource Font.Size.S}"
                            HorizontalAlignment="Right"

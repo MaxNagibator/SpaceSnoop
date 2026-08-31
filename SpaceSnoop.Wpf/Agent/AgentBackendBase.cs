@@ -16,9 +16,12 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
 
     private readonly HashSet<Process> _live = [];
 
+    private readonly Lock _cacheGate = new();
+
     private bool _cacheValid;
     private string _cachedForCliPath = string.Empty;
     private AgentCliInfo? _cached;
+    private int _cacheGeneration;
 
     protected AgentBackendBase(AgentPreferences preferences, ILogger logger)
     {
@@ -77,26 +80,49 @@ public abstract class AgentBackendBase : IAgentBackend, IDisposable
     public AgentCliInfo? Detect()
     {
         var overridePath = _preferences.CliPathFor(Kind);
+        int generation;
 
-        if (_cacheValid && _cachedForCliPath == overridePath)
+        lock (_cacheGate)
         {
-            return _cached;
+            if (_cacheValid && _cachedForCliPath == overridePath)
+            {
+                return _cached;
+            }
+
+            generation = ++_cacheGeneration;
         }
 
-        _cached = AgentCli.Detect(AgentCli.ExecutableNames(CliName), overridePath, ExtraDirectories);
-        _cachedForCliPath = overridePath;
-        _cacheValid = true;
+        var detected = AgentCli.Detect(AgentCli.ExecutableNames(CliName), overridePath, ExtraDirectories);
 
-        if (_cached is not null)
+        lock (_cacheGate)
         {
-            _logger.AgentCliDetected(_cached.ExecutablePath, _cached.Version);
+            if (generation == _cacheGeneration)
+            {
+                _cached = detected;
+                _cachedForCliPath = overridePath;
+                _cacheValid = true;
+            }
+        }
+
+        if (detected is not null)
+        {
+            _logger.AgentCliDetected(detected.ExecutablePath, detected.Version);
         }
         else
         {
             _logger.AgentCliMissing(DisplayName);
         }
 
-        return _cached;
+        return detected;
+    }
+
+    public void InvalidateDetection()
+    {
+        lock (_cacheGate)
+        {
+            _cacheValid = false;
+            _cacheGeneration++;
+        }
     }
 
     public async IAsyncEnumerable<AgentEvent> RunAsync(AgentRequest request, [EnumeratorCancellation] CancellationToken cancellationToken)

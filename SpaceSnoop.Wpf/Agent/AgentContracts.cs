@@ -126,6 +126,8 @@ public interface IAgentBackend
 
     AgentCliInfo? Detect();
 
+    void InvalidateDetection();
+
     IReadOnlyList<AgentModelOption> LoadModels();
 
     IAsyncEnumerable<AgentEvent> RunAsync(AgentRequest request, CancellationToken cancellationToken);

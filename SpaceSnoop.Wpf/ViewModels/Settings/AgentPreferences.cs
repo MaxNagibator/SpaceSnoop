@@ -34,16 +34,28 @@ public sealed partial class AgentPreferences : ObservableObject
         _settings = settings;
 
         _suppressPersist = true;
-        MigrateSharedKeys();
-        Enabled = _settings.GetBool(SettingsKeys.AgentEnabled, AppDefaults.AgentEnabledDefault);
-        Consent = _settings.GetBool(SettingsKeys.AgentConsent, AppDefaults.AgentConsentDefault);
-        HistoryVisible = _settings.GetBool(SettingsKeys.AgentHistoryVisible, AppDefaults.AgentHistoryVisibleDefault);
-        Transcript = _settings.GetBool(SettingsKeys.AgentTranscript, AppDefaults.AgentTranscriptDefault);
-        Backend = _settings.GetEnum(SettingsKeys.AgentBackend, AppDefaults.AgentBackendDefault);
-        Model = ModelFor(Backend);
-        Effort = EffortFor(Backend);
-        CliPath = CliPathFor(Backend);
-        _suppressPersist = false;
+
+        try
+        {
+            MigrateSharedKeys();
+            Enabled = _settings.GetBool(SettingsKeys.AgentEnabled, AppDefaults.AgentEnabledDefault);
+            HistoryVisible = _settings.GetBool(SettingsKeys.AgentHistoryVisible, AppDefaults.AgentHistoryVisibleDefault);
+            Transcript = _settings.GetBool(SettingsKeys.AgentTranscript, AppDefaults.AgentTranscriptDefault);
+            Backend = _settings.GetEnum(SettingsKeys.AgentBackend, AppDefaults.AgentBackendDefault);
+            Consent = ConsentFor(Backend);
+            Model = ModelFor(Backend);
+            Effort = EffortFor(Backend);
+            CliPath = CliPathFor(Backend);
+        }
+        finally
+        {
+            _suppressPersist = false;
+        }
+    }
+
+    public bool ConsentFor(AgentBackendKind kind)
+    {
+        return _settings.GetBool(SettingsKeys.AgentConsent(kind), AppDefaults.AgentConsentDefault);
     }
 
     public string ModelFor(AgentBackendKind kind)
@@ -65,6 +77,22 @@ public sealed partial class AgentPreferences : ObservableObject
     {
         Migrate(SettingsKeys.AgentModelShared, SettingsKeys.AgentModel(AgentBackendKind.Claude));
         Migrate(SettingsKeys.AgentCliPathShared, SettingsKeys.AgentCliPath(AgentBackendKind.Claude));
+        MigrateConsent();
+    }
+
+    private void MigrateConsent()
+    {
+        var sharedKey = SettingsKeys.AgentConsentShared;
+
+        if (string.IsNullOrWhiteSpace(_settings.GetStringValue(sharedKey)))
+        {
+            return;
+        }
+
+        var backendKey = SettingsKeys.AgentConsent(AgentBackendKind.Claude);
+
+        _settings.SetBool(backendKey, _settings.GetBool(sharedKey) && _settings.GetBool(backendKey, true));
+        _settings.SetValue(sharedKey, string.Empty);
     }
 
     private void Migrate(string sharedKey, string backendKey)
@@ -96,7 +124,7 @@ public sealed partial class AgentPreferences : ObservableObject
     {
         if (!_suppressPersist)
         {
-            _settings.SetBool(SettingsKeys.AgentConsent, value);
+            _settings.SetBool(SettingsKeys.AgentConsent(Backend), value);
         }
     }
 
@@ -126,10 +154,18 @@ public sealed partial class AgentPreferences : ObservableObject
         _settings.SetEnum(SettingsKeys.AgentBackend, value);
 
         _suppressPersist = true;
-        Model = ModelFor(value);
-        Effort = EffortFor(value);
-        CliPath = CliPathFor(value);
-        _suppressPersist = false;
+
+        try
+        {
+            Consent = ConsentFor(value);
+            Model = ModelFor(value);
+            Effort = EffortFor(value);
+            CliPath = CliPathFor(value);
+        }
+        finally
+        {
+            _suppressPersist = false;
+        }
     }
 
     partial void OnModelChanged(string value)

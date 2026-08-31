@@ -93,12 +93,12 @@ public static class SettingsKeys
     public const string McpAllowMutations = "wpf.mcp.allow_mutations";
 
     public const string AgentEnabled = "wpf.agent.enabled";
-    public const string AgentConsent = "wpf.agent.consent";
     public const string AgentBackend = "wpf.agent.backend";
     public const string AgentHistoryVisible = $"{AgentPrefix}.history_visible";
     public const string AgentTranscript = $"{AgentPrefix}.transcript";
     public const string AgentModelShared = $"{AgentPrefix}.model";
     public const string AgentCliPathShared = $"{AgentPrefix}.cli_path";
+    public const string AgentConsentShared = $"{AgentPrefix}.consent";
 
     private const string AgentPrefix = "wpf.agent";
 
@@ -122,6 +122,11 @@ public static class SettingsKeys
     public static string AgentEffort(AgentBackendKind backend)
     {
         return $"{AgentPrefix}.{Suffix(backend)}.effort";
+    }
+
+    public static string AgentConsent(AgentBackendKind backend)
+    {
+        return $"{AgentPrefix}.{Suffix(backend)}.consent";
     }
 
     private static string Suffix(AgentBackendKind backend)

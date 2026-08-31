@@ -35,12 +35,12 @@
                       Margin="0,14,0,0"
                       VerticalAlignment="Center" />
 
-            <CheckBox Content="Согласие на отправку данных дано"
+            <CheckBox Content="{Binding AgentConsentLabel}"
                       IsChecked="{Binding Agent.Consent, Mode=TwoWay}"
                       Margin="0,12,0,0"
                       VerticalAlignment="Center" />
             <TextBlock Style="{StaticResource Setting.CheckHint}"
-                       Text="Снимите галку, чтобы отозвать согласие – чат спросит его перед следующим сообщением." />
+                       Text="{Binding AgentConsentHint}" />
 
             <CheckBox Content="Записывать транскрипт хода"
                       IsChecked="{Binding Agent.Transcript, Mode=TwoWay}"
@@ -63,7 +63,7 @@
                      HorizontalAlignment="Left"
                      Margin="0,8,0,0" />
             <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="Модель и путь ниже относятся к выбранному CLI – у каждого свои." />
+                       Text="Согласие выше, модель и путь ниже относятся к выбранному CLI – у каждого свои." />
 
             <StackPanel Visibility="{Binding AgentShellWarning, Converter={StaticResource BoolToVisibility}}">
                 <TextBlock Style="{StaticResource Setting.Hint}"
