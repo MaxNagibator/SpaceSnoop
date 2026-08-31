@@ -10,11 +10,11 @@
       },
       "KeepShell.Testing": {
         "type": "Direct",
-        "requested": "[0.1.96, )",
-        "resolved": "0.1.96",
-        "contentHash": "IeskWTy+ArfBoBcR0S6ybKGPl0pD2Jh8QUtoNLDQ1HvIVtP6muiazbslw7/ojKvzuPYgvPTP3nXY7ffPBeHGIQ==",
+        "requested": "[0.1.105, )",
+        "resolved": "0.1.105",
+        "contentHash": "5Oknq5MWHXCGfKP3QYhiB/xJCz29OzeIumbarC1JtdL+o/MPKMayYv7QGOzvVGJYLIDEyorOLgM7ANoUqbZiOQ==",
         "dependencies": {
-          "KeepShell": "0.1.96"
+          "KeepShell": "0.1.105"
         }
       },
       "Microsoft.NET.Test.Sdk": {
@@ -63,8 +63,8 @@
       },
       "KeepShell": {
         "type": "Transitive",
-        "resolved": "0.1.96",
-        "contentHash": "3SuyrunXzHHJqWSYXRnVdLe9IPAWGVgLilCHZR9nb5HvNDGS75iitSnc92+I5/7D9ZrUtpHl6eY8Xgl9lqxeOg==",
+        "resolved": "0.1.105",
+        "contentHash": "SMdFTFFptJuPp5EMYppDUWnJXVrXqKS4q5rpqGIRgqIxVPVwDfd3bDNR/tpPUwnw9o8bC7ACfc9aEporvOOCfw==",
         "dependencies": {
           "CommunityToolkit.Mvvm": "8.3.2",
           "MahApps.Metro.IconPacks.Lucide": "6.2.1",
@@ -79,18 +79,18 @@
       },
       "KeepShell.Automation": {
         "type": "Transitive",
-        "resolved": "0.1.96",
-        "contentHash": "HR/gWlC856YN3eXS7vUL8/xhncwm0MAicB3MTkmGOEPXCItV27H4lHfH1f/6XK5iaudhspep74DsgTsOLnP1xg==",
+        "resolved": "0.1.105",
+        "contentHash": "/judKFABJ9lWdPTvOfmvEKY2sHzK0QCnkulffLWjlMdGwKF4dWQygHUS3itTOSiPOve6huiME2BRtKNfy3NjIg==",
         "dependencies": {
-          "KeepShell": "0.1.96"
+          "KeepShell": "0.1.105"
         }
       },
       "KeepShell.Themes.Tarkov": {
         "type": "Transitive",
-        "resolved": "0.1.96",
-        "contentHash": "onX9n1WeOQ99dgAdMnxCuKHHKqvEfaOzmdQHtBwqNKmnvvOnEPXgksKtHSNKh6ZOxJeb/6MppEW3DCXRJf1cuQ==",
+        "resolved": "0.1.105",
+        "contentHash": "ZMQKPfkPqeU8FjJDpHwtYfGI9xFNJ/7fd/tbNzCaHg2W752ualwBxaUOAUS8F58Ukn9LYKbzj7ti7vqzYyTSBQ==",
         "dependencies": {
-          "KeepShell": "0.1.96"
+          "KeepShell": "0.1.105"
         }
       },
       "MahApps.Metro.IconPacks.Core": {
@@ -354,15 +354,15 @@
         "type": "Project",
         "dependencies": {
           "CommunityToolkit.Mvvm": "[8.4.2, )",
-          "KeepShell": "[0.1.96, )",
-          "KeepShell.Automation": "[0.1.96, )",
-          "KeepShell.Themes.Tarkov": "[0.1.96, )",
+          "KeepShell": "[0.1.105, )",
+          "KeepShell.Automation": "[0.1.105, )",
+          "KeepShell.Themes.Tarkov": "[0.1.105, )",
           "MahApps.Metro.IconPacks.Lucide": "[6.2.1, )",
           "Microsoft.Extensions.DependencyInjection": "[10.0.9, )",
           "ModelContextProtocol.AspNetCore": "[1.4.1, )",
           "Serilog": "[4.3.1, )",
           "Serilog.Sinks.File": "[6.0.0, )",
-          "SpaceSnoop.Core": "[2.8.64, )",
+          "SpaceSnoop.Core": "[2.8.67, )",
           "Tomlyn": "[2.7.0, )"
         }
       }
