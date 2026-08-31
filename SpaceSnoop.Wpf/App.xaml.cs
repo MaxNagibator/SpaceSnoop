@@ -22,6 +22,7 @@ public partial class App : Application
         {
             LogsDirectory = Path.Combine(AppStorage.DataDirectory, AppStorage.LogsFolderName),
             FileNamePrefix = AppInfo.LogFilePrefix,
+            MinimumLevelOverrides = AppDefaults.LogLevelOverrides,
         });
 
         var syncIndex = Array.FindIndex(e.Args, static arg => string.Equals(arg, AppInfo.SyncArgument, StringComparison.OrdinalIgnoreCase));
@@ -86,6 +87,10 @@ public partial class App : Application
 
             var monitor = _services.GetRequiredService<PerformanceMonitor>();
             monitor.ReportStartup(Stopwatch.GetElapsedTime(startedAt));
+
+            var diagnostics = _services.GetRequiredService<DiagnosticsCollector>();
+            diagnostics.CaptureMachine(MainWindow!);
+            _logging.CreateLogger<MachineProfile>().MachineProfileCaptured(string.Join(" · ", diagnostics.Machine.Describe()));
 
             _services.GetRequiredService<McpServerHost>().Apply();
             monitor.Start();
@@ -179,6 +184,7 @@ public partial class App : Application
         services.AddSingleton<ErrorReportService>();
 
         services.AddSingleton<PerformanceMonitor>();
+        services.AddSingleton<DiagnosticsCollector>();
         services.AddSingleton<PerformanceRunTracker>();
         services.AddSingleton<PerformanceHudViewModel>();
 

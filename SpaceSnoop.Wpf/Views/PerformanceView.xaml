@@ -102,6 +102,28 @@
                             <TextBlock Text="Скопировать сводку" />
                         </StackPanel>
                     </Button>
+
+                    <Button Style="{StaticResource Button.Secondary}"
+                            Command="{Binding SaveDiagnosticsCommand}"
+                            ToolTip="Собрать zip с профилем машины, замерами, просадками, настройками и хвостом журнала – файл, который можно приложить к обращению"
+                            Margin="8,2,0,2"
+                            MinHeight="0"
+                            Height="32"
+                            Padding="10,0">
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FileArchive}"
+                                                      Width="16"
+                                                      Height="16"
+                                                      Margin="0,0,8,0" />
+                            <TextBlock Text="Собрать пакет" />
+                        </StackPanel>
+                    </Button>
+
+                    <CheckBox Content="Пути как есть"
+                              IsChecked="{Binding Preferences.DiagnosticsRawPaths}"
+                              VerticalAlignment="Center"
+                              Margin="12,2,0,2"
+                              ToolTip="По умолчанию из путей в пакете остаются только диск и имя объекта, а имя пользователя и имя машины заменяются. Снимите обезличивание, если разбор упирается в конкретный каталог" />
                 </WrapPanel>
             </Grid>
 

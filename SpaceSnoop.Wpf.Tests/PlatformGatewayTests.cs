@@ -72,7 +72,17 @@ public class PlatformGatewayTests
         var monitor = new PerformanceMonitor(NullLogger<PerformanceMonitor>.Instance);
         var chart = new PerformanceChartViewModel(monitor, settings, new FakeUiDispatcher(), new FakeApplicationLifetime());
 
-        var performance = new PerformanceViewModel(monitor, new(), chart, shellPreferences, new(toasts, shellPreferences), clipboard);
+        var performance = new PerformanceViewModel(
+            monitor,
+            new(),
+            chart,
+            shellPreferences,
+            new(toasts, shellPreferences),
+            clipboard,
+            new(monitor, new(), settings),
+            new NoopDialogs(),
+            new FakeShellLauncher(),
+            NullLogger<PerformanceViewModel>.Instance);
 
         performance.CopySummaryCommand.Execute(null);
 

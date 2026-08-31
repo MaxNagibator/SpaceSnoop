@@ -1,4 +1,6 @@
-﻿using System.Collections.Immutable;
+﻿using KeepShell.Services;
+using System.Collections.Immutable;
+using System.IO;
 
 namespace SpaceSnoop.Wpf.ViewModels;
 
@@ -11,6 +13,14 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
     private readonly ToastNotifier _notifier;
 
     private readonly IClipboardService _clipboard;
+
+    private readonly DiagnosticsCollector _diagnostics;
+
+    private readonly IDialogService _dialogs;
+
+    private readonly IShellLauncher _shell;
+
+    private readonly ILogger<PerformanceViewModel> _logger;
 
     private bool _active;
 
@@ -92,12 +102,20 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
         PerformanceChartViewModel chart,
         ShellPreferences preferences,
         ToastNotifier notifier,
-        IClipboardService clipboard)
+        IClipboardService clipboard,
+        DiagnosticsCollector diagnostics,
+        IDialogService dialogs,
+        IShellLauncher shell,
+        ILogger<PerformanceViewModel> logger)
     {
         _monitor = monitor;
         _runs = runs;
         _notifier = notifier;
         _clipboard = clipboard;
+        _diagnostics = diagnostics;
+        _dialogs = dialogs;
+        _shell = shell;
+        _logger = logger;
 
         Chart = chart;
         Chart.ChartHeight = AppDefaults.PerformanceChartPageHeight;
@@ -160,6 +178,32 @@ public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
         else
         {
             _notifier.Notify("Не удалось скопировать сводку", StatusSeverity.Warning);
+        }
+    }
+
+    [RelayCommand]
+    private void SaveDiagnostics()
+    {
+        try
+        {
+            var rawPaths = Preferences.DiagnosticsRawPaths;
+            var entries = _diagnostics.Build(rawPaths);
+
+            if (!_dialogs.Confirm("Пакет диагностики", DiagnosticsBundle.Describe(entries, !rawPaths) + Environment.NewLine + Environment.NewLine + "Сохранить пакет?"))
+            {
+                return;
+            }
+
+            var path = _diagnostics.Save(entries);
+
+            _logger.DiagnosticsBundleSaved(path, entries.Count, rawPaths ? "как есть" : "обезличены");
+            _notifier.Notify("Пакет диагностики сохранён");
+            _shell.Reveal(path);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            _logger.DiagnosticsBundleFailed(exception);
+            _notifier.Notify("Не удалось собрать пакет диагностики", StatusSeverity.Warning);
         }
     }
 

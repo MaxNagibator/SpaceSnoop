@@ -29,20 +29,35 @@
                              VerticalAlignment="Center"
                              Margin="0,0,9,0"
                              Fill="{DynamicResource Accent.Primary}">
-                        <Ellipse.Triggers>
-                            <EventTrigger RoutedEvent="Ellipse.Loaded">
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                         From="1"
-                                                         To="0.25"
-                                                         Duration="0:0:0.75"
-                                                         AutoReverse="True"
-                                                         RepeatBehavior="Forever" />
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </EventTrigger>
-                        </Ellipse.Triggers>
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsScanning}"
+                                                       Value="True" />
+                                            <Condition Binding="{Binding Enabled, Source={x:Static behaviors:SystemAnimations.Current}}"
+                                                       Value="True" />
+                                        </MultiDataTrigger.Conditions>
+                                        <MultiDataTrigger.EnterActions>
+                                            <BeginStoryboard x:Name="ScanPulseBeat">
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                     From="1"
+                                                                     To="0.25"
+                                                                     Duration="0:0:0.75"
+                                                                     AutoReverse="True"
+                                                                     RepeatBehavior="Forever" />
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </MultiDataTrigger.EnterActions>
+                                        <MultiDataTrigger.ExitActions>
+                                            <StopStoryboard BeginStoryboardName="ScanPulseBeat" />
+                                        </MultiDataTrigger.ExitActions>
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
                     </Ellipse>
                     <TextBlock Text="Сканирование"
                                Style="{StaticResource Caption}"

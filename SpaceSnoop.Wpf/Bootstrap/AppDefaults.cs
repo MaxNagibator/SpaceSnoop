@@ -1,4 +1,5 @@
 ﻿using System.IO.Compression;
+using Serilog.Events;
 
 namespace SpaceSnoop.Wpf.Bootstrap;
 
@@ -136,8 +137,20 @@ public static class AppDefaults
     public const int PerformanceTileColumnsMax = 3;
     public const double ShellBaseFontSize = 14;
 
+    public const int DiagnosticsLogFiles = 2;
+    public const int DiagnosticsLogTailLines = 2000;
+    public const int DiagnosticsHitchRows = 200;
+
+    public const int DiagnosticsNameAttempts = 100;
+
     public const string UpdateRepositoryDefault = AppInfo.RepoSlug;
     public const bool UpdateCheckOnStartupDefault = true;
     public const bool UpdateAutoDownloadDefault = false;
     public const long SelfContainedExeThreshold = 50_000_000;
+
+    public static readonly IReadOnlyDictionary<string, LogEventLevel> LogLevelOverrides = new Dictionary<string, LogEventLevel>
+    {
+        ["SpaceSnoop.Core.DiskSpaceCalculator"] = LogEventLevel.Information,
+        ["SpaceSnoop.Core.DirectoryComparer"] = LogEventLevel.Information,
+    };
 }

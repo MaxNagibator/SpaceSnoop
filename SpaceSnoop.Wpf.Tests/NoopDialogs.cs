@@ -3,9 +3,11 @@ using KeepShell.Services.Modal;
 
 namespace SpaceSnoop.Wpf.Tests;
 
-internal sealed class NoopDialogs(bool showResult = false) : IDialogService
+internal sealed class NoopDialogs(bool showResult = false, bool confirmResult = true) : IDialogService
 {
     private readonly bool _showResult = showResult;
+
+    public string? LastConfirmMessage { get; private set; }
 
     public Task<bool> ShowAsync(IDialogViewModel viewModel)
     {
@@ -19,7 +21,9 @@ internal sealed class NoopDialogs(bool showResult = false) : IDialogService
 
     public bool Confirm(string title, string message, bool defaultYes = false)
     {
-        return true;
+        LastConfirmMessage = message;
+
+        return confirmResult;
     }
 
     public bool ConfirmWarning(string title, string message, bool defaultYes = false)

@@ -13,6 +13,7 @@ public static class SettingsKeys
     public const string PerformanceHud = "wpf.perf.hud";
     public const string PerformanceChart = "wpf.perf.chart";
     public const string PerformanceChartWindow = "wpf.perf.chart_window";
+    public const string PerformanceDiagnosticsRawPaths = "wpf.perf.diagnostics_raw_paths";
 
     public const string WindowLeft = "wpf.window.left";
     public const string WindowTop = "wpf.window.top";

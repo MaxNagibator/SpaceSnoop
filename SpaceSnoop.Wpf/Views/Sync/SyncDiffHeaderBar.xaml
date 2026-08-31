@@ -93,7 +93,8 @@
             <Grid Grid.Column="0"
                   Width="240"
                   HorizontalAlignment="Left">
-                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                <TextBox x:Name="SyncSearchBox"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged, Delay=200}"
                          Style="{StaticResource TextBox.IconField}"
                          Tag="{x:Static iconPacks:PackIconLucideKind.Search}"
                          ToolTip="Фильтр по пути – в дереве оставляет только совпавшие ветки" />
@@ -101,8 +102,22 @@
                            Margin="36,0,8,0"
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource Fg.Muted}"
-                           IsHitTestVisible="False"
-                           Visibility="{Binding SearchTextEmpty, Converter={StaticResource BoolToVisibility}}" />
+                           IsHitTestVisible="False">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock"
+                               BasedOn="{StaticResource {x:Type TextBlock}}">
+                            <Setter Property="Visibility"
+                                    Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Text.Length, ElementName=SyncSearchBox}"
+                                             Value="0">
+                                    <Setter Property="Visibility"
+                                            Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
             </Grid>
 
             <ComboBox Grid.Column="2"
