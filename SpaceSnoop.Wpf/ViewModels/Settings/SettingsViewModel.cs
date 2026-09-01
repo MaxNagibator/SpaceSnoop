@@ -23,6 +23,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     private readonly IApplicationLifetime _lifetime;
     private readonly ToastNotifier _notifier;
     private readonly IReadOnlyDictionary<string, SettingsResetPlan> _resetPlans;
+    private readonly IReadOnlyDictionary<string, SettingsResetField> _resetFields;
     private readonly ILogger<SettingsViewModel> _logger;
 
     [ObservableProperty]
@@ -68,17 +69,28 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         _notifier = notifier;
         _logger = logger;
 
-        _resetPlans = SettingsResetCatalog.Build(theme, shell, scan, operations, update, mcp, agent, settings);
+        _resetPlans = SettingsResetCatalog.Build(theme, shell, scan, operations, update, mcp, agent, settings, ResetField);
         SettingsResetCatalog.EnsureExhaustive(Sections, _resetPlans);
+
+        _resetFields = _resetPlans.Values
+            .SelectMany(plan => plan.Fields)
+            .ToDictionary(field => field.Key, StringComparer.Ordinal);
 
         Theme.PropertyChanged += OnThemePropertyChanged;
         Mcp.PropertyChanged += OnMcpPropertyChanged;
+        Shell.PropertyChanged += OnPreferencesPropertyChanged;
+        Scan.PropertyChanged += OnPreferencesPropertyChanged;
+        Operations.PropertyChanged += OnPreferencesPropertyChanged;
+        Update.PropertyChanged += OnPreferencesPropertyChanged;
+        Agent.PropertyChanged += OnPreferencesPropertyChanged;
 
         Sections.Restore(settings.GetStringValue(SettingsKeys.SettingsSection));
         Sections.PropertyChanged += OnSectionsPropertyChanged;
     }
 
     public IReadOnlyDictionary<string, SettingsResetPlan> ResetPlans => _resetPlans;
+
+    public IReadOnlyDictionary<string, SettingsResetField> ResetFields => _resetFields;
 
     public SettingsSectionList Sections { get; } = CreateSections();
 
@@ -117,12 +129,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
 
     public AgentModelSelector AgentModel { get; }
 
-    public IReadOnlyList<SegmentOption> AgentBackendOptions { get; } =
-    [
-        new(PackIconLucideKind.Bot, "Claude Code", "CLI claude – встроенные инструменты отключаются целиком, у агента только инструменты приложения"),
-        new(PackIconLucideKind.SquareTerminal, "Codex", "CLI codex – помимо инструментов приложения агент получает оболочку системы, отключить её нечем"),
-        new(PackIconLucideKind.SquareCode, "OpenCode", "CLI opencode – работает по локально настроенной авторизации, встроенные инструменты отключены, у агента только инструменты приложения"),
-    ];
+    public IReadOnlyList<SegmentOption> AgentBackendOptions => SettingsOptions.AgentBackends;
 
     public int SelectedAgentBackendIndex
     {
@@ -196,41 +203,15 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         }
     }
 
-    public IReadOnlyList<EnumOption<AppTheme>> ThemeOptions { get; } =
-    [
-        new(AppTheme.Light, "Светлая"),
-        new(AppTheme.Dark, "Тёмная"),
-        new(AppTheme.Tarkov, "Tarkov"),
-    ];
+    public IReadOnlyList<EnumOption<AppTheme>> ThemeOptions => SettingsOptions.Themes;
 
-    public IReadOnlyList<EnumOption<StartupPage>> StartupOptions { get; } =
-    [
-        new(StartupPage.LastUsed, "Последняя активная"),
-        new(StartupPage.Scan, "Сканирование"),
-        new(StartupPage.Sync, "Синхронизация"),
-        new(StartupPage.Logs, "Логи"),
-    ];
+    public IReadOnlyList<EnumOption<StartupPage>> StartupOptions => SettingsOptions.StartupPages;
 
-    public IReadOnlyList<EnumOption<DeleteMode>> DeleteModeOptions { get; } =
-    [
-        new(DeleteMode.RecycleBin, "В корзину"),
-        new(DeleteMode.Permanent, "Безвозвратно"),
-    ];
+    public IReadOnlyList<EnumOption<DeleteMode>> DeleteModeOptions => SettingsOptions.DeleteModes;
 
-    public IReadOnlyList<EnumOption<CompressionLevel>> CompressionOptions { get; } =
-    [
-        new(CompressionLevel.Optimal, "Оптимальное"),
-        new(CompressionLevel.SmallestSize, "Максимальное (медленно)"),
-        new(CompressionLevel.Fastest, "Быстрое"),
-        new(CompressionLevel.NoCompression, "Без сжатия (только упаковка)"),
-    ];
+    public IReadOnlyList<EnumOption<CompressionLevel>> CompressionOptions => SettingsOptions.CompressionLevels;
 
-    public IReadOnlyList<EnumOption<GitFolderPromptChoice>> GitFolderOptions { get; } =
-    [
-        new(GitFolderPromptChoice.Ask, "Спрашивать"),
-        new(GitFolderPromptChoice.Skip, "Всегда пропускать"),
-        new(GitFolderPromptChoice.Keep, "Синхронизировать"),
-    ];
+    public IReadOnlyList<EnumOption<GitFolderPromptChoice>> GitFolderOptions => SettingsOptions.GitFolders;
 
     public EnumOption<AppTheme> SelectedThemeOption
     {
@@ -290,6 +271,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         {
             _settings.SetEnum(SettingsKeys.SyncGitFolders, value.Value);
             OnPropertyChanged();
+            RefreshResetAvailability();
         }
     }
 
@@ -303,6 +285,8 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
 
     private void OnMcpPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        RefreshResetAvailability();
+
         if (e.PropertyName is nameof(McpPreferences.Port) or nameof(McpPreferences.Token))
         {
             OnPropertyChanged(nameof(McpEndpointUrl));
@@ -317,6 +301,8 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
 
     private void OnThemePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        RefreshResetAvailability();
+
         if (e.PropertyName == nameof(ThemeViewModel.Current))
         {
             OnPropertyChanged(nameof(SelectedThemeOption));
@@ -391,13 +377,14 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     [RelayCommand(CanExecute = nameof(CanResetSection))]
     private void ResetSection(string? sectionKey)
     {
-        if (sectionKey is null || !_resetPlans.TryGetValue(sectionKey, out var plan) || plan.Reset is null)
+        if (sectionKey is null || !_resetPlans.TryGetValue(sectionKey, out var plan) || !plan.CanReset)
         {
             return;
         }
 
         plan.Reset();
         NotifyDerivedOptions();
+        RefreshResetAvailability();
 
         var title = Sections[sectionKey].Title;
         _logger.SettingsSectionReset(title, string.Join(", ", plan.Restored));
@@ -407,6 +394,29 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     private bool CanResetSection(string? sectionKey)
     {
         return sectionKey is not null && _resetPlans.TryGetValue(sectionKey, out var plan) && plan.CanReset;
+    }
+
+    private void ResetField(SettingsResetField field)
+    {
+        field.Apply();
+        NotifyDerivedOptions();
+        RefreshResetAvailability();
+
+        _logger.SettingsFieldReset(field.Label, field.DefaultText);
+        _notifier.Notify($"«{field.Label}» вернулось к заводскому значению: {field.DefaultText}.");
+    }
+
+    private void RefreshResetAvailability()
+    {
+        foreach (var field in _resetFields.Values)
+        {
+            field.RefreshAvailability();
+        }
+    }
+
+    private void OnPreferencesPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        RefreshResetAvailability();
     }
 
     private void NotifyDerivedOptions()

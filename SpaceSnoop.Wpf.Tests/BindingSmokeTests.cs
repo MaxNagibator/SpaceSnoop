@@ -12,11 +12,13 @@ using SpaceSnoop.Wpf.Bootstrap.Schedule;
 using SpaceSnoop.Wpf.Bootstrap.Storage;
 using SpaceSnoop.Wpf.ViewModels;
 using SpaceSnoop.Wpf.ViewModels.Cleanup;
+using SpaceSnoop.Wpf.ViewModels.Dialogs;
 using SpaceSnoop.Wpf.ViewModels.Scan;
 using SpaceSnoop.Wpf.ViewModels.Settings;
 using SpaceSnoop.Wpf.ViewModels.Sync;
 using SpaceSnoop.Wpf.Views;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
@@ -317,6 +319,167 @@ public class BindingSmokeTests
         Settle();
 
         Assert.That(_sink.Errors, Is.Not.Empty, "Сенсор ошибок биндинга молчит – остальные проверки этого набора ничего не значат.");
+    }
+
+    [Test]
+    public void Кнопка_сброса_строки_настроек_видна_только_у_изменённого_значения()
+    {
+        Assert.That(_shell.TryNavigate(SectionKey.Settings), Is.True, "Страница «Настройки» не открылась.");
+        Settle();
+
+        var settings = _services.GetRequiredService<SettingsViewModel>();
+        settings.Sections.SelectCommand.Execute(settings.Sections["scan"]);
+        Settle();
+
+        var scan = _services.GetRequiredService<ScanPreferences>();
+        var button = RowResetButton("Сбросить: число параллельных потоков");
+
+        Assert.That(button.Visibility, Is.EqualTo(Visibility.Hidden), "Нетронутая строка показывает кнопку сброса.");
+
+        scan.MaxParallelism = 1;
+        Settle();
+
+        Assert.That(button.Visibility, Is.EqualTo(Visibility.Visible), "Изменённая строка осталась без кнопки сброса: биндинг ResetFields[…] не дошёл до команды.");
+
+        button.Command.Execute(button.CommandParameter);
+        Settle();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(scan.MaxParallelism, Is.EqualTo(scan.ParallelismCeiling), "Нажатие не вернуло настройку к заводскому значению.");
+            Assert.That(button.Visibility, Is.EqualTo(Visibility.Hidden), "Вернувшаяся к умолчанию строка держит кнопку видимой.");
+            Assert.That(button.ActualWidth, Is.GreaterThan(0), "Спрятанная кнопка отдала своё место – строка прыгает при возврате к умолчанию.");
+            Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
+        }
+    }
+
+    [Test]
+    public void Каждая_сбрасываемая_настройка_имеет_кнопку_в_своей_строке()
+    {
+        Assert.That(_shell.TryNavigate(SectionKey.Settings), Is.True, "Страница «Настройки» не открылась.");
+        Settle();
+
+        var names = Descendants<Button>(_window)
+            .Select(AutomationProperties.GetName)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var missing = _services.GetRequiredService<SettingsViewModel>().ResetFields.Values
+            .Where(field => field.Key != SettingsKeys.AgentHistoryVisible)
+            .Where(field => !names.Contains(field.AutomationName))
+            .Select(field => field.Label)
+            .ToArray();
+
+        Assert.That(missing, Is.Empty, $"Настройка сбрасывается разделом, но кнопки в своей строке не получила: {string.Join(", ", missing)}. Заведите её в карточке или объявите исключением здесь.");
+    }
+
+    [Test]
+    public void Кнопка_строки_настроек_сбрасывает_свою_настройку_а_не_соседнюю()
+    {
+        Assert.That(_shell.TryNavigate(SectionKey.Settings), Is.True, "Страница «Настройки» не открылась.");
+        Settle();
+
+        var buttons = RowResetButtons();
+
+        Assert.That(buttons, Is.Not.Empty, "На странице настроек не нашлось ни одной кнопки сброса строки.");
+
+        foreach (var button in buttons)
+        {
+            var box = RowCheckBox(button);
+
+            if (box is null)
+            {
+                continue;
+            }
+
+            var before = buttons.ToDictionary(candidate => candidate, CanReset);
+
+            box.SetCurrentValue(ToggleButton.IsCheckedProperty, !(box.IsChecked ?? false));
+            Settle();
+
+            var flipped = buttons.Where(candidate => CanReset(candidate) != before[candidate]).ToArray();
+
+            box.SetCurrentValue(ToggleButton.IsCheckedProperty, !(box.IsChecked ?? false));
+            Settle();
+
+            Assert.That(flipped, Is.EqualTo(new[] { button }),
+                $"Правка строки «{box.Content}» отозвалась не на своей кнопке: {string.Join(", ", flipped.Select(AutomationProperties.GetName))}. Кнопка привязана к чужой настройке.");
+        }
+    }
+
+    [Test]
+    public void Правка_настройки_мимо_страницы_поднимает_кнопку_сброса_при_возврате()
+    {
+        var store = _services.GetRequiredService<ISettingsStore>();
+
+        Assert.That(_shell.TryNavigate(SectionKey.Settings), Is.True, "Страница «Настройки» не открылась.");
+        Settle();
+
+        var settings = _services.GetRequiredService<SettingsViewModel>();
+        settings.Sections.SelectCommand.Execute(settings.Sections["sync"]);
+        Settle();
+
+        Assert.That(RowResetButton("Сбросить: git-папки").Visibility, Is.EqualTo(Visibility.Hidden), "Политика git-папок не на умолчании – проверять нечего.");
+
+        try
+        {
+            store.SetEnum(SettingsKeys.SyncGitFolders, GitFolderPromptChoice.Skip);
+
+            Assert.That(_shell.TryNavigate(SectionKey.Scan), Is.True, "Страница «Сканирование» не открылась.");
+            Settle();
+
+            Assert.That(_shell.TryNavigate(SectionKey.Settings), Is.True, "Страница «Настройки» не открылась второй раз.");
+            Settle();
+
+            Assert.That(RowResetButton("Сбросить: git-папки").Visibility, Is.EqualTo(Visibility.Visible),
+                "Настройку правит и страница синхронизации, мимо холдеров; вернувшаяся страница настроек не пересчитала доступность сброса.");
+        }
+        finally
+        {
+            store.SetEnum(SettingsKeys.SyncGitFolders, AppDefaults.SyncGitFoldersDefault);
+            (_window.DataContext as ShellViewModel)?.ToString();
+        }
+    }
+
+    private static bool CanReset(Button button)
+    {
+        return button.Command?.CanExecute(null) ?? false;
+    }
+
+    private static CheckBox? RowCheckBox(Button button)
+    {
+        return VisualTreeHelper.GetParent(button) is DependencyObject row
+            ? Descendants<CheckBox>(row).FirstOrDefault()
+            : null;
+    }
+
+    private Button[] RowResetButtons()
+    {
+        return [.. Descendants<Button>(_window).Where(button => AutomationProperties.GetName(button).StartsWith("Сбросить: ", StringComparison.Ordinal))];
+    }
+
+    private Button RowResetButton(string automationName)
+    {
+        return Descendants<Button>(_window).FirstOrDefault(button => AutomationProperties.GetName(button) == automationName)
+               ?? throw new InvalidOperationException($"Кнопка сброса строки «{automationName}» не найдена на странице настроек.");
+    }
+
+    private static IEnumerable<T> Descendants<T>(DependencyObject root)
+        where T : DependencyObject
+    {
+        if (root is T match)
+        {
+            yield return match;
+        }
+
+        var count = VisualTreeHelper.GetChildrenCount(root);
+
+        for (var index = 0; index < count; index++)
+        {
+            foreach (var found in Descendants<T>(VisualTreeHelper.GetChild(root, index)))
+            {
+                yield return found;
+            }
+        }
     }
 
     private static T? Descendant<T>(DependencyObject root)

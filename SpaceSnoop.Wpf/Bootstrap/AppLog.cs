@@ -240,6 +240,9 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1406, Level = LogLevel.Information, Message = "Раздел настроек «{Section}» сброшен к умолчанию: {Restored}")]
     public static partial void SettingsSectionReset(this ILogger logger, string section, string restored);
 
+    [LoggerMessage(EventId = 1407, Level = LogLevel.Information, Message = "Настройка «{Setting}» сброшена к заводскому значению: {Default}")]
+    public static partial void SettingsFieldReset(this ILogger logger, string setting, string @default);
+
     [LoggerMessage(EventId = 1600, Level = LogLevel.Information, Message = "Docker: снимок получен, категорий – {Count}")]
     public static partial void DockerSnapshotLoaded(this ILogger logger, int count);
 

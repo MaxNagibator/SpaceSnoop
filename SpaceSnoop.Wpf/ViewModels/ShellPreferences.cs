@@ -29,21 +29,6 @@ public sealed partial class ShellPreferences : ShellPreferencesBase
         SuppressPersist = false;
     }
 
-    public void ResetAppearanceToDefaults()
-    {
-        ShowPageHeader = AppDefaults.ShowPageHeaderDefault;
-        EnableToastNotifications = AppDefaults.ToastNotificationsDefault;
-        FontScale = FontScaleManager.DefaultScale;
-        ShowPerformanceHud = AppDefaults.PerformanceHudDefault;
-    }
-
-    public void ResetStartupToDefaults()
-    {
-        StartupPage = AppDefaults.StartupPageDefault;
-        NavCollapsed = AppDefaults.NavCollapsedDefault;
-        WarnIfNotAdministrator = AppDefaults.WarnIfNotAdminDefault;
-    }
-
     public string? LastPage
     {
         get => Settings.GetStringValue(SettingsKeys.LastPage);

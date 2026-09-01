@@ -34,10 +34,21 @@
                            Text="Ключи и токены поставщика модели в настройках приложения не хранятся. Сообщение и то, что агент запрашивает у инструментов – пути, размеры, результаты сравнения, – уходит в CLI и дальше поставщику модели под вашей подпиской." />
             </Expander>
 
-            <CheckBox Content="Показывать страницу чата"
-                      IsChecked="{Binding Agent.Enabled, Mode=TwoWay}"
-                      Margin="0,14,0,0"
-                      VerticalAlignment="Center" />
+            <Grid Margin="0,14,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Content="Показывать страницу чата"
+                          IsChecked="{Binding Agent.Enabled, Mode=TwoWay}"
+                          VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.agent.enabled]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
+            </Grid>
 
             <CheckBox Content="{Binding AgentConsentLabel}"
                       IsChecked="{Binding Agent.Consent, Mode=TwoWay}"
@@ -46,10 +57,21 @@
             <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="{Binding AgentConsentHint}" />
 
-            <CheckBox Content="Записывать транскрипт хода"
-                      IsChecked="{Binding Agent.Transcript, Mode=TwoWay}"
-                      Margin="0,12,0,0"
-                      VerticalAlignment="Center" />
+            <Grid Margin="0,12,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Content="Записывать транскрипт хода"
+                          IsChecked="{Binding Agent.Transcript, Mode=TwoWay}"
+                          VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.agent.transcript]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
+            </Grid>
             <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Для разбора странных ответов: ход целиком ложится в logs/chat." />
             <Expander Style="{StaticResource Setting.Details}"
@@ -61,11 +83,25 @@
             <TextBlock Text="CLI"
                        Style="{StaticResource Form.Label}"
                        Margin="0,16,0,0" />
-            <ListBox Style="{StaticResource ListBox.Segmented}"
-                     ItemsSource="{Binding AgentBackendOptions}"
-                     SelectedIndex="{Binding SelectedAgentBackendIndex}"
-                     HorizontalAlignment="Left"
-                     Margin="0,8,0,0" />
+            <Grid Margin="0,8,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ListBox Grid.Column="0"
+                         Style="{StaticResource ListBox.Segmented}"
+                         ItemsSource="{Binding AgentBackendOptions}"
+                         SelectedIndex="{Binding SelectedAgentBackendIndex}"
+                         HorizontalAlignment="Left" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.agent.backend]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}"
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center" />
+            </Grid>
             <TextBlock Style="{StaticResource Form.Hint}"
                        Text="Согласие выше, модель и путь ниже относятся к выбранному CLI – у каждого свои." />
 

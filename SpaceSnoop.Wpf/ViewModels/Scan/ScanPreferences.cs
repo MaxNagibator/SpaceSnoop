@@ -60,17 +60,6 @@ public sealed partial class ScanPreferences : ObservableObject
 
     public bool MftNeedsElevation => MftEnabled && !AdminElevation.IsElevated;
 
-    public void ResetToDefaults()
-    {
-        UseMultithreading = AppDefaults.ScanMultithreadingDefault;
-        MaxParallelism = ParallelismCeiling;
-        MediaAware = AppDefaults.ScanMediaAwareDefault;
-        Intensity = AppDefaults.IntensityDefault;
-        RevealFiles = AppDefaults.ScanRevealFilesDefault;
-        MftEnabled = AppDefaults.ScanMftEnabledDefault;
-        MftRootOnly = AppDefaults.ScanMftRootOnlyDefault;
-    }
-
     public int ResolveParallelism(string path)
     {
         if (!UseMultithreading)

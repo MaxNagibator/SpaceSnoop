@@ -28,6 +28,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="Уровень сжатия .zip"
@@ -49,12 +50,29 @@
                           Width="{StaticResource Setting.ControlWidth}"
                           Margin="16,0,0,0"
                           VerticalAlignment="Center" />
+                <Button Grid.Column="2"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.archive.compression]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
             </Grid>
 
-            <CheckBox Content="После упаковки убирать оригинал в корзину"
-                      IsChecked="{Binding Operations.DeleteOriginalAfterArchive, Mode=TwoWay}"
-                      Margin="0,16,0,0"
-                      VerticalAlignment="Center" />
+            <Grid Margin="0,16,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Content="После упаковки убирать оригинал в корзину"
+                          IsChecked="{Binding Operations.DeleteOriginalAfterArchive, Mode=TwoWay}"
+                          VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.archive.delete_original]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
+            </Grid>
             <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Только после успешной проверки архива и только в корзину – можно восстановить." />
         </StackPanel>

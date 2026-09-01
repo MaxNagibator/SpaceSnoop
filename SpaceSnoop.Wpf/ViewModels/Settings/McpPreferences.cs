@@ -51,13 +51,6 @@ public sealed partial class McpPreferences : ObservableObject
         Token = RandomNumberGenerator.GetHexString(32, true);
     }
 
-    public void ResetToDefaults()
-    {
-        Enabled = AppDefaults.McpEnabledDefault;
-        Port = AppDefaults.McpPortDefault;
-        AllowMutations = AppDefaults.McpAllowMutationsDefault;
-    }
-
     partial void OnEnabledChanged(bool value)
     {
         if (!_suppressPersist)

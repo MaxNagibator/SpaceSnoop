@@ -10,9 +10,9 @@
       },
       "KeepShell": {
         "type": "Direct",
-        "requested": "[0.1.124, )",
-        "resolved": "0.1.124",
-        "contentHash": "T1gRuDOJ/WCSQxfeVfiVMLhvuVECCa6aDiOmUx0rl8d9d7wOquNU7sE4f0Vr7DjLaHHEpWyOp0IDQCCygMb9WQ==",
+        "requested": "[0.1.128, )",
+        "resolved": "0.1.128",
+        "contentHash": "lbcsCkdt9ZnUNWhY14bi6kTL+VnBDKyIK6GmCRPGd4EADd56rvMRNDm22is6elEg6LNfyYfNCjMy4gz+87+2Gw==",
         "dependencies": {
           "CommunityToolkit.Mvvm": "8.3.2",
           "MahApps.Metro.IconPacks.Lucide": "6.2.1",
@@ -27,20 +27,20 @@
       },
       "KeepShell.Automation": {
         "type": "Direct",
-        "requested": "[0.1.124, )",
-        "resolved": "0.1.124",
-        "contentHash": "HTIfAWyrB+Lt9Ti2Tg3OHXLaFelBuspp9/3J3M+t1hXWDTN16ypX4RH+rpkhD8iLPzixPAxwpUsYejeQFczwPA==",
+        "requested": "[0.1.128, )",
+        "resolved": "0.1.128",
+        "contentHash": "h1Hqvkyw0lvWfgrYfUplYoNOR+wFTNylYe2kpn7fsbYvhDxw/V0tVYo5+uF9f8CaKlv0Gd7+AwVOv4O1ZwFoNQ==",
         "dependencies": {
-          "KeepShell": "0.1.124"
+          "KeepShell": "0.1.128"
         }
       },
       "KeepShell.Themes.Tarkov": {
         "type": "Direct",
-        "requested": "[0.1.124, )",
-        "resolved": "0.1.124",
-        "contentHash": "51H2XEcESvB7KOh3+5Q5qx5NAKg8VZizHjTfwpCKTFozy4cJnYhclWxLdM/jjWtv2pLLhiGsli/JfDlg6zdpAw==",
+        "requested": "[0.1.128, )",
+        "resolved": "0.1.128",
+        "contentHash": "tX7cjzQf+I6KOa8gMdfiVK3xeTP6blTlFeJNmmumSrl+251tjoD2Vj1W3SECemJ5IvSXVEa5kj39/g4WLXs8xA==",
         "dependencies": {
-          "KeepShell": "0.1.124"
+          "KeepShell": "0.1.128"
         }
       },
       "MahApps.Metro.IconPacks.Lucide": {

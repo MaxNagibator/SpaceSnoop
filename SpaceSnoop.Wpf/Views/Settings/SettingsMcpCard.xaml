@@ -57,15 +57,37 @@
                            Text="Через сервер агент читает состояние приложения и профили, сравнивает каталоги и открывает страницу «Синхронизация» с нужными путями. Подключаются любые MCP-клиенты – формат строки подключения ниже." />
             </Expander>
 
-            <CheckBox Content="Включить сервер"
-                      IsChecked="{Binding Mcp.Enabled, Mode=TwoWay}"
-                      Margin="0,14,0,0"
-                      VerticalAlignment="Center" />
+            <Grid Margin="0,14,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Content="Включить сервер"
+                          IsChecked="{Binding Mcp.Enabled, Mode=TwoWay}"
+                          VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.mcp.enabled]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
+            </Grid>
 
-            <CheckBox Content="Разрешить изменяющие операции"
-                      IsChecked="{Binding Mcp.AllowMutations, Mode=TwoWay}"
-                      Margin="0,12,0,0"
-                      VerticalAlignment="Center" />
+            <Grid Margin="0,12,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Content="Разрешить изменяющие операции"
+                          IsChecked="{Binding Mcp.AllowMutations, Mode=TwoWay}"
+                          VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.mcp.allow_mutations]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
+            </Grid>
             <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Без галки агент только читает и открывает страницы." />
             <Expander Style="{StaticResource Setting.Details}"
@@ -77,12 +99,26 @@
             <TextBlock Text="Порт"
                        Style="{StaticResource Form.Label}"
                        Margin="0,16,0,0" />
-            <TextBox Style="{StaticResource TextBox.Form}"
-                     Text="{Binding Mcp.Port, UpdateSourceTrigger=LostFocus}"
-                     FontFamily="{DynamicResource Font.Mono}"
-                     Width="120"
-                     HorizontalAlignment="Left"
-                     Margin="0,8,0,0" />
+            <Grid Margin="0,8,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0"
+                         Style="{StaticResource TextBox.Form}"
+                         Text="{Binding Mcp.Port, UpdateSourceTrigger=LostFocus}"
+                         FontFamily="{DynamicResource Font.Mono}"
+                         Width="120"
+                         HorizontalAlignment="Left" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.mcp.port]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}"
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center" />
+            </Grid>
 
             <TextBlock Text="Токен доступа"
                        Style="{StaticResource Form.Label}"

@@ -24,16 +24,39 @@
                             keepshell:Form.ResetCommandParameter="sync"
                             keepshell:Form.ResetHint="{Binding ResetPlans[sync].Hint}">
         <StackPanel>
-            <CheckBox Content="Автодополнение путей"
-                      IsChecked="{Binding Operations.SyncPathSuggest, Mode=TwoWay}"
-                      VerticalAlignment="Center" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Content="Автодополнение путей"
+                          IsChecked="{Binding Operations.SyncPathSuggest, Mode=TwoWay}"
+                          VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.sync.path_suggest]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
+            </Grid>
             <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Подсказывает существующие каталоги при вводе пути; перебор – стрелками ↑/↓." />
 
-            <CheckBox Content="Затираемый файл – в корзину"
-                      IsChecked="{Binding Operations.RecycleOverwritten, Mode=TwoWay}"
-                      VerticalAlignment="Center"
-                      Margin="0,16,0,0" />
+            <Grid Margin="0,16,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Content="Затираемый файл – в корзину"
+                          IsChecked="{Binding Operations.RecycleOverwritten, Mode=TwoWay}"
+                          VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.sync.recycle_overwritten]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
+            </Grid>
             <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Перед перезаписью прежняя версия файла на приёмнике уходит в корзину – её можно вернуть." />
             <Expander Style="{StaticResource Setting.Details}"
@@ -45,6 +68,7 @@
             <Grid Margin="0,16,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
@@ -67,6 +91,12 @@
                           Width="{StaticResource Setting.ControlWidth}"
                           Margin="16,0,0,0"
                           VerticalAlignment="Center" />
+                <Button Grid.Column="2"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.sync.git_folders]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
             </Grid>
 
             <TextBlock Text="Исключения по умолчанию"

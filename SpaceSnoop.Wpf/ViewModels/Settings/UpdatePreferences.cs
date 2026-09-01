@@ -31,12 +31,6 @@ public sealed partial class UpdatePreferences : ObservableObject
         }
     }
 
-    public void ResetToDefaults()
-    {
-        CheckOnStartup = AppDefaults.UpdateCheckOnStartupDefault;
-        AutoDownload = AppDefaults.UpdateAutoDownloadDefault;
-    }
-
     partial void OnRepositoryChanged(string value)
     {
         if (!_suppressPersist)

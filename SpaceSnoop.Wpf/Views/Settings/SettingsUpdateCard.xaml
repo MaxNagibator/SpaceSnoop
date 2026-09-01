@@ -54,15 +54,37 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <CheckBox Content="Проверять обновления при запуске"
-                      IsChecked="{Binding Update.CheckOnStartup, Mode=TwoWay}"
-                      Margin="0,16,0,0"
-                      VerticalAlignment="Center" />
+            <Grid Margin="0,16,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Content="Проверять обновления при запуске"
+                          IsChecked="{Binding Update.CheckOnStartup, Mode=TwoWay}"
+                          VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.update.check]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
+            </Grid>
 
-            <CheckBox Content="Автоматически скачивать новую версию рядом с программой"
-                      IsChecked="{Binding Update.AutoDownload, Mode=TwoWay}"
-                      Margin="0,14,0,0"
-                      VerticalAlignment="Center" />
+            <Grid Margin="0,14,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Content="Автоматически скачивать новую версию рядом с программой"
+                          IsChecked="{Binding Update.AutoDownload, Mode=TwoWay}"
+                          VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.update.auto_download]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
+            </Grid>
             <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Файл не запускается – установка остаётся за вами." />
             <Expander Style="{StaticResource Setting.Details}"

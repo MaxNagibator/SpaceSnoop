@@ -24,15 +24,28 @@
                             keepshell:Form.ResetCommandParameter="delete"
                             keepshell:Form.ResetHint="{Binding ResetPlans[delete].Hint}">
         <StackPanel>
-            <CheckBox Content="Спрашивать подтверждение перед удалением"
-                      IsChecked="{Binding Operations.ConfirmBeforeDelete, Mode=TwoWay}"
-                      VerticalAlignment="Center" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Content="Спрашивать подтверждение перед удалением"
+                          IsChecked="{Binding Operations.ConfirmBeforeDelete, Mode=TwoWay}"
+                          VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.delete.confirm]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
+            </Grid>
             <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Перед переносом помеченных элементов показывать диалог со списком и объёмом." />
 
             <Grid Margin="0,16,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
@@ -50,6 +63,12 @@
                           Width="{StaticResource Setting.ControlWidth}"
                           Margin="16,0,0,0"
                           VerticalAlignment="Center" />
+                <Button Grid.Column="2"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.delete.mode]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
             </Grid>
         </StackPanel>
     </HeaderedContentControl>

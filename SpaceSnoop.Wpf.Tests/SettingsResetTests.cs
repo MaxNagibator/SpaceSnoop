@@ -32,17 +32,13 @@ public class SettingsResetTests
                 store.SetBool(SettingsKeys.EnableToastNotifications, false);
                 store.SetDouble(SettingsKeys.FontScale, 1.4);
                 store.SetBool(SettingsKeys.PerformanceHud, true);
+                store.SetValue(SettingsKeys.Theme, AppThemes.DarkKey);
             },
-            store =>
+            (bench, store) =>
             {
-                var shell = new ShellPreferences(store);
-                shell.ResetAppearanceToDefaults();
+                var shell = bench.Shell;
 
-                return shell;
-            },
-            (holder, store) =>
-            {
-                var shell = (ShellPreferences)holder;
+                Assert.That(store.GetStringValue(SettingsKeys.Theme), Is.EqualTo(AppThemes.LightKey), "Тема осталась прежней: без окна ThemeManager.Apply ничего не делает, и единственный след сброса – ключ в хранилище.");
 
                 Assert.That(shell.ShowPageHeader, Is.EqualTo(AppDefaults.ShowPageHeaderDefault));
                 Assert.That(shell.EnableToastNotifications, Is.EqualTo(AppDefaults.ToastNotificationsDefault));
@@ -62,16 +58,9 @@ public class SettingsResetTests
                 store.SetBool(SettingsKeys.NavCollapsed, true);
                 store.SetBool(SettingsKeys.WarnIfNotAdmin, false);
             },
-            store =>
+            (bench, store) =>
             {
-                var shell = new ShellPreferences(store);
-                shell.ResetStartupToDefaults();
-
-                return shell;
-            },
-            (holder, store) =>
-            {
-                var shell = (ShellPreferences)holder;
+                var shell = bench.Shell;
 
                 Assert.That(shell.StartupPage, Is.EqualTo(AppDefaults.StartupPageDefault));
                 Assert.That(shell.NavCollapsed, Is.EqualTo(AppDefaults.NavCollapsedDefault));
@@ -93,16 +82,9 @@ public class SettingsResetTests
                 store.SetBool(SettingsKeys.ScanMftEnabled, true);
                 store.SetBool(SettingsKeys.ScanMftRootOnly, false);
             },
-            store =>
+            (bench, store) =>
             {
-                var scan = new ScanPreferences(store);
-                scan.ResetToDefaults();
-
-                return scan;
-            },
-            (holder, store) =>
-            {
-                var scan = (ScanPreferences)holder;
+                var scan = bench.Scan;
 
                 Assert.That(scan.UseMultithreading, Is.EqualTo(AppDefaults.ScanMultithreadingDefault));
                 Assert.That(scan.MaxParallelism, Is.EqualTo(scan.ParallelismCeiling));
@@ -127,16 +109,9 @@ public class SettingsResetTests
                 store.SetBool(SettingsKeys.SyncPathSuggest, false);
                 store.SetBool(SettingsKeys.SyncRecycleOverwritten, false);
             },
-            store =>
+            (bench, store) =>
             {
-                var operations = new OperationPreferences(store);
-                operations.ResetSyncToDefaults();
-
-                return operations;
-            },
-            (holder, store) =>
-            {
-                var operations = (OperationPreferences)holder;
+                var operations = bench.Operations;
 
                 Assert.That(operations.SyncPathSuggest, Is.EqualTo(AppDefaults.SyncPathSuggestDefault));
                 Assert.That(operations.RecycleOverwritten, Is.EqualTo(AppDefaults.SyncRecycleOverwrittenDefault));
@@ -151,16 +126,9 @@ public class SettingsResetTests
                 store.SetBool(SettingsKeys.DeleteConfirm, false);
                 store.SetEnum(SettingsKeys.DeleteMode, DeleteMode.Permanent);
             },
-            store =>
+            (bench, store) =>
             {
-                var operations = new OperationPreferences(store);
-                operations.ResetDeleteToDefaults();
-
-                return operations;
-            },
-            (holder, store) =>
-            {
-                var operations = (OperationPreferences)holder;
+                var operations = bench.Operations;
 
                 Assert.That(operations.ConfirmBeforeDelete, Is.EqualTo(AppDefaults.DeleteConfirmDefault));
                 Assert.That(operations.DeleteMode, Is.EqualTo(AppDefaults.DeleteModeDefault));
@@ -175,16 +143,9 @@ public class SettingsResetTests
                 store.SetBool(SettingsKeys.ArchiveDeleteOriginal, false);
                 store.SetEnum(SettingsKeys.ArchiveCompression, CompressionLevel.NoCompression);
             },
-            store =>
+            (bench, store) =>
             {
-                var operations = new OperationPreferences(store);
-                operations.ResetArchiveToDefaults();
-
-                return operations;
-            },
-            (holder, store) =>
-            {
-                var operations = (OperationPreferences)holder;
+                var operations = bench.Operations;
 
                 Assert.That(operations.DeleteOriginalAfterArchive, Is.EqualTo(AppDefaults.ArchiveDeleteOriginalDefault));
                 Assert.That(operations.ArchiveCompression, Is.EqualTo(AppDefaults.ArchiveCompressionDefault));
@@ -199,16 +160,9 @@ public class SettingsResetTests
                 store.SetBool(SettingsKeys.UpdateCheckOnStartup, false);
                 store.SetBool(SettingsKeys.UpdateAutoDownload, true);
             },
-            store =>
+            (bench, store) =>
             {
-                var update = new UpdatePreferences(store);
-                update.ResetToDefaults();
-
-                return update;
-            },
-            (holder, store) =>
-            {
-                var update = (UpdatePreferences)holder;
+                var update = bench.Update;
 
                 Assert.That(update.CheckOnStartup, Is.EqualTo(AppDefaults.UpdateCheckOnStartupDefault));
                 Assert.That(update.AutoDownload, Is.EqualTo(AppDefaults.UpdateAutoDownloadDefault));
@@ -224,16 +178,9 @@ public class SettingsResetTests
                 store.SetInt(SettingsKeys.McpPort, 9123);
                 store.SetBool(SettingsKeys.McpAllowMutations, true);
             },
-            store =>
+            (bench, store) =>
             {
-                var mcp = new McpPreferences(store);
-                mcp.ResetToDefaults();
-
-                return mcp;
-            },
-            (holder, store) =>
-            {
-                var mcp = (McpPreferences)holder;
+                var mcp = bench.Mcp;
 
                 Assert.That(mcp.Enabled, Is.EqualTo(AppDefaults.McpEnabledDefault));
                 Assert.That(mcp.Port, Is.EqualTo(AppDefaults.McpPortDefault));
@@ -252,16 +199,9 @@ public class SettingsResetTests
                 store.SetBool(SettingsKeys.AgentTranscript, true);
                 store.SetEnum(SettingsKeys.AgentBackend, AgentBackendKind.OpenCode);
             },
-            store =>
+            (bench, store) =>
             {
-                var agent = new AgentPreferences(store);
-                agent.ResetToDefaults();
-
-                return agent;
-            },
-            (holder, store) =>
-            {
-                var agent = (AgentPreferences)holder;
+                var agent = bench.Agent;
 
                 Assert.That(agent.Enabled, Is.EqualTo(AppDefaults.AgentEnabledDefault));
                 Assert.That(agent.HistoryVisible, Is.EqualTo(AppDefaults.AgentHistoryVisibleDefault));
@@ -281,11 +221,12 @@ public class SettingsResetTests
         ISettingsStore store = new MemorySettings();
         testCase.Seed(store);
 
-        var holder = testCase.Reset(store);
+        var bench = Build(store);
+        bench.Plans[testCase.Name].Reset();
 
         using (Assert.EnterMultipleScope())
         {
-            testCase.Verify(holder, store);
+            testCase.Verify(bench, store);
         }
     }
 
@@ -297,11 +238,12 @@ public class SettingsResetTests
 
         store.SetInt(SettingsKeys.ScanParallelism, 1);
 
-        var scan = new ScanPreferences(store);
+        var bench = Build(store);
+        var scan = bench.Scan;
 
         Assert.That(scan.MaxParallelism, Is.EqualTo(1), "Затравка не доехала – сбрасывать нечего.");
 
-        scan.ResetToDefaults();
+        bench.Plans["scan"].Reset();
 
         using (Assert.EnterMultipleScope())
         {
@@ -318,7 +260,8 @@ public class SettingsResetTests
 
         store.SetInt(SettingsKeys.ScanParallelism, ceiling * 4);
 
-        var scan = new ScanPreferences(store);
+        var bench = Build(store);
+        var scan = bench.Scan;
 
         using (Assert.EnterMultipleScope())
         {
@@ -326,7 +269,7 @@ public class SettingsResetTests
             Assert.That(store.GetInt(SettingsKeys.ScanParallelism, 0), Is.EqualTo(ceiling), "Кламп конструктора не доехал до хранилища: сброс к тому же числу окажется молчаливым no-op.");
         }
 
-        scan.ResetToDefaults();
+        bench.Plans["scan"].Reset();
 
         using (Assert.EnterMultipleScope())
         {
@@ -365,17 +308,16 @@ public class SettingsResetTests
         store.SetBool(SettingsKeys.AgentConsent(AgentBackendKind.Claude), true);
         store.SetValue(SettingsKeys.AgentEffort(AgentBackendKind.Claude), "xhigh");
 
-        var operations = new OperationPreferences(store);
-        var update = new UpdatePreferences(store);
-        var mcp = new McpPreferences(store);
-        var agent = new AgentPreferences(store);
+        var bench = Build(store);
+        var operations = bench.Operations;
+        var update = bench.Update;
+        var mcp = bench.Mcp;
+        var agent = bench.Agent;
 
-        operations.ResetSyncToDefaults();
-        operations.ResetDeleteToDefaults();
-        operations.ResetArchiveToDefaults();
-        update.ResetToDefaults();
-        mcp.ResetToDefaults();
-        agent.ResetToDefaults();
+        foreach (var plan in bench.Plans.Values)
+        {
+            plan.Reset();
+        }
 
         using (Assert.EnterMultipleScope())
         {
@@ -396,7 +338,7 @@ public class SettingsResetTests
         ISettingsStore store = new MemorySettings();
         store.SetEnum(SettingsKeys.SyncGitFolders, GitFolderPromptChoice.Skip);
 
-        Plans(store)["sync"].Reset!();
+        Build(store).Plans["sync"].Reset();
 
         Assert.That(store.GetEnum(SettingsKeys.SyncGitFolders, GitFolderPromptChoice.Skip), Is.EqualTo(AppDefaults.SyncGitFoldersDefault),
             "Политика git-папок живёт мимо держателей настроек, и сброс раздела о ней забыл.");
@@ -405,7 +347,7 @@ public class SettingsResetTests
     [Test]
     public void Разделу_расположения_данных_сбрасывать_нечего_и_он_об_этом_говорит()
     {
-        var plan = Plans(new MemorySettings())["storage"];
+        var plan = Build(new MemorySettings()).Plans["storage"];
 
         using (Assert.EnterMultipleScope())
         {
@@ -417,7 +359,7 @@ public class SettingsResetTests
     [Test]
     public void Раздел_без_решения_о_сбросе_роняет_сборку_страницы_настроек_а_не_отдаёт_мёртвую_кнопку()
     {
-        var plans = Plans(new MemorySettings());
+        var plans = Build(new MemorySettings()).Plans;
 
         var withNewSection = new SettingsSectionList(
             new SettingsSection("appearance", "Внешний вид", PackIconLucideKind.Palette, string.Empty),
@@ -433,27 +375,173 @@ public class SettingsResetTests
     {
         ISettingsStore store = new MemorySettings();
 
-        Assert.DoesNotThrow(() => SettingsResetCatalog.EnsureExhaustive(SettingsViewModel.CreateSections(), Plans(store)));
+        Assert.DoesNotThrow(() => SettingsResetCatalog.EnsureExhaustive(SettingsViewModel.CreateSections(), Build(store).Plans));
     }
 
-    private static IReadOnlyDictionary<string, SettingsResetPlan> Plans(ISettingsStore store)
+    public static IEnumerable<string> FieldKeys => Build(new MemorySettings()).Fields.Select(entry => entry.Key).ToArray();
+
+    [TestCaseSource(nameof(FieldKeys))]
+    public void Кнопка_строки_молчит_пока_настройка_стоит_на_заводском_значении(string key)
     {
-        return SettingsResetCatalog.Build(
-            new ThemeViewModel(store),
-            new ShellPreferences(store),
-            new ScanPreferences(store),
-            new OperationPreferences(store),
-            new UpdatePreferences(store),
-            new McpPreferences(store),
-            new AgentPreferences(store),
-            store);
+        var field = Build(new MemorySettings()).Field(key);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(field.IsDefault, Is.True, $"Хранилище пустое, а «{field.Label}» считается изменённой: предикат сравнивает не с тем умолчанием.");
+            Assert.That(field.ResetCommand.CanExecute(null), Is.False, $"Строка «{field.Label}» предлагает вернуть значение, которое и так заводское.");
+        }
+    }
+
+    [Test]
+    public void Изменённые_настройки_включают_кнопки_своих_строк()
+    {
+        ISettingsStore store = new MemorySettings();
+        SeedEverything(store);
+
+        var bench = Build(store);
+
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var field in bench.Fields.Where(field => field.Key != SettingsKeys.Theme))
+            {
+                Assert.That(field.ResetCommand.CanExecute(null), Is.True, $"«{field.Label}» изменена, а кнопка её строки спрятана: предикат умолчания не видит правку.");
+            }
+        }
+    }
+
+    [Test]
+    public void Сброс_строки_возвращает_к_умолчанию_только_свою_настройку()
+    {
+        ISettingsStore store = new MemorySettings();
+        SeedEverything(store);
+
+        var bench = Build(store);
+        bench.Field(SettingsKeys.ScanParallelism).ResetCommand.Execute(null);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(bench.Scan.MaxParallelism, Is.EqualTo(bench.Scan.ParallelismCeiling));
+            Assert.That(store.GetInt(SettingsKeys.ScanParallelism, 0), Is.EqualTo(bench.Scan.ParallelismCeiling), "Сброс строки не доехал до хранилища.");
+            Assert.That(bench.Scan.MftEnabled, Is.True, "Сброс одной строки задел соседнюю настройку того же раздела.");
+            Assert.That(bench.Scan.RevealFiles, Is.True, "Сброс одной строки задел соседнюю настройку того же раздела.");
+            Assert.That(bench.Reset.Select(field => field.Key), Is.EqualTo(new[] { SettingsKeys.ScanParallelism }), "Команда строки доложила не о той настройке или сразу о нескольких.");
+        }
+    }
+
+    [Test]
+    public void Каждая_настройка_раздела_сбрасывается_своей_строкой()
+    {
+        ISettingsStore store = new MemorySettings();
+        SeedEverything(store);
+
+        var bench = Build(store);
+
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var plan in bench.Plans.Values)
+            {
+                Assert.That(plan.Restored, Is.EqualTo(plan.Fields.Select(field => field.Label).ToArray()), $"Раздел «{plan.SectionKey}» перечисляет в тосте не то, что сбрасывает.");
+            }
+
+            foreach (var plan in bench.Plans.Values)
+            {
+                plan.Reset();
+            }
+
+            foreach (var field in bench.Fields.Where(field => field.Key != SettingsKeys.Theme))
+            {
+                Assert.That(field.IsDefault, Is.True, $"После сброса всех разделов «{field.Label}» осталась изменённой.");
+            }
+        }
+    }
+
+    private static void SeedEverything(ISettingsStore store)
+    {
+        store.SetBool(SettingsKeys.ShowPageHeader, false);
+        store.SetBool(SettingsKeys.EnableToastNotifications, false);
+        store.SetDouble(SettingsKeys.FontScale, 1.4);
+        store.SetBool(SettingsKeys.PerformanceHud, true);
+        store.SetValue(SettingsKeys.Theme, AppThemes.DarkKey);
+
+        store.SetEnum(SettingsKeys.StartupPage, StartupPage.Logs);
+        store.SetBool(SettingsKeys.NavCollapsed, true);
+        store.SetBool(SettingsKeys.WarnIfNotAdmin, false);
+
+        store.SetBool(SettingsKeys.ScanMultithreading, false);
+        store.SetInt(SettingsKeys.ScanParallelism, 1);
+        store.SetBool(SettingsKeys.ScanMediaAware, false);
+        store.SetDouble(SettingsKeys.ScanIntensity, AppDefaults.IntensityMax);
+        store.SetBool(SettingsKeys.ScanRevealFiles, true);
+        store.SetBool(SettingsKeys.ScanMftEnabled, true);
+        store.SetBool(SettingsKeys.ScanMftRootOnly, false);
+
+        store.SetBool(SettingsKeys.SyncPathSuggest, false);
+        store.SetBool(SettingsKeys.SyncRecycleOverwritten, false);
+        store.SetEnum(SettingsKeys.SyncGitFolders, GitFolderPromptChoice.Skip);
+
+        store.SetBool(SettingsKeys.DeleteConfirm, false);
+        store.SetEnum(SettingsKeys.DeleteMode, DeleteMode.Permanent);
+
+        store.SetBool(SettingsKeys.ArchiveDeleteOriginal, false);
+        store.SetEnum(SettingsKeys.ArchiveCompression, CompressionLevel.NoCompression);
+
+        store.SetBool(SettingsKeys.UpdateCheckOnStartup, false);
+        store.SetBool(SettingsKeys.UpdateAutoDownload, true);
+
+        store.SetBool(SettingsKeys.McpEnabled, true);
+        store.SetInt(SettingsKeys.McpPort, 9123);
+        store.SetBool(SettingsKeys.McpAllowMutations, true);
+
+        store.SetBool(SettingsKeys.AgentEnabled, false);
+        store.SetBool(SettingsKeys.AgentHistoryVisible, true);
+        store.SetBool(SettingsKeys.AgentTranscript, true);
+        store.SetEnum(SettingsKeys.AgentBackend, AgentBackendKind.OpenCode);
+    }
+
+    private static Bench Build(ISettingsStore store)
+    {
+        PackScheme.Ensure();
+
+        var theme = new ThemeViewModel(store);
+        var shell = new ShellPreferences(store);
+        var scan = new ScanPreferences(store);
+        var operations = new OperationPreferences(store);
+        var update = new UpdatePreferences(store);
+        var mcp = new McpPreferences(store);
+        var agent = new AgentPreferences(store);
+        var reset = new List<SettingsResetField>();
+
+        var plans = SettingsResetCatalog.Build(theme, shell, scan, operations, update, mcp, agent, store, field =>
+        {
+            reset.Add(field);
+            field.Apply();
+        });
+
+        return new(shell, scan, operations, update, mcp, agent, plans, reset);
+    }
+
+    public sealed record Bench(
+        ShellPreferences Shell,
+        ScanPreferences Scan,
+        OperationPreferences Operations,
+        UpdatePreferences Update,
+        McpPreferences Mcp,
+        AgentPreferences Agent,
+        IReadOnlyDictionary<string, SettingsResetPlan> Plans,
+        IReadOnlyList<SettingsResetField> Reset)
+    {
+        public IEnumerable<SettingsResetField> Fields => Plans.Values.SelectMany(plan => plan.Fields);
+
+        public SettingsResetField Field(string key)
+        {
+            return Fields.First(field => field.Key == key);
+        }
     }
 
     public sealed record ResetCase(
         string Name,
         Action<ISettingsStore> Seed,
-        Func<ISettingsStore, object> Reset,
-        Action<object, ISettingsStore> Verify)
+        Action<Bench, ISettingsStore> Verify)
     {
         public override string ToString()
         {
