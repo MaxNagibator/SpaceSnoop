@@ -27,10 +27,6 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     [NotifyPropertyChangedFor(nameof(McpConnectSnippet))]
     private int _selectedMcpFormatIndex;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SearchTextEmpty))]
-    private string _searchText = string.Empty;
-
     public SettingsViewModel(
         ThemeViewModel theme,
         ShellPreferences shell,
@@ -86,8 +82,6 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         new SettingsSection("storage", "Файлы и хранение", PackIconLucideKind.Folder, "расположение данных appdata portable settings.toml путь логи журналы"),
         new SettingsSection("mcp", "MCP-сервер", PackIconLucideKind.Plug, "порт токен подключение json cli адрес изменяющие операции агент"),
         new SettingsSection("agent", "Агент-чат", PackIconLucideKind.MessageCircle, "шнырь claude codex opencode cli модель глубина рассуждений транскрипт согласие"));
-
-    public bool SearchTextEmpty => string.IsNullOrWhiteSpace(SearchText);
 
     public ThemeViewModel Theme { get; }
 
@@ -290,23 +284,12 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         }
     }
 
-    partial void OnSearchTextChanged(string value)
-    {
-        Sections.Filter(value);
-    }
-
     private void OnSectionsPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(SettingsSectionList.Selected) && Sections.Selected is not null)
         {
             _settings.SetValue(SettingsKeys.SettingsSection, Sections.Selected.Key);
         }
-    }
-
-    [RelayCommand]
-    private void ClearSearch()
-    {
-        SearchText = string.Empty;
     }
 
     private void OnMcpPropertyChanged(object? sender, PropertyChangedEventArgs e)

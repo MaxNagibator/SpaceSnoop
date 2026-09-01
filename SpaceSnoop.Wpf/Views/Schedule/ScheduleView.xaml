@@ -50,10 +50,10 @@
                     Margin="0,0,0,10">
                 <StackPanel>
                     <TextBlock Text="Как это работает"
-                               Style="{StaticResource Setting.SectionTitle}" />
+                               Style="{StaticResource Form.SectionTitle}" />
                     <TextBlock
                         Text="Каждый профиль – отдельная задача Планировщика Windows, запускающая автосинхронизацию в фоне с собственными каталогами, направлением и временем. «Запустить сейчас» прогоняет профиль немедленно, не дожидаясь расписания."
-                        Style="{StaticResource Setting.Hint}" />
+                        Style="{StaticResource Form.Hint}" />
                 </StackPanel>
             </Border>
 
@@ -121,9 +121,9 @@
                     Visibility="{Binding HasProfiles, Converter={StaticResource InverseBoolToVisibility}}">
                 <StackPanel>
                     <TextBlock Text="Профилей пока нет."
-                               Style="{StaticResource Setting.Label}" />
+                               Style="{StaticResource Form.Label}" />
                     <TextBlock Text="Добавьте профиль, чтобы запланировать автосинхронизацию каталогов."
-                               Style="{StaticResource Setting.Hint}" />
+                               Style="{StaticResource Form.Hint}" />
                 </StackPanel>
             </Border>
 
@@ -141,9 +141,9 @@
                     Margin="0,6,0,10">
                 <StackPanel>
                     <TextBlock Text="История прогонов"
-                               Style="{StaticResource Setting.SectionTitle}" />
+                               Style="{StaticResource Form.SectionTitle}" />
                     <TextBlock Text="Последние записи журнала автосинхронизации (sync-log.txt)."
-                               Style="{StaticResource Setting.Hint}" />
+                               Style="{StaticResource Form.Hint}" />
 
                     <TextBlock Text="Прогонов ещё не было."
                                Style="{StaticResource TextBlock.Subtle}"

@@ -17,12 +17,12 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <HeaderedContentControl Style="{StaticResource Setting.Panel}"
+    <HeaderedContentControl Style="{StaticResource Form.Panel}"
                             Header="{Binding Sections[update].Title}">
         <StackPanel>
             <TextBlock Text="Репозиторий обновлений"
-                       Style="{StaticResource Setting.Label}" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
+                       Style="{StaticResource Form.Label}" />
+            <TextBlock Style="{StaticResource Form.Hint}"
                        Text="Откуда брать релизы, формат owner/repo." />
             <TextBox Style="{StaticResource TextBox.Form}"
                      Text="{Binding Update.Repository, UpdateSourceTrigger=LostFocus}"
@@ -59,7 +59,7 @@
                       IsChecked="{Binding Update.AutoDownload, Mode=TwoWay}"
                       Margin="0,14,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.CheckHint}"
+            <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Файл не запускается – установка остаётся за вами." />
             <Expander Style="{StaticResource Setting.Details}"
                       Header="Что именно скачивается">
@@ -73,7 +73,7 @@
                         Content="Проверить сейчас"
                         Command="{Binding Updater.CheckNowCommand}" />
                 <TextBlock Text="{Binding Updater.CheckStatus}"
-                           Style="{StaticResource Setting.Hint}"
+                           Style="{StaticResource Form.Hint}"
                            Margin="12,0,0,0"
                            VerticalAlignment="Center" />
             </StackPanel>
@@ -84,7 +84,7 @@
                     Visibility="{Binding Updater.HasReleaseNotes, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel>
                     <TextBlock Text="Изменения"
-                               Style="{StaticResource Setting.Label}" />
+                               Style="{StaticResource Form.Label}" />
                     <ScrollViewer MaxHeight="220"
                                   Margin="0,8,0,0"
                                   VerticalScrollBarVisibility="Auto"

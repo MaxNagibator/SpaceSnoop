@@ -17,20 +17,20 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <HeaderedContentControl Style="{StaticResource Setting.Panel}"
+    <HeaderedContentControl Style="{StaticResource Form.Panel}"
                             Header="{Binding Sections[sync].Title}">
         <StackPanel>
             <CheckBox Content="Автодополнение путей"
                       IsChecked="{Binding Operations.SyncPathSuggest, Mode=TwoWay}"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.CheckHint}"
+            <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Подсказывает существующие каталоги при вводе пути; перебор – стрелками ↑/↓." />
 
             <CheckBox Content="Затираемый файл – в корзину"
                       IsChecked="{Binding Operations.RecycleOverwritten, Mode=TwoWay}"
                       VerticalAlignment="Center"
                       Margin="0,16,0,0" />
-            <TextBlock Style="{StaticResource Setting.CheckHint}"
+            <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Перед перезаписью прежняя версия файла на приёмнике уходит в корзину – её можно вернуть." />
             <Expander Style="{StaticResource Setting.Details}"
                       Header="Что будет с прежним файлом">
@@ -45,9 +45,9 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="Git-папки (.git)"
-                               Style="{StaticResource Setting.Label}" />
+                               Style="{StaticResource Form.Label}" />
                     <TextBlock Text="Что делать, если при сравнении найден служебный каталог репозитория."
-                               Style="{StaticResource Setting.Hint}"
+                               Style="{StaticResource Form.Hint}"
                                Margin="0,2,0,0" />
                     <Expander Style="{StaticResource Setting.Details}"
                               Header="Что настройка не меняет">
@@ -66,9 +66,9 @@
             </Grid>
 
             <TextBlock Text="Исключения по умолчанию"
-                       Style="{StaticResource Setting.Label}"
+                       Style="{StaticResource Form.Label}"
                        Margin="0,16,0,0" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
+            <TextBlock Style="{StaticResource Form.Hint}"
                        Text="Glob-паттерны через запятую (напр. bin,obj,*.tmp). Подставляются при пустом поле исключений." />
             <TextBox Style="{StaticResource TextBox.Form}"
                      Text="{Binding Operations.DefaultExclusions, UpdateSourceTrigger=PropertyChanged}"
@@ -76,9 +76,9 @@
                      Margin="0,10,0,0" />
 
             <TextBlock Text="Группировать каталоги (плоский вид)"
-                       Style="{StaticResource Setting.Label}"
+                       Style="{StaticResource Form.Label}"
                        Margin="0,16,0,0" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
+            <TextBlock Style="{StaticResource Form.Hint}"
                        Text="Имена каталогов через запятую (напр. .git,bin,obj). Пусто – без группировки." />
             <Expander Style="{StaticResource Setting.Details}"
                       Header="Как это выглядит в списке">

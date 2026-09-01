@@ -18,16 +18,16 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <HeaderedContentControl Style="{StaticResource Setting.Panel}"
+    <HeaderedContentControl Style="{StaticResource Form.Panel}"
                             Header="{Binding Sections[storage].Title}">
         <StackPanel>
             <TextBlock Text="Расположение данных"
-                       Style="{StaticResource Setting.SectionTitle}" />
+                       Style="{StaticResource Form.SectionTitle}" />
             <CheckBox Content="Хранить файлы приложения в папке AppData"
                       IsChecked="{Binding StoreInAppData, Mode=TwoWay}"
                       Margin="0,12,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.CheckHint}"
+            <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Смена расположения перезапустит приложение." />
             <Expander Style="{StaticResource Setting.Details}"
                       Header="Где лежат файлы">
@@ -40,7 +40,7 @@
                        TextWrapping="Wrap" />
 
             <TextBlock Text="Файл настроек"
-                       Style="{StaticResource Setting.SectionTitle}"
+                       Style="{StaticResource Form.SectionTitle}"
                        Margin="0,20,0,0" />
 
             <Grid>
@@ -54,7 +54,7 @@
                                Style="{StaticResource TextBlock.Mono}"
                                Margin="0,8,0,0"
                                TextWrapping="Wrap" />
-                    <TextBlock Style="{StaticResource Setting.Hint}"
+                    <TextBlock Style="{StaticResource Form.Hint}"
                                Text="Формат TOML, изменения сохраняются автоматически." />
                 </StackPanel>
 

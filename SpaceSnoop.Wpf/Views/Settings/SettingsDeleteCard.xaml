@@ -17,13 +17,13 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <HeaderedContentControl Style="{StaticResource Setting.Panel}"
+    <HeaderedContentControl Style="{StaticResource Form.Panel}"
                             Header="{Binding Sections[delete].Title}">
         <StackPanel>
             <CheckBox Content="Спрашивать подтверждение перед удалением"
                       IsChecked="{Binding Operations.ConfirmBeforeDelete, Mode=TwoWay}"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.CheckHint}"
+            <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Перед переносом помеченных элементов показывать диалог со списком и объёмом." />
 
             <Grid Margin="0,16,0,0">
@@ -33,9 +33,9 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="Куда удалять помеченные элементы"
-                               Style="{StaticResource Setting.Label}" />
+                               Style="{StaticResource Form.Label}" />
                     <TextBlock Text="«Безвозвратно» минует корзину – отменить нельзя."
-                               Style="{StaticResource Setting.Hint}"
+                               Style="{StaticResource Form.Hint}"
                                Margin="0,2,0,0" />
                 </StackPanel>
                 <ComboBox Grid.Column="1"

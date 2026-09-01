@@ -18,13 +18,13 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <HeaderedContentControl Style="{StaticResource Setting.Panel}"
+    <HeaderedContentControl Style="{StaticResource Form.Panel}"
                             Header="{Binding Sections[scan].Title}">
         <StackPanel>
             <CheckBox Content="Многопоточный обход"
                       IsChecked="{Binding Scan.UseMultithreading, Mode=TwoWay}"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.CheckHint}"
+            <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Параллельный обход каталогов – быстрее, но выше расход памяти." />
 
             <Grid Margin="0,16,0,0"
@@ -35,8 +35,8 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="Число параллельных потоков"
-                               Style="{StaticResource Setting.Label}" />
-                    <TextBlock Style="{StaticResource Setting.Hint}"
+                               Style="{StaticResource Form.Label}" />
+                    <TextBlock Style="{StaticResource Form.Hint}"
                                Margin="0,2,0,0"
                                Text="{Binding Scan.ParallelismHint}" />
                 </StackPanel>
@@ -52,7 +52,7 @@
                             Width="{StaticResource Setting.SliderWidth}"
                             VerticalAlignment="Center" />
                     <TextBlock Text="{Binding Scan.MaxParallelism, StringFormat=N0}"
-                               Style="{StaticResource Setting.Value}" />
+                               Style="{StaticResource Form.Value}" />
                 </StackPanel>
             </Grid>
 
@@ -61,7 +61,7 @@
                       Margin="0,16,0,0"
                       IsEnabled="{Binding Scan.UseMultithreading}"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.CheckHint}"
+            <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="На диске со штрафом за позиционирование обход идёт в один поток." />
             <Expander Style="{StaticResource Setting.Details}"
                       Header="Когда обход идёт в один поток">
@@ -73,9 +73,9 @@
                       IsChecked="{Binding Scan.MftEnabled, Mode=TwoWay}"
                       Margin="0,16,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.CheckHint}"
+            <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Вдвое быстрее, и жёсткая ссылка считается один раз, а не под каждым именем." />
-            <TextBlock Style="{StaticResource Setting.CheckHint}"
+            <TextBlock Style="{StaticResource Form.CheckHint}"
                        Foreground="{DynamicResource State.Warning}"
                        Text="Сейчас прав администратора нет, поэтому скан пойдёт обходом каталогов."
                        Visibility="{Binding Scan.MftNeedsElevation, Converter={StaticResource BoolToVisibility}}" />
@@ -90,7 +90,7 @@
                       IsEnabled="{Binding Scan.MftEnabled}"
                       Margin="26,12,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.CheckHint}"
+            <TextBlock Style="{StaticResource Form.CheckHint}"
                        Margin="52,6,0,0"
                        Text="Выбран каталог – скан пойдёт обходом, потому что таблица читается вся, сколько бы ни было в цели." />
             <Expander Style="{StaticResource Setting.Details}"
@@ -107,8 +107,8 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="Интенсивность тепловой подсветки"
-                               Style="{StaticResource Setting.Label}" />
-                    <TextBlock Style="{StaticResource Setting.Hint}"
+                               Style="{StaticResource Form.Label}" />
+                    <TextBlock Style="{StaticResource Form.Hint}"
                                Margin="0,2,0,0"
                                Text="Насколько ярко строка дерева окрашена по доле размера." />
                 </StackPanel>
@@ -124,7 +124,7 @@
                             Width="{StaticResource Setting.SliderWidth}"
                             VerticalAlignment="Center" />
                     <TextBlock Text="{Binding Scan.Intensity, StringFormat=N0}"
-                               Style="{StaticResource Setting.Value}" />
+                               Style="{StaticResource Form.Value}" />
                 </StackPanel>
             </Grid>
 
@@ -132,7 +132,7 @@
                       IsChecked="{Binding Scan.RevealFiles, Mode=TwoWay}"
                       Margin="0,16,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.CheckHint}"
+            <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Выключите, чтобы файл из дерева открывался программой по умолчанию." />
             <Expander Style="{StaticResource Setting.Details}"
                       Header="Что будет, если выключить">

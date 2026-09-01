@@ -18,7 +18,7 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <HeaderedContentControl Style="{StaticResource Setting.Panel}"
+    <HeaderedContentControl Style="{StaticResource Form.Panel}"
                             Header="{Binding Sections[appearance].Title}">
         <StackPanel>
             <Grid>
@@ -28,9 +28,9 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="Тема оформления"
-                               Style="{StaticResource Setting.Label}" />
+                               Style="{StaticResource Form.Label}" />
                     <TextBlock Text="Светлая, тёмная или Tarkov."
-                               Style="{StaticResource Setting.Hint}"
+                               Style="{StaticResource Form.Hint}"
                                Margin="0,2,0,0" />
                 </StackPanel>
                 <ComboBox Grid.Column="1"
@@ -50,9 +50,9 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="Масштаб шрифта"
-                               Style="{StaticResource Setting.Label}" />
+                               Style="{StaticResource Form.Label}" />
                     <TextBlock Text="Размер текста по всему приложению. 100% – стандартный."
-                               Style="{StaticResource Setting.Hint}"
+                               Style="{StaticResource Form.Hint}"
                                Margin="0,2,0,0" />
                 </StackPanel>
                 <StackPanel Grid.Column="1"
@@ -67,7 +67,7 @@
                             Width="{StaticResource Setting.SliderWidth}"
                             VerticalAlignment="Center" />
                     <TextBlock Text="{Binding Shell.FontScale, StringFormat={}{0:P0}}"
-                               Style="{StaticResource Setting.Value}" />
+                               Style="{StaticResource Form.Value}" />
                 </StackPanel>
             </Grid>
 
@@ -75,21 +75,21 @@
                       IsChecked="{Binding Shell.ShowPageHeader, Mode=TwoWay}"
                       Margin="0,16,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.CheckHint}"
+            <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Плашка с названием раздела и описанием над содержимым страницы." />
 
             <CheckBox Content="Показывать всплывающие уведомления"
                       IsChecked="{Binding Shell.EnableToastNotifications, Mode=TwoWay}"
                       Margin="0,14,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.CheckHint}"
+            <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Итоги операций (сканирование, синхронизация, действия агента) в углу окна." />
 
             <CheckBox Content="Показывать производительность в строке состояния"
                       IsChecked="{Binding Shell.ShowPerformanceHud, Mode=TwoWay}"
                       Margin="0,14,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.CheckHint}"
+            <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Отклик интерфейса, память и скорость текущей операции в строке состояния внизу окна." />
         </StackPanel>
     </HeaderedContentControl>

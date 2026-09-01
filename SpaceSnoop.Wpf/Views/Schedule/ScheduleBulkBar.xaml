@@ -17,7 +17,7 @@
 
             <Style x:Key="Bulk.RowLabel"
                    TargetType="TextBlock"
-                   BasedOn="{StaticResource Setting.Label}">
+                   BasedOn="{StaticResource Form.Label}">
                 <Setter Property="VerticalAlignment"
                         Value="Center" />
                 <Setter Property="Margin"
@@ -279,7 +279,7 @@
                            VerticalAlignment="Center"
                            Margin="0,0,10,0"
                            AutomationProperties.LiveSetting="Polite"
-                           Style="{StaticResource Setting.Hint}" />
+                           Style="{StaticResource Form.Hint}" />
                 <Button Style="{StaticResource Button.Ghost}"
                         Command="{Binding CancelRunCommand}"
                         Content="Отменить"
@@ -290,7 +290,7 @@
                        TextWrapping="Wrap">
                 <TextBlock.Style>
                     <Style TargetType="TextBlock"
-                           BasedOn="{StaticResource Setting.Hint}">
+                           BasedOn="{StaticResource Form.Hint}">
                         <Setter Property="Margin"
                                 Value="0,12,0,0" />
                         <Style.Triggers>

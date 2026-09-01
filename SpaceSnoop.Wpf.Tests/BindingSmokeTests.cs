@@ -1,6 +1,7 @@
 ﻿using KeepShell.Bootstrap;
 using KeepShell.Services.Platform;
 using KeepShell.Testing;
+using KeepShell.Views.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using SpaceSnoop.Core;
 using SpaceSnoop.Core.Duplicates;
@@ -12,12 +13,14 @@ using SpaceSnoop.Wpf.Bootstrap.Storage;
 using SpaceSnoop.Wpf.ViewModels;
 using SpaceSnoop.Wpf.ViewModels.Cleanup;
 using SpaceSnoop.Wpf.ViewModels.Scan;
+using SpaceSnoop.Wpf.ViewModels.Settings;
 using SpaceSnoop.Wpf.ViewModels.Sync;
 using SpaceSnoop.Wpf.Views;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
+using System.Windows.Media;
 
 namespace SpaceSnoop.Wpf.Tests;
 
@@ -268,6 +271,44 @@ public class BindingSmokeTests
     }
 
     [Test]
+    public void Возврат_на_настройки_сохраняет_фильтр_разделов()
+    {
+        Assert.That(_shell.TryNavigate(SectionKey.Settings), Is.True, "Страница «Настройки» не открылась.");
+        Settle();
+
+        var rail = Descendant<SettingsRail>(_window) ?? throw new InvalidOperationException("На странице настроек нет рейла разделов.");
+        var sections = _services.GetRequiredService<SettingsViewModel>().Sections;
+
+        try
+        {
+            rail.SetCurrentValue(SettingsRail.SearchTextProperty, "шнырь");
+            Settle();
+
+            Assert.That(_shell.TryNavigate(SectionKey.Scan), Is.True, "Страница «Сканирование» не открылась.");
+            Settle();
+
+            Assert.That(_shell.TryNavigate(SectionKey.Settings), Is.True, "Страница «Настройки» не открылась второй раз.");
+            Settle();
+
+            var reopened = Descendant<SettingsRail>(_window) ?? throw new InvalidOperationException("Вернувшаяся страница настроек осталась без рейла.");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(reopened, Is.Not.SameAs(rail), "Страница вернулась тем же рейлом – регрессию проверять не на чем.");
+                Assert.That(reopened.Sections, Is.SameAs(sections), "Разделы у страницы новые – терять фильтр было негде.");
+                Assert.That(reopened.SearchText, Is.EqualTo("шнырь"), "Новый рейл затёр запрос, который держал список разделов.");
+                Assert.That(sections.Items.Where(section => section.IsVisible).Select(section => section.Key), Is.EqualTo(new[] { "agent" }));
+                Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
+            }
+        }
+        finally
+        {
+            (Descendant<SettingsRail>(_window))?.SetCurrentValue(SettingsRail.SearchTextProperty, string.Empty);
+            Settle();
+        }
+    }
+
+    [Test]
     public void Потерянный_путь_биндинга_виден_тесту()
     {
         var probe = new TextBlock { DataContext = _shell };
@@ -276,6 +317,29 @@ public class BindingSmokeTests
         Settle();
 
         Assert.That(_sink.Errors, Is.Not.Empty, "Сенсор ошибок биндинга молчит – остальные проверки этого набора ничего не значат.");
+    }
+
+    private static T? Descendant<T>(DependencyObject root)
+        where T : DependencyObject
+    {
+        var count = VisualTreeHelper.GetChildrenCount(root);
+
+        for (var index = 0; index < count; index++)
+        {
+            var child = VisualTreeHelper.GetChild(root, index);
+
+            if (child is T found)
+            {
+                return found;
+            }
+
+            if (Descendant<T>(child) is { } nested)
+            {
+                return nested;
+            }
+        }
+
+        return null;
     }
 
     private void Settle()

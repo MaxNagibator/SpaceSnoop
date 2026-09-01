@@ -41,10 +41,10 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <HeaderedContentControl Style="{StaticResource Setting.Panel}"
+    <HeaderedContentControl Style="{StaticResource Form.Panel}"
                             Header="{Binding Sections[mcp].Title}">
         <StackPanel>
-            <TextBlock Style="{StaticResource Setting.Hint}"
+            <TextBlock Style="{StaticResource Form.Hint}"
                        Margin="0"
                        Text="Даёт агенту доступ к запущенному приложению. Слушает только 127.0.0.1 и требует токен." />
             <Expander Style="{StaticResource Setting.Details}"
@@ -62,7 +62,7 @@
                       IsChecked="{Binding Mcp.AllowMutations, Mode=TwoWay}"
                       Margin="0,12,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.CheckHint}"
+            <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Без галки агент только читает и открывает страницы." />
             <Expander Style="{StaticResource Setting.Details}"
                       Header="Какие операции разрешает галка">
@@ -71,7 +71,7 @@
             </Expander>
 
             <TextBlock Text="Порт"
-                       Style="{StaticResource Setting.Label}"
+                       Style="{StaticResource Form.Label}"
                        Margin="0,16,0,0" />
             <TextBox Style="{StaticResource TextBox.Form}"
                      Text="{Binding Mcp.Port, UpdateSourceTrigger=LostFocus}"
@@ -81,7 +81,7 @@
                      Margin="0,8,0,0" />
 
             <TextBlock Text="Токен доступа"
-                       Style="{StaticResource Setting.Label}"
+                       Style="{StaticResource Form.Label}"
                        Margin="0,16,0,0" />
             <Grid Margin="0,8,0,0">
                 <Grid.ColumnDefinitions>
@@ -117,9 +117,9 @@
             </Border>
 
             <TextBlock Text="Подключение"
-                       Style="{StaticResource Setting.Label}"
+                       Style="{StaticResource Form.Label}"
                        Margin="0,16,0,0" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
+            <TextBlock Style="{StaticResource Form.Hint}"
                        Text="MCP поддерживают разные клиенты – выберите формат, который просит ваш." />
             <ListBox ItemsSource="{Binding McpConnectFormats}"
                      SelectedIndex="{Binding SelectedMcpFormatIndex}"
@@ -144,11 +144,11 @@
                     HorizontalAlignment="Left"
                     Margin="0,8,0,0" />
 
-            <TextBlock Style="{StaticResource Setting.Hint}"
+            <TextBlock Style="{StaticResource Form.Hint}"
                        Margin="0,14,0,0"
                        Text="{Binding McpServer.Endpoint, StringFormat=Сервер слушает {0}}"
                        Visibility="{Binding McpServer.Endpoint, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
+            <TextBlock Style="{StaticResource Form.Hint}"
                        Margin="0,14,0,0"
                        Foreground="{DynamicResource State.Error}"
                        Text="{Binding McpServer.LastError}"

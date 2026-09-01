@@ -17,7 +17,7 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <HeaderedContentControl Style="{StaticResource Setting.Panel}"
+    <HeaderedContentControl Style="{StaticResource Form.Panel}"
                             Header="{Binding Sections[archive].Title}">
         <StackPanel>
             <Grid>
@@ -27,9 +27,9 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="Уровень сжатия .zip"
-                               Style="{StaticResource Setting.Label}" />
+                               Style="{StaticResource Form.Label}" />
                     <TextBlock Text="Применяется при «Упаковать в архив»."
-                               Style="{StaticResource Setting.Hint}"
+                               Style="{StaticResource Form.Hint}"
                                Margin="0,2,0,0" />
                     <Expander Style="{StaticResource Setting.Details}"
                               Header="Когда сжатие не помогает">
@@ -51,7 +51,7 @@
                       IsChecked="{Binding Operations.DeleteOriginalAfterArchive, Mode=TwoWay}"
                       Margin="0,16,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.CheckHint}"
+            <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Только после успешной проверки архива и только в корзину – можно восстановить." />
         </StackPanel>
     </HeaderedContentControl>

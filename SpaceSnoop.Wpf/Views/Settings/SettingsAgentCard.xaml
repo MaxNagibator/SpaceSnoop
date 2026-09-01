@@ -18,10 +18,10 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <HeaderedContentControl Style="{StaticResource Setting.Panel}"
+    <HeaderedContentControl Style="{StaticResource Form.Panel}"
                             Header="{Binding Sections[agent].Title}">
         <StackPanel>
-            <TextBlock Style="{StaticResource Setting.Hint}"
+            <TextBlock Style="{StaticResource Form.Hint}"
                        Margin="0"
                        Text="Страница «Чат» говорит с установленным на этой машине CLI по вашей подписке." />
             <Expander Style="{StaticResource Setting.Details}"
@@ -39,14 +39,14 @@
                       IsChecked="{Binding Agent.Consent, Mode=TwoWay}"
                       Margin="0,12,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.CheckHint}"
+            <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="{Binding AgentConsentHint}" />
 
             <CheckBox Content="Записывать транскрипт хода"
                       IsChecked="{Binding Agent.Transcript, Mode=TwoWay}"
                       Margin="0,12,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.CheckHint}"
+            <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Для разбора странных ответов: ход целиком ложится в logs/chat." />
             <Expander Style="{StaticResource Setting.Details}"
                       Header="Что попадает в транскрипт">
@@ -55,18 +55,18 @@
             </Expander>
 
             <TextBlock Text="CLI"
-                       Style="{StaticResource Setting.Label}"
+                       Style="{StaticResource Form.Label}"
                        Margin="0,16,0,0" />
             <ListBox Style="{StaticResource ListBox.Segmented}"
                      ItemsSource="{Binding AgentBackendOptions}"
                      SelectedIndex="{Binding SelectedAgentBackendIndex}"
                      HorizontalAlignment="Left"
                      Margin="0,8,0,0" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
+            <TextBlock Style="{StaticResource Form.Hint}"
                        Text="Согласие выше, модель и путь ниже относятся к выбранному CLI – у каждого свои." />
 
             <StackPanel Visibility="{Binding AgentShellWarning, Converter={StaticResource BoolToVisibility}}">
-                <TextBlock Style="{StaticResource Setting.Hint}"
+                <TextBlock Style="{StaticResource Form.Hint}"
                            Foreground="{DynamicResource State.Warning}"
                            Text="У codex есть собственная оболочка системы, отключить её нечем: агент может выполнять команды с правами приложения." />
                 <Expander Style="{StaticResource Setting.Details}"
@@ -78,7 +78,7 @@
             </StackPanel>
 
             <TextBlock Text="Модель"
-                       Style="{StaticResource Setting.Label}"
+                       Style="{StaticResource Form.Label}"
                        Margin="0,16,0,0" />
             <StackPanel Orientation="Horizontal"
                         Margin="0,8,0,0">
@@ -106,22 +106,22 @@
                                               VerticalAlignment="Center" />
                 </Button>
             </StackPanel>
-            <TextBlock Style="{StaticResource Setting.Hint}"
+            <TextBlock Style="{StaticResource Form.Hint}"
                        Text="{Binding AgentModel.SelectedModel.Hint}" />
 
             <TextBlock Text="Свой слаг модели"
-                       Style="{StaticResource Setting.Label}"
+                       Style="{StaticResource Form.Label}"
                        Margin="0,16,0,0" />
             <TextBox Style="{StaticResource TextBox.Form}"
                      Text="{Binding Agent.Model, UpdateSourceTrigger=LostFocus}"
                      Width="{StaticResource Setting.ControlWidth}"
                      HorizontalAlignment="Left"
                      Margin="0,8,0,0" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
+            <TextBlock Style="{StaticResource Form.Hint}"
                        Text="{Binding AgentModelHint}" />
 
             <TextBlock Text="Глубина рассуждений"
-                       Style="{StaticResource Setting.Label}"
+                       Style="{StaticResource Form.Label}"
                        Margin="0,16,0,0" />
             <ComboBox Style="{StaticResource ComboBox.Form}"
                       ItemsSource="{Binding AgentModel.EffortOptions}"
@@ -130,17 +130,17 @@
                       Width="{StaticResource Setting.ControlWidth}"
                       HorizontalAlignment="Left"
                       Margin="0,8,0,0" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
+            <TextBlock Style="{StaticResource Form.Hint}"
                        Text="Чем выше уровень, тем дольше и дороже ответ. «Уровень CLI» – значение, выбранное в самом CLI." />
 
             <TextBlock Text="{Binding AgentCliPathLabel}"
-                       Style="{StaticResource Setting.Label}"
+                       Style="{StaticResource Form.Label}"
                        Margin="0,16,0,0" />
             <TextBox Style="{StaticResource TextBox.Form}"
                      Text="{Binding Agent.CliPath, UpdateSourceTrigger=LostFocus}"
                      FontFamily="{DynamicResource Font.Mono}"
                      Margin="0,8,0,0" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
+            <TextBlock Style="{StaticResource Form.Hint}"
                        Text="Пусто – найти автоматически в PATH и типичных местах установки." />
         </StackPanel>
     </HeaderedContentControl>
