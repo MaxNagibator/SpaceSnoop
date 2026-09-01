@@ -11,6 +11,7 @@ public partial class SyncForm : Form
     private readonly SyncWorkerService _workerService;
 
     private ComparisonResult? _comparisonResult;
+    private SyncPlanFreshnessState _planState;
     private CancellationTokenSource? _cancellationTokenSource;
 
     public SyncForm(string? initialLeftPath = null)
@@ -70,6 +71,7 @@ public partial class SyncForm : Form
         }
 
         _comparisonResult = null;
+        _planState = default;
         _diffView.SetData(null);
         _syncButton.Enabled = false;
         _compareButton.Enabled = false;
@@ -100,6 +102,7 @@ public partial class SyncForm : Form
         }
 
         _comparisonResult = response.Result;
+        _planState = _planState.AfterComparison();
         _statusLabel.Text = $"Сравнение завершено за {response.Elapsed.TotalSeconds:F2} с";
 
         ApplyCurrentMode();
@@ -109,7 +112,7 @@ public partial class SyncForm : Form
 
     private void OnSyncModeChanged(object? sender, EventArgs e)
     {
-        if (_comparisonResult == null)
+        if (_comparisonResult == null || _workerService.IsBusy)
         {
             return;
         }
@@ -184,7 +187,7 @@ public partial class SyncForm : Form
 
         _diffView.RefreshView();
         UpdateSummary();
-        _statusLabel.Text = $"Хеши вычислены за {response.Elapsed.TotalSeconds:F2} с.";
+        _statusLabel.Text = $"Хеши вычислены за {response.Elapsed.TotalSeconds:F2} с. {_planState.RefusalMessage}";
     }
 
     private void OnShowSizesChanged(object? sender, EventArgs e)
@@ -215,6 +218,14 @@ public partial class SyncForm : Form
             return;
         }
 
+        if (!_planState.IsExecutable)
+        {
+            MessageBox.Show(this, _planState.RefusalMessage, "План устарел",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+
+            return;
+        }
+
         if (_comparisonResult.HasPendingResolution())
         {
             MessageBox.Show(this, "Разрешите все неподтверждённые элементы перед синхронизацией.",
@@ -233,6 +244,10 @@ public partial class SyncForm : Form
 
         _syncButton.Enabled = false;
         _compareButton.Enabled = false;
+        _hashButton.Enabled = false;
+        _resolveConflictsButton.Enabled = false;
+        _syncModeComboBox.Enabled = false;
+        _diffView.Enabled = false;
         _progressBar.Style = ProgressBarStyle.Marquee;
         _statusLabel.Text = "Синхронизация...";
 
@@ -244,22 +259,28 @@ public partial class SyncForm : Form
     {
         _progressBar.Style = ProgressBarStyle.Blocks;
         _compareButton.Enabled = true;
+        _syncModeComboBox.Enabled = true;
+        _diffView.Enabled = true;
 
         if (response?.Error != null)
         {
-            _statusLabel.Text = $"Ошибка: {response.Error}";
+            _planState = _planState.AfterSync(null, false);
+            _statusLabel.Text = $"Ошибка: {response.Error} {_planState.RefusalMessage}";
             return;
         }
 
         if (response?.Report == null)
         {
-            _statusLabel.Text = "Синхронизация отменена.";
+            _planState = _planState.AfterSync(null, true);
+            _statusLabel.Text = _planState.RefusalMessage;
             return;
         }
 
         var report = response.Report;
+        _planState = _planState.AfterSync(report, false);
         _statusLabel.Text = $"Готово за {response.Elapsed.TotalSeconds:F2} с. "
-                            + $"Успешно: {report.SuccessCount}, Ошибок: {report.Errors.Count}";
+                            + $"Успешно: {report.SuccessCount}, Ошибок: {report.Errors.Count}. "
+                            + _planState.RefusalMessage;
 
         WriteSyncLog(report);
 
@@ -313,7 +334,7 @@ public partial class SyncForm : Form
 
     private void ResolveAllConflicts(SyncAction action)
     {
-        if (_comparisonResult == null)
+        if (_comparisonResult == null || _workerService.IsBusy)
         {
             return;
         }
@@ -367,12 +388,15 @@ public partial class SyncForm : Form
                              + $"Конфликтов: {stats[ComparisonStatus.Conflict]}";
 
         var hasPending = _comparisonResult.HasPendingResolution();
+        var busy = _workerService.IsBusy;
 
-        _syncButton.Enabled = !hasPending
+        _syncButton.Enabled = _planState.IsExecutable
+                              && !busy
+                              && !hasPending
                               && stats.Any(kv => kv.Key != ComparisonStatus.Identical && kv.Value > 0);
 
-        _resolveConflictsButton.Enabled = hasPending;
-        _hashButton.Enabled = stats[ComparisonStatus.Modified] > 0;
+        _resolveConflictsButton.Enabled = hasPending && !busy;
+        _hashButton.Enabled = stats[ComparisonStatus.Modified] > 0 && !busy;
     }
 
     private void LoadSettings()

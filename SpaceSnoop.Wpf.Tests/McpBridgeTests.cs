@@ -1,4 +1,5 @@
 ﻿using ModelContextProtocol;
+using SpaceSnoop.Core;
 using SpaceSnoop.Core.Domain;
 using SpaceSnoop.Core.Export;
 using SpaceSnoop.Wpf.Bootstrap;

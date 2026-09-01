@@ -1,4 +1,4 @@
-﻿namespace SpaceSnoop.Wpf.ViewModels.Sync;
+﻿namespace SpaceSnoop.Core;
 
 public enum SyncPlanFreshness
 {
@@ -9,7 +9,7 @@ public enum SyncPlanFreshness
     Interrupted = 4,
 }
 
-internal readonly record struct SyncPlanFreshnessState(
+public readonly record struct SyncPlanFreshnessState(
     SyncPlanFreshness Freshness,
     int ErrorCount = 0,
     int MismatchCount = 0,
@@ -53,4 +53,4 @@ internal readonly record struct SyncPlanFreshnessState(
     }
 }
 
-internal sealed class SyncPlanStaleException(string message) : InvalidOperationException(message);
+public sealed class SyncPlanStaleException(string message) : InvalidOperationException(message);
