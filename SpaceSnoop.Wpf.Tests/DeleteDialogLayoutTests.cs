@@ -36,10 +36,9 @@ public class DeleteDialogLayoutTests
     [OneTimeSetUp]
     public void OneTimeSetUp()
     {
-        if (Application.Current is null)
-        {
-            new App().InitializeComponent();
-        }
+        // Класс App брать нельзя: его OnStartup висит в очереди диспетчера и на первой же прокачке
+        // запускает настоящее приложение – разбор в docs/ui-tests-window-focus.md.
+        _ = TestApplication.Ensure(AppResources.Sources);
 
         _root = Path.Combine(Path.GetTempPath(), "spacesnoop-delete-layout", Guid.NewGuid().ToString("N"));
 
@@ -60,7 +59,9 @@ public class DeleteDialogLayoutTests
         _window = _services.GetRequiredService<MainWindow>();
         _modals = _services.GetRequiredService<ModalHostViewModel>();
 
-        _host = VisualTestHost.Show(_window, WindowWidth, WindowHeight);
+        // Фикстура проверяет, что список берёт клавиатурный фокус, а Focus() в неактивируемом окне
+        // отвечает false – ей нужен настоящий фокус, и хост вернёт активное окно человеку сам.
+        _host = VisualTestHost.Show(_window, WindowWidth, WindowHeight, keyboardFocus: true);
         _host.Settle();
     }
 

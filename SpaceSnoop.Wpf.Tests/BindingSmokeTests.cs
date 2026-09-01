@@ -44,10 +44,9 @@ public class BindingSmokeTests
     [OneTimeSetUp]
     public void OneTimeSetUp()
     {
-        if (Application.Current is null)
-        {
-            new App().InitializeComponent();
-        }
+        // Класс App брать нельзя: его OnStartup висит в очереди диспетчера и на первой же прокачке
+        // запускает настоящее приложение – разбор в docs/ui-tests-window-focus.md.
+        _ = TestApplication.Ensure(AppResources.Sources);
 
         _fixture = GalleryFixtures.Create();
 

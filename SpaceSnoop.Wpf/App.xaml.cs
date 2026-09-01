@@ -19,6 +19,8 @@ public partial class App : Application
 
         base.OnStartup(e);
 
+        AppResources.InstallInto(this);
+
         _logging = KeepShellLogging.Bootstrap(new()
         {
             LogsDirectory = Path.Combine(AppStorage.DataDirectory, AppStorage.LogsFolderName),
