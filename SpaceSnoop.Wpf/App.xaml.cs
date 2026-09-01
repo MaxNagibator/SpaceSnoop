@@ -11,6 +11,7 @@ public partial class App : Application
 {
     private ServiceProvider? _services;
     private KeepShellLogging? _logging;
+    private ISettingsStore? _settings;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -54,6 +55,7 @@ public partial class App : Application
         {
             var settingsPath = Path.Combine(AppStorage.DataDirectory, TomlSettingsFile.PrimaryFileName);
             ISettingsStore settings = new SettingsStore(settingsPath);
+            _settings = settings;
             AppThemes.Register();
             var themeKey = settings.GetStringValue(SettingsKeys.Theme);
             ThemeManager.Apply(string.IsNullOrWhiteSpace(themeKey) ? AppThemes.LightKey : themeKey);
@@ -75,6 +77,8 @@ public partial class App : Application
             {
                 _services = ConfigureServices(settings, _logging);
             }
+
+            ReportSettingsWriteFailures(settings, _services);
 
             using (splash.StartSpan("Открытие главного окна..."))
             {
@@ -111,11 +115,27 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        _services?.GetService<ISettingsStore>()?.Flush();
+        _settings?.Close();
 
         _services?.Dispose();
         _logging?.Dispose();
         base.OnExit(e);
+    }
+
+    private void ReportSettingsWriteFailures(ISettingsStore settings, ServiceProvider services)
+    {
+        var logger = _logging!.CreateLogger<App>();
+        var dispatcher = services.GetRequiredService<IUiDispatcher>();
+        var notifier = services.GetRequiredService<ToastNotifier>();
+
+        settings.WriteFailed += (_, failure) =>
+        {
+            logger.SettingsWriteFailed(failure.Exception, failure.FilePath);
+
+            dispatcher.Invoke(() => notifier.Notify(
+                $"Настройка не сохранена: файл «{failure.FilePath}» не записан. Значение осталось только в окне и пропадёт при следующем запуске.",
+                StatusSeverity.Error));
+        };
     }
 
     private static bool TryRestartAsAdministrator(ISettingsStore settings)
@@ -262,6 +282,7 @@ public partial class App : Application
                 var fixture = GalleryFixtures.Create();
                 var settingsPath = Path.Combine(fixture.Root, TomlSettingsFile.PrimaryFileName);
                 ISettingsStore settings = new SettingsStore(settingsPath);
+                _settings = settings;
                 SyncProfileStore.Save(settings, GalleryFixtures.Profiles(fixture));
 
                 ThemeManager.Apply(AppThemes.LightKey);
@@ -292,6 +313,7 @@ public partial class App : Application
         {
             var settingsPath = Path.Combine(AppStorage.DataDirectory, TomlSettingsFile.PrimaryFileName);
             ISettingsStore settings = new SettingsStore(settingsPath);
+            _settings = settings;
             exitCode = HeadlessSync.Run(settings, _logging!, profileId);
         }
         catch (Exception ex)
