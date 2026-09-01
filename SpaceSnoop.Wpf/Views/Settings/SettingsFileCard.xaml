@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Settings"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
@@ -19,7 +20,10 @@
     </UserControl.Resources>
 
     <HeaderedContentControl Style="{StaticResource Form.Panel}"
-                            Header="{Binding Sections[storage].Title}">
+                            Header="{Binding Sections[storage].Title}"
+                            keepshell:Form.ResetCommand="{Binding ResetSectionCommand}"
+                            keepshell:Form.ResetCommandParameter="storage"
+                            keepshell:Form.ResetHint="{Binding ResetPlans[storage].Hint}">
         <StackPanel>
             <TextBlock Text="Расположение данных"
                        Style="{StaticResource Form.SectionTitle}" />

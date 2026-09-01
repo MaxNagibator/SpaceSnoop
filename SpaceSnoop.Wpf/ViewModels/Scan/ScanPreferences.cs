@@ -33,13 +33,21 @@ public sealed partial class ScanPreferences : ObservableObject
 
         _suppressPersist = true;
         UseMultithreading = _settings.GetBool(SettingsKeys.ScanMultithreading, AppDefaults.ScanMultithreadingDefault);
-        MaxParallelism = Math.Clamp(_settings.GetInt(SettingsKeys.ScanParallelism, ParallelismCeiling), 1, ParallelismCeiling);
+
+        var storedParallelism = _settings.GetInt(SettingsKeys.ScanParallelism, ParallelismCeiling);
+        MaxParallelism = Math.Clamp(storedParallelism, 1, ParallelismCeiling);
+
         MediaAware = _settings.GetBool(SettingsKeys.ScanMediaAware, AppDefaults.ScanMediaAwareDefault);
         Intensity = _settings.GetDouble(SettingsKeys.ScanIntensity, AppDefaults.IntensityDefault);
         RevealFiles = _settings.GetBool(SettingsKeys.ScanRevealFiles, AppDefaults.ScanRevealFilesDefault);
         MftEnabled = _settings.GetBool(SettingsKeys.ScanMftEnabled, AppDefaults.ScanMftEnabledDefault);
         MftRootOnly = _settings.GetBool(SettingsKeys.ScanMftRootOnly, AppDefaults.ScanMftRootOnlyDefault);
         _suppressPersist = false;
+
+        if (storedParallelism != MaxParallelism)
+        {
+            _settings.SetInt(SettingsKeys.ScanParallelism, MaxParallelism);
+        }
 
         DuplicatesEnabled = settings.GetBool(SettingsKeys.ScanDuplicatesEnabled, AppDefaults.ScanDuplicatesEnabledDefault);
     }
@@ -51,6 +59,17 @@ public sealed partial class ScanPreferences : ObservableObject
     public bool DuplicatesEnabled { get; }
 
     public bool MftNeedsElevation => MftEnabled && !AdminElevation.IsElevated;
+
+    public void ResetToDefaults()
+    {
+        UseMultithreading = AppDefaults.ScanMultithreadingDefault;
+        MaxParallelism = ParallelismCeiling;
+        MediaAware = AppDefaults.ScanMediaAwareDefault;
+        Intensity = AppDefaults.IntensityDefault;
+        RevealFiles = AppDefaults.ScanRevealFilesDefault;
+        MftEnabled = AppDefaults.ScanMftEnabledDefault;
+        MftRootOnly = AppDefaults.ScanMftRootOnlyDefault;
+    }
 
     public int ResolveParallelism(string path)
     {

@@ -24,6 +24,17 @@ public sealed partial class UpdatePreferences : ObservableObject
         CheckOnStartup = _settings.GetBool(SettingsKeys.UpdateCheckOnStartup, AppDefaults.UpdateCheckOnStartupDefault);
         AutoDownload = _settings.GetBool(SettingsKeys.UpdateAutoDownload);
         _suppressPersist = false;
+
+        if (stored is not null && !string.Equals(stored, Repository, StringComparison.Ordinal))
+        {
+            _settings.SetValue(SettingsKeys.UpdateRepository, Repository);
+        }
+    }
+
+    public void ResetToDefaults()
+    {
+        CheckOnStartup = AppDefaults.UpdateCheckOnStartupDefault;
+        AutoDownload = AppDefaults.UpdateAutoDownloadDefault;
     }
 
     partial void OnRepositoryChanged(string value)

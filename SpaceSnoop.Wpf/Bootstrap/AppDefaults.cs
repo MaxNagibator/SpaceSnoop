@@ -50,6 +50,11 @@ public static class AppDefaults
 
     public const bool WarnIfNotAdminDefault = true;
     public const StartupPage StartupPageDefault = StartupPage.Scan;
+    public const bool NavCollapsedDefault = false;
+
+    public const AppTheme ThemeDefault = AppTheme.Light;
+    public const bool ShowPageHeaderDefault = true;
+    public const bool ToastNotificationsDefault = true;
 
     public const bool SyncShowSizesDefault = true;
     public const bool SyncShowModifiedDefault = false;
@@ -63,6 +68,7 @@ public static class AppDefaults
 
     public const bool SyncPathSuggestDefault = true;
     public const string SyncGroupFoldersDefault = ".git,bin,obj";
+    public const GitFolderPromptChoice SyncGitFoldersDefault = GitFolderPromptChoice.Ask;
     public const bool SyncRecycleOverwrittenDefault = true;
 
     public const long SyncLogFileSizeLimitBytes = 5_000_000;

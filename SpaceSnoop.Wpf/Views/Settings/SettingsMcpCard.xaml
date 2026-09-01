@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Settings"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
@@ -42,7 +43,10 @@
     </UserControl.Resources>
 
     <HeaderedContentControl Style="{StaticResource Form.Panel}"
-                            Header="{Binding Sections[mcp].Title}">
+                            Header="{Binding Sections[mcp].Title}"
+                            keepshell:Form.ResetCommand="{Binding ResetSectionCommand}"
+                            keepshell:Form.ResetCommandParameter="mcp"
+                            keepshell:Form.ResetHint="{Binding ResetPlans[mcp].Hint}">
         <StackPanel>
             <TextBlock Style="{StaticResource Form.Hint}"
                        Margin="0"

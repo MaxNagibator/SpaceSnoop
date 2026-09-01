@@ -21,6 +21,8 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     private readonly IClipboardService _clipboard;
     private readonly IShellLauncher _shell;
     private readonly IApplicationLifetime _lifetime;
+    private readonly ToastNotifier _notifier;
+    private readonly IReadOnlyDictionary<string, SettingsResetPlan> _resetPlans;
     private readonly ILogger<SettingsViewModel> _logger;
 
     [ObservableProperty]
@@ -44,6 +46,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         IClipboardService clipboard,
         IShellLauncher shellLauncher,
         IApplicationLifetime lifetime,
+        ToastNotifier notifier,
         ILogger<SettingsViewModel> logger)
     {
         Agent = agent;
@@ -62,7 +65,11 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         _clipboard = clipboard;
         _shell = shellLauncher;
         _lifetime = lifetime;
+        _notifier = notifier;
         _logger = logger;
+
+        _resetPlans = SettingsResetCatalog.Build(theme, shell, scan, operations, update, mcp, agent, settings);
+        SettingsResetCatalog.EnsureExhaustive(Sections, _resetPlans);
 
         Theme.PropertyChanged += OnThemePropertyChanged;
         Mcp.PropertyChanged += OnMcpPropertyChanged;
@@ -71,17 +78,24 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         Sections.PropertyChanged += OnSectionsPropertyChanged;
     }
 
-    public SettingsSectionList Sections { get; } = new(
-        new SettingsSection("appearance", "Внешний вид", PackIconLucideKind.Palette, "тема оформления светлая тёмная tarkov масштаб шрифта размер текста заголовок страницы уведомления тосты производительность отклик память диагностика"),
-        new SettingsSection("startup", "Запуск", PackIconLucideKind.Power, "стартовая страница навигационный рейл свернуть права администратора предупреждение"),
-        new SettingsSection("scan", "Сканирование", PackIconLucideKind.HardDrive, "многопоточный обход потоки параллелизм тепловая подсветка интенсивность проводник открытие файлов тип носителя ssd hdd mft таблица ntfs жёсткие ссылки движок администратор подкаталог диск целиком"),
-        new SettingsSection("sync", "Синхронизация", PackIconLucideKind.FolderSync, "исключения glob паттерны автодополнение путей git репозиторий группировка служебных каталогов плоский вид перезапись затираемый файл корзина"),
-        new SettingsSection("delete", "Удаление", PackIconLucideKind.Trash2, "корзина безвозвратно подтверждение помеченные элементы"),
-        new SettingsSection("archive", "Архивация", PackIconLucideKind.FileArchive, "zip сжатие уровень упаковать оригинал корзина"),
-        new SettingsSection("update", "Обновления", PackIconLucideKind.Download, "github релизы репозиторий версия проверка скачивание изменения changelog"),
-        new SettingsSection("storage", "Файлы и хранение", PackIconLucideKind.Folder, "расположение данных appdata portable settings.toml путь логи журналы"),
-        new SettingsSection("mcp", "MCP-сервер", PackIconLucideKind.Plug, "порт токен подключение json cli адрес изменяющие операции агент"),
-        new SettingsSection("agent", "Агент-чат", PackIconLucideKind.MessageCircle, "шнырь claude codex opencode cli модель глубина рассуждений транскрипт согласие"));
+    public IReadOnlyDictionary<string, SettingsResetPlan> ResetPlans => _resetPlans;
+
+    public SettingsSectionList Sections { get; } = CreateSections();
+
+    public static SettingsSectionList CreateSections()
+    {
+        return new(
+            new SettingsSection("appearance", "Внешний вид", PackIconLucideKind.Palette, "тема оформления светлая тёмная tarkov масштаб шрифта размер текста заголовок страницы уведомления тосты производительность отклик память диагностика"),
+            new SettingsSection("startup", "Запуск", PackIconLucideKind.Power, "стартовая страница навигационный рейл свернуть права администратора предупреждение"),
+            new SettingsSection("scan", "Сканирование", PackIconLucideKind.HardDrive, "многопоточный обход потоки параллелизм тепловая подсветка интенсивность проводник открытие файлов тип носителя ssd hdd mft таблица ntfs жёсткие ссылки движок администратор подкаталог диск целиком"),
+            new SettingsSection("sync", "Синхронизация", PackIconLucideKind.FolderSync, "исключения glob паттерны автодополнение путей git репозиторий группировка служебных каталогов плоский вид перезапись затираемый файл корзина"),
+            new SettingsSection("delete", "Удаление", PackIconLucideKind.Trash2, "корзина безвозвратно подтверждение помеченные элементы"),
+            new SettingsSection("archive", "Архивация", PackIconLucideKind.FileArchive, "zip сжатие уровень упаковать оригинал корзина"),
+            new SettingsSection("update", "Обновления", PackIconLucideKind.Download, "github релизы репозиторий версия проверка скачивание изменения changelog"),
+            new SettingsSection("storage", "Файлы и хранение", PackIconLucideKind.Folder, "расположение данных appdata portable settings.toml путь логи журналы"),
+            new SettingsSection("mcp", "MCP-сервер", PackIconLucideKind.Plug, "порт токен подключение json cli адрес изменяющие операции агент"),
+            new SettingsSection("agent", "Агент-чат", PackIconLucideKind.MessageCircle, "шнырь claude codex opencode cli модель глубина рассуждений транскрипт согласие"));
+    }
 
     public ThemeViewModel Theme { get; }
 
@@ -121,12 +135,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
             }
 
             Agent.Backend = AgentBackendChoice.Order[value];
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(AgentCliPathLabel));
-            OnPropertyChanged(nameof(AgentShellWarning));
-            OnPropertyChanged(nameof(AgentModelHint));
-            OnPropertyChanged(nameof(AgentConsentLabel));
-            OnPropertyChanged(nameof(AgentConsentHint));
+            NotifyAgentBackendChanged();
         }
     }
 
@@ -377,6 +386,47 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         }
 
         _lifetime.Shutdown();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanResetSection))]
+    private void ResetSection(string? sectionKey)
+    {
+        if (sectionKey is null || !_resetPlans.TryGetValue(sectionKey, out var plan) || plan.Reset is null)
+        {
+            return;
+        }
+
+        plan.Reset();
+        NotifyDerivedOptions();
+
+        var title = Sections[sectionKey].Title;
+        _logger.SettingsSectionReset(title, string.Join(", ", plan.Restored));
+        _notifier.Notify(plan.Describe(title));
+    }
+
+    private bool CanResetSection(string? sectionKey)
+    {
+        return sectionKey is not null && _resetPlans.TryGetValue(sectionKey, out var plan) && plan.CanReset;
+    }
+
+    private void NotifyDerivedOptions()
+    {
+        OnPropertyChanged(nameof(SelectedThemeOption));
+        OnPropertyChanged(nameof(SelectedStartupOption));
+        OnPropertyChanged(nameof(SelectedDeleteModeOption));
+        OnPropertyChanged(nameof(SelectedCompressionOption));
+        OnPropertyChanged(nameof(SelectedGitFolderOption));
+        NotifyAgentBackendChanged();
+    }
+
+    private void NotifyAgentBackendChanged()
+    {
+        OnPropertyChanged(nameof(SelectedAgentBackendIndex));
+        OnPropertyChanged(nameof(AgentCliPathLabel));
+        OnPropertyChanged(nameof(AgentShellWarning));
+        OnPropertyChanged(nameof(AgentModelHint));
+        OnPropertyChanged(nameof(AgentConsentLabel));
+        OnPropertyChanged(nameof(AgentConsentHint));
     }
 
     [RelayCommand]

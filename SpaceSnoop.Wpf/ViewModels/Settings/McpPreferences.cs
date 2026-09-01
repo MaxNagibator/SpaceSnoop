@@ -26,10 +26,16 @@ public sealed partial class McpPreferences : ObservableObject
 
         _suppressPersist = true;
         Enabled = _settings.GetBool(SettingsKeys.McpEnabled, AppDefaults.McpEnabledDefault);
-        Port = Math.Clamp(_settings.GetInt(SettingsKeys.McpPort, AppDefaults.McpPortDefault), AppDefaults.McpPortMin, AppDefaults.McpPortMax);
+        var storedPort = _settings.GetInt(SettingsKeys.McpPort, AppDefaults.McpPortDefault);
+        Port = Math.Clamp(storedPort, AppDefaults.McpPortMin, AppDefaults.McpPortMax);
         AllowMutations = _settings.GetBool(SettingsKeys.McpAllowMutations, AppDefaults.McpAllowMutationsDefault);
         Token = _settings.GetStringValue(SettingsKeys.McpToken)?.Trim() ?? string.Empty;
         _suppressPersist = false;
+
+        if (storedPort != Port)
+        {
+            _settings.SetInt(SettingsKeys.McpPort, Port);
+        }
 
         if (Token.Length == 0)
         {
@@ -43,6 +49,13 @@ public sealed partial class McpPreferences : ObservableObject
     public void RegenerateToken()
     {
         Token = RandomNumberGenerator.GetHexString(32, true);
+    }
+
+    public void ResetToDefaults()
+    {
+        Enabled = AppDefaults.McpEnabledDefault;
+        Port = AppDefaults.McpPortDefault;
+        AllowMutations = AppDefaults.McpAllowMutationsDefault;
     }
 
     partial void OnEnabledChanged(bool value)

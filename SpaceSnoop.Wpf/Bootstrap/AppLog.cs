@@ -237,6 +237,9 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1405, Level = LogLevel.Error, Message = "Настройка не сохранена: файл {Path} не записан, значение осталось только в памяти")]
     public static partial void SettingsWriteFailed(this ILogger logger, Exception exception, string path);
 
+    [LoggerMessage(EventId = 1406, Level = LogLevel.Information, Message = "Раздел настроек «{Section}» сброшен к умолчанию: {Restored}")]
+    public static partial void SettingsSectionReset(this ILogger logger, string section, string restored);
+
     [LoggerMessage(EventId = 1600, Level = LogLevel.Information, Message = "Docker: снимок получен, категорий – {Count}")]
     public static partial void DockerSnapshotLoaded(this ILogger logger, int count);
 

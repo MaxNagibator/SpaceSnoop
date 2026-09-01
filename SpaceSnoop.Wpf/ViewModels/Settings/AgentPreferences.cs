@@ -53,6 +53,14 @@ public sealed partial class AgentPreferences : ObservableObject
         }
     }
 
+    public void ResetToDefaults()
+    {
+        Enabled = AppDefaults.AgentEnabledDefault;
+        HistoryVisible = AppDefaults.AgentHistoryVisibleDefault;
+        Transcript = AppDefaults.AgentTranscriptDefault;
+        Backend = AppDefaults.AgentBackendDefault;
+    }
+
     public bool ConsentFor(AgentBackendKind kind)
     {
         return _settings.GetBool(SettingsKeys.AgentConsent(kind), AppDefaults.AgentConsentDefault);

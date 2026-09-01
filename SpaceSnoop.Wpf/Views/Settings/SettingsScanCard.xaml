@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Settings"
              xmlns:bootstrap="clr-namespace:SpaceSnoop.Wpf.Bootstrap"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
@@ -19,7 +20,10 @@
     </UserControl.Resources>
 
     <HeaderedContentControl Style="{StaticResource Form.Panel}"
-                            Header="{Binding Sections[scan].Title}">
+                            Header="{Binding Sections[scan].Title}"
+                            keepshell:Form.ResetCommand="{Binding ResetSectionCommand}"
+                            keepshell:Form.ResetCommandParameter="scan"
+                            keepshell:Form.ResetHint="{Binding ResetPlans[scan].Hint}">
         <StackPanel>
             <CheckBox Content="Многопоточный обход"
                       IsChecked="{Binding Scan.UseMultithreading, Mode=TwoWay}"

@@ -47,6 +47,24 @@ public sealed partial class OperationPreferences : ObservableObject
         _suppressPersist = false;
     }
 
+    public void ResetSyncToDefaults()
+    {
+        SyncPathSuggest = AppDefaults.SyncPathSuggestDefault;
+        RecycleOverwritten = AppDefaults.SyncRecycleOverwrittenDefault;
+    }
+
+    public void ResetDeleteToDefaults()
+    {
+        ConfirmBeforeDelete = AppDefaults.DeleteConfirmDefault;
+        DeleteMode = AppDefaults.DeleteModeDefault;
+    }
+
+    public void ResetArchiveToDefaults()
+    {
+        DeleteOriginalAfterArchive = AppDefaults.ArchiveDeleteOriginalDefault;
+        ArchiveCompression = AppDefaults.ArchiveCompressionDefault;
+    }
+
     partial void OnConfirmBeforeDeleteChanged(bool value)
     {
         if (!_suppressPersist)
