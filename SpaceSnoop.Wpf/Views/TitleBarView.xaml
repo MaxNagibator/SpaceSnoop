@@ -181,7 +181,7 @@
                                 <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Sparkles}"
                                                           Width="14"
                                                           Height="14"
-                                                          Foreground="{DynamicResource Accent.Primary}"
+                                                          Foreground="{DynamicResource Accent.Text}"
                                                           VerticalAlignment="Center"
                                                           Margin="0,0,6,0" />
                                 <TextBlock Text="{Binding AppUpdate.PillText}"

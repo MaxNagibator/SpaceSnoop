@@ -107,12 +107,12 @@
 
             <StackPanel Visibility="{Binding AgentShellWarning, Converter={StaticResource BoolToVisibility}}">
                 <TextBlock Style="{StaticResource Form.Hint}"
-                           Foreground="{DynamicResource State.Warning}"
+                           Foreground="{DynamicResource State.WarningText}"
                            Text="У codex есть собственная оболочка системы, отключить её нечем: агент может выполнять команды с правами приложения." />
                 <Expander Style="{StaticResource Setting.Details}"
                           Header="Чем ограничен codex">
                     <TextBlock Style="{StaticResource Setting.DetailsBody}"
-                               Foreground="{DynamicResource State.Warning}"
+                               Foreground="{DynamicResource State.WarningText}"
                                Text="Приложение обычно запущено от администратора, значит команды выполняются с его правами. Инструменты приложения при этом работают только с полным доступом – в песочнице codex не может дозваться разрешения и гасит вызов сам. Из-за оболочки запрет отдельных инструментов для codex остаётся подсказкой, а не преградой: настоящий барьер один для обоих CLI – галка «Разрешить изменяющие операции» в разделе «MCP-сервер», её проверяет сам сервер." />
                 </Expander>
             </StackPanel>

@@ -48,7 +48,7 @@
                                       Height="20"
                                       VerticalAlignment="Center"
                                       Margin="0,0,10,0"
-                                      Foreground="{DynamicResource Accent.Primary}" />
+                                      Foreground="{DynamicResource Accent.Text}" />
             <TextBlock Text="{Binding Title}"
                        Style="{StaticResource DialogTitle}"
                        VerticalAlignment="Center" />
@@ -86,7 +86,7 @@
                                    FontSize="{DynamicResource Font.Size.XS}"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
-                                   Foreground="{DynamicResource State.Success}" />
+                                   Foreground="{DynamicResource State.SuccessText}" />
                     </Border>
 
                     <Button HorizontalAlignment="Center"
@@ -114,7 +114,7 @@
                                                               Height="14"
                                                               HorizontalAlignment="Center"
                                                               VerticalAlignment="Center"
-                                                              Foreground="{DynamicResource Accent.Primary}" />
+                                                              Foreground="{DynamicResource Accent.Text}" />
                                 </Border>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsMouseOver"
@@ -140,7 +140,7 @@
                                    FontSize="{DynamicResource Font.Size.XS}"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
-                                   Foreground="{DynamicResource State.Info}" />
+                                   Foreground="{DynamicResource State.InfoText}" />
                     </Border>
                 </StackPanel>
 
@@ -288,7 +288,7 @@
                                            Text="уже есть"
                                            VerticalAlignment="Center"
                                            Margin="10,0,0,0"
-                                           Foreground="{DynamicResource State.Warning}"
+                                           Foreground="{DynamicResource State.WarningText}"
                                            Visibility="{Binding AlreadyExists, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
                             </Grid>
                         </DataTemplate>

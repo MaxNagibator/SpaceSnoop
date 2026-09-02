@@ -30,12 +30,12 @@
                 <DataTrigger Binding="{Binding NewerIsLeft}"
                              Value="True">
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Success}" />
+                            Value="{DynamicResource State.SuccessText}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding NewerIsRight}"
                              Value="True">
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Info}" />
+                            Value="{DynamicResource State.InfoText}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -50,12 +50,12 @@
                 <DataTrigger Binding="{Binding NewerIsLeft}"
                              Value="True">
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Success}" />
+                            Value="{DynamicResource State.SuccessText}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding NewerIsRight}"
                              Value="True">
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Info}" />
+                            Value="{DynamicResource State.InfoText}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -85,32 +85,32 @@
                             <DataTrigger Binding="{Binding Status}"
                                          Value="{x:Static overview:OverviewRunStatus.Compared}">
                                 <Setter Property="Foreground"
-                                        Value="{DynamicResource Accent.Primary}" />
+                                        Value="{DynamicResource Accent.Text}" />
                             </DataTrigger>
                             <DataTrigger Binding="{Binding Status}"
                                          Value="{x:Static overview:OverviewRunStatus.Unavailable}">
                                 <Setter Property="Foreground"
-                                        Value="{DynamicResource State.Warning}" />
+                                        Value="{DynamicResource State.WarningText}" />
                             </DataTrigger>
                             <DataTrigger Binding="{Binding Status}"
                                          Value="{x:Static overview:OverviewRunStatus.Overlap}">
                                 <Setter Property="Foreground"
-                                        Value="{DynamicResource State.Warning}" />
+                                        Value="{DynamicResource State.WarningText}" />
                             </DataTrigger>
                             <DataTrigger Binding="{Binding Status}"
                                          Value="{x:Static overview:OverviewRunStatus.Error}">
                                 <Setter Property="Foreground"
-                                        Value="{DynamicResource State.Error}" />
+                                        Value="{DynamicResource State.ErrorText}" />
                             </DataTrigger>
                             <DataTrigger Binding="{Binding Status}"
                                          Value="{x:Static overview:OverviewRunStatus.Synced}">
                                 <Setter Property="Foreground"
-                                        Value="{DynamicResource State.Success}" />
+                                        Value="{DynamicResource State.SuccessText}" />
                             </DataTrigger>
                             <DataTrigger Binding="{Binding SyncHadErrors}"
                                          Value="True">
                                 <Setter Property="Foreground"
-                                        Value="{DynamicResource State.Warning}" />
+                                        Value="{DynamicResource State.WarningText}" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>

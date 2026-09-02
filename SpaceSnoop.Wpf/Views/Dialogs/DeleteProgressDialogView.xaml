@@ -40,7 +40,7 @@
                     <Setter Property="Kind"
                             Value="LoaderCircle" />
                     <Setter Property="Foreground"
-                            Value="{DynamicResource Accent.Primary}" />
+                            Value="{DynamicResource Accent.Text}" />
                 </DataTrigger>
                 <MultiDataTrigger>
                     <MultiDataTrigger.Conditions>
@@ -69,14 +69,14 @@
                     <Setter Property="Kind"
                             Value="CircleCheck" />
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Success}" />
+                            Value="{DynamicResource State.SuccessText}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding State}"
                              Value="Failed">
                     <Setter Property="Kind"
                             Value="CircleX" />
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Error}" />
+                            Value="{DynamicResource State.ErrorText}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -116,7 +116,7 @@
                 <DataTrigger Binding="{Binding State}"
                              Value="Failed">
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Error}" />
+                            Value="{DynamicResource State.ErrorText}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -130,7 +130,7 @@
             <Setter Property="FontSize"
                     Value="{DynamicResource Font.Size.Caption}" />
             <Setter Property="Foreground"
-                    Value="{DynamicResource State.Error}" />
+                    Value="{DynamicResource State.ErrorText}" />
         </Style>
     </UserControl.Resources>
 
@@ -150,7 +150,7 @@
                                       Height="20"
                                       VerticalAlignment="Center"
                                       Margin="0,0,10,0"
-                                      Foreground="{DynamicResource State.Error}" />
+                                      Foreground="{DynamicResource State.ErrorText}" />
             <TextBlock Text="{Binding Title}"
                        Style="{StaticResource DialogTitle}"
                        VerticalAlignment="Center" />
@@ -281,7 +281,7 @@
                            VerticalAlignment="Center"
                            FontSize="{DynamicResource Font.Size.S}"
                            FontWeight="Medium"
-                           Foreground="{DynamicResource Accent.Primary}" />
+                           Foreground="{DynamicResource Accent.Text}" />
             </Grid>
 
             <Grid Margin="0,8,0,0">
@@ -327,7 +327,7 @@
                            FontSize="{DynamicResource Font.Size.M}"
                            FontWeight="SemiBold"
                            Typography.NumeralAlignment="Tabular"
-                           Foreground="{DynamicResource Accent.Primary}"
+                           Foreground="{DynamicResource Accent.Text}"
                            Visibility="{Binding ChunkElapsedText, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
 
                 <StackPanel Grid.Column="2"
@@ -343,7 +343,7 @@
                                VerticalAlignment="Center"
                                FontSize="{DynamicResource Font.Size.S}"
                                FontWeight="Medium"
-                               Foreground="{DynamicResource Accent.Primary}" />
+                               Foreground="{DynamicResource Accent.Text}" />
                 </StackPanel>
             </Grid>
 

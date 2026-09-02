@@ -164,13 +164,13 @@
                                               Height="13"
                                               VerticalAlignment="Center"
                                               Margin="0,0,6,0"
-                                              Foreground="{DynamicResource State.Error}" />
+                                              Foreground="{DynamicResource State.ErrorText}" />
                     <TextBlock Text="Нет в дереве"
                                Style="{StaticResource Caption}"
                                Margin="0,0,7,0" />
                     <TextBlock Text="{Binding DropNote}"
                                Style="{StaticResource StatValue}"
-                               Foreground="{DynamicResource State.Error}" />
+                               Foreground="{DynamicResource State.ErrorText}" />
                 </StackPanel>
             </WrapPanel>
         </Grid>

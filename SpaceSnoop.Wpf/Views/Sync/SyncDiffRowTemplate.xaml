@@ -79,7 +79,7 @@
                                               Height="12"
                                               VerticalAlignment="Center"
                                               Margin="4,0,4,0"
-                                              Foreground="{DynamicResource State.Error}"
+                                              Foreground="{DynamicResource State.ErrorText}"
                                               ToolTip="Конфликт – требуется разрешение">
                         <iconPacks:PackIconLucide.Style>
                             <Style TargetType="iconPacks:PackIconLucide">
@@ -155,7 +155,7 @@
                                               Height="12"
                                               VerticalAlignment="Center"
                                               Margin="4,0,4,0"
-                                              Foreground="{DynamicResource State.Error}"
+                                              Foreground="{DynamicResource State.ErrorText}"
                                               ToolTip="Конфликт – требуется разрешение">
                         <iconPacks:PackIconLucide.Style>
                             <Style TargetType="iconPacks:PackIconLucide">

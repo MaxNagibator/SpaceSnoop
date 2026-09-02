@@ -25,7 +25,7 @@
             <Setter Property="Margin"
                     Value="0,0,8,0" />
             <Setter Property="Foreground"
-                    Value="{DynamicResource State.Warning}" />
+                    Value="{DynamicResource State.WarningText}" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding ReclaimsSpace}"
                              Value="True">
@@ -57,7 +57,7 @@
                     <Setter Property="TextDecorations"
                             Value="Strikethrough" />
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Error}" />
+                            Value="{DynamicResource State.ErrorText}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -180,7 +180,7 @@
                                       Height="14"
                                       VerticalAlignment="Top"
                                       Margin="0,2,8,0"
-                                      Foreground="{DynamicResource State.Warning}" />
+                                      Foreground="{DynamicResource State.WarningText}" />
 
             <TextBlock Grid.Column="1"
                        Text="{Binding NoticeText}"
@@ -269,7 +269,7 @@
                                                 <TextBlock Grid.Column="3"
                                                            Style="{StaticResource Caption}"
                                                            Text="{Binding StateText}"
-                                                           Foreground="{DynamicResource State.Warning}"
+                                                           Foreground="{DynamicResource State.WarningText}"
                                                            Margin="10,0,0,0" />
 
                                                 <ToggleButton Grid.Column="4"

@@ -28,7 +28,7 @@
                         <Setter Property="BorderBrush"
                                 Value="{DynamicResource State.Error}" />
                         <Setter Property="Foreground"
-                                Value="{DynamicResource State.Error}" />
+                                Value="{DynamicResource State.ErrorText}" />
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
@@ -232,7 +232,7 @@
                                     Command="{Binding Operations.ResolveAllToLeftCommand}"
                                     Padding="9,2"
                                     MinHeight="26"
-                                    Foreground="{DynamicResource State.Info}"
+                                    Foreground="{DynamicResource State.InfoText}"
                                     ToolTip="Все спорные – справа налево"
                                     AutomationProperties.Name="Все спорные – справа налево">
                                 <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ArrowLeft}"
@@ -345,7 +345,7 @@
                                                           Height="13"
                                                           VerticalAlignment="Center"
                                                           Margin="7,0,0,0"
-                                                          Foreground="{DynamicResource State.Error}"
+                                                          Foreground="{DynamicResource State.ErrorText}"
                                                           Visibility="{Binding Setup.MirrorDeletes, Converter={StaticResource BoolToVisibility}}" />
                             </StackPanel>
                         </ToggleButton>

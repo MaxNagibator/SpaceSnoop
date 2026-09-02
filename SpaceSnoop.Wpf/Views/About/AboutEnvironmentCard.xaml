@@ -130,14 +130,14 @@
                                 <Setter Property="Kind"
                                         Value="Shield" />
                                 <Setter Property="Foreground"
-                                        Value="{DynamicResource State.Warning}" />
+                                        Value="{DynamicResource State.WarningText}" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsElevated}"
                                                  Value="True">
                                         <Setter Property="Kind"
                                                 Value="ShieldCheck" />
                                         <Setter Property="Foreground"
-                                                Value="{DynamicResource State.Success}" />
+                                                Value="{DynamicResource State.SuccessText}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>

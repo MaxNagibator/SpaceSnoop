@@ -71,7 +71,7 @@
                                           VerticalAlignment="Center"
                                           Margin="0,0,10,0"
                                           IsHitTestVisible="False"
-                                          Foreground="{DynamicResource State.Error}"
+                                          Foreground="{DynamicResource State.ErrorText}"
                                           ToolTip="Каталог не найден"
                                           Visibility="{Binding Setup.LeftPathInvalid, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
             </Grid>
@@ -104,7 +104,7 @@
                                                   Height="13"
                                                   HorizontalAlignment="Center"
                                                   VerticalAlignment="Center"
-                                                  Foreground="{DynamicResource Accent.Primary}" />
+                                                  Foreground="{DynamicResource Accent.Text}" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver"
@@ -135,7 +135,7 @@
                            FontSize="{DynamicResource Font.Size.XS}"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center"
-                           Foreground="{DynamicResource State.Info}" />
+                           Foreground="{DynamicResource State.InfoText}" />
             </Border>
             <Button DockPanel.Dock="Left"
                     Style="{StaticResource Button.Secondary}"
@@ -162,7 +162,7 @@
                                           VerticalAlignment="Center"
                                           Margin="0,0,10,0"
                                           IsHitTestVisible="False"
-                                          Foreground="{DynamicResource State.Error}"
+                                          Foreground="{DynamicResource State.ErrorText}"
                                           ToolTip="Каталог не найден"
                                           Visibility="{Binding Setup.RightPathInvalid, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
             </Grid>

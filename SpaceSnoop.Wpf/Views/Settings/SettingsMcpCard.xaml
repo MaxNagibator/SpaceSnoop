@@ -149,7 +149,7 @@
                     </Grid.ColumnDefinitions>
                     <iconPacks:PackIconLucide Style="{StaticResource Mcp.NoticeIcon}"
                                               Kind="{x:Static iconPacks:PackIconLucideKind.ShieldAlert}"
-                                              Foreground="{DynamicResource State.Error}" />
+                                              Foreground="{DynamicResource State.ErrorText}" />
                     <TextBlock Grid.Column="1"
                                Style="{StaticResource Mcp.NoticeText}"
                                Text="Без токена сервер не запускается: подключение без секрета приняло бы кого угодно. Нажмите «Обновить», чтобы выдать новый." />
@@ -190,7 +190,7 @@
                        Visibility="{Binding McpServer.Endpoint, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
             <TextBlock Style="{StaticResource Form.Hint}"
                        Margin="0,14,0,0"
-                       Foreground="{DynamicResource State.Error}"
+                       Foreground="{DynamicResource State.ErrorText}"
                        Text="{Binding McpServer.LastError}"
                        Visibility="{Binding McpServer.LastError, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
 
@@ -205,7 +205,7 @@
                         </Grid.ColumnDefinitions>
                         <iconPacks:PackIconLucide Style="{StaticResource Mcp.NoticeIcon}"
                                                   Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
-                                                  Foreground="{DynamicResource State.Warning}" />
+                                                  Foreground="{DynamicResource State.WarningText}" />
                         <TextBlock Grid.Column="1"
                                    Style="{StaticResource Mcp.NoticeText}"
                                    Text="Приложение запущено от администратора – с теми же правами работает и сервер." />

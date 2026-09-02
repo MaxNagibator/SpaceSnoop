@@ -36,7 +36,7 @@
 
                     <iconPacks:PackIconLucide Grid.Column="0"
                                               Style="{StaticResource Chat.NoticeIcon}"
-                                              Foreground="{DynamicResource Accent.Primary}"
+                                              Foreground="{DynamicResource Accent.Text}"
                                               Kind="{Binding Gates.PendingNavigation.Icon}" />
 
                     <TextBlock Grid.Column="1"

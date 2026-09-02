@@ -121,7 +121,7 @@
             <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Вдвое быстрее, и жёсткая ссылка считается один раз, а не под каждым именем." />
             <TextBlock Style="{StaticResource Form.CheckHint}"
-                       Foreground="{DynamicResource State.Warning}"
+                       Foreground="{DynamicResource State.WarningText}"
                        Text="Сейчас прав администратора нет, поэтому скан пойдёт обходом каталогов."
                        Visibility="{Binding Scan.MftNeedsElevation, Converter={StaticResource BoolToVisibility}}" />
             <Expander Style="{StaticResource Setting.Details}"

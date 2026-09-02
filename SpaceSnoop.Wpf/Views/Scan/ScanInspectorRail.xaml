@@ -41,7 +41,7 @@
 
         <TextBlock Text="{Binding TotalSizeText}"
                    Style="{StaticResource Value}"
-                   Foreground="{DynamicResource Accent.Primary}"
+                   Foreground="{DynamicResource Accent.Text}"
                    Margin="0,14,0,0"
                    HorizontalAlignment="Center"
                    Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}}">
@@ -62,7 +62,7 @@
                 <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ExternalLink}"
                                           Width="16"
                                           Height="16"
-                                          Foreground="{DynamicResource State.Info}" />
+                                          Foreground="{DynamicResource State.InfoText}" />
             </Button>
 
             <Button Style="{StaticResource RailAction}"
@@ -73,7 +73,7 @@
                 <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
                                           Width="16"
                                           Height="16"
-                                          Foreground="{DynamicResource State.Error}" />
+                                          Foreground="{DynamicResource State.ErrorText}" />
             </Button>
 
             <Button Style="{StaticResource RailAction}"
@@ -84,7 +84,7 @@
                 <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.RotateCcw}"
                                           Width="16"
                                           Height="16"
-                                          Foreground="{DynamicResource State.Success}" />
+                                          Foreground="{DynamicResource State.SuccessText}" />
             </Button>
 
             <Button Style="{StaticResource RailAction}"
@@ -95,7 +95,7 @@
                 <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderX}"
                                           Width="16"
                                           Height="16"
-                                          Foreground="{DynamicResource State.Error}" />
+                                          Foreground="{DynamicResource State.ErrorText}" />
             </Button>
 
             <Button Style="{StaticResource RailAction}"
@@ -106,7 +106,7 @@
                 <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.RotateCcw}"
                                           Width="16"
                                           Height="16"
-                                          Foreground="{DynamicResource State.Success}" />
+                                          Foreground="{DynamicResource State.SuccessText}" />
             </Button>
 
             <Border Style="{StaticResource RailSeparator}" />

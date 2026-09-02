@@ -34,7 +34,7 @@
                                           Height="15"
                                           VerticalAlignment="Center"
                                           Margin="0,0,8,0"
-                                          Foreground="{DynamicResource State.Info}" />
+                                          Foreground="{DynamicResource State.InfoText}" />
                 <TextBlock Text="Открыть в проводнике"
                            VerticalAlignment="Center" />
             </StackPanel>
@@ -54,7 +54,7 @@
                                           Height="15"
                                           VerticalAlignment="Center"
                                           Margin="0,0,8,0"
-                                          Foreground="{DynamicResource State.Error}" />
+                                          Foreground="{DynamicResource State.ErrorText}" />
                 <TextBlock Text="Пометить на удаление"
                            VerticalAlignment="Center" />
             </StackPanel>
@@ -70,7 +70,7 @@
                                           Height="15"
                                           VerticalAlignment="Center"
                                           Margin="0,0,8,0"
-                                          Foreground="{DynamicResource State.Success}" />
+                                          Foreground="{DynamicResource State.SuccessText}" />
                 <TextBlock Text="Снять пометку на удаление"
                            VerticalAlignment="Center" />
             </StackPanel>
@@ -86,7 +86,7 @@
                                           Height="15"
                                           VerticalAlignment="Center"
                                           Margin="0,0,8,0"
-                                          Foreground="{DynamicResource State.Error}" />
+                                          Foreground="{DynamicResource State.ErrorText}" />
                 <TextBlock Text="Пометить содержимое"
                            VerticalAlignment="Center" />
             </StackPanel>
@@ -102,7 +102,7 @@
                                           Height="15"
                                           VerticalAlignment="Center"
                                           Margin="0,0,8,0"
-                                          Foreground="{DynamicResource State.Success}" />
+                                          Foreground="{DynamicResource State.SuccessText}" />
                 <TextBlock Text="Снять пометку с содержимого"
                            VerticalAlignment="Center" />
             </StackPanel>

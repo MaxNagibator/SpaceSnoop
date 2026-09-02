@@ -66,7 +66,7 @@
                 <DataTrigger Binding="{Binding Kind}"
                              Value="Added">
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Info}" />
+                            Value="{DynamicResource State.InfoText}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Kind}"
                              Value="Removed">
@@ -196,7 +196,7 @@
                                FontSize="{DynamicResource Font.Size.S}"
                                FontWeight="Medium"
                                VerticalAlignment="Center"
-                               Foreground="{DynamicResource State.Info}" />
+                               Foreground="{DynamicResource State.InfoText}" />
                 </StackPanel>
                 <TextBlock Text="Файлы идентичны"
                            Style="{StaticResource TextBlock.Subtle}"
@@ -294,7 +294,7 @@
                                               Height="14"
                                               VerticalAlignment="Top"
                                               Margin="0,1,8,0"
-                                              Foreground="{DynamicResource State.Info}" />
+                                              Foreground="{DynamicResource State.InfoText}" />
                     <TextBlock Grid.Column="1"
                                Text="{Binding Summary}"
                                Style="{StaticResource TextBlock.Subtle}"

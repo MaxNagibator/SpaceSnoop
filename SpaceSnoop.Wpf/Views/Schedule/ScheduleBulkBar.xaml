@@ -55,7 +55,7 @@
                                               Height="16"
                                               VerticalAlignment="Center"
                                               Margin="0,0,10,0"
-                                              Foreground="{DynamicResource Accent.Primary}" />
+                                              Foreground="{DynamicResource Accent.Text}" />
                     <TextBlock Text="{Binding SelectionSummary}"
                                VerticalAlignment="Center"
                                FontWeight="{DynamicResource Font.Weight.SemiBold}"
@@ -250,7 +250,7 @@
                     <Button Grid.Column="2"
                             Style="{StaticResource Button.Ghost}"
                             Command="{Binding DeleteCommand}"
-                            Foreground="{DynamicResource State.Error}"
+                            Foreground="{DynamicResource State.ErrorText}"
                             MinHeight="{DynamicResource Control.Height.Default}"
                             Padding="12,6"
                             ToolTip="Удалить выбранные профили и их задачи в Планировщике">

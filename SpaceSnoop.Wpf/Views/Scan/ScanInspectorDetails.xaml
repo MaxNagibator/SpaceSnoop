@@ -40,7 +40,7 @@
             <TextBlock Text="{Binding KindText}"
                        FontSize="{DynamicResource Font.Size.Caption}"
                        FontWeight="SemiBold"
-                       Foreground="{DynamicResource Accent.Primary}" />
+                       Foreground="{DynamicResource Accent.Text}" />
         </Border>
 
         <TextBlock Text="{Binding Path}"
@@ -72,7 +72,7 @@
                                Text="{Binding TotalSizeText}"
                                FontSize="{DynamicResource Font.Size.L}"
                                FontWeight="SemiBold"
-                               Foreground="{DynamicResource Accent.Primary}" />
+                               Foreground="{DynamicResource Accent.Text}" />
                 </Grid>
                 <Grid Margin="0,8,0,0"
                       Visibility="{Binding HasOwnSize, Converter={StaticResource BoolToVisibility}}">
@@ -310,7 +310,7 @@
                                           Height="13"
                                           VerticalAlignment="Center"
                                           Margin="0,0,7,0"
-                                          Foreground="{DynamicResource Accent.Primary}" />
+                                          Foreground="{DynamicResource Accent.Text}" />
                 <TextBlock Text="Крупнейшее"
                            Style="{StaticResource SectionTitle}" />
             </StackPanel>

@@ -36,7 +36,7 @@
                 <DataTrigger Binding="{Binding Tone}"
                              Value="{x:Static vm:ConfirmTextTone.Danger}">
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Error}" />
+                            Value="{DynamicResource State.ErrorText}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -61,7 +61,7 @@
                 <DataTrigger Binding="{Binding Tone}"
                              Value="{x:Static vm:ConfirmMetricTone.Danger}">
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Error}" />
+                            Value="{DynamicResource State.ErrorText}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -88,7 +88,7 @@
                 <DataTrigger Binding="{Binding Tone}"
                              Value="{x:Static vm:ConfirmMetricTone.Danger}">
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Error}" />
+                            Value="{DynamicResource State.ErrorText}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -190,7 +190,7 @@
                                       Height="20"
                                       VerticalAlignment="Center"
                                       Margin="0,0,10,0"
-                                      Foreground="{DynamicResource Accent.Primary}" />
+                                      Foreground="{DynamicResource Accent.Text}" />
             <StackPanel Grid.Column="1"
                         VerticalAlignment="Center">
                 <TextBlock Text="{Binding Title}"
@@ -230,13 +230,13 @@
                                       VerticalAlignment="Top"
                                       Margin="0,2,8,0"
                                       AutomationProperties.Name="Предупреждение"
-                                      Foreground="{DynamicResource State.Error}" />
+                                      Foreground="{DynamicResource State.ErrorText}" />
             <TextBlock Grid.Column="1"
                        Text="{Binding Warning}"
                        TextWrapping="Wrap"
                        FontSize="{DynamicResource Font.Size.S}"
                        FontWeight="{DynamicResource Font.Weight.SemiBold}"
-                       Foreground="{DynamicResource State.Error}" />
+                       Foreground="{DynamicResource State.ErrorText}" />
         </Grid>
 
         <ItemsControl Grid.Row="3"

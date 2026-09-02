@@ -72,7 +72,7 @@
         <Setter Property="FontSize"
                 Value="{DynamicResource Font.Size.L}" />
         <Setter Property="Foreground"
-                Value="{DynamicResource Accent.Primary}" />
+                Value="{DynamicResource Accent.Text}" />
     </Style>
 
     <Style x:Key="StatValue.Aside"

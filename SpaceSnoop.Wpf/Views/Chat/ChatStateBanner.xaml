@@ -62,7 +62,7 @@
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Style="{StaticResource Chat.BannerIcon}"
                                               Kind="{x:Static iconPacks:PackIconLucideKind.BotOff}"
-                                              Foreground="{DynamicResource State.Warning}" />
+                                              Foreground="{DynamicResource State.WarningText}" />
                     <TextBlock Text="{Binding Gates.CliMissingTitle}"
                                FontWeight="{DynamicResource Font.Weight.SemiBold}"
                                VerticalAlignment="Center" />
@@ -97,7 +97,7 @@
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Style="{StaticResource Chat.BannerIcon}"
                                               Kind="{x:Static iconPacks:PackIconLucideKind.ShieldAlert}"
-                                              Foreground="{DynamicResource State.Info}" />
+                                              Foreground="{DynamicResource State.InfoText}" />
                     <TextBlock Text="Нужно согласие на отправку данных"
                                FontWeight="{DynamicResource Font.Weight.SemiBold}"
                                VerticalAlignment="Center" />
@@ -121,7 +121,7 @@
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Style="{StaticResource Chat.BannerIcon}"
                                               Kind="{x:Static iconPacks:PackIconLucideKind.Unplug}"
-                                              Foreground="{DynamicResource State.Warning}" />
+                                              Foreground="{DynamicResource State.WarningText}" />
                     <TextBlock Text="MCP-сервер выключен"
                                FontWeight="{DynamicResource Font.Weight.SemiBold}"
                                VerticalAlignment="Center" />
@@ -134,7 +134,7 @@
                         HorizontalAlignment="Left"
                         Margin="0,10,0,0" />
                 <TextBlock Style="{StaticResource Chat.BannerText}"
-                           Foreground="{DynamicResource State.Error}"
+                           Foreground="{DynamicResource State.ErrorText}"
                            Text="{Binding Gates.McpServer.LastError}"
                            Visibility="{Binding Gates.McpServer.LastError, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
             </StackPanel>

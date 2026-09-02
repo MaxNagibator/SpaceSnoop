@@ -86,7 +86,7 @@
             <DataTrigger Binding="{Binding NewerIsRight}"
                          Value="True">
                 <Setter Property="Foreground"
-                        Value="{DynamicResource State.Info}" />
+                        Value="{DynamicResource State.InfoText}" />
             </DataTrigger>
         </Style.Triggers>
     </Style>
@@ -105,7 +105,7 @@
             <DataTrigger Binding="{Binding NewerIsRight}"
                          Value="True">
                 <Setter Property="Foreground"
-                        Value="{DynamicResource State.Info}" />
+                        Value="{DynamicResource State.InfoText}" />
             </DataTrigger>
         </Style.Triggers>
     </Style>

@@ -61,7 +61,7 @@
                     </Ellipse>
                     <TextBlock Text="Сканирование"
                                Style="{StaticResource Caption}"
-                               Foreground="{DynamicResource Accent.Primary}" />
+                               Foreground="{DynamicResource Accent.Text}" />
                 </StackPanel>
 
                 <TextBlock Grid.Column="1"

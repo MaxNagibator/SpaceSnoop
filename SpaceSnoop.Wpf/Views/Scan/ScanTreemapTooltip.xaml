@@ -35,7 +35,7 @@
                                         <Setter Property="Kind"
                                                 Value="Folder" />
                                         <Setter Property="Foreground"
-                                                Value="{DynamicResource Accent.Primary}" />
+                                                Value="{DynamicResource Accent.Text}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -54,7 +54,7 @@
                                         <Setter Property="TextDecorations"
                                                 Value="Strikethrough" />
                                         <Setter Property="Foreground"
-                                                Value="{DynamicResource State.Error}" />
+                                                Value="{DynamicResource State.ErrorText}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -95,7 +95,7 @@
                                        Text="{Binding SizeText}"
                                        FontSize="{DynamicResource Font.Size.M}"
                                        FontWeight="SemiBold"
-                                       Foreground="{DynamicResource Accent.Primary}" />
+                                       Foreground="{DynamicResource Accent.Text}" />
                         </Grid>
                         <Grid Margin="0,6,0,0"
                               Visibility="{Binding HasOwnSize, Converter={StaticResource BoolToVisibility}}">

@@ -26,7 +26,7 @@
                 <Trigger Property="IsMouseOver"
                          Value="True">
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Error}" />
+                            Value="{DynamicResource State.ErrorText}" />
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -95,7 +95,7 @@
                                                           Height="15"
                                                           HorizontalAlignment="Center"
                                                           VerticalAlignment="Center"
-                                                          Foreground="{DynamicResource State.Success}" />
+                                                          Foreground="{DynamicResource State.SuccessText}" />
                             </Button>
                             <Button Style="{StaticResource Button.Icon}"
                                     Command="{Binding CancelDeleteCommand}"
@@ -106,7 +106,7 @@
                                                           Height="15"
                                                           HorizontalAlignment="Center"
                                                           VerticalAlignment="Center"
-                                                          Foreground="{DynamicResource State.Error}" />
+                                                          Foreground="{DynamicResource State.ErrorText}" />
                             </Button>
                         </StackPanel>
                     </Grid>

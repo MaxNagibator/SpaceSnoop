@@ -97,7 +97,7 @@
                                     <TextBlock Text="{Binding AvailabilityText}"
                                                Margin="0,2,0,0"
                                                FontSize="{DynamicResource Font.Size.S}"
-                                               Foreground="{DynamicResource State.Warning}"
+                                               Foreground="{DynamicResource State.WarningText}"
                                                Visibility="{Binding HasAvailabilityIssue, Converter={StaticResource BoolToVisibility}}" />
                                     <TextBlock Text="{Binding UnreadableText}"
                                                Margin="0,2,0,0"

@@ -40,7 +40,7 @@
                                           Height="15"
                                           VerticalAlignment="Center"
                                           Margin="0,0,9,0"
-                                          Foreground="{DynamicResource State.Warning}" />
+                                          Foreground="{DynamicResource State.WarningText}" />
                 <TextBlock Text="Сканирование отменено – результаты не построены"
                            VerticalAlignment="Center"
                            FontSize="{DynamicResource Font.Size.S}"

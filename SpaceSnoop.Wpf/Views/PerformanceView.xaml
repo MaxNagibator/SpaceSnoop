@@ -137,11 +137,11 @@
                                               Height="16"
                                               VerticalAlignment="Center"
                                               Margin="0,0,8,0"
-                                              Foreground="{DynamicResource State.Warning}" />
+                                              Foreground="{DynamicResource State.WarningText}" />
 
                     <TextBlock Text="{Binding StaleText}"
                                VerticalAlignment="Center"
-                               Foreground="{DynamicResource State.Warning}" />
+                               Foreground="{DynamicResource State.WarningText}" />
                 </StackPanel>
             </Border>
 
@@ -177,7 +177,7 @@
                                                 <Setter Property="Kind"
                                                         Value="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}" />
                                                 <Setter Property="Foreground"
-                                                        Value="{DynamicResource State.Warning}" />
+                                                        Value="{DynamicResource State.WarningText}" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -193,7 +193,7 @@
                                             <DataTrigger Binding="{Binding IsHitch}"
                                                          Value="True">
                                                 <Setter Property="Foreground"
-                                                        Value="{DynamicResource State.Warning}" />
+                                                        Value="{DynamicResource State.WarningText}" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -240,7 +240,7 @@
                                         <DataTrigger Binding="{Binding IsFrameSlow}"
                                                      Value="True">
                                             <Setter Property="Foreground"
-                                                    Value="{DynamicResource State.Warning}" />
+                                                    Value="{DynamicResource State.WarningText}" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>

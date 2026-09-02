@@ -82,7 +82,7 @@
                                     <Setter Property="Kind"
                                             Value="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}" />
                                     <Setter Property="Foreground"
-                                            Value="{DynamicResource State.Warning}" />
+                                            Value="{DynamicResource State.WarningText}" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
@@ -99,7 +99,7 @@
                                 <DataTrigger Binding="{Binding Data.HasHitches}"
                                              Value="True">
                                     <Setter Property="Foreground"
-                                            Value="{DynamicResource State.Warning}" />
+                                            Value="{DynamicResource State.WarningText}" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>

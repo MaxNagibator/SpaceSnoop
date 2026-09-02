@@ -145,7 +145,7 @@
                                                             </Grid.ColumnDefinitions>
 
                                                             <TextBlock Text="•"
-                                                                       Foreground="{DynamicResource Accent.Primary}"
+                                                                       Foreground="{DynamicResource Accent.Text}"
                                                                        VerticalAlignment="Top" />
 
                                                             <StackPanel Grid.Column="1">

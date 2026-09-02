@@ -41,7 +41,7 @@
                                     <Setter Property="TextDecorations"
                                             Value="Strikethrough" />
                                     <Setter Property="Foreground"
-                                            Value="{DynamicResource State.Error}" />
+                                            Value="{DynamicResource State.ErrorText}" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>

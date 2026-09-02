@@ -46,7 +46,7 @@
                                                   Height="11"
                                                   VerticalAlignment="Center"
                                                   Margin="0,0,5,0"
-                                                  Foreground="{DynamicResource Accent.Primary}" />
+                                                  Foreground="{DynamicResource Accent.Text}" />
                         <TextBlock Text="{Binding PlanCopyText}"
                                    Style="{StaticResource TallyValue}" />
                     </StackPanel>
@@ -206,7 +206,7 @@
                                     <DataTrigger Binding="{Binding HasConflicts}"
                                                  Value="True">
                                         <Setter Property="Foreground"
-                                                Value="{DynamicResource State.Error}" />
+                                                Value="{DynamicResource State.ErrorText}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>

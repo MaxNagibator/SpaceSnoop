@@ -40,7 +40,7 @@
             <Setter Property="VerticalAlignment"
                     Value="Center" />
             <Setter Property="Foreground"
-                    Value="{DynamicResource Accent.Primary}" />
+                    Value="{DynamicResource Accent.Text}" />
         </Style>
     </UserControl.Resources>
 

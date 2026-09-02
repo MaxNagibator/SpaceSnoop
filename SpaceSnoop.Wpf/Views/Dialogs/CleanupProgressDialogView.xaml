@@ -29,7 +29,7 @@
                                       Height="20"
                                       VerticalAlignment="Center"
                                       Margin="0,0,10,0"
-                                      Foreground="{DynamicResource Accent.Primary}" />
+                                      Foreground="{DynamicResource Accent.Text}" />
             <TextBlock Text="{Binding Title}"
                        Style="{StaticResource DialogTitle}"
                        VerticalAlignment="Center" />
@@ -107,7 +107,7 @@
                            VerticalAlignment="Center"
                            FontSize="{DynamicResource Font.Size.S}"
                            FontWeight="Medium"
-                           Foreground="{DynamicResource Accent.Primary}" />
+                           Foreground="{DynamicResource Accent.Text}" />
             </Grid>
 
             <TextBlock behaviors:PathTrimmer.FullPath="{Binding CurrentPath}"

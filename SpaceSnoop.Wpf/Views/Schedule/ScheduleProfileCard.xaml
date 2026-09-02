@@ -135,7 +135,7 @@
                                                   Height="15"
                                                   VerticalAlignment="Top"
                                                   Margin="0,1,9,0"
-                                                  Foreground="{DynamicResource State.Warning}" />
+                                                  Foreground="{DynamicResource State.WarningText}" />
                         <TextBlock
                             Grid.Column="1"
                             Text="Включено «Зеркало»: лишние файлы на приёмнике удаляются в корзину без подтверждения."
@@ -161,7 +161,7 @@
                                                   Height="15"
                                                   VerticalAlignment="Top"
                                                   Margin="0,1,9,0"
-                                                  Foreground="{DynamicResource State.Warning}" />
+                                                  Foreground="{DynamicResource State.WarningText}" />
                         <TextBlock
                             Grid.Column="1"
                             Text="Задача указывает на другой файл программы (вероятно, старую версию). Откройте профиль и сохраните, чтобы привязать к текущей."
@@ -234,7 +234,7 @@
                     <Grid VerticalAlignment="Center">
                         <Button Style="{StaticResource Button.Ghost}"
                                 Command="{Binding ArmDeleteCommand}"
-                                Foreground="{DynamicResource State.Error}"
+                                Foreground="{DynamicResource State.ErrorText}"
                                 MinHeight="{DynamicResource Control.Height.Default}"
                                 Padding="10,5"
                                 Visibility="{Binding ConfirmingDelete, Converter={StaticResource InverseBoolToVisibility}}">
@@ -258,7 +258,7 @@
                                                           Height="15"
                                                           HorizontalAlignment="Center"
                                                           VerticalAlignment="Center"
-                                                          Foreground="{DynamicResource State.Success}" />
+                                                          Foreground="{DynamicResource State.SuccessText}" />
                             </Button>
                             <Button Style="{StaticResource Button.Icon}"
                                     Command="{Binding CancelDeleteCommand}"
@@ -269,7 +269,7 @@
                                                           Height="15"
                                                           HorizontalAlignment="Center"
                                                           VerticalAlignment="Center"
-                                                          Foreground="{DynamicResource State.Error}" />
+                                                          Foreground="{DynamicResource State.ErrorText}" />
                             </Button>
                         </StackPanel>
                     </Grid>

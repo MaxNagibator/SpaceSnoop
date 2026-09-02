@@ -24,7 +24,7 @@
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                               Kind="{x:Static iconPacks:PackIconLucideKind.ExternalLink}"
-                                              Foreground="{DynamicResource State.Info}" />
+                                              Foreground="{DynamicResource State.InfoText}" />
                     <TextBlock Text="Открыть в проводнике"
                                VerticalAlignment="Center" />
                 </StackPanel>
@@ -39,7 +39,7 @@
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                               Kind="{x:Static iconPacks:PackIconLucideKind.MessageCircle}"
-                                              Foreground="{DynamicResource State.Info}" />
+                                              Foreground="{DynamicResource State.InfoText}" />
                     <TextBlock Text="{x:Static agent:AgentPersona.AskHeader}"
                                VerticalAlignment="Center" />
                 </StackPanel>
@@ -56,7 +56,7 @@
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                               Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
-                                              Foreground="{DynamicResource State.Error}" />
+                                              Foreground="{DynamicResource State.ErrorText}" />
                     <TextBlock Text="Пометить на удаление"
                                VerticalAlignment="Center" />
                 </StackPanel>
@@ -70,7 +70,7 @@
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                               Kind="{x:Static iconPacks:PackIconLucideKind.RotateCcw}"
-                                              Foreground="{DynamicResource State.Success}" />
+                                              Foreground="{DynamicResource State.SuccessText}" />
                     <TextBlock Text="Снять пометку на удаление"
                                VerticalAlignment="Center" />
                 </StackPanel>
@@ -87,7 +87,7 @@
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                               Kind="{x:Static iconPacks:PackIconLucideKind.FolderX}"
-                                              Foreground="{DynamicResource State.Error}" />
+                                              Foreground="{DynamicResource State.ErrorText}" />
                     <TextBlock Text="Пометить содержимое на удаление"
                                VerticalAlignment="Center" />
                 </StackPanel>
@@ -101,7 +101,7 @@
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                               Kind="{x:Static iconPacks:PackIconLucideKind.RotateCcw}"
-                                              Foreground="{DynamicResource State.Success}" />
+                                              Foreground="{DynamicResource State.SuccessText}" />
                     <TextBlock Text="Снять пометку с содержимого"
                                VerticalAlignment="Center" />
                 </StackPanel>
@@ -118,7 +118,7 @@
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                               Kind="{x:Static iconPacks:PackIconLucideKind.Package}"
-                                              Foreground="{DynamicResource State.Info}" />
+                                              Foreground="{DynamicResource State.InfoText}" />
                     <TextBlock Text="Упаковать в архив (.zip)"
                                VerticalAlignment="Center" />
                 </StackPanel>

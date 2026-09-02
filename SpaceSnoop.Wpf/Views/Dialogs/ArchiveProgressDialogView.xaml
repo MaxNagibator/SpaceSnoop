@@ -29,7 +29,7 @@
                                       Height="20"
                                       VerticalAlignment="Center"
                                       Margin="0,0,10,0"
-                                      Foreground="{DynamicResource Accent.Primary}" />
+                                      Foreground="{DynamicResource Accent.Text}" />
             <TextBlock Text="{Binding Title}"
                        Style="{StaticResource DialogTitle}"
                        VerticalAlignment="Center" />
@@ -80,7 +80,7 @@
                                                   Height="15"
                                                   VerticalAlignment="Center"
                                                   Margin="0,0,9,0"
-                                                  Foreground="{DynamicResource Accent.Primary}" />
+                                                  Foreground="{DynamicResource Accent.Text}" />
                         <TextBlock Grid.Column="1"
                                    Text="{Binding TargetName}"
                                    AutomationProperties.Name="Файл архива"
@@ -129,7 +129,7 @@
                            VerticalAlignment="Center"
                            FontSize="{DynamicResource Font.Size.S}"
                            FontWeight="Medium"
-                           Foreground="{DynamicResource Accent.Primary}" />
+                           Foreground="{DynamicResource Accent.Text}" />
             </Grid>
 
             <TextBlock behaviors:PathTrimmer.FullPath="{Binding CurrentPath}"

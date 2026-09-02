@@ -23,7 +23,7 @@
                TargetType="iconPacks:PackIconLucide"
                BasedOn="{StaticResource Docker.ActionButtonContent}">
             <Setter Property="Foreground"
-                    Value="{DynamicResource State.Error}" />
+                    Value="{DynamicResource State.ErrorText}" />
         </Style>
     </UserControl.Resources>
 
@@ -91,7 +91,7 @@
                                           VerticalAlignment="Center"
                                           Margin="0,0,7,0"
                                           AutomationProperties.Name="Предупреждение"
-                                          Foreground="{DynamicResource State.Error}" />
+                                          Foreground="{DynamicResource State.ErrorText}" />
                 <TextBlock Grid.Column="1"
                            Text="Уберут и то, что ещё может понадобиться"
                            Style="{StaticResource Caption}" />

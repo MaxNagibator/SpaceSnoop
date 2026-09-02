@@ -39,7 +39,7 @@
                TargetType="TextBlock"
                BasedOn="{StaticResource Caption}">
             <Setter Property="Foreground"
-                    Value="{DynamicResource State.Info}" />
+                    Value="{DynamicResource State.InfoText}" />
             <Setter Property="Margin"
                     Value="8,0,0,0" />
         </Style>
@@ -93,7 +93,7 @@
             <Setter Property="FontFamily"
                     Value="{DynamicResource Font.Mono}" />
             <Setter Property="Foreground"
-                    Value="{DynamicResource Accent.Primary}" />
+                    Value="{DynamicResource Accent.Text}" />
         </Style>
 
         <Style x:Key="GitLogSubject"
@@ -177,7 +177,7 @@
                                         <DataTrigger Binding="{Binding LeftGitIsDirty}"
                                                      Value="True">
                                             <Setter Property="Foreground"
-                                                    Value="{DynamicResource State.Warning}" />
+                                                    Value="{DynamicResource State.WarningText}" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -203,12 +203,12 @@
                                         <DataTrigger Binding="{Binding GitInSync}"
                                                      Value="True">
                                             <Setter Property="Foreground"
-                                                    Value="{DynamicResource State.Success}" />
+                                                    Value="{DynamicResource State.SuccessText}" />
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding GitShowsNewer}"
                                                      Value="True">
                                             <Setter Property="Foreground"
-                                                    Value="{DynamicResource Accent.Primary}" />
+                                                    Value="{DynamicResource Accent.Text}" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -245,7 +245,7 @@
                                         <DataTrigger Binding="{Binding RightGitIsDirty}"
                                                      Value="True">
                                             <Setter Property="Foreground"
-                                                    Value="{DynamicResource State.Warning}" />
+                                                    Value="{DynamicResource State.WarningText}" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>

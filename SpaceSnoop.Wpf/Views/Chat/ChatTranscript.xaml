@@ -50,7 +50,7 @@
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding IsError}"
                                  Value="True">
-                        <Setter Property="Foreground" Value="{DynamicResource State.Error}" />
+                        <Setter Property="Foreground" Value="{DynamicResource State.ErrorText}" />
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
@@ -90,7 +90,7 @@
                                  Value="True">
                         <Setter Property="Background" Value="{DynamicResource State.WarningSoft}" />
                         <Setter Property="BorderBrush" Value="{DynamicResource State.Warning}" />
-                        <Setter Property="TextElement.Foreground" Value="{DynamicResource State.Warning}" />
+                        <Setter Property="TextElement.Foreground" Value="{DynamicResource State.WarningText}" />
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
@@ -315,14 +315,14 @@
 
                                     <TextBlock Style="{StaticResource TextBlock.Subtle}"
                                                FontSize="{DynamicResource Font.Size.S}"
-                                               Foreground="{DynamicResource State.Warning}"
+                                               Foreground="{DynamicResource State.WarningText}"
                                                Margin="0,8,0,0"
                                                Text="Шнырь остановлен"
                                                Visibility="{Binding IsCancelled, Converter={StaticResource BoolToVisibility}}" />
 
                                     <TextBlock Style="{StaticResource TextBlock.Subtle}"
                                                FontSize="{DynamicResource Font.Size.S}"
-                                               Foreground="{DynamicResource State.Warning}"
+                                               Foreground="{DynamicResource State.WarningText}"
                                                TextWrapping="Wrap"
                                                Margin="0,8,0,0"
                                                Text="Ответ оборвался на полуслове – так его прислал сам CLI. Спросите ещё раз."
@@ -352,7 +352,7 @@
                                           Height="28"
                                           HorizontalAlignment="Center"
                                           VerticalAlignment="Center"
-                                          Foreground="{DynamicResource Accent.Primary}"
+                                          Foreground="{DynamicResource Accent.Text}"
                                           Kind="{x:Static iconPacks:PackIconLucideKind.Rat}" />
             </Border>
 
@@ -386,7 +386,7 @@
                                                           Height="15"
                                                           VerticalAlignment="Top"
                                                           Margin="0,2,10,0"
-                                                          Foreground="{DynamicResource Accent.Primary}"
+                                                          Foreground="{DynamicResource Accent.Text}"
                                                           Kind="{Binding Icon}" />
                                 <TextBlock Grid.Column="1"
                                            Text="{Binding Text}"

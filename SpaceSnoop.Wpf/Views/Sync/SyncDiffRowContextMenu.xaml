@@ -25,7 +25,7 @@
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                               Kind="{x:Static iconPacks:PackIconLucideKind.GitCompareArrows}"
-                                              Foreground="{DynamicResource State.Info}" />
+                                              Foreground="{DynamicResource State.InfoText}" />
                     <TextBlock Text="{Binding PlacementTarget.DataContext.CompareContentHeader, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                VerticalAlignment="Center" />
                 </StackPanel>
@@ -39,7 +39,7 @@
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                               Kind="{x:Static iconPacks:PackIconLucideKind.MessageCircle}"
-                                              Foreground="{DynamicResource State.Info}" />
+                                              Foreground="{DynamicResource State.InfoText}" />
                     <TextBlock Text="{x:Static agent:AgentPersona.AskHeader}"
                                VerticalAlignment="Center" />
                 </StackPanel>
@@ -74,7 +74,7 @@
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                               Kind="{x:Static iconPacks:PackIconLucideKind.ArrowLeft}"
-                                              Foreground="{DynamicResource State.Info}" />
+                                              Foreground="{DynamicResource State.InfoText}" />
                     <TextBlock Text="Копировать справа налево"
                                VerticalAlignment="Center" />
                 </StackPanel>
@@ -103,7 +103,7 @@
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                               Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
-                                              Foreground="{DynamicResource State.Error}" />
+                                              Foreground="{DynamicResource State.ErrorText}" />
                     <TextBlock
                         Text="{Binding PlacementTarget.DataContext.FileDeleteHeader, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                         VerticalAlignment="Center" />
@@ -131,7 +131,7 @@
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                               Kind="{x:Static iconPacks:PackIconLucideKind.ArrowLeft}"
-                                              Foreground="{DynamicResource State.Info}" />
+                                              Foreground="{DynamicResource State.InfoText}" />
                     <TextBlock Text="Всё содержимое: справа налево"
                                VerticalAlignment="Center" />
                 </StackPanel>
@@ -160,7 +160,7 @@
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Style="{StaticResource MenuGlyph}"
                                               Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
-                                              Foreground="{DynamicResource State.Error}" />
+                                              Foreground="{DynamicResource State.ErrorText}" />
                     <TextBlock
                         Text="{Binding PlacementTarget.DataContext.DirDeleteHeader, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                         VerticalAlignment="Center" />

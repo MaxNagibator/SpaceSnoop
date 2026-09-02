@@ -162,7 +162,7 @@
                                            Text="{Binding Intensity, StringFormat=0}"
                                            FontSize="{DynamicResource Font.Size.M}"
                                            FontWeight="Medium"
-                                           Foreground="{DynamicResource Accent.Primary}"
+                                           Foreground="{DynamicResource Accent.Text}"
                                            VerticalAlignment="Center"
                                            Margin="12,0,0,0"
                                            MinWidth="18"

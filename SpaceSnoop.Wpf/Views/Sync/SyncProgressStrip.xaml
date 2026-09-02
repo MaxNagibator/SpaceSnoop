@@ -69,7 +69,7 @@
                                           Height="14"
                                           VerticalAlignment="Center"
                                           Margin="0,0,9,0"
-                                          Foreground="{DynamicResource Accent.Primary}" />
+                                          Foreground="{DynamicResource Accent.Text}" />
                 <TextBlock Grid.Column="1"
                            Text="{Binding ProgressDetail}"
                            Style="{StaticResource TextBlock.Subtle}"
@@ -92,7 +92,7 @@
                                 <Setter Property="Margin"
                                         Value="12,0,0,0" />
                                 <Setter Property="Foreground"
-                                        Value="{DynamicResource Accent.Primary}" />
+                                        Value="{DynamicResource Accent.Text}" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding ProgressRemainingText}"
                                                  Value="">

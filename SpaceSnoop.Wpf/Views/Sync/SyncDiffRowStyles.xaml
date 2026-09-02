@@ -20,7 +20,7 @@
             <DataTrigger Binding="{Binding Status}"
                          Value="Conflict">
                 <Setter Property="Foreground"
-                        Value="{DynamicResource State.Error}" />
+                        Value="{DynamicResource State.ErrorText}" />
             </DataTrigger>
             <DataTrigger Binding="{Binding Status}"
                          Value="Identical">
@@ -305,22 +305,22 @@
             <DataTrigger Binding="{Binding Action}"
                          Value="CopyToLeft">
                 <Setter Property="Foreground"
-                        Value="{DynamicResource State.Info}" />
+                        Value="{DynamicResource State.InfoText}" />
             </DataTrigger>
             <DataTrigger Binding="{Binding Action}"
                          Value="DeleteLeft">
                 <Setter Property="Foreground"
-                        Value="{DynamicResource State.Error}" />
+                        Value="{DynamicResource State.ErrorText}" />
             </DataTrigger>
             <DataTrigger Binding="{Binding Action}"
                          Value="DeleteRight">
                 <Setter Property="Foreground"
-                        Value="{DynamicResource State.Error}" />
+                        Value="{DynamicResource State.ErrorText}" />
             </DataTrigger>
             <DataTrigger Binding="{Binding Action}"
                          Value="None">
                 <Setter Property="Foreground"
-                        Value="{DynamicResource State.Warning}" />
+                        Value="{DynamicResource State.WarningText}" />
             </DataTrigger>
         </Style.Triggers>
     </Style>
@@ -357,7 +357,7 @@
             <DataTrigger Binding="{Binding LeftIsNewer}"
                          Value="True">
                 <Setter Property="Foreground"
-                        Value="{DynamicResource Accent.Primary}" />
+                        Value="{DynamicResource Accent.Text}" />
                 <Setter Property="FontWeight"
                         Value="SemiBold" />
             </DataTrigger>
@@ -371,7 +371,7 @@
             <DataTrigger Binding="{Binding RightIsNewer}"
                          Value="True">
                 <Setter Property="Foreground"
-                        Value="{DynamicResource Accent.Primary}" />
+                        Value="{DynamicResource Accent.Text}" />
                 <Setter Property="FontWeight"
                         Value="SemiBold" />
             </DataTrigger>
