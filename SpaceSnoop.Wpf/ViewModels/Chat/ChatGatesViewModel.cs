@@ -164,11 +164,26 @@ public sealed partial class ChatGatesViewModel : ObservableObject
         _logger.AgentNavigationDeferred(pending.Page);
     }
 
+    /// <summary>
+    /// Понижение доступа посреди хода: чат выключили целиком или отозвали согласие на отправку данных
+    /// поставщику модели. И то и другое обязано остановить идущий ход – иначе баннер говорит
+    /// «согласие отозвано», а ответ на уже отправленное сообщение всё равно доедет до истории.
+    /// </summary>
+    internal static bool CancelsActiveTurn(string? propertyName, AgentPreferences preferences)
+    {
+        return propertyName switch
+        {
+            nameof(AgentPreferences.Enabled) => !preferences.Enabled,
+            nameof(AgentPreferences.Consent) => !preferences.Consent,
+            _ => false,
+        };
+    }
+
     private void OnGateSourceChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (ReferenceEquals(sender, _preferences))
         {
-            if (e.PropertyName == nameof(AgentPreferences.Enabled) && !_preferences.Enabled)
+            if (CancelsActiveTurn(e.PropertyName, _preferences))
             {
                 _cancelActiveTurn();
             }
