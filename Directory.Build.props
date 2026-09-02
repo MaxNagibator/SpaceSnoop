@@ -1,6 +1,6 @@
 ﻿<Project>
   <PropertyGroup>
-    <Version>2.8.69</Version>
+    <Version>2.8.70</Version>
     <WarningsAsErrors>$(WarningsAsErrors);S1048;S1206;S1244;S1656;S1751;S1764;S1848;S1862</WarningsAsErrors>
     <WarningsAsErrors>$(WarningsAsErrors);S2068;S2114;S2115;S2123;S2183;S2184;S2190;S2201</WarningsAsErrors>
     <WarningsAsErrors>$(WarningsAsErrors);S2225;S2251;S2252;S2275;S2328;S2345;S2445;S2551</WarningsAsErrors>
