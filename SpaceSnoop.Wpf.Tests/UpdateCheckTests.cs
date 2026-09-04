@@ -123,6 +123,41 @@ public class UpdateCheckTests
     }
 
     [Test]
+    public void История_изменений_не_берёт_технические_изменения_релиза()
+    {
+        var body = """
+                   ## Скачать
+
+                   EXE ZIP Portable
+
+                   ## Изменения
+
+                   - Скан стал вдвое быстрее
+
+                   ## Технические изменения
+
+                   <details>
+                   <summary>Коммиты (2)</summary>
+
+                   - Каркас обновлён до 0.1.141
+                   - Привязанные коллекции заведены на поток диспетчера
+
+                   </details>
+
+                   **Полный список:** https://github.com/x/y/compare/v2.8.70...v2.8.71
+                   """;
+
+        var items = ReleaseChangelog.ExtractChangeItems(body);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(items, Has.Count.EqualTo(1));
+            Assert.That(items[0].Summary, Is.EqualTo("Скан стал вдвое быстрее"));
+            Assert.That(ReleaseChangelog.ExtractCompareUrl(body), Is.EqualTo("https://github.com/x/y/compare/v2.8.70...v2.8.71"));
+        }
+    }
+
+    [Test]
     public void Тело_без_секции_изменений_берётся_целиком_а_первая_строка_становится_пунктом()
     {
         var body = """

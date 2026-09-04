@@ -56,6 +56,10 @@ jobs:
           fi
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
+      - name: Verify changelog entry
+        shell: bash
+        run: bash .github/changelog-section.sh "${{ steps.version.outputs.VERSION }}" >/dev/null
+
       - name: Decide if release is needed
         id: decide
         shell: bash
@@ -213,12 +217,24 @@ jobs:
             fi
           fi
 
+          COMMITS=$(git log --no-merges --pretty='- %s' "${PREV:+$PREV..}HEAD" | grep -v '^- Версия ' || true)
+          COMMIT_COUNT=$(printf '%s' "$COMMITS" | grep -c '^- ' || true)
+
           {
             sed -e "s|__VERSION__|$VERSION|g" -e "s|__REPO__|$REPO|g" -e "s|__SLUG__|$SLUG|g" .github/release-body.md
             echo
             echo "## Изменения"
             echo
-            git log --no-merges --pretty='- %s' "${PREV:+$PREV..}HEAD" | grep -v '^- Версия ' || true
+            bash .github/changelog-section.sh "$VERSION"
+            echo
+            echo "## Технические изменения"
+            echo
+            echo "<details>"
+            echo "<summary>Коммиты ($COMMIT_COUNT)</summary>"
+            echo
+            printf '%s\n' "$COMMITS"
+            echo
+            echo "</details>"
             if [ -n "$PREV" ]; then
               echo
               echo "**Полный список:** $REPO/compare/$PREV_LABEL...v$VERSION"
