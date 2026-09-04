@@ -201,7 +201,17 @@ jobs:
           VERSION="${{ needs.prepare.outputs.version }}"
           REPO="${{ github.server_url }}/${{ github.repository }}"
           SLUG="${{ github.repository }}"
-          PREV=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
+          PREV_SHA=$(git log --format='%H%x09%s' HEAD^ | grep -m1 -P '\tВерсия [0-9]' | cut -f1 || true)
+          PREV=""
+          PREV_LABEL=""
+          if [ -n "$PREV_SHA" ]; then
+            PREV="$PREV_SHA"
+            PREV_TAG="v$(git log -1 --format='%s' "$PREV_SHA" | sed 's|^Версия ||')"
+            PREV_LABEL="$PREV_SHA"
+            if [ "$(git rev-parse -q --verify "refs/tags/$PREV_TAG^{commit}" || true)" = "$PREV_SHA" ]; then
+              PREV_LABEL="$PREV_TAG"
+            fi
+          fi
 
           {
             sed -e "s|__VERSION__|$VERSION|g" -e "s|__REPO__|$REPO|g" -e "s|__SLUG__|$SLUG|g" .github/release-body.md
@@ -211,7 +221,7 @@ jobs:
             git log --no-merges --pretty='- %s' "${PREV:+$PREV..}HEAD" | grep -v '^- Версия ' || true
             if [ -n "$PREV" ]; then
               echo
-              echo "**Полный список:** $REPO/compare/$PREV...v$VERSION"
+              echo "**Полный список:** $REPO/compare/$PREV_LABEL...v$VERSION"
             fi
           } > release-body.rendered.md
 
