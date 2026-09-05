@@ -1,0 +1,424 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Scan.ScanTargetPicker"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Scan"
+             xmlns:views="clr-namespace:SpaceSnoop.Wpf.Views"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:ScanViewModel}"
+             d:DesignWidth="720"
+             IsVisibleChanged="OnIsVisibleChanged">
+
+    <UserControl.Resources>
+        <Style x:Key="TargetTile.Surface"
+               TargetType="Border"
+               BasedOn="{StaticResource Card.Inset}">
+            <Setter Property="BorderThickness"
+                    Value="2" />
+            <Setter Property="Padding"
+                    Value="10,8" />
+        </Style>
+
+        <Style x:Key="TargetTile"
+               TargetType="ListBoxItem">
+            <Setter Property="Margin"
+                    Value="0,0,10,10" />
+            <Setter Property="Cursor"
+                    Value="Hand" />
+            <Setter Property="ToolTip"
+                    Value="{Binding Path}" />
+            <Setter Property="AutomationProperties.Name"
+                    Value="{Binding AutomationName}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Tile"
+                                Style="{StaticResource TargetTile.Surface}"
+                                Width="200"
+                                Height="82"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                     Value="True">
+                                <Setter TargetName="Tile"
+                                        Property="Background"
+                                        Value="{DynamicResource Bg.Surface}" />
+                                <Setter TargetName="Tile"
+                                        Property="BorderBrush"
+                                        Value="{DynamicResource Border.Default}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected"
+                                     Value="True">
+                                <Setter TargetName="Tile"
+                                        Property="Background"
+                                        Value="{DynamicResource Accent.Soft}" />
+                                <Setter TargetName="Tile"
+                                        Property="BorderBrush"
+                                        Value="{DynamicResource Accent.Primary}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused"
+                                     Value="True">
+                                <Setter TargetName="Tile"
+                                        Property="BorderBrush"
+                                        Value="{DynamicResource Accent.Focus}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled"
+                                     Value="False">
+                                <Setter TargetName="Tile"
+                                        Property="Opacity"
+                                        Value="{DynamicResource Opacity.Disabled}" />
+                                <Setter Property="Cursor"
+                                        Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsMissingMedia}"
+                             Value="True">
+                    <Setter Property="IsEnabled"
+                            Value="False" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="TargetTile.Bar"
+               TargetType="ProgressBar"
+               BasedOn="{StaticResource {x:Type ProgressBar}}">
+            <Setter Property="MinHeight"
+                    Value="0" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding UsageLevel}"
+                             Value="{x:Static vm:DriveUsageLevel.Warning}">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.Warning}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding UsageLevel}"
+                             Value="{x:Static vm:DriveUsageLevel.Critical}">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.Error}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RecentChip"
+               TargetType="Border">
+            <Setter Property="Background"
+                    Value="{DynamicResource Bg.SurfaceAlt}" />
+            <Setter Property="BorderBrush"
+                    Value="{DynamicResource Border.Subtle}" />
+            <Setter Property="BorderThickness"
+                    Value="1" />
+            <Setter Property="CornerRadius"
+                    Value="{DynamicResource Radius.Pill}" />
+            <Setter Property="Margin"
+                    Value="0,0,8,8" />
+        </Style>
+
+        <Style x:Key="RecentChip.Select"
+               TargetType="Button"
+               BasedOn="{StaticResource Button.Ghost}">
+            <Setter Property="Padding"
+                    Value="10,4" />
+            <Setter Property="MinHeight"
+                    Value="0" />
+            <Setter Property="HorizontalContentAlignment"
+                    Value="Left" />
+        </Style>
+
+        <Style x:Key="RecentChip.Remove"
+               TargetType="Button"
+               BasedOn="{StaticResource Button.Ghost}">
+            <Setter Property="Padding"
+                    Value="6,4" />
+            <Setter Property="MinHeight"
+                    Value="0" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Muted}" />
+        </Style>
+    </UserControl.Resources>
+
+    <StackPanel x:Name="PickerBody">
+        <Grid Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0"
+                       Text="Что сканируем"
+                       Style="{StaticResource SectionTitle}"
+                       Foreground="{DynamicResource Fg.Secondary}"
+                       VerticalAlignment="Center" />
+
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal">
+                <Button Style="{StaticResource Button.Ghost}"
+                        Command="{Binding ClosePickerCommand}"
+                        Margin="0,0,6,0"
+                        ToolTip="Вернуться к результатам сканирования"
+                        AutomationProperties.Name="Вернуться к результатам сканирования"
+                        Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ArrowLeft}"
+                                                  Width="14"
+                                                  Height="14"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,6,0" />
+                        <TextBlock Text="К результатам"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
+                <Button Style="{StaticResource Button.Icon}"
+                    Command="{Binding RefreshDrivesCommand}"
+                    ToolTip="Обновить список дисков"
+                    AutomationProperties.Name="Обновить список дисков">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.RefreshCw}"
+                                              Width="15"
+                                              Height="15" />
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <ListBox x:Name="Volumes"
+                 ItemsSource="{Binding Drives.Volumes}"
+                 SelectedValuePath="Path"
+                 SelectedValue="{Binding SelectedDrive, Mode=OneWay}"
+                 SelectionChanged="OnVolumeSelectionChanged"
+                 MouseDoubleClick="OnVolumeDoubleClick"
+                 ItemContainerStyle="{StaticResource TargetTile}"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 Padding="0"
+                 AutomationProperties.Name="Диски"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 ScrollViewer.VerticalScrollBarVisibility="Disabled">
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <views:StretchWrapPanel />
+                </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+                <DataTemplate DataType="{x:Type vm:DriveItem}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <iconPacks:PackIconLucide Grid.Column="0"
+                                                      Kind="{Binding IconKind}"
+                                                      Width="15"
+                                                      Height="15"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,7,0"
+                                                      Foreground="{DynamicResource Fg.Secondary}" />
+
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding Title}"
+                                       VerticalAlignment="Center"
+                                       FontFamily="{DynamicResource Font.Sans}"
+                                       FontSize="{DynamicResource Font.Size.M}"
+                                       FontWeight="{DynamicResource Font.Weight.SemiBold}"
+                                       Foreground="{DynamicResource Fg.Primary}" />
+
+                            <TextBlock Grid.Column="2"
+                                       Text="{Binding VolumeLabel}"
+                                       VerticalAlignment="Center"
+                                       Margin="7,0,0,0"
+                                       TextTrimming="CharacterEllipsis"
+                                       FontFamily="{DynamicResource Font.Sans}"
+                                       FontSize="{DynamicResource Font.Size.S}"
+                                       Foreground="{DynamicResource Fg.Secondary}" />
+
+                            <TextBlock Grid.Column="3"
+                                       Text="{Binding TypeHint}"
+                                       VerticalAlignment="Center"
+                                       Margin="7,0,0,0"
+                                       FontFamily="{DynamicResource Font.Sans}"
+                                       FontSize="{DynamicResource Font.Size.XS}"
+                                       Foreground="{DynamicResource Fg.Muted}" />
+                        </Grid>
+
+                        <Grid Grid.Row="1"
+                              Margin="0,9,0,7"
+                              Visibility="{Binding HasUsage, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <ProgressBar Grid.Column="0"
+                                         Style="{StaticResource TargetTile.Bar}"
+                                         Height="5"
+                                         VerticalAlignment="Center"
+                                         Minimum="0"
+                                         Maximum="1"
+                                         Value="{Binding UsedRatio, Mode=OneWay}" />
+
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding RatioCaption}"
+                                       VerticalAlignment="Center"
+                                       Margin="8,0,0,0"
+                                       FontFamily="{DynamicResource Font.Sans}"
+                                       FontSize="{DynamicResource Font.Size.XS}"
+                                       FontWeight="{DynamicResource Font.Weight.SemiBold}"
+                                       Foreground="{DynamicResource Fg.Secondary}" />
+                        </Grid>
+
+                        <TextBlock Grid.Row="2"
+                                   Text="{Binding Caption}"
+                                   TextTrimming="CharacterEllipsis"
+                                   FontFamily="{DynamicResource Font.Sans}"
+                                   FontSize="{DynamicResource Font.Size.XS}"
+                                   Foreground="{DynamicResource Fg.Muted}" />
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <Button Command="{Binding BrowseCommand}"
+                HorizontalAlignment="Left"
+                Width="200"
+                Height="82"
+                Margin="0,0,10,10"
+                Cursor="Hand"
+                ToolTip="Выбрать другой каталог для анализа"
+                AutomationProperties.Name="Другой каталог">
+            <Button.Template>
+                <ControlTemplate TargetType="Button">
+                    <Grid>
+                        <Rectangle x:Name="Dash"
+                                   RadiusX="10"
+                                   RadiusY="10"
+                                   StrokeThickness="2"
+                                   StrokeDashArray="4 3"
+                                   Stroke="{DynamicResource Border.Default}"
+                                   Fill="Transparent"
+                                   SnapsToDevicePixels="True" />
+                        <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderOpen}"
+                                                      Width="15"
+                                                      Height="15"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,8,0"
+                                                      Foreground="{DynamicResource Fg.Secondary}" />
+                            <TextBlock x:Name="Caption"
+                                       Text="Другой каталог…"
+                                       VerticalAlignment="Center"
+                                       FontFamily="{DynamicResource Font.Sans}"
+                                       FontSize="{DynamicResource Font.Size.S}"
+                                       Foreground="{DynamicResource Fg.Secondary}" />
+                        </StackPanel>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver"
+                                 Value="True">
+                            <Setter TargetName="Dash"
+                                    Property="Stroke"
+                                    Value="{DynamicResource Accent.Primary}" />
+                            <Setter TargetName="Caption"
+                                    Property="Foreground"
+                                    Value="{DynamicResource Fg.Primary}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused"
+                                 Value="True">
+                            <Setter TargetName="Dash"
+                                    Property="Stroke"
+                                    Value="{DynamicResource Accent.Focus}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled"
+                                 Value="False">
+                            <Setter Property="Opacity"
+                                    Value="{DynamicResource Opacity.Disabled}" />
+                            <Setter Property="Cursor"
+                                    Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Button.Template>
+        </Button>
+
+        <StackPanel Margin="0,8,0,0">
+            <StackPanel.Style>
+                <Style TargetType="StackPanel">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Drives.RecentDirectories.Count}"
+                                     Value="0">
+                            <Setter Property="Visibility"
+                                    Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </StackPanel.Style>
+
+            <TextBlock Text="Недавние"
+                       Style="{StaticResource Caption}"
+                       Margin="0,0,0,8" />
+
+            <ItemsControl ItemsSource="{Binding Drives.RecentDirectories}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <views:StretchWrapPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:DriveItem}">
+                        <Border Style="{StaticResource RecentChip}"
+                                ToolTip="{Binding Path}">
+                            <StackPanel Orientation="Horizontal">
+                                <Button Style="{StaticResource RecentChip.Select}"
+                                        Command="{Binding DataContext.SelectTargetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding Path}"
+                                        AutomationProperties.Name="{Binding AutomationName}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Folder}"
+                                                                  Width="13"
+                                                                  Height="13"
+                                                                  VerticalAlignment="Center"
+                                                                  Margin="0,0,7,0"
+                                                                  Foreground="{DynamicResource Fg.Secondary}" />
+                                        <TextBlock Text="{Binding Title}"
+                                                   VerticalAlignment="Center"
+                                                   MaxWidth="260"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   FontFamily="{DynamicResource Font.Mono}"
+                                                   FontSize="{DynamicResource Font.Size.S}" />
+                                    </StackPanel>
+                                </Button>
+
+                                <Button Style="{StaticResource RecentChip.Remove}"
+                                        Command="{Binding DataContext.ForgetTargetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding Path}"
+                                        ToolTip="Убрать из недавних"
+                                        AutomationProperties.Name="{Binding Title, StringFormat='Убрать {0} из недавних'}">
+                                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.X}"
+                                                              Width="11"
+                                                              Height="11"
+                                                              VerticalAlignment="Center" />
+                                </Button>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

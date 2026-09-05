@@ -31,8 +31,10 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsBusy))]
-    [NotifyPropertyChangedFor(nameof(ShowEmptyState))]
+    [NotifyPropertyChangedFor(nameof(ShowTargetPicker))]
+    [NotifyPropertyChangedFor(nameof(ShowScanResult))]
     [NotifyPropertyChangedFor(nameof(ShowScanningState))]
+    [NotifyCanExecuteChangedFor(nameof(OpenPickerCommand))]
     [NotifyCanExecuteChangedFor(nameof(StartCommand))]
     [NotifyCanExecuteChangedFor(nameof(BrowseCommand))]
     [NotifyCanExecuteChangedFor(nameof(StopCommand))]
@@ -48,9 +50,19 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     [NotifyPropertyChangedFor(nameof(TreeVisible))]
     [NotifyPropertyChangedFor(nameof(TreemapVisible))]
     [NotifyPropertyChangedFor(nameof(DuplicatesVisible))]
-    [NotifyPropertyChangedFor(nameof(ShowEmptyState))]
+    [NotifyPropertyChangedFor(nameof(ShowTargetPicker))]
+    [NotifyPropertyChangedFor(nameof(ShowScanResult))]
     [NotifyPropertyChangedFor(nameof(ShowScanningState))]
+    [NotifyCanExecuteChangedFor(nameof(OpenPickerCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ClosePickerCommand))]
     private bool _hasResult;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowTargetPicker))]
+    [NotifyPropertyChangedFor(nameof(ShowScanResult))]
+    [NotifyCanExecuteChangedFor(nameof(OpenPickerCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ClosePickerCommand))]
+    private bool _isPickerOpen;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TreeVisible))]
@@ -124,7 +136,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
             value => SelectedNode = value,
             () => HasResult = false,
             () => IsScanning,
-            () => Drives.ReloadLabels());
+            () => Drives.ReloadLabels(SelectedDrive));
 
         _archive = new(archiveDialogFactory,
             dialogs,
@@ -134,7 +146,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
             Inspector,
             () => SelectedNode,
             Marks,
-            () => Drives.ReloadLabels());
+            () => Drives.ReloadLabels(SelectedDrive));
 
         Duplicates = new(dialogs,
             duplicateDialogFactory,
@@ -201,7 +213,9 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
     public bool DuplicatesVisible => HasResult && ViewMode == ScanViewMode.Duplicates;
 
-    public bool ShowEmptyState => !HasResult && !IsScanning;
+    public bool ShowTargetPicker => !IsScanning && (!HasResult || IsPickerOpen);
+
+    public bool ShowScanResult => !ShowTargetPicker;
 
     public bool ShowScanningState => !HasResult && IsScanning;
 
@@ -414,6 +428,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
         _cts = CancellationTokenSource.CreateLinkedTokenSource(external);
         var token = _cts.Token;
+        IsPickerOpen = false;
         IsScanning = true;
         ScanWasCancelled = false;
         ScanTargetPath = path;

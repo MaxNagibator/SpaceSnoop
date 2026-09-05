@@ -202,6 +202,49 @@ public class BindingSmokeTests
     }
 
     [Test]
+    public void Выбор_цели_сканирования_не_теряет_биндинги()
+    {
+        var page = _services.GetRequiredService<ScanViewModel>();
+        var recent = _fixture.Root;
+
+        Assert.That(_shell.TryNavigate(SectionKey.Scan), Is.True, "Страница «Сканирование» не открылась.");
+        Settle();
+
+        _sink.Clear();
+
+        if (!page.Drives.HasDrive(recent))
+        {
+            page.Drives.AddDrive(recent);
+        }
+
+        page.IsPickerOpen = true;
+
+        Settle();
+
+        var volumes = ViewCapture.Find(_window, "Volumes") as ListBox;
+
+        try
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.That(page.ShowTargetPicker, Is.True, "Открытый чипом выбор цели не показан.");
+                Assert.That(volumes?.IsVisible, Is.True, "Плитки дисков не показаны.");
+                Assert.That(volumes?.Items, Is.Not.Empty, "Ни один том не попал в плитки.");
+                Assert.That(page.Drives.RecentDirectories, Is.Not.Empty, "Каталог не попал в недавние.");
+                Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
+            });
+
+            SaveFrame(ViewCapture.Find(_window, "PickerBody"), "scan-target-picker");
+        }
+        finally
+        {
+            page.IsPickerOpen = false;
+            page.Drives.RemoveDrive(recent);
+            Settle();
+        }
+    }
+
+    [Test]
     public void Панель_дубликатов_не_теряет_биндинги()
     {
         var report = FindDuplicates();
@@ -226,7 +269,7 @@ public class BindingSmokeTests
                 Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
             });
 
-            SaveFrame(panel);
+            SaveFrame(panel, "scan-duplicates");
         }
         finally
         {
@@ -258,7 +301,7 @@ public class BindingSmokeTests
         return new DuplicateFinder().Find(tree, DuplicateOptions.Default, null, CancellationToken.None);
     }
 
-    private static void SaveFrame(FrameworkElement? panel)
+    private static void SaveFrame(FrameworkElement? panel, string name)
     {
         if (panel is null)
         {
@@ -266,9 +309,9 @@ public class BindingSmokeTests
         }
 
         var directory = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "spacesnoop-frames"));
-        var file = Path.Combine(directory.FullName, "scan-duplicates.png");
+        var file = Path.Combine(directory.FullName, $"{name}.png");
         ViewCapture.Save(panel, file, AppDefaults.ViewCaptureScaleDefault);
-        TestContext.Out.WriteLine($"Кадр панели дубликатов: {file}");
+        TestContext.Out.WriteLine($"Кадр «{name}»: {file}");
     }
 
     [Test]

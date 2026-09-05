@@ -18,43 +18,30 @@
 
             <WrapPanel Grid.Column="0"
                        VerticalAlignment="Center">
-                <StackPanel Orientation="Horizontal"
-                            VerticalAlignment="Center"
-                            Margin="0,2,14,2">
-                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.HardDrive}"
-                                              Width="16"
-                                              Height="16"
-                                              VerticalAlignment="Center"
-                                              Margin="2,0,10,0"
-                                              Foreground="{DynamicResource Fg.Secondary}" />
-                    <ComboBox ItemsSource="{Binding Drives.Items}"
-                              SelectedValue="{Binding SelectedDrive}"
-                              SelectedValuePath="Path"
-                              DropDownOpened="OnDrivesDropDownOpened"
-                              Style="{StaticResource ComboBox.Toolbar}"
-                              MinWidth="180"
-                              MaxWidth="340"
-                              ToolTip="Диск или каталог для анализа">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate DataType="{x:Type vm:DriveItem}">
-                                <TextBlock Text="{Binding Label}"
-                                           TextTrimming="CharacterEllipsis" />
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
-                </StackPanel>
-
                 <Button Style="{StaticResource Button.Secondary}"
-                        Command="{Binding BrowseCommand}"
+                        Command="{Binding OpenPickerCommand}"
                         Margin="0,2,14,2"
-                        ToolTip="Выбрать другой каталог для анализа">
+                        MaxWidth="360"
+                        Visibility="{Binding ShowScanResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}"
+                        ToolTip="Выбрать другой диск или каталог"
+                        AutomationProperties.Name="{Binding SelectedDrive, StringFormat='Цель сканирования: {0}. Выбрать другую'}">
                     <StackPanel Orientation="Horizontal">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderOpen}"
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.HardDrive}"
                                                   Width="15"
                                                   Height="15"
                                                   VerticalAlignment="Center"
-                                                  Margin="0,0,6,0" />
-                        <TextBlock Text="Каталог…" />
+                                                  Margin="0,0,8,0"
+                                                  Foreground="{DynamicResource Fg.Secondary}" />
+                        <TextBlock Text="{Binding SelectedDrive}"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   FontFamily="{DynamicResource Font.Mono}" />
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ChevronDown}"
+                                                  Width="13"
+                                                  Height="13"
+                                                  VerticalAlignment="Center"
+                                                  Margin="8,0,0,0"
+                                                  Foreground="{DynamicResource Fg.Muted}" />
                     </StackPanel>
                 </Button>
 

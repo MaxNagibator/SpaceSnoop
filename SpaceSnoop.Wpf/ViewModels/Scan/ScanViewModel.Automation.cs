@@ -118,7 +118,7 @@ public sealed partial class ScanViewModel : IScanAutomation
         HasResult = true;
         Duplicates.Clear();
         Marks.RecountMarked();
-        Drives.ReloadLabels();
+        Drives.ReloadLabels(SelectedDrive);
 
         _logger.ScanCompleted(result.AbsolutePath,
             result.TotalSizeText,
