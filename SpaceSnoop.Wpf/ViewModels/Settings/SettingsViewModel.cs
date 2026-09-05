@@ -1,6 +1,6 @@
 ﻿using KeepShell.Services;
+using MahApps.Metro.IconPacks;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.IO.Compression;
 
 namespace SpaceSnoop.Wpf.ViewModels.Settings;
@@ -16,7 +16,19 @@ public sealed record EnumOption<T>(T Value, string Label) where T : struct, Enum
 public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
 {
     private readonly ISettingsStore _settings;
+    private readonly IDialogService _dialogs;
+    private readonly AgentBackends _agentBackends;
+    private readonly IClipboardService _clipboard;
+    private readonly IShellLauncher _shell;
+    private readonly IApplicationLifetime _lifetime;
+    private readonly ToastNotifier _notifier;
+    private readonly IReadOnlyDictionary<string, SettingsResetPlan> _resetPlans;
+    private readonly IReadOnlyDictionary<string, SettingsResetField> _resetFields;
     private readonly ILogger<SettingsViewModel> _logger;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(McpConnectSnippet))]
+    private int _selectedMcpFormatIndex;
 
     public SettingsViewModel(
         ThemeViewModel theme,
@@ -25,19 +37,76 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         ScanPreferences scan,
         UpdatePreferences update,
         AppUpdateViewModel updater,
+        McpPreferences mcp,
+        McpServerHost mcpServer,
+        AgentPreferences agent,
+        AgentModelSelector agentModels,
+        AgentBackends agentBackends,
         ISettingsStore settings,
+        IDialogService dialogs,
+        IClipboardService clipboard,
+        IShellLauncher shellLauncher,
+        IApplicationLifetime lifetime,
+        ToastNotifier notifier,
         ILogger<SettingsViewModel> logger)
     {
+        Agent = agent;
+        AgentModel = agentModels;
+        _agentBackends = agentBackends;
         Theme = theme;
         Shell = shell;
         Operations = operations;
         Scan = scan;
         Update = update;
         Updater = updater;
+        Mcp = mcp;
+        McpServer = mcpServer;
         _settings = settings;
+        _dialogs = dialogs;
+        _clipboard = clipboard;
+        _shell = shellLauncher;
+        _lifetime = lifetime;
+        _notifier = notifier;
         _logger = logger;
 
+        _resetPlans = SettingsResetCatalog.Build(theme, shell, scan, operations, update, mcp, agent, settings, ResetField);
+        SettingsResetCatalog.EnsureExhaustive(Sections, _resetPlans);
+
+        _resetFields = _resetPlans.Values
+            .SelectMany(plan => plan.Fields)
+            .ToDictionary(field => field.Key, StringComparer.Ordinal);
+
         Theme.PropertyChanged += OnThemePropertyChanged;
+        Mcp.PropertyChanged += OnMcpPropertyChanged;
+        Shell.PropertyChanged += OnPreferencesPropertyChanged;
+        Scan.PropertyChanged += OnPreferencesPropertyChanged;
+        Operations.PropertyChanged += OnPreferencesPropertyChanged;
+        Update.PropertyChanged += OnPreferencesPropertyChanged;
+        Agent.PropertyChanged += OnPreferencesPropertyChanged;
+
+        Sections.Restore(settings.GetStringValue(SettingsKeys.SettingsSection));
+        Sections.PropertyChanged += OnSectionsPropertyChanged;
+    }
+
+    public IReadOnlyDictionary<string, SettingsResetPlan> ResetPlans => _resetPlans;
+
+    public IReadOnlyDictionary<string, SettingsResetField> ResetFields => _resetFields;
+
+    public SettingsSectionList Sections { get; } = CreateSections();
+
+    public static SettingsSectionList CreateSections()
+    {
+        return new(
+            new SettingsSection("appearance", "Внешний вид", PackIconLucideKind.Palette, "тема оформления светлая тёмная tarkov масштаб шрифта размер текста заголовок страницы уведомления тосты производительность отклик память диагностика"),
+            new SettingsSection("startup", "Запуск", PackIconLucideKind.Power, "стартовая страница навигационный рейл свернуть права администратора предупреждение"),
+            new SettingsSection("scan", "Сканирование", PackIconLucideKind.HardDrive, "многопоточный обход потоки параллелизм тепловая подсветка интенсивность проводник открытие файлов тип носителя ssd hdd mft таблица ntfs жёсткие ссылки движок администратор подкаталог диск целиком"),
+            new SettingsSection("sync", "Синхронизация", PackIconLucideKind.FolderSync, "исключения glob паттерны автодополнение путей git репозиторий группировка служебных каталогов плоский вид перезапись затираемый файл корзина"),
+            new SettingsSection("delete", "Удаление", PackIconLucideKind.Trash2, "корзина безвозвратно подтверждение помеченные элементы"),
+            new SettingsSection("archive", "Архивация", PackIconLucideKind.FileArchive, "zip сжатие уровень упаковать оригинал корзина"),
+            new SettingsSection("update", "Обновления", PackIconLucideKind.Download, "github релизы репозиторий версия проверка скачивание изменения changelog"),
+            new SettingsSection("storage", "Файлы и хранение", PackIconLucideKind.Folder, "расположение данных appdata portable settings.toml путь логи журналы"),
+            new SettingsSection("mcp", "MCP-сервер", PackIconLucideKind.Plug, "порт токен подключение json cli адрес изменяющие операции агент"),
+            new SettingsSection("agent", "Агент-чат", PackIconLucideKind.MessageCircle, "шнырь claude codex opencode cli модель глубина рассуждений транскрипт согласие"));
     }
 
     public ThemeViewModel Theme { get; }
@@ -51,6 +120,56 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     public UpdatePreferences Update { get; }
 
     public AppUpdateViewModel Updater { get; }
+
+    public McpPreferences Mcp { get; }
+
+    public McpServerHost McpServer { get; }
+
+    public AgentPreferences Agent { get; }
+
+    public AgentModelSelector AgentModel { get; }
+
+    public IReadOnlyList<SegmentOption> AgentBackendOptions => SettingsOptions.AgentBackends;
+
+    public int SelectedAgentBackendIndex
+    {
+        get => AgentBackendChoice.Order.IndexOf(Agent.Backend);
+        set
+        {
+            if (value < 0 || value >= AgentBackendChoice.Order.Length || AgentBackendChoice.Order[value] == Agent.Backend)
+            {
+                return;
+            }
+
+            Agent.Backend = AgentBackendChoice.Order[value];
+            NotifyAgentBackendChanged();
+        }
+    }
+
+    public string AgentCliPathLabel => $"Путь к {_agentBackends.Current.CliName}.exe";
+
+    public string AgentConsentLabel => $"Согласие на отправку данных в {_agentBackends.Current.DisplayName} дано";
+
+    public string AgentConsentHint => $"Согласие даётся каждому CLI отдельно. Снимите галку, чтобы отозвать его для {_agentBackends.Current.DisplayName} – чат спросит согласие перед следующим сообщением.";
+
+    public string AgentModelHint => _agentBackends.Current.ModelHint;
+
+    public bool AgentShellWarning => _agentBackends.Current.HasBuiltInShell;
+
+    public bool McpElevatedWarning => Mcp.Enabled && AdminElevation.IsElevated;
+
+    public IReadOnlyList<SegmentOption> McpConnectFormats { get; } =
+    [
+        new(PackIconLucideKind.Braces, "JSON", "Фрагмент конфигурации MCP-клиента (mcpServers)"),
+        new(PackIconLucideKind.Bot, "Claude Code", "Команда claude mcp add"),
+        new(PackIconLucideKind.SquareTerminal, "Codex", "Блок для ~/.codex/config.toml"),
+        new(PackIconLucideKind.SquareCode, "OpenCode", "Блок для opencode.json"),
+        new(PackIconLucideKind.Link, "Адрес", "Адрес и заголовок для клиента, который спрашивает их формой"),
+    ];
+
+    public string McpEndpointUrl => $"http://127.0.0.1:{Mcp.Port}{AppDefaults.McpEndpointPath}";
+
+    public string McpConnectSnippet => McpConnectSnippets.For(SelectedMcpFormatIndex, McpEndpointUrl, Mcp.Token);
 
     public IReadOnlyList<string> UpdateRepositoryPresets { get; } =
     [
@@ -73,48 +192,26 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         {
             if (value != AppStorage.UseAppData)
             {
-                ChangeStorageLocation(value);
+                _ = ChangeStorageLocationAsync(value)
+                    .ContinueWith(task => _logger.StorageLocationChangeFailed(task.Exception!, AppStorage.DirectoryFor(value)),
+                        CancellationToken.None,
+                        TaskContinuationOptions.OnlyOnFaulted,
+                        TaskScheduler.Default);
             }
 
             OnPropertyChanged();
         }
     }
 
-    public IReadOnlyList<EnumOption<AppTheme>> ThemeOptions { get; } =
-    [
-        new(AppTheme.Light, "Светлая"),
-        new(AppTheme.Dark, "Тёмная"),
-        new(AppTheme.Tarkov, "Tarkov"),
-    ];
+    public IReadOnlyList<EnumOption<AppTheme>> ThemeOptions => SettingsOptions.Themes;
 
-    public IReadOnlyList<EnumOption<StartupPage>> StartupOptions { get; } =
-    [
-        new(StartupPage.LastUsed, "Последняя активная"),
-        new(StartupPage.Scan, "Сканирование"),
-        new(StartupPage.Sync, "Синхронизация"),
-        new(StartupPage.Logs, "Логи"),
-    ];
+    public IReadOnlyList<EnumOption<StartupPage>> StartupOptions => SettingsOptions.StartupPages;
 
-    public IReadOnlyList<EnumOption<DeleteMode>> DeleteModeOptions { get; } =
-    [
-        new(DeleteMode.RecycleBin, "В корзину"),
-        new(DeleteMode.Permanent, "Безвозвратно"),
-    ];
+    public IReadOnlyList<EnumOption<DeleteMode>> DeleteModeOptions => SettingsOptions.DeleteModes;
 
-    public IReadOnlyList<EnumOption<CompressionLevel>> CompressionOptions { get; } =
-    [
-        new(CompressionLevel.Optimal, "Оптимальное"),
-        new(CompressionLevel.SmallestSize, "Максимальное (медленно)"),
-        new(CompressionLevel.Fastest, "Быстрое"),
-        new(CompressionLevel.NoCompression, "Без сжатия (только упаковка)"),
-    ];
+    public IReadOnlyList<EnumOption<CompressionLevel>> CompressionOptions => SettingsOptions.CompressionLevels;
 
-    public IReadOnlyList<EnumOption<GitFolderPromptChoice>> GitFolderOptions { get; } =
-    [
-        new(GitFolderPromptChoice.Ask, "Спрашивать"),
-        new(GitFolderPromptChoice.Skip, "Всегда пропускать"),
-        new(GitFolderPromptChoice.Keep, "Синхронизировать"),
-    ];
+    public IReadOnlyList<EnumOption<GitFolderPromptChoice>> GitFolderOptions => SettingsOptions.GitFolders;
 
     public EnumOption<AppTheme> SelectedThemeOption
     {
@@ -174,45 +271,84 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         {
             _settings.SetEnum(SettingsKeys.SyncGitFolders, value.Value);
             OnPropertyChanged();
+            RefreshResetAvailability();
+        }
+    }
+
+    private void OnSectionsPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SettingsSectionList.Selected) && Sections.Selected is not null)
+        {
+            _settings.SetValue(SettingsKeys.SettingsSection, Sections.Selected.Key);
+        }
+    }
+
+    private void OnMcpPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        RefreshResetAvailability();
+
+        if (e.PropertyName is nameof(McpPreferences.Port) or nameof(McpPreferences.Token))
+        {
+            OnPropertyChanged(nameof(McpEndpointUrl));
+            OnPropertyChanged(nameof(McpConnectSnippet));
+        }
+
+        if (e.PropertyName == nameof(McpPreferences.Enabled))
+        {
+            OnPropertyChanged(nameof(McpElevatedWarning));
         }
     }
 
     private void OnThemePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        RefreshResetAvailability();
+
         if (e.PropertyName == nameof(ThemeViewModel.Current))
         {
             OnPropertyChanged(nameof(SelectedThemeOption));
         }
     }
 
-    private void ChangeStorageLocation(bool useAppData)
+    private async Task ChangeStorageLocationAsync(bool useAppData)
     {
         var source = AppStorage.DataDirectory;
         var destination = AppStorage.DirectoryFor(useAppData);
         var place = useAppData ? "в папке AppData" : "рядом с программой";
 
-        var choice = StyledMessageBox.Show($"""
-                                            Хранить файлы приложения {place}:
-                                            {destination}
+        var migrate = new ConfirmChoice("Перенести файлы", ConfirmChoiceKind.Primary);
 
-                                            Перенести туда текущие настройки, логи и журналы (Нет – оставить их на старом месте)?
-                                            После смены приложение будет перезапущено.
-                                            """,
+        var confirm = new ConfirmDialogViewModel(
             "Расположение данных",
-            MessageBoxButton.YesNoCancel,
-            MessageBoxImage.Question);
+            PackIconLucideKind.HardDrive,
+            [
+                new ConfirmTextLine($"Файлы приложения будут храниться {place}:"),
+                new ConfirmTextLine(destination, ConfirmTextTone.Muted),
+                new ConfirmGapLine(),
+                new ConfirmTextLine("Текущие настройки, логи и журналы можно перенести туда или оставить на старом месте."),
+                new ConfirmTextLine("После смены приложение перезапустится."),
+            ],
+            [
+                new("Отмена", ConfirmChoiceKind.Dismissive),
+                new("Оставить файлы на месте", ConfirmChoiceKind.Secondary),
+                migrate,
+            ]);
 
-        if (choice == MessageBoxResult.Cancel)
+        if (!await _dialogs.ShowAsync(confirm))
         {
             return;
         }
 
         try
         {
-            if (choice == MessageBoxResult.Yes)
+            if (ReferenceEquals(confirm.Chosen, migrate))
             {
                 _settings.Flush();
-                AppStorage.Migrate(source, destination);
+                var left = AppStorage.Migrate(source, destination);
+
+                if (left > 0)
+                {
+                    _logger.StorageSourceFilesLeft(left);
+                }
             }
 
             AppStorage.SetUseAppData(useAppData);
@@ -221,22 +357,86 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         catch (Exception exception)
         {
             _logger.StorageLocationChangeFailed(exception, destination);
-            StyledMessageBox.Show($"Не удалось изменить расположение данных.{Environment.NewLine}{Environment.NewLine}{exception.Message}",
-                "Расположение данных",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
+            _dialogs.Error("Расположение данных", $"Не удалось изменить расположение данных.{Environment.NewLine}{Environment.NewLine}{exception.Message}");
 
             return;
         }
 
         var executable = Environment.ProcessPath;
 
-        if (!string.IsNullOrEmpty(executable))
+        if (!string.IsNullOrEmpty(executable) && !_shell.Start(executable))
         {
-            Process.Start(executable);
+            _dialogs.Error("Расположение данных", "Данные перенесены, но перезапустить программу не удалось – закройте и откройте её сами.");
+
+            return;
         }
 
-        Application.Current.Shutdown();
+        _lifetime.Shutdown();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanResetSection))]
+    private void ResetSection(string? sectionKey)
+    {
+        if (sectionKey is null || !_resetPlans.TryGetValue(sectionKey, out var plan) || !plan.CanReset)
+        {
+            return;
+        }
+
+        plan.Reset();
+        NotifyDerivedOptions();
+        RefreshResetAvailability();
+
+        var title = Sections[sectionKey].Title;
+        _logger.SettingsSectionReset(title, string.Join(", ", plan.Restored));
+        _notifier.Notify(plan.Describe(title));
+    }
+
+    private bool CanResetSection(string? sectionKey)
+    {
+        return sectionKey is not null && _resetPlans.TryGetValue(sectionKey, out var plan) && plan.CanReset;
+    }
+
+    private void ResetField(SettingsResetField field)
+    {
+        field.Apply();
+        NotifyDerivedOptions();
+        RefreshResetAvailability();
+
+        _logger.SettingsFieldReset(field.Label, field.DefaultText);
+        _notifier.Notify($"«{field.Label}» вернулось к заводскому значению: {field.DefaultText}.");
+    }
+
+    private void RefreshResetAvailability()
+    {
+        foreach (var field in _resetFields.Values)
+        {
+            field.RefreshAvailability();
+        }
+    }
+
+    private void OnPreferencesPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        RefreshResetAvailability();
+    }
+
+    private void NotifyDerivedOptions()
+    {
+        OnPropertyChanged(nameof(SelectedThemeOption));
+        OnPropertyChanged(nameof(SelectedStartupOption));
+        OnPropertyChanged(nameof(SelectedDeleteModeOption));
+        OnPropertyChanged(nameof(SelectedCompressionOption));
+        OnPropertyChanged(nameof(SelectedGitFolderOption));
+        NotifyAgentBackendChanged();
+    }
+
+    private void NotifyAgentBackendChanged()
+    {
+        OnPropertyChanged(nameof(SelectedAgentBackendIndex));
+        OnPropertyChanged(nameof(AgentCliPathLabel));
+        OnPropertyChanged(nameof(AgentShellWarning));
+        OnPropertyChanged(nameof(AgentModelHint));
+        OnPropertyChanged(nameof(AgentConsentLabel));
+        OnPropertyChanged(nameof(AgentConsentHint));
     }
 
     [RelayCommand]
@@ -251,30 +451,24 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         try
         {
             _settings.Flush();
-
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = SystemExecutable.Explorer,
-                Arguments = $"/select,\"{SettingsFilePath}\"",
-                UseShellExecute = true,
-            });
         }
         catch (Exception exception)
         {
-            _logger.ShowSettingsFileFailed(exception, SettingsFilePath);
+            _logger.SettingsFlushFailed(exception, SettingsFilePath);
         }
+
+        _shell.Reveal(SettingsFilePath);
+    }
+
+    [RelayCommand]
+    private void CopyMcpConnection()
+    {
+        _clipboard.TrySetText(McpConnectSnippet);
     }
 
     [RelayCommand]
     private void CopySettingsPath()
     {
-        try
-        {
-            Clipboard.SetText(SettingsFilePath);
-        }
-        catch (Exception exception)
-        {
-            _logger.CopySettingsPathFailed(exception);
-        }
+        _clipboard.TrySetText(SettingsFilePath);
     }
 }

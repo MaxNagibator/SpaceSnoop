@@ -52,14 +52,24 @@ public partial class ScanView : UserControl, IView<ScanViewModel>
         }
     }
 
+    private void OnContentAreaSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (e.WidthChanged)
+        {
+            ApplyInspectorLayout();
+        }
+    }
+
     private void OnInspectorSplitterDragCompleted(object sender, DragCompletedEventArgs e)
     {
-        if (_vm is null || _vm.Inspector.IsInspectorCollapsed)
+        var inspector = _vm?.Inspector;
+
+        if (inspector is null || inspector.IsInspectorCollapsed)
         {
             return;
         }
 
-        _vm.Inspector.SetInspectorWidth(InspectorColumn.ActualWidth);
+        inspector.SetInspectorWidth(InspectorColumn.ActualWidth);
 
         ApplyInspectorLayout();
     }
@@ -97,13 +107,18 @@ public partial class ScanView : UserControl, IView<ScanViewModel>
         {
             InspectorColumn.SetCurrentValue(ColumnDefinition.MinWidthProperty, RailWidth);
             InspectorColumn.SetCurrentValue(ColumnDefinition.WidthProperty, new GridLength(RailWidth));
-            SplitterColumn.SetCurrentValue(ColumnDefinition.WidthProperty, new GridLength(0));
         }
         else
         {
             InspectorColumn.SetCurrentValue(ColumnDefinition.MinWidthProperty, MinPanelWidth);
-            InspectorColumn.SetCurrentValue(ColumnDefinition.WidthProperty, new GridLength(_vm.Inspector.InspectorWidth));
-            SplitterColumn.SetCurrentValue(ColumnDefinition.WidthProperty, new GridLength(6));
+            InspectorColumn.SetCurrentValue(ColumnDefinition.WidthProperty, new GridLength(Math.Min(_vm.Inspector.InspectorWidth, AvailableInspectorWidth())));
         }
+    }
+
+    private double AvailableInspectorWidth()
+    {
+        var free = ContentArea.ActualWidth - StructureColumn.MinWidth - SplitterColumn.ActualWidth;
+
+        return free > MinPanelWidth ? free : MinPanelWidth;
     }
 }

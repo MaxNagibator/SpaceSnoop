@@ -10,7 +10,7 @@ public abstract class SpaceBase(string name, SpaceBase? parent, DateTime creatio
     /// <summary>
     /// Название директории.
     /// </summary>
-    public string Name { get; } = string.Intern(name);
+    public string Name { get; } = name;
 
     /// <summary>
     /// Полный путь до директории.

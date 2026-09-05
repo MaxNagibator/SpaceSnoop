@@ -1,15 +1,21 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.VisualBasic.FileIO;
+using System.Diagnostics;
 using System.Security;
 
 namespace SpaceSnoop.Core;
 
-public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = true)
+public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = true, bool recycleOverwritten = false)
 {
+    private const string TempSuffix = ".sstmp";
+    private const int TempNameAttempts = 20;
+
     public SyncReport Execute(ComparisonResult comparisonResult, CancellationToken cancel, IProgress<OperationProgress>? progress = null)
     {
         var report = new SyncReport();
-        ExecuteRecursive(comparisonResult.Root, comparisonResult.LeftPath, comparisonResult.RightPath, report, progress, cancel);
+        var tracker = new TransferTracker(progress, report);
+        var blocked = new Dictionary<(DirectoryComparison Directory, SyncAction Action), bool>();
+        ExecuteRecursive(comparisonResult.Root, comparisonResult.LeftPath, comparisonResult.RightPath, report, tracker, cancel, DeleteGate.Open, blocked);
         return report;
     }
 
@@ -39,6 +45,8 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
                 report.Mismatches.Add(new(item.RelativePath, item.Action, reason));
             }
         }
+
+        report.MarkVerified();
     }
 
     private static string? VerifyCopy(string source, string destination)
@@ -59,9 +67,14 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
 
             var sourceFile = new FileInfo(source);
 
-            return sourceFile.Exists && !DirectoryComparer.FilesIdentical(sourceFile, destinationFile)
-                ? "содержимое расходится после копирования"
-                : null;
+            if (!sourceFile.Exists)
+            {
+                return "источник исчез после копирования";
+            }
+
+            return DirectoryComparer.FilesIdentical(sourceFile, destinationFile)
+                ? null
+                : "содержимое расходится после копирования";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SecurityException)
         {
@@ -93,18 +106,51 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         };
     }
 
-    private static void CopyAtomic(string source, string destination)
+    private static string ReserveTempPath(string destination)
     {
-        var temp = destination + ".sstmp";
+        for (var index = 1; index <= TempNameAttempts; index++)
+        {
+            var temp = index == 1 ? destination + TempSuffix : $"{destination}.{index}{TempSuffix}";
+
+            if (TryCreateExclusive(temp))
+            {
+                return temp;
+            }
+        }
+
+        throw new IOException($"Не удалось занять временное имя рядом с «{destination}»");
+    }
+
+    private static bool TryCreateExclusive(string path)
+    {
+        try
+        {
+            using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException && (File.Exists(path) || Directory.Exists(path)))
+        {
+            return false;
+        }
+    }
+
+    private void CopyAtomic(string source, string destination, TransferTracker tracker, CancellationToken cancel)
+    {
+        var temp = ReserveTempPath(destination);
+        var moved = false;
 
         try
         {
-            File.Copy(source, temp, true);
+            FileCopy.Copy(source, temp, tracker.Advance, cancel);
+            cancel.ThrowIfCancellationRequested();
+            RecyclePrevious(destination);
             File.Move(temp, destination, true);
+            moved = true;
         }
         finally
         {
-            if (File.Exists(temp))
+            if (!moved && File.Exists(temp))
             {
                 File.Delete(temp);
             }
@@ -136,7 +182,101 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         }
     }
 
-    private void ExecuteFileAction(FileComparison file, string leftBase, string rightBase)
+    private static bool ShouldApply(FileComparison file)
+    {
+        return file.Action is not (SyncAction.None or SyncAction.Skip);
+    }
+
+    private bool Reject(SyncAction action, string relativePath, SyncReport report, bool alreadyReported)
+    {
+        if (alreadyReported)
+        {
+            return true;
+        }
+
+        report.Errors.Add(new(relativePath, action, "удаление отклонено: сторона-источник обойдена не полностью; остальные отказы в этой ветке не перечисляются"));
+        logger.SyncDeleteBlocked(action, relativePath);
+
+        return true;
+    }
+
+    private void RejectTypeConflict(FileComparison file, SyncReport report)
+    {
+        var reason = file.TypeConflict switch
+        {
+            FileTypeConflict.LeftLinkRightObject => "слева ссылка, справа настоящий объект – разрешается вручную",
+            FileTypeConflict.RightLinkLeftObject => "справа ссылка, слева настоящий объект – разрешается вручную",
+            FileTypeConflict.LeftFileRightDirectory => "слева файл, справа каталог – разрешается вручную",
+            FileTypeConflict.CaseCollision => "имена различаются только регистром, приёмник их не различит – разрешается вручную",
+            _ => "справа файл, слева каталог – разрешается вручную",
+        };
+
+        report.Errors.Add(new(file.RelativePath, file.Action, $"действие отклонено: {reason}"));
+        logger.SyncTypeConflictBlocked(file.Action, file.RelativePath, file.TypeConflict);
+    }
+
+    private readonly record struct DeleteGate(bool Left, bool Right, bool Reported)
+    {
+        public static DeleteGate Open { get; } = new(false, false, false);
+
+        public DeleteGate Inherit(DirectoryComparison dir)
+        {
+            return this with
+            {
+                Left = Left || dir.RightIncomplete || dir.DeleteLeftBlocked,
+                Right = Right || dir.LeftIncomplete || dir.DeleteRightBlocked,
+            };
+        }
+
+        public bool Blocks(SyncAction action, bool leftBlocked = false, bool rightBlocked = false)
+        {
+            return action switch
+            {
+                SyncAction.DeleteLeft => Left || leftBlocked,
+                SyncAction.DeleteRight => Right || rightBlocked,
+                _ => false,
+            };
+        }
+    }
+
+    private static bool SubtreeBlocks(
+        DirectoryComparison dir,
+        SyncAction action,
+        Dictionary<(DirectoryComparison Directory, SyncAction Action), bool> cache)
+    {
+        if (cache.TryGetValue((dir, action), out var known))
+        {
+            return known;
+        }
+
+        var blocked = false;
+
+        foreach (var file in dir.Files)
+        {
+            if (DeleteGate.Open.Blocks(action, file.DeleteLeftBlocked, file.DeleteRightBlocked))
+            {
+                blocked = true;
+                break;
+            }
+        }
+
+        if (!blocked)
+        {
+            foreach (var sub in dir.SubDirectories)
+            {
+                if (DeleteGate.Open.Inherit(sub).Blocks(action) || SubtreeBlocks(sub, action, cache))
+                {
+                    blocked = true;
+                    break;
+                }
+            }
+        }
+
+        cache[(dir, action)] = blocked;
+        return blocked;
+    }
+
+    private void ExecuteFileAction(FileComparison file, string leftBase, string rightBase, TransferTracker tracker, CancellationToken cancel)
     {
         var leftPath = Path.Combine(leftBase, file.RelativePath);
         var rightPath = Path.Combine(rightBase, file.RelativePath);
@@ -144,15 +284,11 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         switch (file.Action)
         {
             case SyncAction.CopyToRight:
-                EnsureDirectoryExists(rightPath);
-                ClearReadOnly(rightPath);
-                CopyAtomic(leftPath, rightPath);
+                CopyFile(leftPath, rightPath, tracker, cancel);
                 break;
 
             case SyncAction.CopyToLeft:
-                EnsureDirectoryExists(leftPath);
-                ClearReadOnly(leftPath);
-                CopyAtomic(rightPath, leftPath);
+                CopyFile(rightPath, leftPath, tracker, cancel);
                 break;
 
             case SyncAction.DeleteLeft:
@@ -173,6 +309,28 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
 
                 break;
         }
+    }
+
+    private void CopyFile(string source, string destination, TransferTracker tracker, CancellationToken cancel)
+    {
+        if (Directory.Exists(destination))
+        {
+            throw new IOException($"Приёмник занят каталогом с тем же именем: {destination}");
+        }
+
+        EnsureDirectoryExists(destination);
+        ClearReadOnly(destination);
+        CopyAtomic(source, destination, tracker, cancel);
+    }
+
+    private void RecyclePrevious(string destination)
+    {
+        if (!recycleOverwritten || !File.Exists(destination))
+        {
+            return;
+        }
+
+        RecycleFile(destination);
     }
 
     private void RecycleFile(string path)
@@ -231,7 +389,7 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
                     break;
             }
 
-            report.Applied.Add(new(dir.Action, dir.RelativePath, 0));
+            report.AddApplied(dir.Action, dir.RelativePath, 0);
             logger.SyncFileApplied(dir.Action, dir.RelativePath);
         }
         catch (Exception ex)
@@ -246,61 +404,150 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         string leftBase,
         string rightBase,
         SyncReport report,
-        IProgress<OperationProgress>? progress,
-        CancellationToken cancel)
+        TransferTracker tracker,
+        CancellationToken cancel,
+        DeleteGate gate,
+        Dictionary<(DirectoryComparison Directory, SyncAction Action), bool> blocked)
     {
         cancel.ThrowIfCancellationRequested();
 
+        gate = gate.Inherit(dir);
+
         if (dir.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
         {
-            ApplyDirectoryAction(dir, leftBase, rightBase, report);
-            progress?.Report(new(report.SuccessCount + report.Errors.Count, dir.RelativePath));
-            return;
+            if (gate.Blocks(dir.Action) || SubtreeBlocks(dir, dir.Action, blocked))
+            {
+                gate = gate with { Reported = Reject(dir.Action, dir.RelativePath, report, gate.Reported) };
+            }
+            else
+            {
+                cancel.ThrowIfCancellationRequested();
+                ApplyDirectoryActionAndReport(dir, leftBase, rightBase, report, tracker);
+                return;
+            }
         }
-
-        if (dir.Action is SyncAction.CopyToRight or SyncAction.CopyToLeft)
+        else if (dir.Action is SyncAction.CopyToRight or SyncAction.CopyToLeft)
         {
-            ApplyDirectoryAction(dir, leftBase, rightBase, report);
-            progress?.Report(new(report.SuccessCount + report.Errors.Count, dir.RelativePath));
+            ApplyDirectoryActionAndReport(dir, leftBase, rightBase, report, tracker);
         }
 
         foreach (var file in dir.Files)
         {
             cancel.ThrowIfCancellationRequested();
 
-            if (file.Action is SyncAction.None or SyncAction.Skip)
+            if (!ShouldApply(file))
             {
                 continue;
             }
 
-            try
+            if (gate.Blocks(file.Action, file.DeleteLeftBlocked, file.DeleteRightBlocked))
             {
-                ExecuteFileAction(file, leftBase, rightBase);
-
-                if (file.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
-                {
-                    report.DeletedCount++;
-                }
-                else
-                {
-                    report.CopiedCount++;
-                }
-
-                report.Applied.Add(new(file.Action, file.RelativePath, AppliedBytes(file)));
-                logger.SyncFileApplied(file.Action, file.RelativePath);
-            }
-            catch (Exception ex)
-            {
-                report.Errors.Add(new(file.RelativePath, file.Action, ex.Message));
-                logger.SyncFileFailed(ex, file.Action, file.RelativePath);
+                gate = gate with { Reported = Reject(file.Action, file.RelativePath, report, gate.Reported) };
+                continue;
             }
 
-            progress?.Report(new(report.SuccessCount + report.Errors.Count, file.RelativePath));
+            if (file.TypeConflict != FileTypeConflict.None)
+            {
+                RejectTypeConflict(file, report);
+                continue;
+            }
+
+            tracker.BeginFile(file.RelativePath);
+            ApplyFileActionAndReport(file, leftBase, rightBase, report, tracker, cancel);
+            tracker.EndFile();
+            tracker.Report(file.RelativePath);
         }
 
         foreach (var sub in dir.SubDirectories)
         {
-            ExecuteRecursive(sub, leftBase, rightBase, report, progress, cancel);
+            ExecuteRecursive(sub, leftBase, rightBase, report, tracker, cancel, gate, blocked);
+        }
+    }
+
+    private void ApplyDirectoryActionAndReport(
+        DirectoryComparison dir,
+        string leftBase,
+        string rightBase,
+        SyncReport report,
+        TransferTracker tracker)
+    {
+        ApplyDirectoryAction(dir, leftBase, rightBase, report);
+        tracker.Report(dir.RelativePath);
+    }
+
+    private void ApplyFileActionAndReport(
+        FileComparison file,
+        string leftBase,
+        string rightBase,
+        SyncReport report,
+        TransferTracker tracker,
+        CancellationToken cancel)
+    {
+        try
+        {
+            ExecuteFileAction(file, leftBase, rightBase, tracker, cancel);
+
+            if (file.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
+            {
+                report.DeletedCount++;
+            }
+            else
+            {
+                report.CopiedCount++;
+            }
+
+            report.AddApplied(file.Action, file.RelativePath, AppliedBytes(file));
+            logger.SyncFileApplied(file.Action, file.RelativePath);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            report.Errors.Add(new(file.RelativePath, file.Action, ex.Message));
+            logger.SyncFileFailed(ex, file.Action, file.RelativePath);
+        }
+    }
+
+    private sealed class TransferTracker(IProgress<OperationProgress>? progress, SyncReport report)
+    {
+        private static readonly TimeSpan ReportInterval = TimeSpan.FromMilliseconds(120);
+
+        private readonly Stopwatch _clock = Stopwatch.StartNew();
+
+        private long _appliedBytes;
+        private long _currentBytes;
+        private string _currentPath = string.Empty;
+        private TimeSpan? _lastReport;
+
+        public void BeginFile(string relativePath)
+        {
+            _currentPath = relativePath;
+            _currentBytes = 0;
+            _lastReport = null;
+        }
+
+        public void Advance(long transferredOfCurrentFile)
+        {
+            _currentBytes = transferredOfCurrentFile;
+
+            var now = _clock.Elapsed;
+
+            if (_lastReport is { } last && now - last < ReportInterval)
+            {
+                return;
+            }
+
+            _lastReport = now;
+            Report(_currentPath);
+        }
+
+        public void EndFile()
+        {
+            _appliedBytes += _currentBytes;
+            _currentBytes = 0;
+        }
+
+        public void Report(string relativePath)
+        {
+            progress?.Report(new(report.SuccessCount + report.Errors.Count, relativePath, _appliedBytes + _currentBytes));
         }
     }
 }
@@ -310,9 +557,31 @@ public sealed class SyncReport
     public int CopiedCount { get; set; }
     public int DeletedCount { get; set; }
     public int SuccessCount => CopiedCount + DeletedCount;
+    public long CopiedBytes { get; private set; }
+    public long DeletedBytes { get; private set; }
+    public bool Verified { get; private set; }
     public List<SyncApplied> Applied { get; } = [];
     public List<SyncError> Errors { get; } = [];
     public List<SyncMismatch> Mismatches { get; } = [];
+
+    public void MarkVerified()
+    {
+        Verified = true;
+    }
+
+    public void AddApplied(SyncAction action, string relativePath, long bytes)
+    {
+        Applied.Add(new(action, relativePath, bytes));
+
+        if (action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
+        {
+            DeletedBytes += bytes;
+        }
+        else
+        {
+            CopiedBytes += bytes;
+        }
+    }
 
     public void WriteDetails(TextWriter writer)
     {

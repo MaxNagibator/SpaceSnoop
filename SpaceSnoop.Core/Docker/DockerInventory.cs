@@ -45,7 +45,7 @@ public static class DockerInventory
                 size,
                 DockerSize.ToBytes(size),
                 containers > 0,
-                Str(image, "CreatedSince")));
+                DockerText.Age(Str(image, "CreatedSince"))));
         }
     }
 
@@ -63,7 +63,7 @@ public static class DockerInventory
                 size,
                 DockerSize.ToBytes(size),
                 running,
-                Str(container, "Status")));
+                DockerText.Status(Str(container, "Status"))));
         }
     }
 
@@ -78,7 +78,7 @@ public static class DockerInventory
             into.Add(new(
                 DockerObjectKind.Volume,
                 name,
-                name,
+                DockerText.ShortName(name),
                 size,
                 DockerSize.ToBytes(size),
                 links > 0,

@@ -12,21 +12,10 @@
              d:DesignHeight="600"
              d:DesignWidth="980"
              Width="980"
-             MinHeight="560">
+             MinHeight="260"
+             AutomationProperties.Name="Сравнение содержимого файла">
 
     <UserControl.Resources>
-        <!-- TODO: фиксированные тинты под схему направлений дерева (левое/удалено = зелёный Success как LeftOnly, правое/добавлено = синий Info как RightOnly); в теме нет subtle-фон токенов для +/−, апгрейд на токены KeepShell, если появятся -->
-        <SolidColorBrush x:Key="Diff.AddedBg"
-                         Color="#333B82F6" />
-        <SolidColorBrush x:Key="Diff.RemovedBg"
-                         Color="#3327C93F" />
-        <SolidColorBrush x:Key="Diff.EmptyBg"
-                         Color="#14808080" />
-        <SolidColorBrush x:Key="Diff.AddedStrong"
-                         Color="#663B82F6" />
-        <SolidColorBrush x:Key="Diff.RemovedStrong"
-                         Color="#6627C93F" />
-
         <Style x:Key="DiffNum"
                TargetType="TextBlock">
             <Setter Property="FontFamily"
@@ -77,12 +66,12 @@
                 <DataTrigger Binding="{Binding Kind}"
                              Value="Added">
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Info}" />
+                            Value="{DynamicResource State.InfoText}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Kind}"
                              Value="Removed">
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Success}" />
+                            Value="{DynamicResource Sync.LeftOnly}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -95,12 +84,12 @@
                 <DataTrigger Binding="{Binding Kind}"
                              Value="Added">
                     <Setter Property="Background"
-                            Value="{StaticResource Diff.AddedBg}" />
+                            Value="{DynamicResource Diff.AddedBg}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Kind}"
                              Value="Removed">
                     <Setter Property="Background"
-                            Value="{StaticResource Diff.RemovedBg}" />
+                            Value="{DynamicResource Diff.RemovedBg}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -113,12 +102,12 @@
                 <DataTrigger Binding="{Binding LeftKind}"
                              Value="Removed">
                     <Setter Property="Background"
-                            Value="{StaticResource Diff.RemovedBg}" />
+                            Value="{DynamicResource Diff.RemovedBg}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding LeftKind}"
                              Value="None">
                     <Setter Property="Background"
-                            Value="{StaticResource Diff.EmptyBg}" />
+                            Value="{DynamicResource Diff.EmptyBg}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -131,12 +120,12 @@
                 <DataTrigger Binding="{Binding RightKind}"
                              Value="Added">
                     <Setter Property="Background"
-                            Value="{StaticResource Diff.AddedBg}" />
+                            Value="{DynamicResource Diff.AddedBg}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding RightKind}"
                              Value="None">
                     <Setter Property="Background"
-                            Value="{StaticResource Diff.EmptyBg}" />
+                            Value="{DynamicResource Diff.EmptyBg}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -185,13 +174,14 @@
                                           Height="20"
                                           VerticalAlignment="Center"
                                           Margin="0,0,10,0"
-                                          Foreground="{DynamicResource State.Info}" />
+                                          Foreground="{DynamicResource Fg.Secondary}" />
                 <TextBlock Text="{Binding Name}"
-                           Style="{StaticResource TextBlock.Heading}"
+                           Style="{StaticResource DialogTitle}"
                            VerticalAlignment="Center" />
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center"
                             Margin="14,0,0,0"
+                            AutomationProperties.Name="Различий строк"
                             ToolTip="«−N» – строки есть слева, но нет справа; «+N» – есть справа, но нет слева. Показана разница сторон, а не направление синхронизации."
                             Visibility="{Binding HasChanges, Converter={StaticResource BoolToVisibility}}">
                     <TextBlock Text="{Binding Removed, StringFormat=−{0}}"
@@ -200,13 +190,13 @@
                                FontWeight="Medium"
                                VerticalAlignment="Center"
                                Margin="0,0,8,0"
-                               Foreground="{DynamicResource State.Success}" />
+                               Foreground="{DynamicResource Sync.LeftOnly}" />
                     <TextBlock Text="{Binding Added, StringFormat=+{0}}"
                                FontFamily="{DynamicResource Font.Mono}"
                                FontSize="{DynamicResource Font.Size.S}"
                                FontWeight="Medium"
                                VerticalAlignment="Center"
-                               Foreground="{DynamicResource State.Info}" />
+                               Foreground="{DynamicResource State.InfoText}" />
                 </StackPanel>
                 <TextBlock Text="Файлы идентичны"
                            Style="{StaticResource TextBlock.Subtle}"
@@ -267,6 +257,7 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0"
                            Text="{Binding LeftPath}"
+                           AutomationProperties.Name="Путь слева"
                            Style="{StaticResource TextBlock.Subtle}"
                            TextTrimming="CharacterEllipsis"
                            ToolTip="{Binding LeftPath, StringFormat='Левая сторона: {0}'}" />
@@ -279,6 +270,7 @@
                                           Foreground="{DynamicResource Fg.Muted}" />
                 <TextBlock Grid.Column="2"
                            Text="{Binding RightPath}"
+                           AutomationProperties.Name="Путь справа"
                            Style="{StaticResource TextBlock.Subtle}"
                            TextTrimming="CharacterEllipsis"
                            ToolTip="{Binding RightPath, StringFormat='Правая сторона: {0}'}" />
@@ -291,18 +283,23 @@
                     BorderBrush="{DynamicResource Border.Subtle}"
                     BorderThickness="1"
                     Visibility="{Binding HasSummary, Converter={StaticResource BoolToVisibility}}">
-                <StackPanel Orientation="Horizontal">
-                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Info}"
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <iconPacks:PackIconLucide Grid.Column="0"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.Info}"
                                               Width="14"
                                               Height="14"
                                               VerticalAlignment="Top"
                                               Margin="0,1,8,0"
-                                              Foreground="{DynamicResource State.Info}" />
-                    <TextBlock Text="{Binding Summary}"
+                                              Foreground="{DynamicResource State.InfoText}" />
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding Summary}"
                                Style="{StaticResource TextBlock.Subtle}"
-                               TextWrapping="Wrap"
-                               MaxWidth="860" />
-                </StackPanel>
+                               TextWrapping="Wrap" />
+                </Grid>
             </Border>
         </StackPanel>
 
@@ -317,11 +314,11 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
             <TextBlock Grid.Column="1"
-                       Text="ЛЕВАЯ"
+                       Text="Левая"
                        Style="{StaticResource Caption}"
                        Margin="2,0,0,0" />
             <TextBlock Grid.Column="4"
-                       Text="ПРАВАЯ"
+                       Text="Правая"
                        Style="{StaticResource Caption}"
                        Margin="2,0,0,0" />
         </Grid>
@@ -346,6 +343,7 @@
                                HorizontalAlignment="Center" />
                 </StackPanel>
                 <ListBox ItemsSource="{Binding Items}"
+                         AutomationProperties.Name="Строки сравнения"
                          Visibility="{Binding HasLineView, Converter={StaticResource BoolToVisibility}}"
                          Background="Transparent"
                          BorderThickness="0"
@@ -380,7 +378,7 @@
                                            Style="{StaticResource DiffNum}" />
                                 <TextBlock Grid.Column="1"
                                            behaviors:DiffInline.Spans="{Binding LeftSpans}"
-                                           behaviors:DiffInline.ChangedBrush="{StaticResource Diff.RemovedStrong}"
+                                           behaviors:DiffInline.ChangedBrush="{DynamicResource Diff.RemovedStrong}"
                                            Style="{StaticResource DiffText}"
                                            ToolTip="{Binding LeftText}" />
                                 <Border Grid.Column="2"
@@ -390,7 +388,7 @@
                                            Style="{StaticResource DiffNum}" />
                                 <TextBlock Grid.Column="4"
                                            behaviors:DiffInline.Spans="{Binding RightSpans}"
-                                           behaviors:DiffInline.ChangedBrush="{StaticResource Diff.AddedStrong}"
+                                           behaviors:DiffInline.ChangedBrush="{DynamicResource Diff.AddedStrong}"
                                            Style="{StaticResource DiffText}"
                                            ToolTip="{Binding RightText}" />
                             </Grid>
@@ -461,7 +459,7 @@
         <Grid Grid.Row="4"
               Margin="0,18,0,0">
             <Button HorizontalAlignment="Right"
-                    Style="{StaticResource Button.Primary}"
+                    Style="{StaticResource Button.Secondary}"
                     Command="{Binding CloseCommand}"
                     Content="Закрыть"
                     MinWidth="96"

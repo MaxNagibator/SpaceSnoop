@@ -1,10 +1,19 @@
-﻿using SpaceSnoop.Core;
+﻿using Microsoft.Win32.SafeHandles;
+using SpaceSnoop.Core;
+using SpaceSnoop.Core.Domain;
+using System.Buffers.Binary;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace SpaceSnoop.Tests;
 
 [TestFixture]
 public class DiskSpaceCalculatorTests
 {
+    private const uint FsctlSetReparsePoint = 0x0009_00A4;
+    private const uint ThirdPartyReparseTag = 0x0000_0042;
+    private const int ReparseGuidHeaderSize = 24;
+
     private string _tempDir = null!;
 
     [SetUp]
@@ -28,10 +37,7 @@ public class DiskSpaceCalculatorTests
     [TearDown]
     public void TearDown()
     {
-        if (Directory.Exists(_tempDir))
-        {
-            Directory.Delete(_tempDir, true);
-        }
+        RemoveTree(_tempDir);
     }
 
     [Test]
@@ -122,11 +128,295 @@ public class DiskSpaceCalculatorTests
         }
     }
 
+    [TestCase(true)]
+    [TestCase(false)]
+    public void Calculate_CountsDirectoryItCouldNotRead(bool multithreaded)
+    {
+        var calculator = new DiskSpaceCalculator();
+        var progress = new ScanProgress();
+        var missing = new DirectoryInfo(Path.Combine(_tempDir, "vanished"));
+
+        var result = multithreaded
+            ? calculator.CalculateMultithreaded(missing, 4, progress, CancellationToken.None)
+            : calculator.Calculate(missing, progress, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.State, Is.EqualTo(SpaceState.Error));
+            Assert.That(progress.CreateSnapshot().DirectoriesFailed, Is.EqualTo(1));
+        }
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void Calculate_CountsHiddenAndSystemFiles(bool multithreaded)
+    {
+        var hidden = Path.Combine(_tempDir, "hidden.txt");
+        File.WriteAllText(hidden, new string('h', 700));
+        File.SetAttributes(hidden, FileAttributes.Hidden | FileAttributes.System);
+
+        var calculator = new DiskSpaceCalculator();
+
+        var result = multithreaded
+            ? calculator.CalculateMultithreaded(new(_tempDir), 4, CancellationToken.None)
+            : calculator.Calculate(new(_tempDir), CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.TotalFileCount, Is.EqualTo(6));
+            Assert.That(result.TotalSize, Is.EqualTo(2200));
+        }
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void Calculate_DoesNotFollowReparsePoint(bool multithreaded)
+    {
+        var link = Path.Combine(_tempDir, "link");
+
+        try
+        {
+            Directory.CreateSymbolicLink(link, Path.Combine(_tempDir, "sub"));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Assert.Ignore("не удалось создать символьную ссылку");
+        }
+
+        var calculator = new DiskSpaceCalculator();
+
+        var result = multithreaded
+            ? calculator.CalculateMultithreaded(new(_tempDir), 4, CancellationToken.None)
+            : calculator.Calculate(new(_tempDir), CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.TotalSize, Is.EqualTo(1500));
+            Assert.That(result.TotalDirectoryCount, Is.EqualTo(2));
+        }
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void Calculate_DoesNotFollowJunction(bool multithreaded)
+    {
+        if (!TryCreateJunction(Path.Combine(_tempDir, "junction"), Path.Combine(_tempDir, "sub")))
+        {
+            Assert.Ignore("не удалось создать junction");
+        }
+
+        var calculator = new DiskSpaceCalculator();
+
+        var result = multithreaded
+            ? calculator.CalculateMultithreaded(new(_tempDir), 4, CancellationToken.None)
+            : calculator.Calculate(new(_tempDir), CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.TotalSize, Is.EqualTo(1500));
+            Assert.That(result.TotalDirectoryCount, Is.EqualTo(2));
+        }
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void Calculate_SkipsSymbolicLinkFile(bool multithreaded)
+    {
+        try
+        {
+            File.CreateSymbolicLink(Path.Combine(_tempDir, "link.txt"), Path.Combine(_tempDir, "a.txt"));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Assert.Ignore("не удалось создать символьную ссылку");
+        }
+
+        var calculator = new DiskSpaceCalculator();
+
+        var result = multithreaded
+            ? calculator.CalculateMultithreaded(new(_tempDir), 4, CancellationToken.None)
+            : calculator.Calculate(new(_tempDir), CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.TotalFileCount, Is.EqualTo(5));
+            Assert.That(result.TotalSize, Is.EqualTo(1500));
+        }
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void Calculate_CountsFileWithDataReparseTag(bool multithreaded)
+    {
+        var path = Path.Combine(_tempDir, "placeholder.bin");
+        File.WriteAllText(path, new string('p', 600));
+
+        if (!TryTagAsDataReparsePoint(path))
+        {
+            Assert.Ignore("не удалось поставить reparse-точку с тегом-содержимым");
+        }
+
+        var calculator = new DiskSpaceCalculator();
+
+        var result = multithreaded
+            ? calculator.CalculateMultithreaded(new(_tempDir), 4, CancellationToken.None)
+            : calculator.Calculate(new(_tempDir), CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.TotalFileCount, Is.EqualTo(6));
+            Assert.That(result.TotalSize, Is.EqualTo(2100));
+        }
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void Calculate_ThrowsOnCancellation(bool multithreaded)
+    {
+        var calculator = new DiskSpaceCalculator();
+        using var source = new CancellationTokenSource();
+        source.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => _ = multithreaded
+            ? calculator.CalculateMultithreaded(new(_tempDir), 4, source.Token)
+            : calculator.Calculate(new(_tempDir), source.Token));
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void Calculate_KeepsReadableSiblingsOfUnreadableDirectory(bool multithreaded)
+    {
+        var closed = Path.Combine(_tempDir, "closed");
+        Directory.CreateDirectory(closed);
+        File.WriteAllText(Path.Combine(closed, "f.txt"), new string('f', 600));
+        TestAcl.DenyEnumeration(closed);
+
+        try
+        {
+            var calculator = new DiskSpaceCalculator();
+
+            var result = multithreaded
+                ? calculator.CalculateMultithreaded(new(_tempDir), 4, CancellationToken.None)
+                : calculator.Calculate(new(_tempDir), CancellationToken.None);
+
+            var blocked = result.SubDirectories.Single(x => x.Name == "closed");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(blocked.State, Is.EqualTo(SpaceState.Error));
+                Assert.That(result.TotalSize, Is.EqualTo(1500));
+                Assert.That(result.TotalFileCount, Is.EqualTo(5));
+            }
+        }
+        finally
+        {
+            TestAcl.AllowEnumeration(closed);
+        }
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void Calculate_GivesAbsolutePathsToTree(bool multithreaded)
+    {
+        var calculator = new DiskSpaceCalculator();
+
+        var result = multithreaded
+            ? calculator.CalculateMultithreaded(new(_tempDir), 4, CancellationToken.None)
+            : calculator.Calculate(new(_tempDir), CancellationToken.None);
+
+        var file = result.Files.Single(x => x.Name == "a.txt");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.AbsolutePath, Is.EqualTo(_tempDir));
+            Assert.That(file.AbsolutePath, Is.EqualTo(Path.Combine(_tempDir, "a.txt")));
+        }
+    }
+
     [Test]
     public void ScanProgressSnapshot_FractionIsNull_WhenTopLevelUnknown()
     {
         var progress = new ScanProgress();
 
         Assert.That(progress.CreateSnapshot().Fraction, Is.Null);
+    }
+
+    private static void RemoveTree(string path)
+    {
+        if (!Directory.Exists(path))
+        {
+            return;
+        }
+
+        var directory = new DirectoryInfo(path);
+
+        if ((directory.Attributes & FileAttributes.ReparsePoint) != 0)
+        {
+            directory.Delete();
+            return;
+        }
+
+        foreach (var sub in directory.GetDirectories())
+        {
+            RemoveTree(sub.FullName);
+        }
+
+        directory.Delete(true);
+    }
+
+    private static bool TryTagAsDataReparsePoint(string path)
+    {
+        var buffer = new byte[ReparseGuidHeaderSize];
+        BinaryPrimitives.WriteUInt32LittleEndian(buffer, ThirdPartyReparseTag);
+        Guid.NewGuid().TryWriteBytes(buffer.AsSpan(8));
+
+        try
+        {
+            using var handle = File.OpenHandle(path, FileMode.Open, FileAccess.ReadWrite);
+
+            if (!DeviceIoControl(handle, FsctlSetReparsePoint, buffer, buffer.Length, IntPtr.Zero, 0, out _, IntPtr.Zero))
+            {
+                return false;
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+
+        return (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool DeviceIoControl(
+        SafeFileHandle hDevice,
+        uint dwIoControlCode,
+        byte[] lpInBuffer,
+        int nInBufferSize,
+        IntPtr lpOutBuffer,
+        int nOutBufferSize,
+        out int lpBytesReturned,
+        IntPtr lpOverlapped);
+
+    private static bool TryCreateJunction(string path, string target)
+    {
+        var start = new ProcessStartInfo("cmd.exe", $"/c mklink /J \"{path}\" \"{target}\"")
+        {
+            CreateNoWindow = true,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+
+        using var process = Process.Start(start);
+
+        if (process is null)
+        {
+            return false;
+        }
+
+        process.WaitForExit();
+
+        return process.ExitCode == 0;
     }
 }

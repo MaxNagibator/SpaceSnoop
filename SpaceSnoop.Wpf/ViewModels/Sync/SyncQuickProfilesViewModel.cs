@@ -42,7 +42,7 @@ public sealed partial class SyncQuickProfilesViewModel(
             .ToList();
 
         profiles.Insert(0,
-            new(capture(CurrentProfileId, "Текущие поля", null),
+            new(capture(CurrentProfileId, "Текущие пути", null),
                 true,
                 RequestDeleteProfile,
                 ConfirmDeleteProfile,
@@ -69,12 +69,13 @@ public sealed partial class SyncQuickProfilesViewModel(
             return;
         }
 
-        var current = capture(CurrentProfileId, "Текущие поля", null);
+        var current = capture(CurrentProfileId, "Текущие пути", null);
         var model = Items[0].Model;
         model.Left = current.Left;
         model.Right = current.Right;
         model.Mode = current.Mode;
         model.Mirror = current.Mirror;
+        model.Winner = current.Winner;
         model.Exclusions = current.Exclusions;
         SelectedProfile = Items[0];
     }

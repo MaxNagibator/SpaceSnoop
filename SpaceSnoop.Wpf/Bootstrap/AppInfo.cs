@@ -15,6 +15,7 @@ public static class AppInfo
     public const string SessionStartMarker = Name + ".Wpf запускается";
 
     public const string SyncArgument = "--sync";
+    public const string GalleryArgument = "--gallery";
 
     public const string DeletionLogFileName = "deleted.txt";
     public const string SyncLogFileName = "sync-log.txt";

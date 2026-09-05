@@ -3,86 +3,216 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Settings"
              xmlns:bootstrap="clr-namespace:SpaceSnoop.Wpf.Bootstrap"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
-             d:DesignWidth="900">
+             d:DesignWidth="900"
+             Visibility="{Binding Sections[scan].IsSelected, Converter={StaticResource BoolToVisibility}}">
 
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/Views/Settings/SettingsResources.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/SpaceSnoop.Wpf;component/Views/Settings/SettingsResources.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource Card.Inset}"
-            Margin="0,0,0,10">
+    <HeaderedContentControl Style="{StaticResource Form.Panel}"
+                            Header="{Binding Sections[scan].Title}"
+                            keepshell:Form.ResetCommand="{Binding ResetSectionCommand}"
+                            keepshell:Form.ResetCommandParameter="scan"
+                            keepshell:Form.ResetHint="{Binding ResetPlans[scan].Hint}">
         <StackPanel>
-            <TextBlock Text="Сканирование"
-                       Style="{StaticResource Setting.SectionTitle}" />
-
-            <CheckBox Content="Многопоточный обход"
-                      IsChecked="{Binding Scan.UseMultithreading, Mode=TwoWay}"
-                      Margin="0,14,0,0"
-                      VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Content="Многопоточный обход"
+                          IsChecked="{Binding Scan.UseMultithreading, Mode=TwoWay}"
+                          VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.scan.multithreading]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
+            </Grid>
+            <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Параллельный обход каталогов – быстрее, но выше расход памяти." />
 
-            <StackPanel Margin="0,16,0,0"
-                        IsEnabled="{Binding Scan.UseMultithreading}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0"
-                               Text="Число параллельных потоков"
-                               Style="{StaticResource Setting.Label}" />
-                    <TextBlock Grid.Column="1"
-                               Text="{Binding Scan.MaxParallelism, StringFormat=N0}"
-                               Style="{StaticResource TextBlock.Mono}"
-                               VerticalAlignment="Center" />
-                </Grid>
-                <Slider Minimum="1"
-                        Maximum="{Binding Scan.ProcessorCount}"
-                        Value="{Binding Scan.MaxParallelism, Mode=TwoWay}"
-                        TickFrequency="1"
-                        IsSnapToTickEnabled="True"
-                        Margin="0,6,0,0" />
-                <TextBlock Style="{StaticResource Setting.Hint}"
-                           Text="{Binding Scan.ParallelismHint}" />
-            </StackPanel>
+            <Grid Margin="0,16,0,0"
+                  IsEnabled="{Binding Scan.UseMultithreading}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Число параллельных потоков"
+                               Style="{StaticResource Form.Label}" />
+                    <TextBlock Style="{StaticResource Form.Hint}"
+                               Margin="0,2,0,0"
+                               Text="{Binding Scan.ParallelismHint}" />
+                </StackPanel>
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            Margin="16,0,0,0"
+                            VerticalAlignment="Center">
+                    <Slider Minimum="1"
+                            Maximum="{Binding Scan.ParallelismCeiling}"
+                            Value="{Binding Scan.MaxParallelism, Mode=TwoWay}"
+                            TickFrequency="1"
+                            IsSnapToTickEnabled="True"
+                            Width="{StaticResource Setting.SliderWidth}"
+                            VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding Scan.MaxParallelism, StringFormat=N0}"
+                               Style="{StaticResource Form.Value}" />
+                </StackPanel>
+                <Button Grid.Column="2"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.scan.parallelism]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
+            </Grid>
 
-            <StackPanel Margin="0,16,0,0">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0"
-                               Text="Интенсивность тепловой подсветки"
-                               Style="{StaticResource Setting.Label}" />
-                    <TextBlock Grid.Column="1"
-                               Text="{Binding Scan.Intensity, StringFormat=N0}"
-                               Style="{StaticResource TextBlock.Mono}"
-                               VerticalAlignment="Center" />
-                </Grid>
-                <Slider Minimum="{x:Static bootstrap:AppDefaults.IntensityMin}"
-                        Maximum="{x:Static bootstrap:AppDefaults.IntensityMax}"
-                        Value="{Binding Scan.Intensity, Mode=TwoWay}"
-                        TickFrequency="1"
-                        IsSnapToTickEnabled="True"
-                        Margin="0,6,0,0" />
-            </StackPanel>
+            <Grid Margin="0,16,0,0"
+                  IsEnabled="{Binding Scan.UseMultithreading}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Content="Учитывать тип носителя"
+                          IsChecked="{Binding Scan.MediaAware, Mode=TwoWay}"
+                          VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.scan.media_aware]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
+            </Grid>
+            <TextBlock Style="{StaticResource Form.CheckHint}"
+                       Text="На диске со штрафом за позиционирование обход идёт в один поток." />
+            <Expander Style="{StaticResource Setting.Details}"
+                      Header="Когда обход идёт в один поток">
+                <TextBlock Style="{StaticResource Setting.DetailsBody}"
+                           Text="У вращающегося диска параллельный обход заставляет головку метаться между каталогами и отнимает больше, чем даёт. Тип носителя спрашивается у драйвера один раз на том, поэтому внешний диск, подменённый под той же буквой, до перезапуска отвечает прежним типом. Сетевые пути и носители, о которых драйвер молчит, считаются неизвестными, и для них настройка ничего не меняет." />
+            </Expander>
 
-            <CheckBox Content="Выделять файлы в проводнике, не запускать"
-                      IsChecked="{Binding Scan.RevealFiles, Mode=TwoWay}"
-                      Margin="0,16,0,0"
-                      VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="При открытии файла из дерева проводник подсвечивает его в папке. Выключите, чтобы файл открывался программой по умолчанию (исполняемые при этом запускаются)." />
+            <Grid Margin="0,16,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Content="Читать таблицу NTFS вместо обхода каталогов"
+                          IsChecked="{Binding Scan.MftEnabled, Mode=TwoWay}"
+                          VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.scan.mft.enabled]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
+            </Grid>
+            <TextBlock Style="{StaticResource Form.CheckHint}"
+                       Text="Вдвое быстрее, и жёсткая ссылка считается один раз, а не под каждым именем." />
+            <TextBlock Style="{StaticResource Form.CheckHint}"
+                       Foreground="{DynamicResource State.WarningText}"
+                       Text="Сейчас прав администратора нет, поэтому скан пойдёт обходом каталогов."
+                       Visibility="{Binding Scan.MftNeedsElevation, Converter={StaticResource BoolToVisibility}}" />
+            <Expander Style="{StaticResource Setting.Details}"
+                      Header="Что нужно движку NTFS">
+                <TextBlock Style="{StaticResource Setting.DetailsBody}"
+                           Text="Движок читает служебную таблицу тома напрямую, поэтому ему нужны права администратора и локальный том NTFS. Сетевой диск, флешка с exFAT, отсутствие прав или сбой разбора дают тихий откат на обычный обход – итог получится прежним, о причине скажет журнал. Таблица читается целиком независимо от того, что сканируют, поэтому на одном подкаталоге движок проигрывает обходу, а на диске целиком выигрывает вдвое. Часть записей в дерево не попадает по устройству формата (оторванные, повреждённые, без имени) – их число показывает полоса итогов, а не умалчивает." />
+            </Expander>
+
+            <Grid Margin="26,12,0,0"
+                  IsEnabled="{Binding Scan.MftEnabled}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Content="Только при сканировании диска целиком"
+                          IsChecked="{Binding Scan.MftRootOnly, Mode=TwoWay}"
+                          VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.scan.mft.root_only]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
+            </Grid>
+            <TextBlock Style="{StaticResource Form.CheckHint}"
+                       Margin="52,6,0,0"
+                       Text="Выбран каталог – скан пойдёт обходом, потому что таблица читается вся, сколько бы ни было в цели." />
+            <Expander Style="{StaticResource Setting.Details}"
+                      Header="Когда галку стоит снять"
+                      Margin="26,2,0,0">
+                <TextBlock Style="{StaticResource Setting.DetailsBody}"
+                           Text="На подкаталоге чтение тома целиком стоит дороже обхода, а числа неполноты в полосе итогов всё равно считаются по всему тому, а не по выбранной ветке. Выключите, если счёт жёстких ссылок один раз нужен и внутри каталога – например, в папке Windows, которая почти целиком из них состоит." />
+            </Expander>
+
+            <Grid Margin="0,16,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Интенсивность тепловой подсветки"
+                               Style="{StaticResource Form.Label}" />
+                    <TextBlock Style="{StaticResource Form.Hint}"
+                               Margin="0,2,0,0"
+                               Text="Насколько ярко строка дерева окрашена по доле размера." />
+                </StackPanel>
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            Margin="16,0,0,0"
+                            VerticalAlignment="Center">
+                    <Slider Minimum="{x:Static bootstrap:AppDefaults.IntensityMin}"
+                            Maximum="{x:Static bootstrap:AppDefaults.IntensityMax}"
+                            Value="{Binding Scan.Intensity, Mode=TwoWay}"
+                            TickFrequency="1"
+                            IsSnapToTickEnabled="True"
+                            Width="{StaticResource Setting.SliderWidth}"
+                            VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding Scan.Intensity, StringFormat=N0}"
+                               Style="{StaticResource Form.Value}" />
+                </StackPanel>
+                <Button Grid.Column="2"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.scan.intensity]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
+            </Grid>
+
+            <Grid Margin="0,16,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Content="Выделять файлы в проводнике, не запускать"
+                          IsChecked="{Binding Scan.RevealFiles, Mode=TwoWay}"
+                          VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.scan.reveal_files]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
+            </Grid>
+            <TextBlock Style="{StaticResource Form.CheckHint}"
+                       Text="Выключите, чтобы файл из дерева открывался программой по умолчанию." />
+            <Expander Style="{StaticResource Setting.Details}"
+                      Header="Что будет, если выключить">
+                <TextBlock Style="{StaticResource Setting.DetailsBody}"
+                           Text="При включённой настройке проводник подсвечивает файл в папке и ничего не выполняет. При выключенной исполняемые файлы запускаются." />
+            </Expander>
         </StackPanel>
-    </Border>
+    </HeaderedContentControl>
 </UserControl>

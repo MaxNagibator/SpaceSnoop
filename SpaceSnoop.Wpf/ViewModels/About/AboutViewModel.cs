@@ -1,11 +1,15 @@
 ﻿using KeepShell.Services;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 
 namespace SpaceSnoop.Wpf.ViewModels.About;
 
-public sealed partial class AboutViewModel(ErrorReportService errorReports, AppUpdateViewModel updater, ILogger<AboutViewModel> logger)
+public sealed partial class AboutViewModel(
+    ErrorReportService errorReports,
+    AppUpdateViewModel updater,
+    IClipboardService clipboard,
+    IShellLauncher shell,
+    ILogger<AboutViewModel> logger)
     : ObservableObject, IPageHeader
 {
     public string AppName => AppInfo.Name;
@@ -19,8 +23,10 @@ public sealed partial class AboutViewModel(ErrorReportService errorReports, AppU
     public string Description =>
         "Исследуй бескрайние просторы своих накопителей и почувствуй себя археологом: SpaceSnoop "
         + "откопает древние артефакты среди данных и покажет занятое место деревом, где жирные папки "
-        + "краснеют от стыда под тепловой подсветкой. А ещё сведёт две папки лицом к лицу и "
-        + "синхронизирует их. Дай накопителям дышать полной грудью – убери весь хлам!";
+        + "краснеют от стыда под тепловой подсветкой, или картой, где тяжёлые ветки видно плитками. "
+        + "А ещё сведёт две папки лицом к лицу и синхронизирует их, выметет системные корзины Windows "
+        + "и всё, что отъел Docker, а если копаться самому лень – спроси Шныря, он посмотрит сам. "
+        + "Дай накопителям дышать полной грудью – убери весь хлам!";
 
     public string DotNetVersion => RuntimeInformation.FrameworkDescription;
 
@@ -68,16 +74,8 @@ public sealed partial class AboutViewModel(ErrorReportService errorReports, AppU
         {
             var payload = errorReports.Build(null, "Отчёт из раздела «О программе»");
 
-            try
-            {
-                Clipboard.SetText(payload.LogClipboard);
-            }
-            catch (Exception clipEx)
-            {
-                logger.ClipboardLogSectionFailed(clipEx);
-            }
-
-            Process.Start(new ProcessStartInfo(payload.IssueUrl) { UseShellExecute = true });
+            clipboard.TrySetText(payload.LogClipboard);
+            shell.Open(payload.IssueUrl);
         }
         catch (Exception ex)
         {
@@ -96,25 +94,11 @@ public sealed partial class AboutViewModel(ErrorReportService errorReports, AppU
             .Append($"Права: {(IsElevated ? "Администратор" : "Обычный режим")}")
             .ToString();
 
-        try
-        {
-            Clipboard.SetText(text);
-        }
-        catch (Exception ex)
-        {
-            logger.DiagnosticsCopyFailed(ex);
-        }
+        clipboard.TrySetText(text);
     }
 
     private void OpenUrl(string url)
     {
-        try
-        {
-            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-        }
-        catch (Exception ex)
-        {
-            logger.OpenUrlFailed(ex, url);
-        }
+        shell.Open(url);
     }
 }

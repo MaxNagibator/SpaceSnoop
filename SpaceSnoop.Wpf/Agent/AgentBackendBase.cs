@@ -1,0 +1,478 @@
+﻿using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
+using System.Runtime.CompilerServices;
+using System.Text;
+using System.Text.Json;
+
+namespace SpaceSnoop.Wpf.Agent;
+
+public abstract class AgentBackendBase : IAgentBackend, IDisposable
+{
+    internal const string TokenVariable = "SPACESNOOP_MCP_TOKEN";
+
+    private readonly AgentPreferences _preferences;
+    private readonly ILogger _logger;
+
+    private readonly HashSet<Process> _live = [];
+
+    private readonly Lock _cacheGate = new();
+
+    private bool _cacheValid;
+    private string _cachedForCliPath = string.Empty;
+    private AgentCliInfo? _cached;
+    private int _cacheGeneration;
+
+    protected AgentBackendBase(AgentPreferences preferences, ILogger logger)
+    {
+        _preferences = preferences;
+        _logger = logger;
+    }
+
+    public abstract AgentBackendKind Kind { get; }
+
+    public abstract string DisplayName { get; }
+
+    public abstract string CliName { get; }
+
+    public abstract bool HasBuiltInShell { get; }
+
+    public abstract bool SendsSystemPromptEachTurn { get; }
+
+    public abstract string MissingCliHint { get; }
+
+    public virtual string ModelHint => "Модель, которой нет в списке: слаг уходит в CLI как есть и появляется отдельным пунктом выше. Пусто – модель, выбранная по умолчанию в самом CLI.";
+
+    protected abstract IReadOnlyList<string> ExtraDirectories { get; }
+
+    public virtual IReadOnlyList<AgentModelOption> LoadModels()
+    {
+        return AgentModels.For(Kind);
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!disposing)
+        {
+            return;
+        }
+
+        Process[] live;
+
+        lock (_live)
+        {
+            live = [.. _live];
+            _live.Clear();
+        }
+
+        foreach (var process in live)
+        {
+            TryKill(process);
+        }
+    }
+
+    public AgentCliInfo? Detect()
+    {
+        var overridePath = _preferences.CliPathFor(Kind);
+        int generation;
+
+        lock (_cacheGate)
+        {
+            if (_cacheValid && _cachedForCliPath == overridePath)
+            {
+                return _cached;
+            }
+
+            generation = ++_cacheGeneration;
+        }
+
+        var detected = AgentCli.Detect(AgentCli.ExecutableNames(CliName), overridePath, ExtraDirectories);
+
+        lock (_cacheGate)
+        {
+            if (generation == _cacheGeneration)
+            {
+                _cached = detected;
+                _cachedForCliPath = overridePath;
+                _cacheValid = true;
+            }
+        }
+
+        if (detected is not null)
+        {
+            _logger.AgentCliDetected(detected.ExecutablePath, detected.Version);
+        }
+        else
+        {
+            _logger.AgentCliMissing(DisplayName);
+        }
+
+        return detected;
+    }
+
+    public void InvalidateDetection()
+    {
+        lock (_cacheGate)
+        {
+            _cacheValid = false;
+            _cacheGeneration++;
+        }
+    }
+
+    public async IAsyncEnumerable<AgentEvent> RunAsync(AgentRequest request, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var cli = await Task.Run(Detect, cancellationToken).ConfigureAwait(false);
+
+        if (cli is null)
+        {
+            var reason = $"CLI {DisplayName} не найден на машине – {MissingCliHint}";
+            _logger.AgentTurnFailed(null, reason);
+            yield return AgentEvent.Fail(reason);
+            yield break;
+        }
+
+        await foreach (var agentEvent in RunProcessAsync(cli, request, cancellationToken).ConfigureAwait(false))
+        {
+            yield return agentEvent;
+        }
+    }
+
+    internal static string DescribeLaunch(string backend, AgentCliInfo cli, AgentRequest request, AgentLaunch launch)
+    {
+        var builder = new StringBuilder();
+
+        builder.AppendLine($"бэкенд: {backend}");
+        builder.AppendLine($"CLI: {cli.ExecutablePath} ({cli.Version})");
+        builder.AppendLine($"модель: {Named(request.Model)}");
+        builder.AppendLine($"рассуждения: {Named(request.Effort)}");
+        builder.AppendLine($"продолжение сессии: {Named(request.ResumeSessionId)}");
+        builder.AppendLine($"инструменты: {string.Join(", ", request.Mcp?.AllowedTools ?? [])}");
+        builder.AppendLine($"переменные окружения: {string.Join(", ", launch.Environment.Keys)}");
+        builder.Append($"аргументы: {string.Join(' ', launch.Arguments)}");
+
+        return builder.ToString();
+    }
+
+    internal static string ReadArguments(JsonElement owner, string name)
+    {
+        if (!owner.TryGetProperty(name, out var value))
+        {
+            return string.Empty;
+        }
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.Object => value.GetRawText(),
+            JsonValueKind.String => value.GetString() ?? string.Empty,
+            _ => string.Empty,
+        };
+    }
+
+    internal static string RedactToken(string text, string? token)
+    {
+        return string.IsNullOrEmpty(token) ? text : text.Replace(token, "<токен>");
+    }
+
+    protected static string TempConfigPath(string extension)
+    {
+        return Path.Combine(Path.GetTempPath(), $"spacesnoop-mcp-{Guid.NewGuid():N}.{extension}");
+    }
+
+    protected virtual void InspectLine(string line)
+    {
+    }
+
+    protected abstract AgentLaunch CreateLaunch(AgentRequest request);
+
+    protected abstract IAgentStreamParser CreateParser();
+
+    private static async Task WriteTempFilesAsync(
+        AgentLaunch launch,
+        IAgentTranscript? transcript,
+        CancellationToken cancellationToken)
+    {
+        foreach (var file in launch.TempFiles)
+        {
+            await File.WriteAllTextAsync(file.Path, file.Content, cancellationToken).ConfigureAwait(false);
+            transcript?.Write(AgentTranscriptKind.Config, $"{file.Path}\n{file.Content}");
+        }
+    }
+
+    private static async Task<Exception?> WriteStdinAsync(Process process, string input, IAgentTranscript? transcript)
+    {
+        try
+        {
+            transcript?.Write(AgentTranscriptKind.Stdin, input);
+            await process.StandardInput.WriteAsync(input).ConfigureAwait(false);
+            await process.StandardInput.FlushAsync().ConfigureAwait(false);
+            process.StandardInput.Close();
+            return null;
+        }
+        catch (IOException exception)
+        {
+            return exception;
+        }
+    }
+
+    private static string Named(string? value)
+    {
+        return value is { Length: > 0 } ? value : "–";
+    }
+
+    private void TryKill(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or Win32Exception)
+        {
+            _logger.AgentProcessKillFailed(exception);
+        }
+    }
+
+    private void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            _logger.AgentTempFileLeft(exception, path);
+        }
+    }
+
+    private async Task DrainStderrAsync(Process process, List<string> tail, string? mcpToken, IAgentTranscript? transcript)
+    {
+        const int maxLines = 20;
+
+        try
+        {
+            while (await process.StandardError.ReadLineAsync().ConfigureAwait(false) is { } line)
+            {
+                transcript?.Write(AgentTranscriptKind.Stderr, line);
+
+                if (tail.Count >= maxLines)
+                {
+                    tail.RemoveAt(0);
+                }
+
+                tail.Add(RedactToken(line, mcpToken));
+            }
+        }
+        catch (Exception exception) when (exception is IOException or ObjectDisposedException or InvalidOperationException)
+        {
+            _logger.AgentStderrReadFailed(exception);
+        }
+    }
+
+    private static ProcessStartInfo? BuildProcessStartInfo(string executablePath, AgentLaunch launch)
+    {
+        var info = AgentCli.CreateStartInfo(executablePath, launch.Arguments);
+
+        if (info is null)
+        {
+            return null;
+        }
+
+        info.RedirectStandardInput = true;
+        info.StandardInputEncoding = Encoding.UTF8;
+        info.WorkingDirectory = AppStorage.DataDirectory;
+
+        foreach (var (name, value) in launch.Environment)
+        {
+            info.Environment[name] = value;
+        }
+
+        return info;
+    }
+
+    private async IAsyncEnumerable<AgentEvent> RunProcessAsync(
+        AgentCliInfo cli,
+        AgentRequest request,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var launch = CreateLaunch(request);
+        var transcript = request.Transcript;
+        Process? process = null;
+        var stderrTail = new List<string>();
+        var resultYielded = false;
+        var stopwatch = Stopwatch.StartNew();
+        var parser = CreateParser();
+
+        _logger.AgentTurnStarted(DisplayName, request.Mcp?.AllowedTools.Count ?? 0, !string.IsNullOrEmpty(request.ResumeSessionId));
+
+        try
+        {
+            transcript?.Write(AgentTranscriptKind.Launch, DescribeLaunch(DisplayName, cli, request, launch));
+
+            await WriteTempFilesAsync(launch, transcript, cancellationToken).ConfigureAwait(false);
+
+            var info = BuildProcessStartInfo(cli.ExecutablePath, launch);
+            process = info is null ? null : TryStartProcess(info);
+
+            if (process is null)
+            {
+                var reason = $"Не удалось запустить CLI {DisplayName}.";
+                yield return AgentEvent.Fail(reason);
+                yield break;
+            }
+
+            lock (_live)
+            {
+                _live.Add(process);
+            }
+
+            using var kill = cancellationToken.Register(() => TryKill(process));
+
+            var mcpToken = request.Mcp?.Token;
+            var stderrTask = DrainStderrAsync(process, stderrTail, mcpToken, transcript);
+
+            var stdinFailure = await WriteStdinAsync(process, launch.Stdin, transcript).ConfigureAwait(false);
+
+            if (stdinFailure is not null)
+            {
+                await stderrTask.ConfigureAwait(false);
+
+                var reason = BuildExitReason(process, stderrTail, parser.FailureHint);
+                _logger.AgentTurnFailed(stdinFailure, reason);
+                yield return AgentEvent.Fail(reason);
+                yield break;
+            }
+
+            await foreach (var agentEvent in ReadEventsAsync(process, parser, transcript, cancellationToken).ConfigureAwait(false))
+            {
+                resultYielded |= LogAgentEvent(agentEvent, stopwatch);
+                yield return agentEvent;
+            }
+
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            await stderrTask.ConfigureAwait(false);
+
+            if (!resultYielded && process.ExitCode == 0 && parser.Complete() is { } completion)
+            {
+                resultYielded = true;
+                _logger.AgentTurnCompleted(stopwatch.ElapsedMilliseconds, completion.CostUsd, completion.Tokens);
+                yield return completion;
+            }
+
+            if (!resultYielded)
+            {
+                var reason = BuildExitReason(process, stderrTail, parser.FailureHint);
+                _logger.AgentTurnFailed(null, reason);
+                yield return AgentEvent.Fail(reason);
+            }
+        }
+        finally
+        {
+            Cleanup(process, launch, transcript, stopwatch, cancellationToken);
+        }
+    }
+
+    private Process? TryStartProcess(ProcessStartInfo info)
+    {
+        try
+        {
+            return Process.Start(info);
+        }
+        catch (Exception exception) when (exception is Win32Exception or InvalidOperationException)
+        {
+            _logger.AgentTurnFailed(exception, "не удалось запустить процесс CLI");
+            return null;
+        }
+    }
+
+    private async IAsyncEnumerable<AgentEvent> ReadEventsAsync(
+        Process process,
+        IAgentStreamParser parser,
+        IAgentTranscript? transcript,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        while (await process.StandardOutput.ReadLineAsync(cancellationToken).ConfigureAwait(false) is { } line)
+        {
+            transcript?.Write(AgentTranscriptKind.Stdout, line);
+            InspectLine(line);
+
+            if (parser.Parse(line) is { } agentEvent)
+            {
+                yield return agentEvent;
+            }
+        }
+    }
+
+    private bool LogAgentEvent(AgentEvent agentEvent, Stopwatch stopwatch)
+    {
+        switch (agentEvent.Kind)
+        {
+            case AgentEventKind.ToolCall:
+                _logger.AgentToolInvoked(agentEvent.ToolName ?? string.Empty);
+                return false;
+
+            case AgentEventKind.Completed:
+                _logger.AgentTurnCompleted(stopwatch.ElapsedMilliseconds, agentEvent.CostUsd, agentEvent.Tokens);
+                return true;
+
+            case AgentEventKind.Failed:
+                _logger.AgentTurnFailed(null, agentEvent.Text);
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    private void Cleanup(
+        Process? process,
+        AgentLaunch launch,
+        IAgentTranscript? transcript,
+        Stopwatch stopwatch,
+        CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            _logger.AgentTurnCancelled();
+        }
+
+        if (process is not null)
+        {
+            transcript?.Write(AgentTranscriptKind.Exit, $"код {(process.HasExited ? process.ExitCode : -1)}, {stopwatch.ElapsedMilliseconds} мс, отмена {cancellationToken.IsCancellationRequested}");
+
+            lock (_live)
+            {
+                _live.Remove(process);
+            }
+
+            TryKill(process);
+            process.Dispose();
+        }
+
+        foreach (var file in launch.TempFiles)
+        {
+            TryDelete(file.Path);
+        }
+    }
+
+    private string BuildExitReason(Process process, IReadOnlyList<string> stderrTail, string? failureHint)
+    {
+        var exitCode = process.HasExited ? process.ExitCode : -1;
+
+        if (!string.IsNullOrWhiteSpace(failureHint))
+        {
+            return $"CLI {DisplayName} завершился с кодом {exitCode}: {failureHint}";
+        }
+
+        return stderrTail.Count > 0
+            ? $"CLI {DisplayName} завершился с кодом {exitCode}: {string.Join(" ", stderrTail)}"
+            : $"CLI {DisplayName} завершился с кодом {exitCode} без ответа.";
+    }
+}

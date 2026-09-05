@@ -2,73 +2,127 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Settings"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
-             d:DesignWidth="900">
+             d:DesignWidth="900"
+             Visibility="{Binding Sections[sync].IsSelected, Converter={StaticResource BoolToVisibility}}">
 
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/Views/Settings/SettingsResources.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/SpaceSnoop.Wpf;component/Views/Settings/SettingsResources.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource Card.Inset}"
-            Margin="0,0,0,10">
+    <HeaderedContentControl Style="{StaticResource Form.Panel}"
+                            Header="{Binding Sections[sync].Title}"
+                            keepshell:Form.ResetCommand="{Binding ResetSectionCommand}"
+                            keepshell:Form.ResetCommandParameter="sync"
+                            keepshell:Form.ResetHint="{Binding ResetPlans[sync].Hint}">
         <StackPanel>
-            <TextBlock Text="Синхронизация"
-                       Style="{StaticResource Setting.SectionTitle}" />
-
-            <CheckBox Content="Автодополнение путей"
-                      IsChecked="{Binding Operations.SyncPathSuggest, Mode=TwoWay}"
-                      Margin="0,14,0,0"
-                      VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="Подсказывает существующие каталоги при вводе пути; перебор вариантов – стрелками ↑/↓." />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Content="Автодополнение путей"
+                          IsChecked="{Binding Operations.SyncPathSuggest, Mode=TwoWay}"
+                          VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.sync.path_suggest]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
+            </Grid>
+            <TextBlock Style="{StaticResource Form.CheckHint}"
+                       Text="Подсказывает существующие каталоги при вводе пути; перебор – стрелками ↑/↓." />
 
             <Grid Margin="0,16,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="240" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Content="Затираемый файл – в корзину"
+                          IsChecked="{Binding Operations.RecycleOverwritten, Mode=TwoWay}"
+                          VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.sync.recycle_overwritten]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
+            </Grid>
+            <TextBlock Style="{StaticResource Form.CheckHint}"
+                       Text="Перед перезаписью прежняя версия файла на приёмнике уходит в корзину – её можно вернуть." />
+            <Expander Style="{StaticResource Setting.Details}"
+                      Header="Что будет с прежним файлом">
+                <TextBlock Style="{StaticResource Setting.DetailsBody}"
+                           Text="Выключено – перезапись необратима, прежний файл пропадает без следа. Включено – каждая перезапись добавляет файл в корзину, и на больших прогонах она заметно растёт; место освободится после её очистки." />
+            </Expander>
+
+            <Grid Margin="0,16,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="Git-папки (.git)"
-                               Style="{StaticResource Setting.Label}" />
-                    <TextBlock
-                        Text="Что делать, если при сравнении найдены служебные каталоги репозитория. Состояние репозитория (ветка, коммит) показывается над списком в любом случае."
-                        Style="{StaticResource Setting.Hint}"
-                        Margin="0,2,0,0" />
+                               Style="{StaticResource Form.Label}" />
+                    <TextBlock Text="Что делать, если при сравнении найден служебный каталог репозитория."
+                               Style="{StaticResource Form.Hint}"
+                               Margin="0,2,0,0" />
+                    <Expander Style="{StaticResource Setting.Details}"
+                              Header="Что настройка не меняет">
+                        <TextBlock Style="{StaticResource Setting.DetailsBody}"
+                                   Text="Настройка решает только, копировать ли сам каталог .git. Состояние репозитория – ветка, коммит, изменения – показывается над списком в любом случае." />
+                    </Expander>
                 </StackPanel>
                 <ComboBox Grid.Column="1"
                           Style="{StaticResource ComboBox.Form}"
                           ItemsSource="{Binding GitFolderOptions}"
                           SelectedItem="{Binding SelectedGitFolderOption}"
                           DisplayMemberPath="Label"
+                          Width="{StaticResource Setting.ControlWidth}"
+                          Margin="16,0,0,0"
                           VerticalAlignment="Center" />
+                <Button Grid.Column="2"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.sync.git_folders]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
             </Grid>
 
             <TextBlock Text="Исключения по умолчанию"
-                       Style="{StaticResource Setting.Label}"
+                       Style="{StaticResource Form.Label}"
                        Margin="0,16,0,0" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="Glob-паттерны через запятую (напр. bin,obj,*.tmp). Подставляются в «Синхронизацию» при пустом поле исключений." />
+            <TextBlock Style="{StaticResource Form.Hint}"
+                       Text="Glob-паттерны через запятую (напр. bin,obj,*.tmp). Подставляются при пустом поле исключений." />
             <TextBox Style="{StaticResource TextBox.Form}"
                      Text="{Binding Operations.DefaultExclusions, UpdateSourceTrigger=PropertyChanged}"
                      FontFamily="{DynamicResource Font.Mono}"
                      Margin="0,10,0,0" />
 
             <TextBlock Text="Группировать каталоги (плоский вид)"
-                       Style="{StaticResource Setting.Label}"
+                       Style="{StaticResource Form.Label}"
                        Margin="0,16,0,0" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="Имена каталогов через запятую (напр. .git,bin,obj). В плоском виде «Синхронизации» их файлы собираются в свёрнутую группу «Служебные файлы» внизу списка. Пусто – без группировки." />
+            <TextBlock Style="{StaticResource Form.Hint}"
+                       Text="Имена каталогов через запятую (напр. .git,bin,obj). Пусто – без группировки." />
+            <Expander Style="{StaticResource Setting.Details}"
+                      Header="Как это выглядит в списке">
+                <TextBlock Style="{StaticResource Setting.DetailsBody}"
+                           Text="В плоском виде «Синхронизации» файлы перечисленных каталогов собираются в свёрнутую группу «Служебные файлы» внизу списка. Из сравнения они при этом не исключаются – это делают исключения выше." />
+            </Expander>
             <TextBox Style="{StaticResource TextBox.Form}"
                      Text="{Binding Operations.GroupFolders, UpdateSourceTrigger=PropertyChanged}"
                      FontFamily="{DynamicResource Font.Mono}"
                      Margin="0,10,0,0" />
         </StackPanel>
-    </Border>
+    </HeaderedContentControl>
 </UserControl>

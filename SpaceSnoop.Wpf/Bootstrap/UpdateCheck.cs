@@ -1,9 +1,18 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using System.IO;
 
 namespace SpaceSnoop.Wpf.Bootstrap;
 
 public static class UpdateCheck
 {
+    public static bool IsSelfContained()
+    {
+        var path = Environment.ProcessPath;
+
+        // TODO: размер exe – единственный надёжный признак self-contained для single-file (рантайм встроен, рядом hostfxr нет); порог в AppDefaults
+        return path is not null && File.Exists(path) && new FileInfo(path).Length > AppDefaults.SelfContainedExeThreshold;
+    }
+
     public static bool IsNewer(string? latestTag, string? currentVersion)
     {
         return TryParse(latestTag, out var latest)

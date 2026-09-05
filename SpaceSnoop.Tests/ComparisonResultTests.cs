@@ -140,6 +140,82 @@ public class ComparisonResultTests
         }
     }
 
+    [TestCase(SyncWinner.Left, SyncAction.CopyToRight)]
+    [TestCase(SyncWinner.Right, SyncAction.CopyToLeft)]
+    public void ApplyBidirectional_WinnerSide_ResolvesModifiedRegardlessOfDate(SyncWinner winner, SyncAction expected)
+    {
+        var now = DateTime.Now;
+        var earlier = now.AddHours(-1);
+
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("a.txt", "a.txt") { Status = ComparisonStatus.Modified, LeftModified = earlier, RightModified = now });
+        root.Files.Add(new("b.txt", "b.txt") { Status = ComparisonStatus.Modified, LeftModified = now, RightModified = earlier });
+        root.Files.Add(new("l.txt", "l.txt") { Status = ComparisonStatus.LeftOnly });
+        root.Files.Add(new("r.txt", "r.txt") { Status = ComparisonStatus.RightOnly });
+
+        var result = new ComparisonResult("C:\\Left", "C:\\Right", root);
+        result.ApplyMode(SyncMode.Bidirectional, false, winner);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(root.Files[0].Action, Is.EqualTo(expected));
+            Assert.That(root.Files[1].Action, Is.EqualTo(expected));
+            Assert.That(root.Files[0].Status, Is.EqualTo(ComparisonStatus.Modified));
+            Assert.That(root.Files[2].Action, Is.EqualTo(SyncAction.CopyToRight));
+            Assert.That(root.Files[3].Action, Is.EqualTo(SyncAction.CopyToLeft));
+        }
+    }
+
+    [TestCase(SyncWinner.Left)]
+    [TestCase(SyncWinner.Right)]
+    public void ApplyBidirectional_MirrorWinner_DeletesLoserOnlyItems_KeepsWinnerOnly(SyncWinner winner)
+    {
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("left.txt", "left.txt") { Status = ComparisonStatus.LeftOnly });
+        root.Files.Add(new("right.txt", "right.txt") { Status = ComparisonStatus.RightOnly });
+
+        var leftDir = new DirectoryComparison("ld", "ld") { Status = ComparisonStatus.LeftOnly };
+        var rightDir = new DirectoryComparison("rd", "rd") { Status = ComparisonStatus.RightOnly };
+        root.SubDirectories.Add(leftDir);
+        root.SubDirectories.Add(rightDir);
+
+        var result = new ComparisonResult("C:\\Left", "C:\\Right", root);
+        result.ApplyMode(SyncMode.Bidirectional, true, winner);
+
+        var keepLeft = winner == SyncWinner.Left;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(root.Files[0].Action, Is.EqualTo(keepLeft ? SyncAction.CopyToRight : SyncAction.DeleteLeft));
+            Assert.That(root.Files[1].Action, Is.EqualTo(keepLeft ? SyncAction.DeleteRight : SyncAction.CopyToLeft));
+            Assert.That(leftDir.Action, Is.EqualTo(keepLeft ? SyncAction.CopyToRight : SyncAction.DeleteLeft));
+            Assert.That(rightDir.Action, Is.EqualTo(keepLeft ? SyncAction.DeleteRight : SyncAction.CopyToLeft));
+        }
+    }
+
+    [TestCase(SyncWinner.Left, SyncAction.CopyToRight)]
+    [TestCase(SyncWinner.Right, SyncAction.CopyToLeft)]
+    public void ApplyBidirectional_ReapplyWithWinnerSide_ResolvesFileThatNewestFlaggedConflict(SyncWinner winner, SyncAction expected)
+    {
+        var now = DateTime.Now;
+
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("a.txt", "a.txt") { Status = ComparisonStatus.Modified, LeftModified = now, RightModified = now });
+
+        var result = new ComparisonResult("C:\\Left", "C:\\Right", root);
+        result.ApplyMode(SyncMode.Bidirectional, false, SyncWinner.Newest);
+
+        Assume.That(root.Files[0].Status, Is.EqualTo(ComparisonStatus.Conflict));
+
+        result.ApplyMode(SyncMode.Bidirectional, false, winner);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(root.Files[0].Status, Is.EqualTo(ComparisonStatus.Modified));
+            Assert.That(root.Files[0].Action, Is.EqualTo(expected));
+        }
+    }
+
     [Test]
     public void CountPlannedActions_SplitsNewAndModifiedAndDeletes()
     {
@@ -163,6 +239,56 @@ public class ComparisonResultTests
             Assert.That(planned.Deletes, Is.EqualTo(1));
             Assert.That(planned.Copies, Is.EqualTo(4));
             Assert.That(planned.Total, Is.EqualTo(5));
+        }
+    }
+
+    [Test]
+    public void CountPlannedActions_SumsBytesBySideAndNovelty()
+    {
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("new.txt", "new.txt") { Status = ComparisonStatus.LeftOnly, Action = SyncAction.CopyToRight, LeftSize = 100 });
+        root.Files.Add(new("mod.txt", "mod.txt") { Status = ComparisonStatus.Modified, Action = SyncAction.CopyToRight, LeftSize = 500, RightSize = 200 });
+        root.Files.Add(new("back.txt", "back.txt") { Status = ComparisonStatus.RightOnly, Action = SyncAction.CopyToLeft, RightSize = 70 });
+        root.Files.Add(new("gone.txt", "gone.txt") { Status = ComparisonStatus.LeftOnly, Action = SyncAction.DeleteLeft, LeftSize = 40 });
+
+        var planned = new ComparisonResult("C:\\Left", "C:\\Right", root).CountPlannedActions();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(planned.NewCopyBytes, Is.EqualTo(170));
+            Assert.That(planned.ModifiedCopyBytes, Is.EqualTo(500));
+            Assert.That(planned.CopyBytes, Is.EqualTo(670));
+            Assert.That(planned.CopyToRightBytes, Is.EqualTo(600));
+            Assert.That(planned.CopyToLeftBytes, Is.EqualTo(70));
+            Assert.That(planned.OverwriteRightBytes, Is.EqualTo(200));
+            Assert.That(planned.RequiredRightBytes, Is.EqualTo(400));
+            Assert.That(planned.RequiredLeftBytes, Is.EqualTo(70));
+            Assert.That(planned.DeleteFileBytes, Is.EqualTo(40));
+            Assert.That(planned.DeleteBytes, Is.EqualTo(40));
+        }
+    }
+
+    [Test]
+    public void CountPlannedActions_CountsBytesInsideDeletedDirectory()
+    {
+        var root = new DirectoryComparison("root", "");
+        var extra = new DirectoryComparison("extra", "extra") { Status = ComparisonStatus.RightOnly };
+        extra.Files.Add(new("nested.txt", "extra\\nested.txt") { Status = ComparisonStatus.RightOnly, RightSize = 900 });
+
+        var deeper = new DirectoryComparison("deeper", "extra\\deeper") { Status = ComparisonStatus.RightOnly };
+        deeper.Files.Add(new("deep.txt", "extra\\deeper\\deep.txt") { Status = ComparisonStatus.RightOnly, RightSize = 100 });
+        extra.SubDirectories.Add(deeper);
+        root.SubDirectories.Add(extra);
+
+        var result = new ComparisonResult("C:\\Left", "C:\\Right", root);
+        result.ApplyMode(SyncMode.LeftToRight, true);
+        var planned = result.CountPlannedActions();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(planned.DirDeletes, Is.EqualTo(1));
+            Assert.That(planned.DeleteFileBytes, Is.Zero);
+            Assert.That(planned.DeleteDirBytes, Is.EqualTo(1000));
         }
     }
 
@@ -223,6 +349,138 @@ public class ComparisonResultTests
 
         root.Files[0].Action = SyncAction.CopyToRight;
         Assert.That(result.HasUnresolvedConflicts(), Is.False);
+    }
+
+    [Test]
+    public void SkippedLinks_ReportsRelativePathsFromWholeTree()
+    {
+        var root = new DirectoryComparison("root", "");
+        root.SkippedLinks.Add("junction");
+
+        var sub = new DirectoryComparison("modules", "modules");
+        sub.SkippedLinks.Add("link.txt");
+        root.SubDirectories.Add(sub);
+
+        var result = new ComparisonResult("C:\\Left", "C:\\Right", root);
+
+        Assert.That(result.SkippedLinks(), Is.EqualTo(new[] { "junction", Path.Combine("modules", "link.txt") }));
+    }
+
+    [TestCase(SyncMode.LeftToRight, SyncWinner.Newest)]
+    [TestCase(SyncMode.Bidirectional, SyncWinner.Left)]
+    public void ApplyMode_IncompleteLeftSide_PlansNoDeletesOnRight(SyncMode mode, SyncWinner winner)
+    {
+        var root = new DirectoryComparison("root", "");
+        root.Files.Add(new("kept.txt", "kept.txt") { Status = ComparisonStatus.RightOnly, RightSize = 10 });
+
+        var blind = new DirectoryComparison("blind", "blind") { Status = ComparisonStatus.Modified, LeftIncomplete = true };
+        blind.Files.Add(new("orphan.txt", "blind\\orphan.txt") { Status = ComparisonStatus.RightOnly, RightSize = 20 });
+        blind.Files.Add(new("new.txt", "blind\\new.txt") { Status = ComparisonStatus.LeftOnly, LeftSize = 30 });
+
+        var deeper = new DirectoryComparison("deeper", "blind\\deeper") { Status = ComparisonStatus.RightOnly };
+        deeper.Files.Add(new("deep.txt", "blind\\deeper\\deep.txt") { Status = ComparisonStatus.RightOnly, RightSize = 40 });
+        blind.SubDirectories.Add(deeper);
+        root.SubDirectories.Add(blind);
+
+        var result = new ComparisonResult("C:\\Left", "C:\\Right", root);
+        result.ApplyMode(mode, true, winner);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(root.Files[0].Action, Is.EqualTo(SyncAction.DeleteRight), "полный каталог удаления сохраняет");
+            Assert.That(blind.Files[0].Action, Is.EqualTo(SyncAction.Skip));
+            Assert.That(blind.Files[1].Action, Is.EqualTo(SyncAction.CopyToRight), "копирование по неполным данным остаётся");
+            Assert.That(deeper.Action, Is.EqualTo(SyncAction.Skip));
+            Assert.That(deeper.Files[0].Action, Is.EqualTo(SyncAction.Skip), "запрет наследуется вглубь");
+            Assert.That(result.CountPlannedActions().Deletes, Is.EqualTo(1));
+            Assert.That(result.IncompleteDirectories(), Is.EqualTo(new[] { "blind" }));
+        }
+    }
+
+    [Test]
+    public void ApplyMode_VanishedLeftDirectory_DoesNotDeleteItWholesale()
+    {
+        var root = new DirectoryComparison("root", "");
+
+        var vanished = new DirectoryComparison("vanished", "vanished")
+        {
+            Status = ComparisonStatus.RightOnly,
+            LeftIncomplete = true,
+        };
+
+        vanished.Files.Add(new("inside.txt", "vanished\\inside.txt") { Status = ComparisonStatus.RightOnly, RightSize = 10 });
+        root.SubDirectories.Add(vanished);
+
+        var result = new ComparisonResult("C:\\Left", "C:\\Right", root);
+        result.ApplyMode(SyncMode.LeftToRight, true);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(vanished.Action, Is.EqualTo(SyncAction.Skip), "признак самого каталога обязан действовать на его же действие");
+            Assert.That(vanished.Files[0].Action, Is.EqualTo(SyncAction.Skip));
+            Assert.That(result.CountPlannedActions().DirDeletes, Is.EqualTo(0));
+        }
+    }
+
+    [Test]
+    public void ApplyMode_MarksDeleteBlockedOnNodesAndInheritsDown()
+    {
+        var root = new DirectoryComparison("root", "");
+        var blind = new DirectoryComparison("blind", "blind") { Status = ComparisonStatus.Modified, LeftIncomplete = true };
+        blind.Files.Add(new("orphan.txt", "blind\\orphan.txt") { Status = ComparisonStatus.RightOnly, RightSize = 20 });
+
+        var deeper = new DirectoryComparison("deeper", "blind\\deeper") { Status = ComparisonStatus.RightOnly };
+        deeper.Files.Add(new("deep.txt", "blind\\deeper\\deep.txt") { Status = ComparisonStatus.RightOnly, RightSize = 40 });
+        blind.SubDirectories.Add(deeper);
+        root.SubDirectories.Add(blind);
+
+        var result = new ComparisonResult("C:\\Left", "C:\\Right", root);
+        result.ApplyMode(SyncMode.LeftToRight, true);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(root.DeleteRightBlocked, Is.False);
+            Assert.That(blind.DeleteRightBlocked, Is.True);
+            Assert.That(blind.Files[0].DeleteRightBlocked, Is.True);
+            Assert.That(deeper.DeleteRightBlocked, Is.True, "запрет наследуется вглубь");
+            Assert.That(deeper.Files[0].DeleteRightBlocked, Is.True);
+            Assert.That(deeper.Files[0].DeleteLeftBlocked, Is.False, "запрещена только сторона, чей обход неполон");
+        }
+    }
+
+    [Test]
+    public void ApplyMode_TypeConflictFile_StillGetsDeleteBlockedFlags()
+    {
+        var blind = new DirectoryComparison("blind", "blind") { Status = ComparisonStatus.Modified, LeftIncomplete = true };
+        blind.Files.Add(new("config", "blind\\config") { Status = ComparisonStatus.Conflict, TypeConflict = FileTypeConflict.RightFileLeftDirectory });
+
+        var root = new DirectoryComparison("root", "");
+        root.SubDirectories.Add(blind);
+
+        var result = new ComparisonResult("C:\\Left", "C:\\Right", root);
+        result.ApplyMode(SyncMode.LeftToRight, true);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(blind.Files[0].DeleteRightBlocked, Is.True, "ранний выход по конфликту типов не должен терять запрет");
+            Assert.That(blind.Files[0].Action, Is.EqualTo(SyncAction.None));
+        }
+    }
+
+    [Test]
+    public void ApplyMode_IncompleteRightSide_PlansNoDeletesOnLeft()
+    {
+        var root = new DirectoryComparison("root", "") { RightIncomplete = true };
+        root.Files.Add(new("orphan.txt", "orphan.txt") { Status = ComparisonStatus.LeftOnly, LeftSize = 10 });
+
+        var result = new ComparisonResult("C:\\Left", "C:\\Right", root);
+        result.ApplyMode(SyncMode.RightToLeft, true);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(root.Files[0].Action, Is.EqualTo(SyncAction.Skip));
+            Assert.That(result.IncompleteDirectories(), Is.EqualTo(new[] { "root" }));
+        }
     }
 
     [Test]

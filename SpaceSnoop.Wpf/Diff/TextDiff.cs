@@ -106,27 +106,6 @@ public static class TextDiff
         var removed = new List<DiffLine>();
         var added = new List<DiffLine>();
 
-        void Flush()
-        {
-            var max = Math.Max(removed.Count, added.Count);
-
-            for (var i = 0; i < max; i++)
-            {
-                var l = i < removed.Count ? removed[i] : null;
-                var r = i < added.Count ? added[i] : null;
-
-                rows.Add(new(l is null ? DiffLineKind.None : DiffLineKind.Removed,
-                    l?.LeftNumberText ?? string.Empty,
-                    l?.Text ?? string.Empty,
-                    r is null ? DiffLineKind.None : DiffLineKind.Added,
-                    r?.RightNumberText ?? string.Empty,
-                    r?.Text ?? string.Empty));
-            }
-
-            removed.Clear();
-            added.Clear();
-        }
-
         foreach (var line in lines)
         {
             switch (line.Kind)
@@ -140,14 +119,40 @@ public static class TextDiff
                     break;
 
                 default:
-                    Flush();
-                    rows.Add(new(DiffLineKind.Context, line.LeftNumberText, line.Text, DiffLineKind.Context, line.RightNumberText, line.Text));
+                    FlushRows(rows, removed, added);
+                    AddContextRow(rows, line);
                     break;
             }
         }
 
-        Flush();
+        FlushRows(rows, removed, added);
         return rows;
+    }
+
+    private static void FlushRows(List<DiffRow> rows, List<DiffLine> removed, List<DiffLine> added)
+    {
+        var max = Math.Max(removed.Count, added.Count);
+
+        for (var i = 0; i < max; i++)
+        {
+            var left = i < removed.Count ? removed[i] : null;
+            var right = i < added.Count ? added[i] : null;
+
+            rows.Add(new(left is null ? DiffLineKind.None : DiffLineKind.Removed,
+                left?.LeftNumberText ?? string.Empty,
+                left?.Text ?? string.Empty,
+                right is null ? DiffLineKind.None : DiffLineKind.Added,
+                right?.RightNumberText ?? string.Empty,
+                right?.Text ?? string.Empty));
+        }
+
+        removed.Clear();
+        added.Clear();
+    }
+
+    private static void AddContextRow(List<DiffRow> rows, DiffLine line)
+    {
+        rows.Add(new(DiffLineKind.Context, line.LeftNumberText, line.Text, DiffLineKind.Context, line.RightNumberText, line.Text));
     }
 
     private static IReadOnlyList<DiffSpan> Whole(string text)
@@ -237,68 +242,103 @@ public static class TextDiff
     private static bool TryMyers(IReadOnlyList<string> left, IReadOnlyList<string> right, int leftStart, int n, int m, List<DiffLine> output)
     {
         var max = n + m;
-        var offset = max;
         var maxD = (int)Math.Min(max, MaxTraceCells / (2L * max + 1));
-        var v = new int[2 * max + 1];
-        var trace = new List<int[]>();
+        var window = new MyersWindow(left, right, leftStart, n, m, max);
 
-        var foundD = -1;
+        if (!TryFindTrace(window, maxD, out var trace, out var foundD))
+        {
+            return false;
+        }
 
-        for (var d = 0; d <= max && foundD < 0; d++)
+        var edits = BuildEdits(window, trace, foundD);
+
+        edits.Reverse();
+        output.AddRange(edits);
+        return true;
+    }
+
+    private static bool TryFindTrace(in MyersWindow window, int maxD, out List<int[]> trace, out int foundD)
+    {
+        var v = new int[2 * window.Offset + 1];
+        trace = [];
+
+        for (var d = 0; d <= window.N + window.M; d++)
         {
             if (d > maxD)
             {
+                foundD = -1;
                 return false;
             }
 
             trace.Add((int[])v.Clone());
 
-            for (var k = -d; k <= d; k += 2)
+            if (AdvanceTrace(v, window, d, out foundD))
             {
-                var x = k == -d || k != d && v[offset + k - 1] < v[offset + k + 1]
-                    ? v[offset + k + 1]
-                    : v[offset + k - 1] + 1;
-
-                var y = x - k;
-
-                while (x < n && y < m && left[leftStart + x] == right[leftStart + y])
-                {
-                    x++;
-                    y++;
-                }
-
-                v[offset + k] = x;
-
-                if (x >= n && y >= m)
-                {
-                    foundD = d;
-                    break;
-                }
+                return true;
             }
         }
 
+        foundD = -1;
+        return false;
+    }
+
+    private static bool AdvanceTrace(int[] v, in MyersWindow window, int d, out int foundD)
+    {
+        var (left, right, leftStart, n, m, offset) = window;
+
+        for (var k = -d; k <= d; k += 2)
+        {
+            var x = k == -d || k != d && v[offset + k - 1] < v[offset + k + 1]
+                ? v[offset + k + 1]
+                : v[offset + k - 1] + 1;
+
+            var y = x - k;
+
+            while (x < n && y < m && left[leftStart + x] == right[leftStart + y])
+            {
+                x++;
+                y++;
+            }
+
+            v[offset + k] = x;
+
+            if (x >= n && y >= m)
+            {
+                foundD = d;
+                return true;
+            }
+        }
+
+        foundD = -1;
+        return false;
+    }
+
+    private static List<DiffLine> BuildEdits(in MyersWindow window, IReadOnlyList<int[]> trace, int foundD)
+    {
+        var (left, right, leftStart, n, m, offset) = window;
         var edits = new List<DiffLine>();
-        int px = n, py = m;
+        var px = n;
+        var py = m;
 
         for (var d = foundD; d > 0; d--)
         {
-            var prev = trace[d];
+            var previous = trace[d];
             var k = px - py;
-            var prevK = k == -d || k != d && prev[offset + k - 1] < prev[offset + k + 1]
+            var previousK = k == -d || k != d && previous[offset + k - 1] < previous[offset + k + 1]
                 ? k + 1
                 : k - 1;
 
-            var prevX = prev[offset + prevK];
-            var prevY = prevX - prevK;
+            var previousX = previous[offset + previousK];
+            var previousY = previousX - previousK;
 
-            while (px > prevX && py > prevY)
+            while (px > previousX && py > previousY)
             {
                 px--;
                 py--;
                 edits.Add(new(DiffLineKind.Context, left[leftStart + px], leftStart + px + 1, leftStart + py + 1));
             }
 
-            if (px == prevX)
+            if (px == previousX)
             {
                 py--;
                 edits.Add(new(DiffLineKind.Added, right[leftStart + py], 0, leftStart + py + 1));
@@ -317,8 +357,14 @@ public static class TextDiff
             edits.Add(new(DiffLineKind.Context, left[leftStart + px], leftStart + px + 1, leftStart + py + 1));
         }
 
-        edits.Reverse();
-        output.AddRange(edits);
-        return true;
+        return edits;
     }
+
+    private readonly record struct MyersWindow(
+        IReadOnlyList<string> Left,
+        IReadOnlyList<string> Right,
+        int LeftStart,
+        int N,
+        int M,
+        int Offset);
 }

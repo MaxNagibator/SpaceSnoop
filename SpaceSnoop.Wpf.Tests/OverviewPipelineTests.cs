@@ -1,4 +1,5 @@
 ﻿using SpaceSnoop.Wpf.Bootstrap;
+using SpaceSnoop.Wpf.Bootstrap.Schedule;
 using SpaceSnoop.Wpf.ViewModels.Overview;
 
 namespace SpaceSnoop.Wpf.Tests;

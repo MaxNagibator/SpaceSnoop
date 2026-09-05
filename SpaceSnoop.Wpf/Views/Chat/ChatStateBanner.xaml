@@ -1,0 +1,155 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Chat.ChatStateBanner"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:chatvm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Chat"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance chatvm:ChatViewModel}"
+             d:DesignWidth="900">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/SpaceSnoop.Wpf;component/Views/Chat/ChatResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <Style x:Key="Chat.Banner"
+                   TargetType="Border">
+                <Setter Property="Background" Value="{DynamicResource Bg.SurfaceAlt}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="{DynamicResource Radius.M}" />
+                <Setter Property="Padding" Value="16" />
+                <Setter Property="Margin" Value="16,16,16,0" />
+            </Style>
+
+            <Style x:Key="Chat.BannerText"
+                   TargetType="TextBlock"
+                   BasedOn="{StaticResource TextBlock.Subtle}">
+                <Setter Property="TextWrapping" Value="Wrap" />
+                <Setter Property="Margin" Value="0,6,0,0" />
+            </Style>
+
+            <Style x:Key="Chat.BannerIcon"
+                   TargetType="iconPacks:PackIconLucide">
+                <Setter Property="Width" Value="18" />
+                <Setter Property="Height" Value="18" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Margin" Value="0,0,10,0" />
+            </Style>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <Border Style="{StaticResource Chat.Banner}"
+                BorderBrush="{DynamicResource Border.Subtle}"
+                Visibility="{Binding Gates.IsDetectingCli, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel Orientation="Horizontal">
+                <iconPacks:PackIconLucide Style="{StaticResource Chat.BannerIcon}"
+                                          Kind="{x:Static iconPacks:PackIconLucideKind.LoaderCircle}"
+                                          Foreground="{DynamicResource Fg.Muted}" />
+                <TextBlock Text="{Binding Gates.DetectingCliText}"
+                           Style="{StaticResource TextBlock.Subtle}"
+                           VerticalAlignment="Center" />
+            </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource Chat.Banner}"
+                BorderBrush="{DynamicResource State.Warning}"
+                Visibility="{Binding Gates.ShowCliMissingBanner, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource Chat.BannerIcon}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.BotOff}"
+                                              Foreground="{DynamicResource State.WarningText}" />
+                    <TextBlock Text="{Binding Gates.CliMissingTitle}"
+                               FontWeight="{DynamicResource Font.Weight.SemiBold}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Style="{StaticResource Chat.BannerText}"
+                           Text="{Binding Gates.CliMissingText}" />
+                <TextBlock Style="{StaticResource Chat.BannerText}"
+                           Text="{Binding Gates.InstallHintsText}"
+                           Visibility="{Binding Gates.ShowInstallHints, Converter={StaticResource BoolToVisibility}}" />
+                <TextBlock Style="{StaticResource Chat.BannerText}"
+                           Text="{Binding Gates.AlternativeCliText}"
+                           Visibility="{Binding Gates.HasAlternativeCli, Converter={StaticResource BoolToVisibility}}" />
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Left"
+                            Margin="0,10,0,0">
+                    <Button Style="{StaticResource Button.Primary}"
+                            Content="{Binding Gates.SwitchToAlternativeText}"
+                            Command="{Binding Gates.SwitchToAlternativeCommand}"
+                            Margin="0,0,8,0"
+                            Visibility="{Binding Gates.HasAlternativeCli, Converter={StaticResource BoolToVisibility}}" />
+                    <Button Style="{StaticResource Button.Secondary}"
+                            Content="Проверить снова"
+                            Command="{Binding Gates.RecheckCliCommand}" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource Chat.Banner}"
+                BorderBrush="{DynamicResource State.Info}"
+                Visibility="{Binding Gates.ShowConsentBanner, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource Chat.BannerIcon}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.ShieldAlert}"
+                                              Foreground="{DynamicResource State.InfoText}" />
+                    <TextBlock Text="Нужно согласие на отправку данных"
+                               FontWeight="{DynamicResource Font.Weight.SemiBold}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Style="{StaticResource Chat.BannerText}"
+                           Text="{Binding Gates.ConsentText}" />
+                <TextBlock Style="{StaticResource Chat.BannerText}"
+                           Text="Продолжение разговора заставляет CLI хранить весь диалог – сообщения и то, что вернули инструменты, то есть пути и размеры с ваших дисков – локально, в своей рабочей папке, привязанной к текущему каталогу запуска." />
+                <Button Style="{StaticResource Button.Primary}"
+                        Content="Разрешить"
+                        Command="{Binding Gates.GrantConsentCommand}"
+                        HorizontalAlignment="Left"
+                        Margin="0,10,0,0" />
+            </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource Chat.Banner}"
+                BorderBrush="{DynamicResource State.Warning}"
+                Visibility="{Binding Gates.ShowMcpBanner, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource Chat.BannerIcon}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.Unplug}"
+                                              Foreground="{DynamicResource State.WarningText}" />
+                    <TextBlock Text="MCP-сервер выключен"
+                               FontWeight="{DynamicResource Font.Weight.SemiBold}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Style="{StaticResource Chat.BannerText}"
+                           Text="Без него у Шныря нет ни одного инструмента приложения – он не сможет ни просканировать диск, ни посмотреть сравнение." />
+                <Button Style="{StaticResource Button.Primary}"
+                        Content="Включить MCP-сервер"
+                        Command="{Binding Gates.EnableMcpCommand}"
+                        HorizontalAlignment="Left"
+                        Margin="0,10,0,0" />
+                <TextBlock Style="{StaticResource Chat.BannerText}"
+                           Foreground="{DynamicResource State.ErrorText}"
+                           Text="{Binding Gates.McpServer.LastError}"
+                           Visibility="{Binding Gates.McpServer.LastError, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
+            </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource Chat.Notice}"
+                Margin="16,12,16,0"
+                ToolTip="{Binding Gates.ShellNotice}"
+                Visibility="{Binding Gates.ShowShellBanner, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel Orientation="Horizontal">
+                <iconPacks:PackIconLucide Style="{StaticResource Chat.NoticeIcon}"
+                                          Kind="{x:Static iconPacks:PackIconLucideKind.SquareTerminal}" />
+                <TextBlock Style="{StaticResource Chat.NoticeText}"
+                           Text="{Binding Gates.ShellNoticeShort}" />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

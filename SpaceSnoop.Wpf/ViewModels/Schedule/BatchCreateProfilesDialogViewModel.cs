@@ -1,6 +1,5 @@
 ﻿using KeepShell.Services.Modal;
 using MahApps.Metro.IconPacks;
-using Microsoft.Win32;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 
@@ -10,6 +9,7 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
 {
     private readonly IReadOnlyList<SyncProfile> _existing;
     private readonly ISettingsStore _settings;
+    private readonly IFilePicker _filePicker;
 
     [ObservableProperty]
     private string _sourceParent = string.Empty;
@@ -21,6 +21,9 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
     private int _selectedModeIndex;
 
     [ObservableProperty]
+    private int _selectedWinnerIndex;
+
+    [ObservableProperty]
     private bool _mirror;
 
     [ObservableProperty]
@@ -29,15 +32,17 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
     [ObservableProperty]
     private int _selectedSort;
 
-    public BatchCreateProfilesDialogViewModel(ISettingsStore settings)
+    public BatchCreateProfilesDialogViewModel(ISettingsStore settings, IFilePicker filePicker)
     {
         _settings = settings;
+        _filePicker = filePicker;
         _existing = SyncProfileStore.Load(settings);
         PathSuggest = settings.GetBool(SettingsKeys.SyncPathSuggest, AppDefaults.SyncPathSuggestDefault);
 
         _sourceParent = settings.GetStringValue(SettingsKeys.BatchSource) ?? string.Empty;
         _destParent = settings.GetStringValue(SettingsKeys.BatchDest) ?? string.Empty;
         _selectedModeIndex = Math.Clamp(settings.GetInt(SettingsKeys.BatchMode, settings.GetInt(SettingsKeys.SyncMode)), 0, Modes.Count - 1);
+        _selectedWinnerIndex = Math.Clamp(settings.GetInt(SettingsKeys.BatchWinner, settings.GetInt(SettingsKeys.SyncWinner)), 0, Winners.Count - 1);
         _mirror = settings.GetBool(SettingsKeys.BatchMirror, settings.GetBool(SettingsKeys.SyncMirror));
         _selectedSort = Math.Clamp(settings.GetInt(SettingsKeys.BatchSort), 0, SortOptions.Count - 1);
         _exclusions = settings.GetStringValue(SettingsKeys.BatchExclusions) ?? FallbackExclusions(settings);
@@ -51,7 +56,9 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
 
     public bool PathSuggest { get; }
 
-    public IReadOnlyList<string> Modes { get; } = ["Слева направо", "Справа налево", "Двусторонний"];
+    public IReadOnlyList<SegmentOption> Modes => SyncOptions.Modes;
+
+    public IReadOnlyList<SegmentOption> Winners => SyncOptions.Winners;
 
     public IReadOnlyList<string> SortOptions { get; } = ["Имя (А–Я)", "Имя (Я–А)", "Сначала новые"];
 
@@ -79,6 +86,10 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
 
     public string SelectionSummary => $"Отмечено: {SelectedCount} из {Rows.Count}";
 
+    public string CreateCaption => SelectedCount > 0
+        ? $"Создать {Plural.Format(SelectedCount, "профиль", "профиля", "профилей")}"
+        : "Создать профили";
+
     public bool? AllSelected
     {
         get
@@ -104,7 +115,9 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
         }
     }
 
-    public bool MirrorApplicable => SelectedModeIndex != 2;
+    public bool WinnerApplicable => SelectedModeIndex == 2;
+
+    public bool MirrorApplicable => SelectedModeIndex != 2 || SelectedWinnerIndex is 1 or 2;
 
     private void OnRowChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -128,13 +141,11 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
         return exclusions;
     }
 
-    private static void Browse(Action<string> assign)
+    private void Browse(Action<string> assign)
     {
-        var dialog = new OpenFolderDialog { Title = "Выберите каталог" };
-
-        if (dialog.ShowDialog() == true)
+        if (_filePicker.PickFolder("Выберите каталог") is { } path)
         {
-            assign(dialog.FolderName);
+            assign(path);
         }
     }
 
@@ -142,6 +153,7 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
     {
         OnPropertyChanged(nameof(SelectedCount));
         OnPropertyChanged(nameof(SelectionSummary));
+        OnPropertyChanged(nameof(CreateCaption));
         OnPropertyChanged(nameof(AllSelected));
         CreateCommand.NotifyCanExecuteChanged();
     }
@@ -170,6 +182,7 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
                 Left = row.Left,
                 Right = row.Right,
                 Mode = SelectedModeIndex,
+                Winner = SyncProfile.WinnerFromIndex(SelectedWinnerIndex),
                 Mirror = Mirror,
                 Exclusions = Exclusions.Trim(),
             })
@@ -211,9 +224,16 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
     partial void OnSelectedModeIndexChanged(int value)
     {
         _settings.SetInt(SettingsKeys.BatchMode, value);
+        OnPropertyChanged(nameof(WinnerApplicable));
         OnPropertyChanged(nameof(MirrorApplicable));
         OnPropertyChanged(nameof(DirectionIconKind));
         OnPropertyChanged(nameof(DirectionHint));
+    }
+
+    partial void OnSelectedWinnerIndexChanged(int value)
+    {
+        _settings.SetInt(SettingsKeys.BatchWinner, value);
+        OnPropertyChanged(nameof(MirrorApplicable));
     }
 
     partial void OnMirrorChanged(bool value)

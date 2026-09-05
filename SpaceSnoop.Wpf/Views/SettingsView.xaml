@@ -3,25 +3,48 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Settings"
              xmlns:settings="clr-namespace:SpaceSnoop.Wpf.Views.Settings"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
              d:DesignHeight="700"
-             d:DesignWidth="900">
+             d:DesignWidth="1100">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto"
-                  HorizontalScrollBarVisibility="Disabled"
-                  Padding="0,0,12,0">
-        <StackPanel>
-            <settings:SettingsAppearanceCard />
-            <settings:SettingsScanCard />
-            <settings:SettingsDeleteCard />
-            <settings:SettingsArchiveCard />
-            <settings:SettingsExclusionsCard />
-            <settings:SettingsUpdateCard />
-            <settings:SettingsStartupCard />
-            <settings:SettingsFileCard />
-        </StackPanel>
-    </ScrollViewer>
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/SpaceSnoop.Wpf;component/Views/Settings/SettingsResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*"
+                              MaxWidth="{StaticResource Setting.ContentWidth}" />
+        </Grid.ColumnDefinitions>
+
+        <keepshell:SettingsRail Sections="{Binding Sections}" />
+
+        <ScrollViewer Grid.Column="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Margin="16,0,0,0"
+                      Padding="0,0,12,0">
+            <Grid RequestBringIntoView="SuppressAutoScroll">
+                <settings:SettingsAppearanceCard />
+                <settings:SettingsStartupCard />
+                <settings:SettingsScanCard />
+                <settings:SettingsExclusionsCard />
+                <settings:SettingsDeleteCard />
+                <settings:SettingsArchiveCard />
+                <settings:SettingsUpdateCard />
+                <settings:SettingsFileCard />
+                <settings:SettingsMcpCard />
+                <settings:SettingsAgentCard />
+            </Grid>
+        </ScrollViewer>
+    </Grid>
 </UserControl>

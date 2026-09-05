@@ -23,8 +23,6 @@ public sealed class TreemapView : FrameworkElement
     private const double IconSize = 12;
     private const double IconGap = 5;
     private const double MarkerSize = 9;
-    private const double BeakTipOffset = 24;
-    private const double BeakGap = 4;
 
     public static readonly DependencyProperty ItemsSourceProperty =
         DependencyProperty.Register(nameof(ItemsSource),
@@ -89,18 +87,9 @@ public sealed class TreemapView : FrameworkElement
         Unloaded += OnUnloaded;
     }
 
-    private enum TooltipSide
-    {
-        None = 0,
-        Below = 1,
-        Above = 2,
-        RightOf = 3,
-        LeftOf = 4,
-    }
-
     public IEnumerable? ItemsSource
     {
-        get => (IEnumerable?)GetValue(ItemsSourceProperty);
+        get => ReadDependencyValue<IEnumerable>(ItemsSourceProperty);
         set => SetValue(ItemsSourceProperty, value);
     }
 
@@ -118,7 +107,7 @@ public sealed class TreemapView : FrameworkElement
 
     public ICommand? DrillCommand
     {
-        get => (ICommand?)GetValue(DrillCommandProperty);
+        get => ReadDependencyValue<ICommand>(DrillCommandProperty);
         set => SetValue(DrillCommandProperty, value);
     }
 
@@ -142,12 +131,34 @@ public sealed class TreemapView : FrameworkElement
 
     protected override int VisualChildrenCount => 1;
 
-    protected override void OnRender(DrawingContext context)
+    public ToolTip? ShowTooltipForAutomation(Point point)
+    {
+        var node = HitTest(point);
+
+        if (node is null)
+        {
+            return null;
+        }
+
+        _cursor = point;
+        _hover = node;
+        ShowTooltip(node);
+
+        return _toolTip.IsOpen ? _toolTip : null;
+    }
+
+    public void HideTooltipForAutomation()
+    {
+        _hover = null;
+        _toolTip.IsOpen = false;
+    }
+
+    protected override void OnRender(DrawingContext drawingContext)
     {
         var width = ActualWidth;
         var height = ActualHeight;
 
-        context.DrawRectangle(Brushes.Transparent, null, new(0, 0, width, height));
+        drawingContext.DrawRectangle(Brushes.Transparent, null, new(0, 0, width, height));
 
         var nodes = Nodes();
         var weights = new double[nodes.Count];
@@ -161,11 +172,11 @@ public sealed class TreemapView : FrameworkElement
         var layout = TreemapLayout.Squarify(weights, Math.Max(0, width - Gap), Math.Max(0, height - Gap));
         var tiles = new (Rect, ScanNodeViewModel)[nodes.Count];
 
-        var selectionPen = ResourcePen("Fg.Primary", 1.5);
-        var deletedPen = ResourcePen("State.Error", 1.5);
-        var monoFont = TryFindResource("Font.Mono") as FontFamily;
-        var intensity = Intensity;
-        var scale = FontScaleManager.Current;
+        var style = new TileStyle(ResourcePen("Fg.Primary", 1.5),
+            ResourcePen("State.Error", 1.5),
+            TryFindResource("Font.Sans") as FontFamily,
+            Intensity,
+            FontScaleManager.Current);
 
         for (var i = 0; i < nodes.Count; i++)
         {
@@ -173,52 +184,58 @@ public sealed class TreemapView : FrameworkElement
             var bounds = new Rect(layout[i].X + inset, layout[i].Y + inset, layout[i].Width, layout[i].Height);
             tiles[i] = (bounds, node);
 
-            var tile = Deflate(bounds, inset);
-
-            if (tile.Width <= 0 || tile.Height <= 0)
-            {
-                continue;
-            }
-
-            var fill = new SolidColorBrush(HeatColor.From(node.Fraction, intensity));
-
-            if (node.IsMarkedDeleted)
-            {
-                fill.Opacity = 0.5;
-            }
-
-            fill.Freeze();
-
-            var pen = ReferenceEquals(node, SelectedItem) ? selectionPen
-                : node.IsMarkedDeleted ? deletedPen
-                : null;
-
-            var radius = node.IsDirectory ? CornerRadius : 0;
-
-            context.DrawRoundedRectangle(fill, null, tile, radius, radius);
-
-            if (node is { IsDirectory: true, IsMarkedDeleted: false })
-            {
-                context.DrawRoundedRectangle(CushionBrush, null, tile, radius, radius);
-            }
-
-            if (pen is not null)
-            {
-                context.DrawRoundedRectangle(null, pen, tile, radius, radius);
-            }
-
-            if (tile.Width >= LabelMinWidth && tile.Height >= LabelMinHeight * scale)
-            {
-                DrawLabel(context, node, tile, monoFont, scale);
-            }
-
-            if (node.IsDirectory)
-            {
-                DrawFolderMarker(context, tile);
-            }
+            DrawTile(drawingContext, node, Deflate(bounds, inset), style);
         }
 
         _tiles = tiles;
+    }
+
+    private void DrawTile(DrawingContext context, ScanNodeViewModel node, Rect tile, TileStyle style)
+    {
+        if (tile.Width <= 0 || tile.Height <= 0)
+        {
+            return;
+        }
+
+        var fill = new SolidColorBrush(HeatColor.From(node.Fraction, style.Intensity));
+
+        if (node.IsMarkedDeleted)
+        {
+            fill.Opacity = 0.5;
+        }
+
+        fill.Freeze();
+
+        var pen = (ReferenceEquals(node, SelectedItem), node.IsMarkedDeleted) switch
+        {
+            (true, _) => style.Selection,
+            (false, true) => style.Deleted,
+            _ => null,
+        };
+
+        var radius = node.IsDirectory ? CornerRadius : 0;
+
+        context.DrawRoundedRectangle(fill, null, tile, radius, radius);
+
+        if (node is { IsDirectory: true, IsMarkedDeleted: false })
+        {
+            context.DrawRoundedRectangle(CushionBrush, null, tile, radius, radius);
+        }
+
+        if (pen is not null)
+        {
+            context.DrawRoundedRectangle(null, pen, tile, radius, radius);
+        }
+
+        if (tile.Width >= LabelMinWidth && tile.Height >= LabelMinHeight * style.Scale)
+        {
+            DrawLabel(context, node, tile, style.Mono, style.Scale);
+        }
+
+        if (node.IsDirectory)
+        {
+            DrawFolderMarker(context, tile);
+        }
     }
 
     protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
@@ -339,7 +356,7 @@ public sealed class TreemapView : FrameworkElement
 
     private void OnItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(ScanNodeViewModel.IsMarkedDeleted) or nameof(ScanNodeViewModel.IsSelected) or "" or null)
+        if (e.PropertyName is nameof(ScanNodeViewModel.IsMarkedDeleted) or "" or null)
         {
             InvalidateVisual();
         }
@@ -462,17 +479,6 @@ public sealed class TreemapView : FrameworkElement
         context.DrawGeometry(MarkerBrush, null, geometry);
     }
 
-    private static Point TopLeftFor(TooltipSide side, Point c, double w, double h, double t, double g)
-    {
-        return side switch
-        {
-            TooltipSide.Above => new(c.X - t, c.Y - g - h),
-            TooltipSide.RightOf => new(c.X + g, c.Y - t),
-            TooltipSide.LeftOf => new(c.X - g - w, c.Y - t),
-            _ => new(c.X - t, c.Y + g),
-        };
-    }
-
     private static void ApplyBeak(Path beak, TooltipSide side)
     {
         switch (side)
@@ -505,6 +511,20 @@ public sealed class TreemapView : FrameworkElement
                 beak.Margin = new(16, 1, 0, 0);
                 break;
         }
+    }
+
+    private T? ReadDependencyValue<T>(DependencyProperty property) where T : class
+    {
+        var value = GetValue(property);
+
+        if (value is null)
+        {
+            return null;
+        }
+
+        return value is T typed
+            ? typed
+            : throw new InvalidCastException($"Значение свойства {property.Name} имеет тип {value.GetType().FullName}, ожидался {typeof(T).FullName}.");
     }
 
     private void ShowTooltip(ScanNodeViewModel? node)
@@ -558,47 +578,25 @@ public sealed class TreemapView : FrameworkElement
 
     private CustomPopupPlacement[] PlaceTooltip(Size popupSize, Size targetSize, Point offset)
     {
-        var w = popupSize.Width;
-        var h = popupSize.Height;
-        var t = BeakTipOffset;
-        var g = BeakGap;
-        var c = _cursor;
-
-        var minX = 0.0;
-        var minY = 0.0;
-        var maxX = targetSize.Width;
-        var maxY = targetSize.Height;
+        var dpi = VisualTreeHelper.GetDpi(this);
+        var bounds = new Rect(0, 0, targetSize.Width / dpi.DpiScaleX, targetSize.Height / dpi.DpiScaleY);
 
         if (Window.GetWindow(this) is { } window)
         {
             var origin = TranslatePoint(new(0, 0), window);
-            minX = -origin.X;
-            minY = -origin.Y;
-            maxX = minX + window.ActualWidth;
-            maxY = minY + window.ActualHeight;
+            bounds = new(-origin.X, -origin.Y, window.ActualWidth, window.ActualHeight);
         }
 
-        var side = TooltipSide.Below;
-
-        foreach (var candidate in (ReadOnlySpan<TooltipSide>)[TooltipSide.Below, TooltipSide.Above, TooltipSide.RightOf, TooltipSide.LeftOf])
-        {
-            var p = TopLeftFor(candidate, c, w, h, t, g);
-
-            if (p.X >= minX && p.Y >= minY && p.X + w <= maxX && p.Y + h <= maxY)
-            {
-                side = candidate;
-                break;
-            }
-        }
+        var placement = TreemapTooltip.Place(_cursor, popupSize, bounds, dpi);
 
         _beak ??= _toolTip.Template?.FindName("Beak", _toolTip) as Path;
 
         if (_beak is not null)
         {
-            ApplyBeak(_beak, side);
+            ApplyBeak(_beak, placement.Side);
         }
 
-        return [new(TopLeftFor(side, c, w, h, t, g), PopupPrimaryAxis.None)];
+        return [new(placement.DeviceTopLeft, PopupPrimaryAxis.None)];
     }
 
     private void HookItems()
@@ -727,4 +725,6 @@ public sealed class TreemapView : FrameworkElement
     {
         return TryFindResource(resourceKey) is Brush brush ? new(brush, thickness) : null;
     }
+
+    private readonly record struct TileStyle(Pen? Selection, Pen? Deleted, FontFamily? Mono, double Intensity, double Scale);
 }

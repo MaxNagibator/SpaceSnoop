@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Dialogs"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:behaviors="clr-namespace:SpaceSnoop.Wpf.Views.Behaviors"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
@@ -10,7 +11,8 @@
              d:DesignHeight="520"
              d:DesignWidth="640"
              Width="{DynamicResource Dialog.Width.Medium}"
-             MinHeight="380">
+             MinHeight="260"
+             AutomationProperties.Name="{Binding Title}">
 
     <UserControl.Resources>
         <Style x:Key="RowGlyph"
@@ -38,23 +40,59 @@
                     <Setter Property="Kind"
                             Value="LoaderCircle" />
                     <Setter Property="Foreground"
-                            Value="{DynamicResource Accent.Primary}" />
+                            Value="{DynamicResource Accent.Text}" />
                 </DataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding State}"
+                                   Value="Deleting" />
+                        <Condition Binding="{Binding Source={x:Static SystemParameters.ClientAreaAnimation}}"
+                                   Value="True" />
+                    </MultiDataTrigger.Conditions>
+                    <MultiDataTrigger.EnterActions>
+                        <BeginStoryboard x:Name="RowGlyphSpin">
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetProperty="(RenderTransform).(RotateTransform.Angle)"
+                                                 From="0"
+                                                 To="360"
+                                                 Duration="0:0:1.1"
+                                                 RepeatBehavior="Forever" />
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </MultiDataTrigger.EnterActions>
+                    <MultiDataTrigger.ExitActions>
+                        <StopStoryboard BeginStoryboardName="RowGlyphSpin" />
+                    </MultiDataTrigger.ExitActions>
+                </MultiDataTrigger>
                 <DataTrigger Binding="{Binding State}"
                              Value="Done">
                     <Setter Property="Kind"
                             Value="CircleCheck" />
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Success}" />
+                            Value="{DynamicResource State.SuccessText}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding State}"
                              Value="Failed">
                     <Setter Property="Kind"
                             Value="CircleX" />
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Error}" />
+                            Value="{DynamicResource State.ErrorText}" />
                 </DataTrigger>
             </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RowParent"
+               TargetType="TextBlock">
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Setter Property="Margin"
+                    Value="10,0,0,0" />
+            <Setter Property="TextTrimming"
+                    Value="CharacterEllipsis" />
+            <Setter Property="FontSize"
+                    Value="{DynamicResource Font.Size.Caption}" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Muted}" />
         </Style>
 
         <Style x:Key="RowPath"
@@ -78,9 +116,21 @@
                 <DataTrigger Binding="{Binding State}"
                              Value="Failed">
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Error}" />
+                            Value="{DynamicResource State.ErrorText}" />
                 </DataTrigger>
             </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RowError"
+               TargetType="TextBlock">
+            <Setter Property="Margin"
+                    Value="0,1,0,0" />
+            <Setter Property="TextTrimming"
+                    Value="CharacterEllipsis" />
+            <Setter Property="FontSize"
+                    Value="{DynamicResource Font.Size.Caption}" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource State.ErrorText}" />
         </Style>
     </UserControl.Resources>
 
@@ -100,9 +150,9 @@
                                       Height="20"
                                       VerticalAlignment="Center"
                                       Margin="0,0,10,0"
-                                      Foreground="{DynamicResource State.Error}" />
+                                      Foreground="{DynamicResource State.ErrorText}" />
             <TextBlock Text="{Binding Title}"
-                       Style="{StaticResource TextBlock.Heading}"
+                       Style="{StaticResource DialogTitle}"
                        VerticalAlignment="Center" />
         </StackPanel>
 
@@ -115,6 +165,7 @@
             <TextBlock Text="{Binding StatusText}"
                        Style="{StaticResource TextBlock.Subtle}"
                        TextWrapping="Wrap"
+                       AutomationProperties.LiveSetting="Polite"
                        Visibility="{Binding IsIdle, Converter={StaticResource InverseBoolToVisibility}}" />
         </Grid>
 
@@ -122,40 +173,88 @@
                 Style="{StaticResource Card.Inset}"
                 Padding="6"
                 Margin="0,14,0,0"
-                MinHeight="150">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <ItemsControl ItemsSource="{Binding Items}"
-                              Grid.IsSharedSizeScope="True">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Grid Margin="6,3"
-                                  ToolTip="{Binding Path}">
+                MinHeight="88">
+            <ItemsControl x:Name="MarkedItems"
+                          ItemsSource="{Binding Items}"
+                          AutomationProperties.Name="Помеченные объекты"
+                          Focusable="True"
+                          behaviors:ListNavigation.Enabled="True"
+                          behaviors:ListNavigation.FollowIndex="{Binding FollowIndex}"
+                          VirtualizingPanel.IsVirtualizing="True"
+                          VirtualizingPanel.VirtualizationMode="Recycling">
+                <ItemsControl.Template>
+                    <ControlTemplate TargetType="ItemsControl">
+                        <ScrollViewer Focusable="False"
+                                      CanContentScroll="True"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <ItemsPresenter />
+                        </ScrollViewer>
+                    </ControlTemplate>
+                </ItemsControl.Template>
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <VirtualizingStackPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="6,3"
+                              ToolTip="{Binding ToolTipText}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <iconPacks:PackIconLucide Grid.Column="0"
+                                                      Style="{StaticResource RowGlyph}"
+                                                      RenderTransformOrigin="0.5,0.5">
+                                <iconPacks:PackIconLucide.RenderTransform>
+                                    <RotateTransform />
+                                </iconPacks:PackIconLucide.RenderTransform>
+                            </iconPacks:PackIconLucide>
+
+                            <Grid Grid.Column="1">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto"
-                                                      SharedSizeGroup="RowSize" />
                                 </Grid.ColumnDefinitions>
-
-                                <iconPacks:PackIconLucide Grid.Column="0"
-                                                          Style="{StaticResource RowGlyph}" />
-
-                                <TextBlock Grid.Column="1"
-                                           Text="{Binding Path}"
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0"
+                                           Grid.Column="0"
+                                           Text="{Binding Name}"
                                            Style="{StaticResource RowPath}" />
+                                <TextBlock Grid.Row="0"
+                                           Grid.Column="1"
+                                           Text="{Binding ParentPath}"
+                                           Style="{StaticResource RowParent}" />
+                                <TextBlock Grid.Row="1"
+                                           Grid.Column="0"
+                                           Grid.ColumnSpan="2"
+                                           Text="{Binding ErrorSummary}"
+                                           Style="{StaticResource RowError}"
+                                           Visibility="{Binding ErrorSummary, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
+                            </Grid>
 
-                                <TextBlock Grid.Column="2"
-                                           Text="{Binding SizeText}"
-                                           VerticalAlignment="Center"
-                                           Margin="14,0,2,0"
-                                           FontFamily="{DynamicResource Font.Mono}"
+                            <Grid Grid.Column="2"
+                                  Margin="14,0,2,0"
+                                  VerticalAlignment="Center">
+                                <TextBlock Text="{Binding DataContext.WidestSizeText, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                           Visibility="Hidden"
+                                           FontSize="{DynamicResource Font.Size.Caption}" />
+                                <TextBlock Text="{Binding SizeText}"
+                                           HorizontalAlignment="Right"
                                            FontSize="{DynamicResource Font.Size.Caption}"
                                            Foreground="{DynamicResource Fg.Muted}" />
                             </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
         </Border>
 
         <StackPanel Grid.Row="3"
@@ -171,37 +270,69 @@
                              VerticalAlignment="Center"
                              Minimum="0"
                              Maximum="1"
-                             Value="{Binding ProgressValue, Mode=OneWay}" />
+                             AutomationProperties.Name="Ход удаления"
+                             Value="{Binding ProgressValue, Mode=OneWay}"
+                             IsIndeterminate="{Binding IsChunkStalled, FallbackValue=False}" />
                 <TextBlock Grid.Column="1"
                            Text="{Binding CountText}"
+                           AutomationProperties.Name="Удалено объектов"
+                           AutomationProperties.LiveSetting="Polite"
                            Margin="12,0,0,0"
                            VerticalAlignment="Center"
-                           FontFamily="{DynamicResource Font.Mono}"
                            FontSize="{DynamicResource Font.Size.S}"
                            FontWeight="Medium"
-                           Foreground="{DynamicResource Accent.Primary}" />
+                           Foreground="{DynamicResource Accent.Text}" />
             </Grid>
 
             <Grid Margin="0,8,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Column="0"
-                           Text="{Binding CurrentPath}"
-                           TextTrimming="CharacterEllipsis"
-                           VerticalAlignment="Center"
-                           Margin="0,0,12,0"
-                           FontFamily="{DynamicResource Font.Mono}"
-                           FontSize="{DynamicResource Font.Size.S}"
-                           Foreground="{DynamicResource Fg.Muted}"
-                           ToolTip="{Binding CurrentPath}"
-                           Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+                <Grid Grid.Column="0"
+                      Margin="0,0,12,0"
+                      Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                    <TextBlock behaviors:PathTrimmer.FullPath="{Binding CurrentPath}"
+                               AutomationProperties.Name="Текущий объект"
+                               TextWrapping="NoWrap"
+                               VerticalAlignment="Center"
+                               FontFamily="{DynamicResource Font.Mono}"
+                               FontSize="{DynamicResource Font.Size.S}"
+                               Foreground="{DynamicResource Fg.Muted}"
+                               ToolTip="{Binding CurrentPath}"
+                               Visibility="{Binding BatchCaption, Converter={StaticResource NullToVisibility}, ConverterParameter=Inverse}" />
+                    <TextBlock Text="{Binding BatchCaption}"
+                               AutomationProperties.Name="Текущая пачка"
+                               AutomationProperties.LiveSetting="Polite"
+                               TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center"
+                               FontFamily="{DynamicResource Font.Sans}"
+                               FontSize="{DynamicResource Font.Size.S}"
+                               Typography.NumeralAlignment="Tabular"
+                               Foreground="{DynamicResource Fg.Muted}"
+                               Visibility="{Binding BatchCaption, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
+                </Grid>
 
-                <StackPanel Grid.Column="1"
+                <TextBlock Grid.Column="1"
+                           Text="{Binding ChunkElapsedText}"
+                           AutomationProperties.Name="Время текущей операции"
+                           AutomationProperties.LiveSetting="Polite"
+                           MinWidth="104"
+                           Margin="0,0,16,0"
+                           TextAlignment="Right"
+                           VerticalAlignment="Center"
+                           FontFamily="{DynamicResource Font.Sans}"
+                           FontSize="{DynamicResource Font.Size.M}"
+                           FontWeight="SemiBold"
+                           Typography.NumeralAlignment="Tabular"
+                           Foreground="{DynamicResource Accent.Text}"
+                           Visibility="{Binding ChunkElapsedText, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
+
+                <StackPanel Grid.Column="2"
                             Orientation="Horizontal">
-                    <TextBlock Text="ОСВОБОЖДЕНО"
+                    <TextBlock Text="Освобождено"
                                VerticalAlignment="Center"
                                Margin="0,0,7,0"
                                FontFamily="{DynamicResource Font.Sans}"
@@ -210,12 +341,19 @@
                                Foreground="{DynamicResource Fg.Muted}" />
                     <TextBlock Text="{Binding FreedText}"
                                VerticalAlignment="Center"
-                               FontFamily="{DynamicResource Font.Mono}"
                                FontSize="{DynamicResource Font.Size.S}"
                                FontWeight="Medium"
-                               Foreground="{DynamicResource Accent.Primary}" />
+                               Foreground="{DynamicResource Accent.Text}" />
                 </StackPanel>
             </Grid>
+
+            <TextBlock Text="{Binding DiagnosticsText}"
+                       AutomationProperties.Name="Диагностика удаления"
+                       TextWrapping="Wrap"
+                       Margin="0,8,0,0"
+                       FontSize="{DynamicResource Font.Size.XS}"
+                       Foreground="{DynamicResource Fg.Muted}"
+                       Visibility="{Binding DiagnosticsText, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
         </StackPanel>
 
         <Grid Grid.Row="4"
@@ -223,7 +361,7 @@
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Visibility="{Binding IsIdle, Converter={StaticResource BoolToVisibility}}">
-                <Button Style="{StaticResource Button.Ghost}"
+                <Button Style="{StaticResource Button.Secondary}"
                         Command="{Binding CloseCommand}"
                         Content="Отмена"
                         MinWidth="96"
@@ -250,9 +388,10 @@
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
-                <Button Style="{StaticResource Button.Ghost}"
+                <Button Style="{StaticResource Button.Secondary}"
                         Command="{Binding CancelRunCommand}"
-                        Content="Отменить удаление"
+                        Content="{Binding CancelCaption}"
+                        ToolTip="{Binding CancelHint}"
                         MinWidth="96"
                         MinHeight="{DynamicResource Control.Height.Default}"
                         Padding="14,6" />
@@ -261,7 +400,7 @@
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Visibility="{Binding IsFinished, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
-                <Button Style="{StaticResource Button.Primary}"
+                <Button Style="{StaticResource Button.Secondary}"
                         Command="{Binding CloseCommand}"
                         Content="Закрыть"
                         MinWidth="96"

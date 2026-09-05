@@ -12,20 +12,47 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
     private bool _migrated;
     private bool _persisting;
 
-    public ScheduleViewModel(ISettingsStore settings, IDialogService dialogs, ILogger<ScheduleViewModel> logger)
+    public ScheduleViewModel(
+        ISettingsStore settings,
+        IDialogService dialogs,
+        IFilePicker filePicker,
+        IShellLauncher shell,
+        IScheduleRunner scheduler,
+        ILogger<ScheduleViewModel> logger)
     {
         Settings = settings;
         _dialogs = dialogs;
+        FilePicker = filePicker;
+        Shell = shell;
+        Scheduler = scheduler;
         _logger = logger;
 
+        Bulk = new(this, dialogs, logger);
+
         ReloadProfiles();
-        Profiles.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasProfiles));
+
+        Profiles.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(HasProfiles));
+            Bulk.NotifySelectionChanged();
+        };
+
         Settings.Changed += OnSettingsChanged;
     }
 
     public ISettingsStore Settings { get; }
 
-    public IReadOnlyList<string> Modes { get; } = ["Слева направо", "Справа налево", "Двусторонний"];
+    public IFilePicker FilePicker { get; }
+
+    public IShellLauncher Shell { get; }
+
+    public IScheduleRunner Scheduler { get; }
+
+    public ScheduleBulkViewModel Bulk { get; }
+
+    public IReadOnlyList<SegmentOption> Modes => SyncOptions.Modes;
+
+    public IReadOnlyList<SegmentOption> Winners => SyncOptions.Winners;
 
     public IReadOnlyList<string> Intervals { get; } = ["Ежедневно", "Каждый час", "При входе в систему"];
 
@@ -102,11 +129,6 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
         _logger.ScheduleTaskFailed(name, error);
     }
 
-    internal static bool LineHasErrors(string line)
-    {
-        return !line.Contains(", 0 ошибок", StringComparison.Ordinal);
-    }
-
     private void OnSettingsChanged(object? sender, string key)
     {
         if (!_persisting && key == SettingsKeys.ScheduleProfiles)
@@ -126,6 +148,7 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
             Right = (Settings.GetStringValue(SettingsKeys.SyncRight) ?? string.Empty).Trim(),
             Mode = Settings.GetInt(SettingsKeys.SyncMode),
             Mirror = Settings.GetBool(SettingsKeys.SyncMirror),
+            Winner = SyncProfile.WinnerFromIndex(Settings.GetInt(SettingsKeys.SyncWinner)),
             Exclusions = (Settings.GetStringValue(SettingsKeys.SyncExclusions) ?? string.Empty).Trim(),
         };
 
@@ -137,7 +160,7 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
     [RelayCommand]
     private async Task CreateBatch()
     {
-        var dialog = new BatchCreateProfilesDialogViewModel(Settings);
+        var dialog = new BatchCreateProfilesDialogViewModel(Settings, FilePicker);
 
         if (!await _dialogs.ShowAsync(dialog) || dialog.CreatedProfiles.Count == 0)
         {
@@ -168,49 +191,20 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
 
         _migrated = true;
 
-        if (Profiles.Count > 0)
+        if (Profiles.Count > 0 || ScheduleMigration.BuildLegacyProfile(Settings) is not { } model)
         {
             return;
         }
-
-        var left = (Settings.GetStringValue(SettingsKeys.SyncLeft) ?? string.Empty).Trim();
-        var right = (Settings.GetStringValue(SettingsKeys.SyncRight) ?? string.Empty).Trim();
-        var legacyExists = SyncScheduler.Exists(SyncScheduler.LegacyTaskName);
-
-        if (!legacyExists && (left.Length == 0 || right.Length == 0))
-        {
-            return;
-        }
-
-        var exclusions = (Settings.GetStringValue(SettingsKeys.SyncExclusions) ?? string.Empty).Trim();
-
-        if (exclusions.Length == 0)
-        {
-            exclusions = (Settings.GetStringValue(SettingsKeys.DefaultExclusions) ?? string.Empty).Trim();
-        }
-
-        var model = new SyncProfile
-        {
-            Id = Guid.NewGuid().ToString("N")[..8],
-            Name = "По умолчанию",
-            Left = left,
-            Right = right,
-            Mode = Settings.GetInt(SettingsKeys.SyncMode),
-            Mirror = Settings.GetBool(SettingsKeys.SyncMirror),
-            Exclusions = exclusions,
-            Enabled = legacyExists,
-        };
 
         Profiles.Add(new(this, model));
         Persist();
 
-        if (!legacyExists)
+        if (!model.Enabled)
         {
             return;
         }
 
-        SyncScheduler.Remove(SyncScheduler.LegacyTaskName, out _);
-        SyncScheduler.Create(SyncScheduler.TaskNameFor(model.Id), ScheduleInterval.Daily, new(3, 0, 0), $"{AppInfo.SyncArgument} {model.Id}", out _);
+        ScheduleMigration.ReplaceLegacyTask(model);
         _logger.ScheduleProfileMigrated(model.Name);
     }
 
@@ -219,12 +213,13 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
         History.Clear();
 
         var lines = SyncLog.ReadTail(
-            static line => line.StartsWith('[') && line.Contains("Автосинхронизация"),
-            40);
+            static line => SyncLog.MatchesOrigin(line, SyncLogOrigin.Scheduled),
+            40,
+            _logger);
 
         foreach (var line in lines)
         {
-            History.Add(new(line, LineHasErrors(line)));
+            History.Add(new(line, SyncLog.LineHasErrors(line)));
         }
 
         OnPropertyChanged(nameof(HasHistory));

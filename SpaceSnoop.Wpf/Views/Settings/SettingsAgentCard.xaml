@@ -1,0 +1,187 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Settings.SettingsAgentCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Settings"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
+             d:DesignWidth="900"
+             Visibility="{Binding Sections[agent].IsSelected, Converter={StaticResource BoolToVisibility}}">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/SpaceSnoop.Wpf;component/Views/Settings/SettingsResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <HeaderedContentControl Style="{StaticResource Form.Panel}"
+                            Header="{Binding Sections[agent].Title}"
+                            keepshell:Form.ResetCommand="{Binding ResetSectionCommand}"
+                            keepshell:Form.ResetCommandParameter="agent"
+                            keepshell:Form.ResetHint="{Binding ResetPlans[agent].Hint}">
+        <StackPanel>
+            <TextBlock Style="{StaticResource Form.Hint}"
+                       Margin="0"
+                       Text="Страница «Чат» говорит с установленным на этой машине CLI по вашей подписке." />
+            <Expander Style="{StaticResource Setting.Details}"
+                      Header="Что уходит в CLI">
+                <TextBlock Style="{StaticResource Setting.DetailsBody}"
+                           Text="Ключи и токены поставщика модели в настройках приложения не хранятся. Сообщение и то, что агент запрашивает у инструментов – пути, размеры, результаты сравнения, – уходит в CLI и дальше поставщику модели под вашей подпиской." />
+            </Expander>
+
+            <Grid Margin="0,14,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Content="Показывать страницу чата"
+                          IsChecked="{Binding Agent.Enabled, Mode=TwoWay}"
+                          VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.agent.enabled]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
+            </Grid>
+
+            <CheckBox Content="{Binding AgentConsentLabel}"
+                      IsChecked="{Binding Agent.Consent, Mode=TwoWay}"
+                      Margin="0,12,0,0"
+                      VerticalAlignment="Center" />
+            <TextBlock Style="{StaticResource Form.CheckHint}"
+                       Text="{Binding AgentConsentHint}" />
+
+            <Grid Margin="0,12,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Content="Записывать транскрипт хода"
+                          IsChecked="{Binding Agent.Transcript, Mode=TwoWay}"
+                          VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.agent.transcript]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
+            </Grid>
+            <TextBlock Style="{StaticResource Form.CheckHint}"
+                       Text="Для разбора странных ответов: ход целиком ложится в logs/chat." />
+            <Expander Style="{StaticResource Setting.Details}"
+                      Header="Что попадает в транскрипт">
+                <TextBlock Style="{StaticResource Setting.DetailsBody}"
+                           Text="Всё, что уходит в CLI и приходит от него, пишется отдельным файлом на ход, кнопка на сообщении его открывает. Токен доступа затирается, остальное сохраняется как есть – вопрос, состояние окна и ответы инструментов. Хранятся последние 20 ходов." />
+            </Expander>
+
+            <TextBlock Text="CLI"
+                       Style="{StaticResource Form.Label}"
+                       Margin="0,16,0,0" />
+            <Grid Margin="0,8,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ListBox Grid.Column="0"
+                         Style="{StaticResource ListBox.Segmented}"
+                         ItemsSource="{Binding AgentBackendOptions}"
+                         SelectedIndex="{Binding SelectedAgentBackendIndex}"
+                         HorizontalAlignment="Left" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.agent.backend]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}"
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center" />
+            </Grid>
+            <TextBlock Style="{StaticResource Form.Hint}"
+                       Text="Согласие выше, модель и путь ниже относятся к выбранному CLI – у каждого свои." />
+
+            <StackPanel Visibility="{Binding AgentShellWarning, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Style="{StaticResource Form.Hint}"
+                           Foreground="{DynamicResource State.WarningText}"
+                           Text="У codex есть собственная оболочка системы, отключить её нечем: агент может выполнять команды с правами приложения." />
+                <Expander Style="{StaticResource Setting.Details}"
+                          Header="Чем ограничен codex">
+                    <TextBlock Style="{StaticResource Setting.DetailsBody}"
+                               Foreground="{DynamicResource State.WarningText}"
+                               Text="Приложение обычно запущено от администратора, значит команды выполняются с его правами. Инструменты приложения при этом работают только с полным доступом – в песочнице codex не может дозваться разрешения и гасит вызов сам. Из-за оболочки запрет отдельных инструментов для codex остаётся подсказкой, а не преградой: настоящий барьер один для обоих CLI – галка «Разрешить изменяющие операции» в разделе «MCP-сервер», её проверяет сам сервер." />
+                </Expander>
+            </StackPanel>
+
+            <TextBlock Text="Модель"
+                       Style="{StaticResource Form.Label}"
+                       Margin="0,16,0,0" />
+            <StackPanel Orientation="Horizontal"
+                        Margin="0,8,0,0">
+                <ComboBox Style="{StaticResource ComboBox.Form}"
+                          ItemsSource="{Binding AgentModel.ModelOptions}"
+                          SelectedItem="{Binding AgentModel.SelectedModel, Mode=TwoWay}"
+                          Width="{StaticResource Setting.ControlWidth}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Title}"
+                                       ToolTip="{Binding Hint}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <Button Style="{StaticResource Button.Icon}"
+                        Command="{Binding AgentModel.ReloadModelsCommand}"
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center"
+                        AutomationProperties.Name="Обновить список моделей"
+                        ToolTip="Спросить у CLI, какие модели доступны сейчас">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.RefreshCw}"
+                                              Width="16"
+                                              Height="16"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                </Button>
+            </StackPanel>
+            <TextBlock Style="{StaticResource Form.Hint}"
+                       Text="{Binding AgentModel.SelectedModel.Hint}" />
+
+            <TextBlock Text="Свой слаг модели"
+                       Style="{StaticResource Form.Label}"
+                       Margin="0,16,0,0" />
+            <TextBox Style="{StaticResource TextBox.Form}"
+                     Text="{Binding Agent.Model, UpdateSourceTrigger=LostFocus}"
+                     Width="{StaticResource Setting.ControlWidth}"
+                     HorizontalAlignment="Left"
+                     Margin="0,8,0,0" />
+            <TextBlock Style="{StaticResource Form.Hint}"
+                       Text="{Binding AgentModelHint}" />
+
+            <TextBlock Text="Глубина рассуждений"
+                       Style="{StaticResource Form.Label}"
+                       Margin="0,16,0,0" />
+            <ComboBox Style="{StaticResource ComboBox.Form}"
+                      ItemsSource="{Binding AgentModel.EffortOptions}"
+                      SelectedItem="{Binding AgentModel.SelectedEffort, Mode=TwoWay}"
+                      DisplayMemberPath="Title"
+                      Width="{StaticResource Setting.ControlWidth}"
+                      HorizontalAlignment="Left"
+                      Margin="0,8,0,0" />
+            <TextBlock Style="{StaticResource Form.Hint}"
+                       Text="Чем выше уровень, тем дольше и дороже ответ. «Уровень CLI» – значение, выбранное в самом CLI." />
+
+            <TextBlock Text="{Binding AgentCliPathLabel}"
+                       Style="{StaticResource Form.Label}"
+                       Margin="0,16,0,0" />
+            <TextBox Style="{StaticResource TextBox.Form}"
+                     Text="{Binding Agent.CliPath, UpdateSourceTrigger=LostFocus}"
+                     FontFamily="{DynamicResource Font.Mono}"
+                     Margin="0,8,0,0" />
+            <TextBlock Style="{StaticResource Form.Hint}"
+                       Text="Пусто – найти автоматически в PATH и типичных местах установки." />
+        </StackPanel>
+    </HeaderedContentControl>
+</UserControl>

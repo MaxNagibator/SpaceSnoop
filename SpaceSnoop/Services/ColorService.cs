@@ -1,6 +1,6 @@
 ﻿namespace SpaceSnoop.Services;
 
-public class ColorService(SpaceColorCalculator spaceColorCalculator) : IDisposable
+public sealed class ColorService(SpaceColorCalculator spaceColorCalculator) : IDisposable
 {
     private TrackBar? _intensityBar;
 

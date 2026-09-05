@@ -1,53 +1,57 @@
 ﻿using KeepShell.Services;
+using MahApps.Metro.IconPacks;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 
 namespace SpaceSnoop.Wpf.ViewModels.Docker;
 
-public sealed partial class DockerViewModel(
-    DockerService docker,
-    IDialogService dialogs,
-    ILogger<DockerViewModel> logger)
-    : ObservableObject, IPageHeader, IPageRefresh
+public sealed partial class DockerViewModel : ObservableObject, IPageHeader, IPageRefresh, IPageStatus
 {
-    private bool _loadedOnce;
+    internal const string PollingStatus = "Опрашиваю Docker…";
 
-    private Func<Task>? _pendingCleanupAction;
+    private readonly DockerService _docker;
+    private readonly IDialogService _dialogs;
+    private readonly IUiDispatcher _uiDispatcher;
+    private readonly ILogger<DockerViewModel> _logger;
+
+    private bool _loadedOnce;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanRun))]
     [NotifyPropertyChangedFor(nameof(IsIdle))]
-    [NotifyPropertyChangedFor(nameof(CanArmCleanup))]
     private bool _isBusy;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanRun))]
-    [NotifyPropertyChangedFor(nameof(CanArmCleanup))]
     private bool _isAvailable = true;
 
     [ObservableProperty]
     private string? _unavailableReason;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatusCaption))]
     private string? _statusText;
 
     [ObservableProperty]
     private bool _pruneAllVolumes;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasPendingCleanup))]
-    [NotifyPropertyChangedFor(nameof(CanArmCleanup))]
-    private string? _pendingCleanupMessage;
+    public DockerViewModel(DockerService docker, IDialogService dialogs, IUiDispatcher uiDispatcher, ILogger<DockerViewModel> logger)
+    {
+        _docker = docker;
+        _dialogs = dialogs;
+        _uiDispatcher = uiDispatcher;
+        _logger = logger;
 
-    public ObservableCollection<DockerUsage> Buckets { get; } = [];
+        Compact = new(this, docker, dialogs, uiDispatcher, logger);
+    }
+
+    public DockerCompactViewModel Compact { get; }
+
+    public ObservableCollection<DockerBucketViewModel> Buckets { get; } = [];
 
     public ObservableCollection<DockerGroupViewModel> Groups { get; } = [];
 
     public bool CanRun => !IsBusy && IsAvailable;
-
-    public bool CanArmCleanup => CanRun && !HasPendingCleanup;
-
-    public bool HasPendingCleanup => PendingCleanupMessage is not null;
 
     public bool IsIdle => !IsBusy;
 
@@ -56,6 +60,16 @@ public sealed partial class DockerViewModel(
     public string PageDescription => "Сколько места занял Docker и как его вернуть. Очистка безвозвратна – мимо корзины.";
 
     public string? RefreshTooltip => "Опросить Docker заново";
+
+    public string? StatusCaption => StatusText;
+
+    public bool IsIndeterminate => true;
+
+    public double ProgressValue => 0;
+
+    public double ProgressMax => 1;
+
+    public ICommand? CancelCommand => Compact.CanCancel ? Compact.CancelCommand : null;
 
     ICommand IPageRefresh.RefreshCommand => RefreshCommand;
 
@@ -68,6 +82,18 @@ public sealed partial class DockerViewModel(
 
         _loadedOnce = true;
         await RefreshAsync();
+    }
+
+    internal void NotifyCancelChanged()
+    {
+        OnPropertyChanged(nameof(CancelCommand));
+    }
+
+    internal void ForgetSnapshot()
+    {
+        Buckets.Clear();
+        Groups.Clear();
+        _loadedOnce = false;
     }
 
     private static string Summarize(string output)
@@ -85,43 +111,21 @@ public sealed partial class DockerViewModel(
         }
 
         IsBusy = true;
-        StatusText = "Опрашиваю Docker…";
+        StatusText = PollingStatus;
         try
         {
-            var snapshot = await docker.GetSnapshotAsync();
+            var snapshot = await _docker.GetSnapshotAsync(CancellationToken.None);
 
-            Buckets.Clear();
-            IsAvailable = snapshot.Available;
-            UnavailableReason = snapshot.Error;
+            IReadOnlyList<DockerObject> inventory = snapshot.Available
+                ? await _docker.GetInventoryAsync(CancellationToken.None)
+                : [];
 
-            Groups.Clear();
-
-            if (snapshot.Available)
-            {
-                foreach (var bucket in snapshot.Buckets)
-                {
-                    Buckets.Add(bucket);
-                }
-
-                await LoadObjectsAsync();
-
-                logger.DockerSnapshotLoaded(snapshot.Buckets.Count);
-                StatusText = $"Обновлено: категорий – {snapshot.Buckets.Count}.";
-            }
-            else
-            {
-                logger.DockerUnavailable(snapshot.Error ?? "неизвестно");
-                StatusText = "Docker недоступен.";
-            }
+            _uiDispatcher.Invoke(() => ApplySnapshot(snapshot, inventory));
         }
         catch (Exception ex)
         {
-            logger.DockerUnavailable(ex.Message);
-            IsAvailable = false;
-            UnavailableReason = ex.Message;
-            Buckets.Clear();
-            Groups.Clear();
-            StatusText = "Docker недоступен.";
+            _logger.DockerUnavailable(ex.Message);
+            _uiDispatcher.Invoke(() => ApplyUnavailable(ex.Message));
         }
         finally
         {
@@ -129,10 +133,40 @@ public sealed partial class DockerViewModel(
         }
     }
 
-    private async Task LoadObjectsAsync()
+    private void ApplySnapshot(DockerSnapshot snapshot, IReadOnlyList<DockerObject> inventory)
     {
-        var inventory = await docker.GetInventoryAsync();
+        Buckets.Clear();
+        IsAvailable = snapshot.Available;
+        UnavailableReason = snapshot.Error;
 
+        Groups.Clear();
+
+        if (!snapshot.Available)
+        {
+            _logger.DockerUnavailable(snapshot.Error ?? "неизвестно");
+            StatusText = "Docker недоступен.";
+
+            return;
+        }
+
+        FillBuckets(snapshot.Buckets);
+        FillGroups(inventory);
+
+        _logger.DockerSnapshotLoaded(snapshot.Buckets.Count);
+        StatusText = $"Обновлено: категорий – {snapshot.Buckets.Count}.";
+    }
+
+    private void ApplyUnavailable(string reason)
+    {
+        IsAvailable = false;
+        UnavailableReason = reason;
+        Buckets.Clear();
+        Groups.Clear();
+        StatusText = "Docker недоступен.";
+    }
+
+    private void FillGroups(IReadOnlyList<DockerObject> inventory)
+    {
         var groups = inventory
             .GroupBy(o => o.Kind)
             .Select(g => new DockerGroupViewModel(g.Key, g.ToList()))
@@ -144,7 +178,7 @@ public sealed partial class DockerViewModel(
             Groups.Add(group);
         }
 
-        logger.DockerInventoryLoaded(inventory.Count, groups.Count);
+        _logger.DockerInventoryLoaded(inventory.Count, groups.Count);
     }
 
     [RelayCommand]
@@ -169,17 +203,28 @@ public sealed partial class DockerViewModel(
         StatusText = $"Удаляю {kind} «{target.Name}»…";
         try
         {
-            await docker.RemoveAsync(target);
-            logger.DockerObjectRemoved(target.Kind.ToString(), target.Name);
+            await _docker.RemoveAsync(target, CancellationToken.None);
+            _logger.DockerObjectRemoved(target.Kind.ToString(), target.Name);
         }
         catch (Exception ex)
         {
-            logger.DockerObjectRemoveFailed(ex, target.Kind.ToString(), target.Name);
-            dialogs.Error($"Удалить {kind}", ex.Message);
-            IsBusy = false;
+            _logger.DockerObjectRemoveFailed(ex, target.Kind.ToString(), target.Name);
+            _uiDispatcher.Invoke(() =>
+            {
+                _dialogs.Error($"Удалить {kind}", ex.Message);
+                IsBusy = false;
+            });
+
             return;
         }
 
+        _uiDispatcher.Invoke(() => ApplyRemoved(row, kind, target.Name));
+
+        await RefreshBucketsAsync();
+    }
+
+    private void ApplyRemoved(DockerObjectViewModel row, string kind, string name)
+    {
         foreach (var group in Groups)
         {
             if (group.Remove(row))
@@ -194,130 +239,128 @@ public sealed partial class DockerViewModel(
         }
 
         IsBusy = false;
-        StatusText = $"Удалён {kind} «{target.Name}».";
-        await RefreshBucketsAsync();
+        StatusText = $"Удалён {kind} «{name}».";
     }
 
     private async Task RefreshBucketsAsync()
     {
         try
         {
-            var snapshot = await docker.GetSnapshotAsync();
+            var snapshot = await _docker.GetSnapshotAsync(CancellationToken.None);
             if (!snapshot.Available)
             {
                 return;
             }
 
-            Buckets.Clear();
-            foreach (var bucket in snapshot.Buckets)
-            {
-                Buckets.Add(bucket);
-            }
+            _uiDispatcher.Invoke(() => FillBuckets(snapshot.Buckets));
         }
         catch (Exception ex)
         {
-            logger.DockerUnavailable(ex.Message);
+            _logger.DockerUnavailable(ex.Message);
+        }
+    }
+
+    private void FillBuckets(IReadOnlyList<DockerUsage> buckets)
+    {
+        Buckets.Clear();
+
+        foreach (var bucket in DockerBucketViewModel.Build(buckets))
+        {
+            Buckets.Add(bucket);
         }
     }
 
     [RelayCommand]
-    private void PruneBuildCache()
+    private Task PruneBuildCacheAsync()
     {
-        ArmCleanup("Удалить весь кэш сборки Docker? Это безопасно, но следующая сборка займёт больше времени.",
+        return ConfirmCleanupAsync(
+            "Кэш сборки",
+            PackIconLucideKind.Hammer,
+            ["Будет удалён весь кэш сборки Docker.", "Следующая сборка займёт больше времени."],
+            "Очистить кэш",
             () => RunCleanupAsync(DockerCleanupTarget.BuildCache, "Очистить кэш сборки"));
     }
 
     [RelayCommand]
-    private void PruneDanglingImages()
+    private Task PruneDanglingImagesAsync()
     {
-        ArmCleanup("Удалить образы без тегов (dangling)? Безвозвратно.",
+        return ConfirmCleanupAsync(
+            "Висячие образы",
+            PackIconLucideKind.Image,
+            ["Будут удалены образы без тегов (dangling).", "Образы, привязанные к контейнерам, не тронуты."],
+            "Удалить образы",
             () => RunCleanupAsync(DockerCleanupTarget.DanglingImages, "Удалить «висячие» образы"));
     }
 
     [RelayCommand]
-    private void PruneStoppedContainers()
+    private Task PruneStoppedContainersAsync()
     {
-        ArmCleanup("Удалить все остановленные контейнеры? Безвозвратно.",
+        return ConfirmCleanupAsync(
+            "Остановленные контейнеры",
+            PackIconLucideKind.Box,
+            ["Будут удалены все остановленные контейнеры.", "Данные внутри них пропадут вместе с контейнером."],
+            "Удалить контейнеры",
             () => RunCleanupAsync(DockerCleanupTarget.StoppedContainers, "Удалить остановленные контейнеры"));
     }
 
     [RelayCommand]
-    private void PruneUnusedImages()
+    private Task PruneUnusedImagesAsync()
     {
-        ArmCleanup("Удалить ВСЕ образы, не привязанные к контейнерам? Их придётся скачивать заново. Безвозвратно.",
+        return ConfirmCleanupAsync(
+            "Неиспользуемые образы",
+            PackIconLucideKind.Trash2,
+            ["Будут удалены все образы, не привязанные к контейнерам.", "Нужные придётся скачивать заново."],
+            "Удалить образы",
             () => RunCleanupAsync(DockerCleanupTarget.UnusedImages, "Удалить неиспользуемые образы"));
     }
 
     [RelayCommand]
-    private void PruneVolumes()
+    private Task PruneVolumesAsync()
     {
-        var scope = PruneAllVolumes ? "ВСЕ неиспользуемые тома (включая именованные)" : "неиспользуемые анонимные тома";
         var allUnused = PruneAllVolumes;
-        ArmCleanup($"⚠ Удалить {scope}? В них лежат данные (БД и т.п.) – они пропадут БЕЗВОЗВРАТНО.",
+
+        var scope = allUnused
+            ? "Будут удалены все неиспользуемые тома, включая именованные."
+            : "Будут удалены неиспользуемые анонимные тома.";
+
+        return ConfirmCleanupAsync(
+            "Неиспользуемые тома",
+            PackIconLucideKind.Database,
+            [scope, "В томах лежат данные приложений – базы, кэши, загруженные файлы."],
+            "Удалить тома",
             () => RunCleanupAsync(DockerCleanupTarget.UnusedVolumes, "Удалить неиспользуемые тома", allUnused));
     }
 
-    [RelayCommand]
-    private void Compact()
-    {
-        ArmCleanup("WSL и Docker будут остановлены, образ диска (VHDX) сожмётся, место вернётся на диск. "
-            + "После этого запустите Docker заново.",
-            CompactCoreAsync);
-    }
-
-    private void ArmCleanup(string message, Func<Task> action)
+    private async Task ConfirmCleanupAsync(
+        string title,
+        PackIconLucideKind iconKind,
+        IReadOnlyList<string> lines,
+        string action,
+        Func<Task> run)
     {
         if (!CanRun)
         {
             return;
         }
 
-        _pendingCleanupAction = action;
-        PendingCleanupMessage = message;
-    }
+        var confirm = new ConfirmDialogViewModel(
+            title,
+            iconKind,
+            lines,
+            [
+                new("Отмена", ConfirmChoiceKind.Dismissive),
+                new(action, ConfirmChoiceKind.Destructive),
+            ])
+        {
+            Warning = "Docker удаляет мимо корзины – вернуть удалённое нельзя.",
+        };
 
-    [RelayCommand]
-    private void CancelCleanup()
-    {
-        _pendingCleanupAction = null;
-        PendingCleanupMessage = null;
-    }
+        if (!await _dialogs.ShowAsync(confirm))
+        {
+            return;
+        }
 
-    [RelayCommand]
-    private async Task ConfirmCleanup()
-    {
-        var action = _pendingCleanupAction;
-        CancelCleanup();
-        if (action is not null)
-        {
-            await action();
-        }
-    }
-
-    private async Task CompactCoreAsync()
-    {
-        IsBusy = true;
-        StatusText = "Сжимаю образ диска Docker…";
-        try
-        {
-            logger.DockerCompactStarted();
-            var result = await docker.CompactAsync();
-            logger.DockerCompactFinished();
-            dialogs.Info("Сжатие диска Docker", result);
-            StatusText = "Готово. Запустите Docker заново.";
-            Buckets.Clear();
-            Groups.Clear();
-            _loadedOnce = false;
-        }
-        catch (Exception ex)
-        {
-            logger.DockerCompactFailed(ex);
-            dialogs.Error("Сжатие диска Docker", ex.Message);
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        await run();
     }
 
     private async Task RunCleanupAsync(DockerCleanupTarget target, string title, bool allUnused = false)
@@ -331,16 +374,20 @@ public sealed partial class DockerViewModel(
         StatusText = $"{title}…";
         try
         {
-            logger.DockerCleanupStarted(target.ToString());
-            var result = await docker.PruneAsync(target, allUnused);
-            logger.DockerCleanupFinished(target.ToString(), Summarize(result));
-            dialogs.Info(title, string.IsNullOrWhiteSpace(result) ? "Готово. Освобождать было нечего." : result);
+            _logger.DockerCleanupStarted(target.ToString());
+            var result = await _docker.PruneAsync(target, allUnused, CancellationToken.None);
+            _logger.DockerCleanupFinished(target.ToString(), Summarize(result));
+            _uiDispatcher.Invoke(() => _dialogs.Info(title, string.IsNullOrWhiteSpace(result) ? "Готово. Освобождать было нечего." : result));
         }
         catch (Exception ex)
         {
-            logger.DockerCleanupFailed(ex, target.ToString());
-            dialogs.Error(title, ex.Message);
-            IsBusy = false;
+            _logger.DockerCleanupFailed(ex, target.ToString());
+            _uiDispatcher.Invoke(() =>
+            {
+                _dialogs.Error(title, ex.Message);
+                IsBusy = false;
+            });
+
             return;
         }
 

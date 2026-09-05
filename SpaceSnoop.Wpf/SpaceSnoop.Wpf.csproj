@@ -10,25 +10,34 @@
     <RootNamespace>SpaceSnoop.Wpf</RootNamespace>
     <AssemblyName>SpaceSnoop.Wpf</AssemblyName>
     <ApplicationIcon>icon.ico</ApplicationIcon>
+    <DisableMicrosoftExtensionsLoggingSourceGenerator>true</DisableMicrosoftExtensionsLoggingSourceGenerator>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 
   <ItemGroup>
     <Resource Include="icon.ico" />
     <InternalsVisibleTo Include="SpaceSnoop.Wpf.Tests" />
+    <InternalsVisibleTo Include="SpaceSnoop.Benchmarks" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\SpaceSnoop.Core\SpaceSnoop.Core.csproj" />
-    <PackageReference Include="KeepShell" Version="0.1.31" />
-    <PackageReference Include="KeepShell.Themes.Tarkov" Version="0.1.31" />
+    <PackageReference Include="KeepShell" Version="0.1.141" />
+    <PackageReference Include="KeepShell.Automation" Version="0.1.141" />
+    <PackageReference Include="KeepShell.Themes.Tarkov" Version="0.1.141" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="MahApps.Metro.IconPacks.Lucide" Version="6.2.1" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="1.4.1" />
     <PackageReference Include="Serilog" Version="4.3.1" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+    <PackageReference Include="SonarAnalyzer.CSharp" Version="10.31.0.145097">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="Tomlyn" Version="2.7.0" />
   </ItemGroup>
 

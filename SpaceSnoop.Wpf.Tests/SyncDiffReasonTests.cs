@@ -23,7 +23,7 @@ public class SyncDiffReasonTests
             RightModified = Base.AddSeconds(secondsApart),
         };
 
-        return SyncNodeViewModel.DescribeDiff(file);
+        return SyncNodeText.DescribeDiff(file);
     }
 
     [Test]
@@ -31,6 +31,6 @@ public class SyncDiffReasonTests
     {
         var file = new FileComparison("a.txt", "a.txt") { Status = ComparisonStatus.Identical };
 
-        Assert.That(SyncNodeViewModel.DescribeDiff(file), Is.Empty);
+        Assert.That(SyncNodeText.DescribeDiff(file), Is.Empty);
     }
 }

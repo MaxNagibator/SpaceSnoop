@@ -1,6 +1,5 @@
 ﻿using MahApps.Metro.IconPacks;
-using Microsoft.Win32;
-using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 
 namespace SpaceSnoop.Wpf.ViewModels.Sync;
@@ -30,7 +29,13 @@ public sealed partial class SyncProfileViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(Summary))]
     [NotifyPropertyChangedFor(nameof(MirrorApplicable))]
     [NotifyPropertyChangedFor(nameof(MirrorWarning))]
+    [NotifyPropertyChangedFor(nameof(WinnerApplicable))]
     private int _selectedModeIndex;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MirrorApplicable))]
+    [NotifyPropertyChangedFor(nameof(MirrorWarning))]
+    private int _selectedWinnerIndex;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(MirrorWarning))]
@@ -51,6 +56,9 @@ public sealed partial class SyncProfileViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isEditing;
+
+    [ObservableProperty]
+    private bool _isSelected;
 
     [ObservableProperty]
     private bool _confirmingDelete;
@@ -89,6 +97,7 @@ public sealed partial class SyncProfileViewModel : ObservableObject
         _rightPath = model.Right;
         _exclusions = model.Exclusions;
         _selectedModeIndex = Math.Clamp(model.Mode, 0, 2);
+        _selectedWinnerIndex = SyncProfile.IndexOfWinner(model.Winner);
         _mirror = model.Mirror;
         _selectedIntervalIndex = model.Interval switch
         {
@@ -104,7 +113,9 @@ public sealed partial class SyncProfileViewModel : ObservableObject
 
     public string Id { get; }
 
-    public IReadOnlyList<string> Modes => _parent.Modes;
+    public IReadOnlyList<SegmentOption> Modes => _parent.Modes;
+
+    public IReadOnlyList<SegmentOption> Winners => _parent.Winners;
 
     public IReadOnlyList<string> Intervals => _parent.Intervals;
 
@@ -112,9 +123,11 @@ public sealed partial class SyncProfileViewModel : ObservableObject
 
     public bool TimeApplicable => SelectedIntervalIndex != 2;
 
-    public bool MirrorApplicable => SelectedModeIndex != 2;
+    public bool WinnerApplicable => SelectedModeIndex == 2;
 
-    public bool MirrorWarning => Mirror && SelectedModeIndex != 2;
+    public bool MirrorApplicable => SelectedModeIndex != 2 || SelectedWinnerIndex is 1 or 2;
+
+    public bool MirrorWarning => Mirror && MirrorApplicable;
 
     public PackIconLucideKind StatusIconKind =>
         Enabled && IsScheduled && OsEnabled ? PackIconLucideKind.CalendarCheck : PackIconLucideKind.CalendarOff;
@@ -155,6 +168,7 @@ public sealed partial class SyncProfileViewModel : ObservableObject
             Left = LeftPath.Trim(),
             Right = RightPath.Trim(),
             Mode = SelectedModeIndex,
+            Winner = SyncProfile.WinnerFromIndex(SelectedWinnerIndex),
             Mirror = Mirror,
             Exclusions = Exclusions.Trim(),
             Interval = SelectedIntervalIndex switch
@@ -168,11 +182,6 @@ public sealed partial class SyncProfileViewModel : ObservableObject
         };
     }
 
-    public void RefreshStatus()
-    {
-        ApplyStatus(SyncScheduler.Query(TaskName));
-    }
-
     public void ApplyStatus(ScheduleStatus status)
     {
         IsScheduled = status.Exists;
@@ -183,14 +192,17 @@ public sealed partial class SyncProfileViewModel : ObservableObject
         IsStale = status.Exists && SyncScheduler.IsStale(status.Action, Environment.ProcessPath ?? string.Empty);
     }
 
-    private static void Browse(Action<string> assign)
+    private void Browse(Action<string> assign)
     {
-        var dialog = new OpenFolderDialog { Title = "Выберите каталог" };
-
-        if (dialog.ShowDialog() == true)
+        if (_parent.FilePicker.PickFolder("Выберите каталог") is { } path)
         {
-            assign(dialog.FolderName);
+            assign(path);
         }
+    }
+
+    partial void OnIsSelectedChanged(bool value)
+    {
+        _parent.Bulk.NotifySelectionChanged();
     }
 
     partial void OnEnabledChanged(bool value)
@@ -200,16 +212,50 @@ public sealed partial class SyncProfileViewModel : ObservableObject
             return;
         }
 
-        if (value && !ValidateForScheduling(out var reason))
+        ApplyEnabled(value);
+        _parent.Persist();
+    }
+
+    internal bool ApplyEnabled(bool value)
+    {
+        if (!PrepareEnabled(value))
         {
-            Message = reason;
-            _suppress = true;
-            Enabled = false;
-            _suppress = false;
-            return;
+            return false;
         }
 
-        Apply();
+        ApplySchedule();
+        return true;
+    }
+
+    internal bool PrepareEnabled(bool value)
+    {
+        if (!ValidateEnable(value))
+        {
+            return false;
+        }
+
+        CommitEnabled(value);
+        return true;
+    }
+
+    internal bool ValidateEnable(bool value)
+    {
+        if (!value || ValidateForScheduling(out var reason))
+        {
+            return true;
+        }
+
+        Message = reason;
+        CommitEnabled(false);
+
+        return false;
+    }
+
+    internal void CommitEnabled(bool value)
+    {
+        _suppress = true;
+        Enabled = value;
+        _suppress = false;
     }
 
     [RelayCommand]
@@ -229,6 +275,7 @@ public sealed partial class SyncProfileViewModel : ObservableObject
     {
         Message = string.Empty;
         ConfirmingDelete = false;
+        IsSelected = false;
         IsEditing = true;
     }
 
@@ -245,6 +292,7 @@ public sealed partial class SyncProfileViewModel : ObservableObject
             RightPath = model.Right;
             Exclusions = model.Exclusions;
             SelectedModeIndex = Math.Clamp(model.Mode, 0, 2);
+            SelectedWinnerIndex = SyncProfile.IndexOfWinner(model.Winner);
             Mirror = model.Mirror;
             SelectedIntervalIndex = model.Interval switch
             {
@@ -308,51 +356,50 @@ public sealed partial class SyncProfileViewModel : ObservableObject
             return;
         }
 
-        try
+        if (_parent.Shell.Start(exe, AppInfo.SyncArgument, Id))
         {
-            var info = new ProcessStartInfo(exe) { UseShellExecute = false };
-            info.ArgumentList.Add(AppInfo.SyncArgument);
-            info.ArgumentList.Add(Id);
-            Process.Start(info);
-
             _parent.LogRunNow(DisplayName);
             Message = "Запущено в фоне – результат появится в истории.";
         }
-        catch (Exception exception)
+        else
         {
-            Message = $"Не удалось запустить: {exception.Message}";
+            Message = "Не удалось запустить";
         }
     }
 
     private void Apply()
     {
         _parent.Persist();
+        ApplySchedule();
+    }
 
-        if (Enabled)
+    internal void ApplySchedule()
+    {
+        ApplyScheduleOutcome(_parent.Scheduler.Apply(BuildScheduleRequest()));
+    }
+
+    internal ScheduleRequest BuildScheduleRequest(bool? enabled = null)
+    {
+        TimeSpan.TryParse(Time, CultureInfo.InvariantCulture, out var time);
+
+        return new(enabled ?? Enabled, TaskName, ToModel().Interval, time, $"{AppInfo.SyncArgument} {Id}");
+    }
+
+    internal void ApplyScheduleOutcome(ScheduleOutcome outcome)
+    {
+        if (!outcome.Ok)
         {
-            TimeSpan.TryParse(Time, out var time);
-
-            if (!SyncScheduler.Create(TaskName, ToModel().Interval, time, $"{AppInfo.SyncArgument} {Id}", out var error))
-            {
-                Message = $"Не удалось создать задачу: {error}";
-                _parent.LogTaskFailed(DisplayName, error);
-                return;
-            }
-
-            Message = "Расписание сохранено.";
+            Message = $"Не удалось применить расписание: {outcome.Error}";
+            _parent.LogTaskFailed(DisplayName, outcome.Error);
+            return;
         }
-        else
-        {
-            if (SyncScheduler.Exists(TaskName))
-            {
-                SyncScheduler.Disable(TaskName, out _);
-            }
 
-            Message = "Профиль сохранён, автозапуск выключен.";
-        }
+        Message = Enabled
+            ? "Расписание сохранено."
+            : "Профиль сохранён, автозапуск выключен.";
 
         _parent.LogSaved(DisplayName, Enabled);
-        RefreshStatus();
+        ApplyStatus(outcome.Status);
     }
 
     private bool ValidateForScheduling(out string reason)
@@ -378,7 +425,7 @@ public sealed partial class SyncProfileViewModel : ObservableObject
             return false;
         }
 
-        if (TimeApplicable && (!TimeSpan.TryParse(Time, out var time) || time < TimeSpan.Zero || time.TotalHours >= 24))
+        if (TimeApplicable && !SyncProfile.IsValidTime(Time))
         {
             reason = "Время укажите в формате ЧЧ:ММ, например 03:00.";
             return false;

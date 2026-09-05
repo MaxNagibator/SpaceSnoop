@@ -200,6 +200,46 @@ public class DirectoryComparerTests
         {
             Assert.That(result.Root.Files, Is.Empty);
             Assert.That(result.Root.SubDirectories, Is.Empty);
+            Assert.That(result.SkippedLinks(), Is.EqualTo(new[] { "link" }), "пропуск ссылки должен доезжать до вызывающего");
+        }
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void LinkOnOneSide_RealObjectOnOther_IsConflictWithoutActions(bool isDirectory)
+    {
+        var target = Path.Combine(_tempDir, "target");
+        var real = Path.Combine(_rightDir, "data");
+
+        if (isDirectory)
+        {
+            Directory.CreateDirectory(target);
+            Directory.CreateDirectory(real);
+            File.WriteAllText(Path.Combine(real, "inner.txt"), "payload");
+        }
+        else
+        {
+            File.WriteAllText(target, "link target");
+            File.WriteAllText(real, "payload");
+        }
+
+        if (!TryCreateSymlink(Path.Combine(_leftDir, "data"), target, isDirectory))
+        {
+            Assert.Ignore("Создание символьных ссылок недоступно (нет прав / режима разработчика).");
+        }
+
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
+        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
+        result.ApplyMode(SyncMode.LeftToRight, true);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Root.SubDirectories, Is.Empty, "спорное имя живёт одной строкой-файлом, а не веткой дерева");
+            Assert.That(result.Root.Files, Has.Count.EqualTo(1));
+            Assert.That(result.Root.Files[0].TypeConflict, Is.EqualTo(FileTypeConflict.LeftLinkRightObject));
+            Assert.That(result.Root.Files[0].Status, Is.EqualTo(ComparisonStatus.Conflict));
+            Assert.That(result.Root.Files[0].Action, Is.EqualTo(SyncAction.None), "зеркало не удаляет объект, которого не видели");
+            Assert.That(result.CountPlannedActions().Total, Is.EqualTo(0));
         }
     }
 
@@ -221,6 +261,252 @@ public class DirectoryComparerTests
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return false;
+        }
+    }
+
+    [Test]
+    public void MissingLeftRoot_MarksIncompleteAndBlocksMirrorDeletes()
+    {
+        File.WriteAllText(Path.Combine(_rightDir, "orphan.txt"), "payload");
+        Directory.Delete(_leftDir, true);
+
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
+        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
+        result.ApplyMode(SyncMode.LeftToRight, true);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Root.LeftIncomplete, Is.True);
+            Assert.That(result.Root.Files.Single().Action, Is.EqualTo(SyncAction.Skip));
+            Assert.That(result.CountPlannedActions().Deletes, Is.EqualTo(0));
+            Assert.That(result.IncompleteDirectories(), Is.Not.Empty);
+        }
+    }
+
+    [Test]
+    public void UnreadableLeftDirectory_MarksIncompleteAndBlocksMirrorDeletes()
+    {
+        var leftLocked = Path.Combine(_leftDir, "locked");
+        var rightLocked = Path.Combine(_rightDir, "locked");
+        Directory.CreateDirectory(leftLocked);
+        Directory.CreateDirectory(rightLocked);
+        File.WriteAllText(Path.Combine(leftLocked, "a.txt"), "hello");
+        File.WriteAllText(Path.Combine(rightLocked, "a.txt"), "hello");
+        File.WriteAllText(Path.Combine(rightLocked, "orphan.txt"), "payload");
+        TestAcl.DenyEnumeration(leftLocked);
+
+        try
+        {
+            if (Readable(leftLocked))
+            {
+                Assert.Ignore("Deny-ACE не действует на этот процесс (запуск от администратора) – ветку нечем воспроизвести.");
+            }
+
+            var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
+            var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
+            result.ApplyMode(SyncMode.LeftToRight, true);
+
+            var locked = result.Root.SubDirectories.Single(x => x.Name == "locked");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(locked.LeftIncomplete, Is.True);
+                Assert.That(locked.Files.Select(x => x.Action), Is.All.EqualTo(SyncAction.Skip));
+                Assert.That(result.CountPlannedActions().Deletes, Is.EqualTo(0));
+            }
+        }
+        finally
+        {
+            TestAcl.AllowEnumeration(leftLocked);
+        }
+    }
+
+    private static bool Readable(string path)
+    {
+        try
+        {
+            Directory.EnumerateFileSystemEntries(path).Any();
+            return true;
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            return false;
+        }
+    }
+
+    [TestCase(SyncMode.LeftToRight, false, SyncWinner.Newest)]
+    [TestCase(SyncMode.LeftToRight, true, SyncWinner.Newest)]
+    [TestCase(SyncMode.RightToLeft, true, SyncWinner.Newest)]
+    [TestCase(SyncMode.Bidirectional, true, SyncWinner.Left)]
+    public void NameTakenByFileAndDirectory_IsConflictWithoutActions(SyncMode mode, bool mirror, SyncWinner winner)
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "config"), "payload");
+        var rightConfig = Path.Combine(_rightDir, "config");
+        Directory.CreateDirectory(rightConfig);
+        File.WriteAllText(Path.Combine(rightConfig, "inner.txt"), "inner");
+
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
+        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
+        result.ApplyMode(mode, mirror, winner);
+
+        var file = result.Root.Files.Single();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(file.Status, Is.EqualTo(ComparisonStatus.Conflict));
+            Assert.That(file.TypeConflict, Is.EqualTo(FileTypeConflict.LeftFileRightDirectory));
+            Assert.That(file.Action, Is.EqualTo(SyncAction.None));
+            Assert.That(result.Root.SubDirectories, Is.Empty);
+            Assert.That(result.CountPlannedActions().Total, Is.EqualTo(0));
+            Assert.That(result.HasUnresolvedConflicts(), Is.True);
+        }
+    }
+
+    [Test]
+    public void NameTakenByDirectoryAndFile_NamesTheSideThatHoldsFile()
+    {
+        Directory.CreateDirectory(Path.Combine(_leftDir, "config"));
+        File.WriteAllText(Path.Combine(_rightDir, "config"), "payload");
+
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
+        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
+        result.ApplyMode(SyncMode.RightToLeft, true);
+
+        var file = result.Root.Files.Single();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(file.TypeConflict, Is.EqualTo(FileTypeConflict.RightFileLeftDirectory));
+            Assert.That(file.RightSize, Is.EqualTo(7));
+            Assert.That(file.LeftSize, Is.Null);
+            Assert.That(file.Action, Is.EqualTo(SyncAction.None));
+        }
+    }
+
+    [Test]
+    public void TypeConflict_MassResolveCopiesSkipsIt()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "config"), "payload");
+        Directory.CreateDirectory(Path.Combine(_rightDir, "config"));
+
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
+        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
+        result.ApplyMode(SyncMode.LeftToRight);
+
+        var copied = result.ResolveAllConflicts(SyncAction.CopyToRight);
+        var skipped = result.ResolveAllConflicts(SyncAction.Skip);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(copied, Is.EqualTo(0));
+            Assert.That(skipped, Is.EqualTo(1));
+            Assert.That(result.Root.Files.Single().Action, Is.EqualTo(SyncAction.Skip));
+        }
+    }
+
+    [Test]
+    public void CrossCaseNames_OnInsensitiveVolumes_AreOneFile()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "foo.txt"), "left");
+        File.WriteAllText(Path.Combine(_rightDir, "Foo.txt"), "right side");
+
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
+        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None, caseRules: PathCaseRules.Insensitive);
+
+        var file = result.Root.Files.Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(file.Status, Is.EqualTo(ComparisonStatus.Modified));
+            Assert.That(file.TypeConflict, Is.EqualTo(FileTypeConflict.None));
+            Assert.That(file.LeftSize, Is.EqualTo(4));
+            Assert.That(file.RightSize, Is.EqualTo(10));
+        }
+    }
+
+    [Test]
+    public void CrossCaseNames_OnSensitiveVolumes_AreTwoOneSidedFiles()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "foo.txt"), "left");
+        File.WriteAllText(Path.Combine(_rightDir, "Foo.txt"), "right");
+
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
+        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None, caseRules: PathCaseRules.Sensitive);
+        result.ApplyMode(SyncMode.LeftToRight, true);
+
+        var left = result.Root.Files.Single(x => x.Name == "foo.txt");
+        var right = result.Root.Files.Single(x => x.Name == "Foo.txt");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Root.Files, Has.Count.EqualTo(2));
+            Assert.That(left.Status, Is.EqualTo(ComparisonStatus.LeftOnly));
+            Assert.That(right.Status, Is.EqualTo(ComparisonStatus.RightOnly));
+            Assert.That(left.Action, Is.EqualTo(SyncAction.CopyToRight));
+            Assert.That(right.Action, Is.EqualTo(SyncAction.DeleteRight));
+        }
+    }
+
+    [Test]
+    public void CrossCaseNames_OnMixedVolumes_AreConflictWithoutActions()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "foo.txt"), "left");
+        File.WriteAllText(Path.Combine(_rightDir, "Foo.txt"), "right");
+
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
+        var mixed = new PathCaseRules(StringComparer.Ordinal, StringComparer.OrdinalIgnoreCase);
+        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None, caseRules: mixed);
+        result.ApplyMode(SyncMode.LeftToRight, true);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Root.Files, Has.Count.EqualTo(2));
+            Assert.That(result.Root.Files.Select(x => x.TypeConflict),
+                Is.All.EqualTo(FileTypeConflict.CaseCollision));
+            Assert.That(result.Root.Files.Select(x => x.Status), Is.All.EqualTo(ComparisonStatus.Conflict));
+            Assert.That(result.Root.Files.Select(x => x.Action), Is.All.EqualTo(SyncAction.None));
+        }
+    }
+
+    [Test]
+    public void CrossCaseDirectories_OnMixedVolumes_AreConflictAndLeaveTreeAlone()
+    {
+        Directory.CreateDirectory(Path.Combine(_leftDir, "data"));
+        Directory.CreateDirectory(Path.Combine(_rightDir, "Data"));
+        File.WriteAllText(Path.Combine(_leftDir, "data", "a.txt"), "left");
+
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
+        var mixed = new PathCaseRules(StringComparer.Ordinal, StringComparer.OrdinalIgnoreCase);
+        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None, caseRules: mixed);
+        result.ApplyMode(SyncMode.LeftToRight, true);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Root.SubDirectories, Is.Empty);
+            Assert.That(result.Root.Files.Select(x => x.Name), Is.EquivalentTo(new[] { "Data", "data" }));
+            Assert.That(result.Root.Files.Select(x => x.TypeConflict),
+                Is.All.EqualTo(FileTypeConflict.CaseCollision));
+            Assert.That(result.Root.Files.Select(x => x.Action), Is.All.EqualTo(SyncAction.None));
+        }
+    }
+
+    [Test]
+    public void CaseCollision_MassResolveCopiesSkipsIt()
+    {
+        File.WriteAllText(Path.Combine(_leftDir, "foo.txt"), "left");
+        File.WriteAllText(Path.Combine(_rightDir, "Foo.txt"), "right");
+
+        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
+        var mixed = new PathCaseRules(StringComparer.Ordinal, StringComparer.OrdinalIgnoreCase);
+        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None, caseRules: mixed);
+        result.ApplyMode(SyncMode.LeftToRight);
+
+        var copied = result.ResolveAllConflicts(SyncAction.CopyToRight);
+        var skipped = result.ResolveAllConflicts(SyncAction.Skip);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(copied, Is.EqualTo(0));
+            Assert.That(skipped, Is.EqualTo(2));
+            Assert.That(result.Root.Files.Select(x => x.Action), Is.All.EqualTo(SyncAction.Skip));
         }
     }
 

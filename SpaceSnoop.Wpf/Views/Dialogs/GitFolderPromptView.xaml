@@ -25,9 +25,9 @@
                                       Height="20"
                                       VerticalAlignment="Center"
                                       Margin="0,0,10,0"
-                                      Foreground="{DynamicResource Accent.Primary}" />
+                                      Foreground="{DynamicResource Accent.Text}" />
             <TextBlock Text="{Binding Title}"
-                       Style="{StaticResource TextBlock.Heading}"
+                       Style="{StaticResource DialogTitle}"
                        VerticalAlignment="Center" />
         </StackPanel>
 
@@ -62,9 +62,9 @@
             <StackPanel Grid.Column="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right">
-                <Button Style="{StaticResource Button.Ghost}"
+                <Button Style="{StaticResource Button.Secondary}"
                         Command="{Binding KeepCommand}"
-                        Content="Нет"
+                        Content="Синхронизировать .git"
                         MinWidth="96"
                         MinHeight="{DynamicResource Control.Height.Default}"
                         Padding="14,6"
@@ -72,7 +72,7 @@
                         IsCancel="True" />
                 <Button Style="{StaticResource Button.Primary}"
                         Command="{Binding SkipCommand}"
-                        Content="Да"
+                        Content="Пропустить .git"
                         MinWidth="96"
                         MinHeight="{DynamicResource Control.Height.Default}"
                         Padding="14,6"

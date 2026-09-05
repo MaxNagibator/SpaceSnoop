@@ -9,6 +9,7 @@ public class DirectorySpace : SpaceBase
     private readonly List<FileSpace> _files;
     private long? _maxTotalSize;
     private int? _totalFileCount;
+    private int? _totalDirectoryCount;
     private long _totalSize;
 
     /// <summary>
@@ -58,7 +59,7 @@ public class DirectorySpace : SpaceBase
     /// <summary>
     /// Количество всех подкаталогов (включая вложенные).
     /// </summary>
-    public int TotalDirectoryCount => _subDirectories.Count + _subDirectories.Sum(x => x.TotalDirectoryCount);
+    public int TotalDirectoryCount => _totalDirectoryCount ??= _subDirectories.Count + _subDirectories.Sum(x => x.TotalDirectoryCount);
 
     private IEnumerable<SpaceBase> All => _subDirectories.AsEnumerable<SpaceBase>().Concat(Files);
 
@@ -101,6 +102,7 @@ public class DirectorySpace : SpaceBase
         _subDirectories.Add(subDirectory);
         _maxTotalSize = null;
         _totalFileCount = null;
+        _totalDirectoryCount = null;
     }
 
     /// <summary>
@@ -118,6 +120,7 @@ public class DirectorySpace : SpaceBase
         _totalSize = Size;
         _maxTotalSize = null;
         _totalFileCount = null;
+        _totalDirectoryCount = null;
     }
 
     public FileSpace AddFile(FileInfo file)
@@ -127,6 +130,59 @@ public class DirectorySpace : SpaceBase
         Size += file.Length;
         PropagateAddition(file.Length);
         return space;
+    }
+
+    internal void AddScannedFile(in ScanEntry entry)
+    {
+        _files.Add(FileSpace.Create(entry, this));
+        Size += entry.Length;
+    }
+
+    internal void AddScannedDirectory(DirectorySpace subDirectory)
+    {
+        _subDirectories.Add(subDirectory);
+    }
+
+    internal void SealFiles()
+    {
+        _totalSize = Size;
+        _maxTotalSize = null;
+        _totalFileCount = null;
+        _totalDirectoryCount = null;
+    }
+
+    internal void AggregateTotals()
+    {
+        var stack = new Stack<(DirectorySpace Node, bool Ascending)>();
+        stack.Push((this, false));
+
+        while (stack.Count > 0)
+        {
+            var (node, ascending) = stack.Pop();
+
+            if (ascending)
+            {
+                var total = node.Size;
+
+                foreach (var subDirectory in node._subDirectories)
+                {
+                    total += subDirectory._totalSize;
+                }
+
+                node._totalSize = total;
+                node._maxTotalSize = null;
+                node._totalFileCount = null;
+                node._totalDirectoryCount = null;
+                continue;
+            }
+
+            stack.Push((node, true));
+
+            foreach (var subDirectory in node._subDirectories)
+            {
+                stack.Push((subDirectory, false));
+            }
+        }
     }
 
     /// <summary>
@@ -167,6 +223,7 @@ public class DirectorySpace : SpaceBase
         _totalSize -= child.TotalSize;
         _maxTotalSize = null;
         _totalFileCount = null;
+        _totalDirectoryCount = null;
 
         if (Parent is DirectorySpace parentDir && parentDir.ContainsChild(this))
         {
@@ -234,6 +291,7 @@ public class DirectorySpace : SpaceBase
         _totalSize -= size;
         _maxTotalSize = null;
         _totalFileCount = null;
+        _totalDirectoryCount = null;
 
         if (Parent is DirectorySpace parentDir && parentDir.ContainsChild(this))
         {
@@ -246,6 +304,7 @@ public class DirectorySpace : SpaceBase
         _totalSize += size;
         _maxTotalSize = null;
         _totalFileCount = null;
+        _totalDirectoryCount = null;
 
         if (Parent is DirectorySpace parentDir && parentDir.ContainsChild(this))
         {

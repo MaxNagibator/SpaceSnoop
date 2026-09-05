@@ -52,6 +52,21 @@ public class DockerInventoryTests
         }
     }
 
+    [Test]
+    public void Parse_LocalizesAgeAndStatus()
+    {
+        var objects = DockerInventory.Parse(Sample);
+
+        var image = objects.First(o => o.Kind == DockerObjectKind.Image && o.InUse);
+        var container = objects.First(o => o.Kind == DockerObjectKind.Container);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(image.Detail, Is.EqualTo("2 часа назад"));
+            Assert.That(container.Detail, Is.EqualTo("Остановлен (137), 2 дня назад"));
+        }
+    }
+
     [TestCase("", 0L)]
     [TestCase("0B", 0L)]
     [TestCase("512MB", 512_000_000L)]

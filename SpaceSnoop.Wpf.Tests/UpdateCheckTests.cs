@@ -1,5 +1,6 @@
 ﻿using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.ViewModels.Settings;
+using System.IO;
 using System.Text.Json;
 
 namespace SpaceSnoop.Wpf.Tests;
@@ -7,6 +8,33 @@ namespace SpaceSnoop.Wpf.Tests;
 [TestFixture]
 public class UpdateCheckTests
 {
+    [Test]
+    public async Task Скачивание_докладывает_только_смену_целого_процента()
+    {
+        const int megabytes = 16;
+        var payload = new byte[megabytes * 1024 * 1024];
+        var reports = new List<int>();
+
+        await ReleaseFeed.CopyAsync(new MemoryStream(payload), Stream.Null, payload.Length, new PercentCollector(reports));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(reports, Has.Count.LessThanOrEqualTo(101), $"Докладов {reports.Count} на 101 значение процента – отчёт снова идёт на каждый блок.");
+            Assert.That(reports, Is.Ordered.Ascending.And.Unique);
+            Assert.That(reports[^1], Is.EqualTo(100), "Последний процент до экрана не доехал.");
+        }
+    }
+
+    [Test]
+    public async Task Скачивание_без_известного_размера_молчит()
+    {
+        var reports = new List<int>();
+
+        await ReleaseFeed.CopyAsync(new MemoryStream(new byte[1024 * 1024]), Stream.Null, -1, new PercentCollector(reports));
+
+        Assert.That(reports, Is.Empty);
+    }
+
     [TestCase("v2.9.0", "2.8.16", true)]
     [TestCase("2.9.0", "2.8.16", true)]
     [TestCase("v2.8.17", "2.8.16", true)]
@@ -81,8 +109,8 @@ public class UpdateCheckTests
                    - Исправлена синхронизация
                    """;
 
-        Assert.That(AppUpdateViewModel.ExtractChanges(body), Is.EqualTo("- Добавлена карта\r\n  Карта теперь рисуется пиксельным буфером.\r\n- Исправлена синхронизация"));
-        var items = AppUpdateViewModel.ExtractChangeItems(body);
+        Assert.That(ReleaseChangelog.ExtractChanges(body), Is.EqualTo("- Добавлена карта\r\n  Карта теперь рисуется пиксельным буфером.\r\n- Исправлена синхронизация"));
+        var items = ReleaseChangelog.ExtractChangeItems(body);
 
         using (Assert.EnterMultipleScope())
         {
@@ -95,6 +123,41 @@ public class UpdateCheckTests
     }
 
     [Test]
+    public void История_изменений_не_берёт_технические_изменения_релиза()
+    {
+        var body = """
+                   ## Скачать
+
+                   EXE ZIP Portable
+
+                   ## Изменения
+
+                   - Скан стал вдвое быстрее
+
+                   ## Технические изменения
+
+                   <details>
+                   <summary>Коммиты (2)</summary>
+
+                   - Каркас обновлён до 0.1.141
+                   - Привязанные коллекции заведены на поток диспетчера
+
+                   </details>
+
+                   **Полный список:** https://github.com/x/y/compare/v2.8.70...v2.8.71
+                   """;
+
+        var items = ReleaseChangelog.ExtractChangeItems(body);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(items, Has.Count.EqualTo(1));
+            Assert.That(items[0].Summary, Is.EqualTo("Скан стал вдвое быстрее"));
+            Assert.That(ReleaseChangelog.ExtractCompareUrl(body), Is.EqualTo("https://github.com/x/y/compare/v2.8.70...v2.8.71"));
+        }
+    }
+
+    [Test]
     public void Тело_без_секции_изменений_берётся_целиком_а_первая_строка_становится_пунктом()
     {
         var body = """
@@ -102,11 +165,11 @@ public class UpdateCheckTests
                    Вторая строка.
                    """;
 
-        var items = AppUpdateViewModel.ExtractChangeItems(body);
+        var items = ReleaseChangelog.ExtractChangeItems(body);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(AppUpdateViewModel.ExtractChanges(body), Is.EqualTo("Просто текст без заголовков.\r\nВторая строка."));
+            Assert.That(ReleaseChangelog.ExtractChanges(body), Is.EqualTo("Просто текст без заголовков.\r\nВторая строка."));
             Assert.That(items, Has.Count.EqualTo(1));
             Assert.That(items[0].Summary, Is.EqualTo("Просто текст без заголовков."));
             Assert.That(items[0].Details, Is.EqualTo(["Вторая строка."]));
@@ -128,8 +191,8 @@ public class UpdateCheckTests
                    Скачиваний: [![всего](badge)](url)
                    """;
 
-        Assert.That(AppUpdateViewModel.ExtractChanges(body), Is.Empty);
-        Assert.That(AppUpdateViewModel.ExtractChangeItems(body), Is.Empty);
+        Assert.That(ReleaseChangelog.ExtractChanges(body), Is.Empty);
+        Assert.That(ReleaseChangelog.ExtractChangeItems(body), Is.Empty);
     }
 
     [Test]
@@ -143,7 +206,7 @@ public class UpdateCheckTests
                    - Второй пункт
                    """;
 
-        var items = AppUpdateViewModel.ExtractChangeItems(body);
+        var items = ReleaseChangelog.ExtractChangeItems(body);
 
         using (Assert.EnterMultipleScope())
         {
@@ -158,7 +221,7 @@ public class UpdateCheckTests
     [TestCase(null, null)]
     public void Ссылка_сравнения_извлекается_из_тела_релиза(string? body, string? expected)
     {
-        Assert.That(AppUpdateViewModel.ExtractCompareUrl(body), Is.EqualTo(expected));
+        Assert.That(ReleaseChangelog.ExtractCompareUrl(body), Is.EqualTo(expected));
     }
 
     [Test]
@@ -189,7 +252,7 @@ public class UpdateCheckTests
             """;
 
         using var document = JsonDocument.Parse(json);
-        var entries = AppUpdateViewModel.BuildChangelogEntries(document.RootElement);
+        var entries = ReleaseChangelog.BuildChangelogEntries(document.RootElement);
 
         using (Assert.EnterMultipleScope())
         {
@@ -221,7 +284,7 @@ public class UpdateCheckTests
             """;
 
         using var document = JsonDocument.Parse(json);
-        var notes = AppUpdateViewModel.BuildReleaseNotes(document.RootElement);
+        var notes = ReleaseChangelog.BuildReleaseNotes(document.RootElement);
 
         using (Assert.EnterMultipleScope())
         {
@@ -242,12 +305,20 @@ public class UpdateCheckTests
             """;
 
         using var document = JsonDocument.Parse(json);
-        var notes = AppUpdateViewModel.BuildReleaseNotes(document.RootElement);
+        var notes = ReleaseChangelog.BuildReleaseNotes(document.RootElement);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(notes, Does.Contain("v99.9.0"));
             Assert.That(notes, Does.Contain("v99.8.0"));
+        }
+    }
+
+    private sealed class PercentCollector(List<int> sink) : IProgress<int>
+    {
+        public void Report(int value)
+        {
+            sink.Add(value);
         }
     }
 }

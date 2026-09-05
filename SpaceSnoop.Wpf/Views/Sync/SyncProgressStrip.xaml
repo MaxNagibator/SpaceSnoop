@@ -6,10 +6,11 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
-             d:DataContext="{d:DesignInstance vm:SyncViewModel}"
+             d:DataContext="{d:DesignInstance vm:SyncSessionViewModel}"
              d:DesignWidth="1040">
 
-    <Border Margin="0,0,0,10"
+    <Border DataContext="{Binding Session}"
+            Margin="0,0,0,10"
             Padding="16,12">
         <Border.Style>
             <Style TargetType="Border"
@@ -59,6 +60,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
                 <iconPacks:PackIconLucide Grid.Column="0"
@@ -67,12 +69,41 @@
                                           Height="14"
                                           VerticalAlignment="Center"
                                           Margin="0,0,9,0"
-                                          Foreground="{DynamicResource Accent.Primary}" />
+                                          Foreground="{DynamicResource Accent.Text}" />
                 <TextBlock Grid.Column="1"
                            Text="{Binding ProgressDetail}"
                            Style="{StaticResource TextBlock.Subtle}"
                            VerticalAlignment="Center"
-                           TextTrimming="CharacterEllipsis" />
+                           TextTrimming="CharacterEllipsis"
+                           ToolTip="{Binding ProgressDetail}" />
+
+                <StackPanel Grid.Column="2"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="14,0,0,0"
+                            Visibility="{Binding HasProgressRate, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                    <TextBlock Text="{Binding ProgressRateText}"
+                               Style="{StaticResource StatValue}" />
+                    <TextBlock Text="{Binding ProgressRemainingText}"
+                               ToolTip="Оценка по средней скорости от начала операции">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock"
+                                   BasedOn="{StaticResource StatValue}">
+                                <Setter Property="Margin"
+                                        Value="12,0,0,0" />
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource Accent.Text}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ProgressRemainingText}"
+                                                 Value="">
+                                        <Setter Property="Visibility"
+                                                Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
             </Grid>
 
             <Grid Grid.Row="1">

@@ -2,31 +2,32 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Settings"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
-             d:DesignWidth="900">
+             d:DesignWidth="900"
+             Visibility="{Binding Sections[update].IsSelected, Converter={StaticResource BoolToVisibility}}">
 
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/Views/Settings/SettingsResources.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/SpaceSnoop.Wpf;component/Views/Settings/SettingsResources.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource Card.Inset}"
-            Margin="0,0,0,10">
+    <HeaderedContentControl Style="{StaticResource Form.Panel}"
+                            Header="{Binding Sections[update].Title}"
+                            keepshell:Form.ResetCommand="{Binding ResetSectionCommand}"
+                            keepshell:Form.ResetCommandParameter="update"
+                            keepshell:Form.ResetHint="{Binding ResetPlans[update].Hint}">
         <StackPanel>
-            <TextBlock Text="Обновления"
-                       Style="{StaticResource Setting.SectionTitle}" />
-
             <TextBlock Text="Репозиторий обновлений"
-                       Style="{StaticResource Setting.Label}"
-                       Margin="0,14,0,0" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="Откуда брать релизы (формат owner/repo). Проверка идёт по последнему релизу этого репозитория на GitHub." />
+                       Style="{StaticResource Form.Label}" />
+            <TextBlock Style="{StaticResource Form.Hint}"
+                       Text="Откуда брать релизы, формат owner/repo." />
             <TextBox Style="{StaticResource TextBox.Form}"
                      Text="{Binding Update.Repository, UpdateSourceTrigger=LostFocus}"
                      FontFamily="{DynamicResource Font.Mono}"
@@ -53,17 +54,44 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <CheckBox Content="Проверять обновления при запуске"
-                      IsChecked="{Binding Update.CheckOnStartup, Mode=TwoWay}"
-                      Margin="0,16,0,0"
-                      VerticalAlignment="Center" />
+            <Grid Margin="0,16,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Content="Проверять обновления при запуске"
+                          IsChecked="{Binding Update.CheckOnStartup, Mode=TwoWay}"
+                          VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.update.check]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
+            </Grid>
 
-            <CheckBox Content="Автоматически скачивать новую версию рядом с программой"
-                      IsChecked="{Binding Update.AutoDownload, Mode=TwoWay}"
-                      Margin="0,14,0,0"
-                      VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="Найденная версия в той же редакции (exe или portable) скачивается в папку программы. Файл не запускается – установка остаётся за вами." />
+            <Grid Margin="0,14,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Content="Автоматически скачивать новую версию рядом с программой"
+                          IsChecked="{Binding Update.AutoDownload, Mode=TwoWay}"
+                          VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.update.auto_download]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
+            </Grid>
+            <TextBlock Style="{StaticResource Form.CheckHint}"
+                       Text="Файл не запускается – установка остаётся за вами." />
+            <Expander Style="{StaticResource Setting.Details}"
+                      Header="Что именно скачивается">
+                <TextBlock Style="{StaticResource Setting.DetailsBody}"
+                           Text="Скачивается ассет той же редакции, что и запущенная программа (exe или portable), в её папку. Проверка идёт по релизам указанного выше репозитория на GitHub." />
+            </Expander>
 
             <StackPanel Orientation="Horizontal"
                         Margin="0,16,0,0">
@@ -71,7 +99,7 @@
                         Content="Проверить сейчас"
                         Command="{Binding Updater.CheckNowCommand}" />
                 <TextBlock Text="{Binding Updater.CheckStatus}"
-                           Style="{StaticResource Setting.Hint}"
+                           Style="{StaticResource Form.Hint}"
                            Margin="12,0,0,0"
                            VerticalAlignment="Center" />
             </StackPanel>
@@ -82,7 +110,7 @@
                     Visibility="{Binding Updater.HasReleaseNotes, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel>
                     <TextBlock Text="Изменения"
-                               Style="{StaticResource Setting.Label}" />
+                               Style="{StaticResource Form.Label}" />
                     <ScrollViewer MaxHeight="220"
                                   Margin="0,8,0,0"
                                   VerticalScrollBarVisibility="Auto"
@@ -96,5 +124,5 @@
                 </StackPanel>
             </Border>
         </StackPanel>
-    </Border>
+    </HeaderedContentControl>
 </UserControl>

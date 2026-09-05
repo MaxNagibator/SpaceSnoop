@@ -1,20 +1,16 @@
 ﻿using KeepShell.Services;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.IO;
-using System.Net.Http;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace SpaceSnoop.Wpf.ViewModels.Settings;
 
 public sealed partial class AppUpdateViewModel : ObservableObject
 {
-    private static readonly HttpClient Http = CreateClient();
-
     private readonly UpdatePreferences _preferences;
     private readonly ISettingsStore _settings;
     private readonly IDialogService _dialogs;
+    private readonly IShellLauncher _shell;
     private readonly ILogger<AppUpdateViewModel> _logger;
 
     private string? _latestTag;
@@ -63,26 +59,31 @@ public sealed partial class AppUpdateViewModel : ObservableObject
     [ObservableProperty]
     private bool _isChangelogLoading;
 
-    public AppUpdateViewModel(UpdatePreferences preferences, ISettingsStore settings, IDialogService dialogs, ILogger<AppUpdateViewModel> logger)
+    public AppUpdateViewModel(UpdatePreferences preferences, ISettingsStore settings, IDialogService dialogs, IShellLauncher shell, ILogger<AppUpdateViewModel> logger)
     {
         _preferences = preferences;
         _settings = settings;
         _dialogs = dialogs;
+        _shell = shell;
         _logger = logger;
 
         _preferences.PropertyChanged += OnPreferencesChanged;
     }
 
-    public string PillText =>
-        IsDownloading ? $"Загрузка {DownloadPercent}%"
-        : _downloadedPath is not null ? "Готово к установке"
-        : $"Доступна версия {VersionLabel}";
+    public string PillText => (IsDownloading, _downloadedPath) switch
+    {
+        (true, _) => $"Загрузка {DownloadPercent}%",
+        (false, not null) => "Готово к установке",
+        _ => $"Доступна версия {VersionLabel}",
+    };
 
     public bool HasReleaseNotes => !string.IsNullOrWhiteSpace(ReleaseNotes);
 
     public bool HasChangelog => ChangelogEntries.Count > 0 || !string.IsNullOrWhiteSpace(Changelog);
 
     public bool HasChangelogStatus => !string.IsNullOrWhiteSpace(ChangelogStatus);
+
+    private string Repository => string.IsNullOrWhiteSpace(_preferences.Repository) ? AppInfo.RepoSlug : _preferences.Repository.Trim();
 
     public void Start()
     {
@@ -107,20 +108,16 @@ public sealed partial class AppUpdateViewModel : ObservableObject
             return;
         }
 
-        var repo = string.IsNullOrWhiteSpace(_preferences.Repository) ? AppInfo.RepoSlug : _preferences.Repository.Trim();
-
         try
         {
             IsChangelogLoading = true;
             ChangelogStatus = "Загружаем историю изменений…";
 
-            using var json = await GetReleasesAsync(repo);
+            using var json = await ReleaseFeed.GetReleasesAsync(Repository);
             var releases = json.RootElement;
-            var entries = releases.ValueKind == JsonValueKind.Array ? BuildChangelogEntries(releases) : [];
+            var entries = releases.ValueKind == JsonValueKind.Array ? ReleaseChangelog.BuildChangelogEntries(releases) : [];
 
-            ChangelogEntries = entries;
-            Changelog = BuildChangelog(entries);
-            ChangelogStatus = HasChangelog ? string.Empty : "Релизы не найдены";
+            ApplyChangelog(entries);
         }
         catch (Exception ex)
         {
@@ -133,93 +130,6 @@ public sealed partial class AppUpdateViewModel : ObservableObject
         }
     }
 
-    internal static string ExtractChanges(string? body)
-    {
-        if (string.IsNullOrWhiteSpace(body))
-        {
-            return string.Empty;
-        }
-
-        var text = body.Replace("\r\n", "\n", StringComparison.Ordinal);
-        const string marker = "## Изменения";
-        var index = text.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-
-        if (index >= 0)
-        {
-            text = text[(index + marker.Length)..].Trim();
-            var next = text.IndexOf("\n## ", StringComparison.Ordinal);
-
-            if (next >= 0)
-            {
-                text = text[..next].Trim();
-            }
-        }
-        else
-        {
-            text = RemoveSection(text, "## Скачать");
-            text = RemoveSection(text, "## Статистика");
-        }
-
-        return text.Replace("\n", Environment.NewLine, StringComparison.Ordinal).Trim();
-    }
-
-    private static string RemoveSection(string text, string heading)
-    {
-        var start = text.IndexOf(heading, StringComparison.OrdinalIgnoreCase);
-
-        if (start < 0)
-        {
-            return text;
-        }
-
-        var end = text.IndexOf("\n## ", start + heading.Length, StringComparison.Ordinal);
-        return (end < 0 ? text[..start] : text[..start] + text[(end + 1)..]).Trim();
-    }
-
-    internal static IReadOnlyList<ReleaseChangeViewModel> ExtractChangeItems(string? body)
-    {
-        var changes = ExtractChanges(body);
-
-        if (string.IsNullOrWhiteSpace(changes))
-        {
-            return [];
-        }
-
-        var items = new List<(string Summary, List<string> Details)>();
-
-        foreach (var line in changes.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
-        {
-            if (line.StartsWith("**Полный список:**", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            if (line.StartsWith("- ", StringComparison.Ordinal) || line.StartsWith("* ", StringComparison.Ordinal))
-            {
-                items.Add((line[2..].Trim(), []));
-                continue;
-            }
-
-            var detail = line.Trim();
-
-            if (detail.Length == 0)
-            {
-                continue;
-            }
-
-            if (items.Count == 0)
-            {
-                items.Add((detail, []));
-            }
-            else
-            {
-                items[^1].Details.Add(detail);
-            }
-        }
-
-        return items.Select(static item => new ReleaseChangeViewModel(item.Summary, item.Details)).ToList();
-    }
-
     private void OnPreferencesChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(UpdatePreferences.Repository) && _started)
@@ -228,23 +138,14 @@ public sealed partial class AppUpdateViewModel : ObservableObject
         }
     }
 
-    private static HttpClient CreateClient()
+    private void ApplyChangelog(IReadOnlyList<ReleaseNoteViewModel> entries)
     {
-        var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
-        client.DefaultRequestHeaders.UserAgent.Add(new(AppInfo.Name, AppInfo.Version));
-        client.DefaultRequestHeaders.Accept.Add(new("application/vnd.github+json"));
-        return client;
+        ChangelogEntries = entries;
+        Changelog = ReleaseChangelog.BuildChangelog(entries);
+        ChangelogStatus = HasChangelog ? string.Empty : "Релизы не найдены";
     }
 
-    private static bool IsSelfContained()
-    {
-        var path = Environment.ProcessPath;
-
-        // TODO: размер exe – единственный надёжный признак self-contained для single-file (рантайм встроен, рядом hostfxr нет); порог в AppDefaults
-        return path is not null && File.Exists(path) && new FileInfo(path).Length > AppDefaults.SelfContainedExeThreshold;
-    }
-
-    private static void TryDelete(string path)
+    private void TryDelete(string path)
     {
         try
         {
@@ -253,106 +154,10 @@ public sealed partial class AppUpdateViewModel : ObservableObject
                 File.Delete(path);
             }
         }
-        catch (IOException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
+            _logger.UpdateTempFileLeft(exception, path);
         }
-        catch (UnauthorizedAccessException)
-        {
-        }
-    }
-
-    internal static string BuildReleaseNotes(JsonElement releases)
-    {
-        var notes = new List<(string Tag, string Changes)>();
-
-        foreach (var release in releases.EnumerateArray())
-        {
-            var tag = release.TryGetProperty("tag_name", out var tagProperty) ? tagProperty.GetString() : null;
-
-            if (!UpdateCheck.IsNewer(tag, AppInfo.Version))
-            {
-                continue;
-            }
-
-            var body = release.TryGetProperty("body", out var bodyProperty) ? bodyProperty.GetString() : null;
-            var changes = ExtractChanges(body).Replace("**", string.Empty, StringComparison.Ordinal);
-
-            if (string.IsNullOrWhiteSpace(changes))
-            {
-                continue;
-            }
-
-            notes.Add((tag ?? string.Empty, changes));
-        }
-
-        return notes.Count == 1
-            ? notes[0].Changes
-            : string.Join($"{Environment.NewLine}{Environment.NewLine}", notes.Select(static note => $"{note.Tag}{Environment.NewLine}{note.Changes}"));
-    }
-
-    private static string BuildChangelog(IReadOnlyList<ReleaseNoteViewModel> entries)
-    {
-        return string.Join($"{Environment.NewLine}{Environment.NewLine}", entries
-            .Select(static entry =>
-                $"## {entry.Title} · {entry.PublishedDate}{Environment.NewLine}{string.Join(Environment.NewLine, entry.Changes.Select(static change => FormatChange(change)))}"));
-    }
-
-    private static string FormatChange(ReleaseChangeViewModel change)
-    {
-        var lines = new List<string> { $"- {change.Summary}" };
-        lines.AddRange(change.Details.Select(static detail => $"  {detail}"));
-        return string.Join(Environment.NewLine, lines);
-    }
-
-    internal static IReadOnlyList<ReleaseNoteViewModel> BuildChangelogEntries(JsonElement releases)
-    {
-        var entries = new List<ReleaseNoteViewModel>();
-
-        foreach (var release in releases.EnumerateArray())
-        {
-            var tag = release.TryGetProperty("tag_name", out var tagProperty) ? tagProperty.GetString() : null;
-            var name = release.TryGetProperty("name", out var nameProperty) ? nameProperty.GetString() : null;
-            var date = release.TryGetProperty("published_at", out var dateProperty) ? dateProperty.GetString() : null;
-            var body = release.TryGetProperty("body", out var bodyProperty) ? bodyProperty.GetString() : null;
-            var url = release.TryGetProperty("html_url", out var urlProperty) ? urlProperty.GetString() : null;
-            var title = string.IsNullOrWhiteSpace(name) ? tag : name;
-
-            if (string.IsNullOrWhiteSpace(title))
-            {
-                continue;
-            }
-
-            var publishedDate = string.IsNullOrWhiteSpace(date) || date.Length < 10 ? "без даты" : date[..10];
-            var changes = ExtractChangeItems(body);
-            var compareUrl = ExtractCompareUrl(body);
-
-            entries.Add(new(title, publishedDate, changes.Count == 0 ? [new("Изменения не описаны.", [])] : changes, compareUrl ?? url));
-        }
-
-        return entries;
-    }
-
-    internal static string? ExtractCompareUrl(string? body)
-    {
-        if (string.IsNullOrWhiteSpace(body))
-        {
-            return null;
-        }
-
-        var match = CompareUrlRegex().Match(body);
-        return match.Success ? match.Value.TrimEnd('.') : null;
-    }
-
-    [GeneratedRegex(@"https://\S+/compare/\S+")]
-    private static partial Regex CompareUrlRegex();
-
-    private static async Task<JsonDocument> GetReleasesAsync(string repo)
-    {
-        using var response = await Http.GetAsync($"https://api.github.com/repos/{repo}/releases?per_page=100");
-        response.EnsureSuccessStatusCode();
-
-        await using var stream = await response.Content.ReadAsStreamAsync();
-        return await JsonDocument.ParseAsync(stream);
     }
 
     private async Task CheckAsync(bool announce = false)
@@ -362,15 +167,13 @@ public sealed partial class AppUpdateViewModel : ObservableObject
             return;
         }
 
-        var repo = string.IsNullOrWhiteSpace(_preferences.Repository) ? AppInfo.RepoSlug : _preferences.Repository.Trim();
-
         _checking = true;
         ResetState();
         CheckStatus = "Проверяем обновления…";
 
         try
         {
-            using var json = await GetReleasesAsync(repo);
+            using var json = await ReleaseFeed.GetReleasesAsync(Repository);
             var releases = json.RootElement;
 
             if (releases.ValueKind != JsonValueKind.Array || releases.GetArrayLength() == 0)
@@ -382,11 +185,8 @@ public sealed partial class AppUpdateViewModel : ObservableObject
             var latest = releases.EnumerateArray().FirstOrDefault();
             _latestTag = latest.TryGetProperty("tag_name", out var tag) ? tag.GetString() : null;
             _releaseUrl = latest.TryGetProperty("html_url", out var url) ? url.GetString() : null;
-            var entries = BuildChangelogEntries(releases);
-            ReleaseNotes = BuildReleaseNotes(releases);
-            ChangelogEntries = entries;
-            Changelog = BuildChangelog(entries);
-            ChangelogStatus = HasChangelog ? string.Empty : "Релизы не найдены";
+            ReleaseNotes = ReleaseChangelog.BuildReleaseNotes(releases);
+            ApplyChangelog(ReleaseChangelog.BuildChangelogEntries(releases));
 
             if (!UpdateCheck.IsNewer(_latestTag, AppInfo.Version))
             {
@@ -460,7 +260,7 @@ public sealed partial class AppUpdateViewModel : ObservableObject
             }
         }
 
-        _assetName = UpdateCheck.PickAsset(names, AppInfo.Name, IsSelfContained());
+        _assetName = UpdateCheck.PickAsset(names, AppInfo.Name, UpdateCheck.IsSelfContained());
 
         if (_assetName is not null)
         {
@@ -478,7 +278,7 @@ public sealed partial class AppUpdateViewModel : ObservableObject
 
         if (_downloadedPath is not null && File.Exists(_downloadedPath))
         {
-            OpenFolder(_downloadedPath);
+            _shell.Reveal(_downloadedPath);
             return;
         }
 
@@ -498,7 +298,7 @@ public sealed partial class AppUpdateViewModel : ObservableObject
 
         if (_dialogs.Confirm("Доступно обновление", browse))
         {
-            OpenUrl(_releaseUrl ?? AppInfo.ReleasesUrl);
+            _shell.Open(_releaseUrl ?? AppInfo.ReleasesUrl);
         }
     }
 
@@ -534,29 +334,7 @@ public sealed partial class AppUpdateViewModel : ObservableObject
             IsDownloading = true;
             DownloadPercent = 0;
 
-            using var response = await Http.GetAsync(_assetUrl, HttpCompletionOption.ResponseHeadersRead);
-            response.EnsureSuccessStatusCode();
-
-            var total = response.Content.Headers.ContentLength ?? -1;
-
-            await using (var source = await response.Content.ReadAsStreamAsync())
-            await using (var destination = File.Create(temp))
-            {
-                var buffer = new byte[81920];
-                long received = 0;
-                int read;
-
-                while ((read = await source.ReadAsync(buffer)) > 0)
-                {
-                    await destination.WriteAsync(buffer.AsMemory(0, read));
-                    received += read;
-
-                    if (total > 0)
-                    {
-                        DownloadPercent = (int)(received * 100 / total);
-                    }
-                }
-            }
+            await ReleaseFeed.FetchAssetAsync(_assetUrl, temp, new Progress<int>(percent => DownloadPercent = percent));
 
             if (File.Exists(target))
             {
@@ -571,7 +349,7 @@ public sealed partial class AppUpdateViewModel : ObservableObject
 
             if (announce && _dialogs.Confirm("Обновление скачано", $"Файл сохранён рядом с программой:{Environment.NewLine}{target}{Environment.NewLine}{Environment.NewLine}Открыть папку?"))
             {
-                OpenFolder(target);
+                _shell.Reveal(target);
             }
         }
         catch (Exception ex)
@@ -600,37 +378,4 @@ public sealed partial class AppUpdateViewModel : ObservableObject
         var notes = ReleaseNotes.Length <= 1200 ? ReleaseNotes : ReleaseNotes[..1200] + "…";
         return $"{Environment.NewLine}Изменения:{Environment.NewLine}{notes}{Environment.NewLine}";
     }
-
-    private void OpenFolder(string filePath)
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = SystemExecutable.Explorer,
-                Arguments = $"/select,\"{filePath}\"",
-                UseShellExecute = true,
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.OpenExplorerFailed(ex, filePath);
-        }
-    }
-
-    private void OpenUrl(string url)
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-        }
-        catch (Exception ex)
-        {
-            _logger.OpenUrlFailed(ex, url);
-        }
-    }
 }
-
-public sealed record ReleaseNoteViewModel(string Title, string PublishedDate, IReadOnlyList<ReleaseChangeViewModel> Changes, string? CompareUrl);
-
-public sealed record ReleaseChangeViewModel(string Summary, IReadOnlyList<string> Details);

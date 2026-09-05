@@ -10,6 +10,18 @@
              d:DesignWidth="860">
 
     <UserControl.Resources>
+        <Style x:Key="RowCard"
+               TargetType="Border"
+               BasedOn="{StaticResource Card.Inset}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IncludeInBatch}"
+                             Value="False">
+                    <Setter Property="Opacity"
+                            Value="0.55" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="FreshIcon"
                TargetType="iconPacks:PackIconLucide">
             <Setter Property="Foreground"
@@ -18,12 +30,12 @@
                 <DataTrigger Binding="{Binding NewerIsLeft}"
                              Value="True">
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Success}" />
+                            Value="{DynamicResource State.SuccessText}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding NewerIsRight}"
                              Value="True">
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Info}" />
+                            Value="{DynamicResource State.InfoText}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -38,18 +50,18 @@
                 <DataTrigger Binding="{Binding NewerIsLeft}"
                              Value="True">
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Success}" />
+                            Value="{DynamicResource State.SuccessText}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding NewerIsRight}"
                              Value="True">
                     <Setter Property="Foreground"
-                            Value="{DynamicResource State.Info}" />
+                            Value="{DynamicResource State.InfoText}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource Card.Inset}"
+    <Border Style="{StaticResource RowCard}"
             Margin="0,0,0,8"
             Padding="14,10">
         <Grid>
@@ -73,32 +85,32 @@
                             <DataTrigger Binding="{Binding Status}"
                                          Value="{x:Static overview:OverviewRunStatus.Compared}">
                                 <Setter Property="Foreground"
-                                        Value="{DynamicResource Accent.Primary}" />
+                                        Value="{DynamicResource Accent.Text}" />
                             </DataTrigger>
                             <DataTrigger Binding="{Binding Status}"
                                          Value="{x:Static overview:OverviewRunStatus.Unavailable}">
                                 <Setter Property="Foreground"
-                                        Value="{DynamicResource State.Warning}" />
+                                        Value="{DynamicResource State.WarningText}" />
                             </DataTrigger>
                             <DataTrigger Binding="{Binding Status}"
                                          Value="{x:Static overview:OverviewRunStatus.Overlap}">
                                 <Setter Property="Foreground"
-                                        Value="{DynamicResource State.Warning}" />
+                                        Value="{DynamicResource State.WarningText}" />
                             </DataTrigger>
                             <DataTrigger Binding="{Binding Status}"
                                          Value="{x:Static overview:OverviewRunStatus.Error}">
                                 <Setter Property="Foreground"
-                                        Value="{DynamicResource State.Error}" />
+                                        Value="{DynamicResource State.ErrorText}" />
                             </DataTrigger>
                             <DataTrigger Binding="{Binding Status}"
                                          Value="{x:Static overview:OverviewRunStatus.Synced}">
                                 <Setter Property="Foreground"
-                                        Value="{DynamicResource State.Success}" />
+                                        Value="{DynamicResource State.SuccessText}" />
                             </DataTrigger>
                             <DataTrigger Binding="{Binding SyncHadErrors}"
                                          Value="True">
                                 <Setter Property="Foreground"
-                                        Value="{DynamicResource State.Warning}" />
+                                        Value="{DynamicResource State.WarningText}" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
@@ -118,10 +130,13 @@
                     <Run Text="{Binding DirectionArrow, Mode=OneWay}" />
                     <Run Text="{Binding Right, Mode=OneWay}" />
                 </TextBlock>
-                <TextBlock Text="{Binding StatusText}"
-                           Foreground="{DynamicResource Fg.Primary}"
+                <TextBlock Foreground="{DynamicResource Fg.Primary}"
                            TextTrimming="CharacterEllipsis"
-                           Margin="0,4,0,0" />
+                           Margin="0,4,0,0">
+                    <Run Text="{Binding StatusText, Mode=OneWay}" />
+                    <Run Text="{Binding WinnerText, Mode=OneWay}"
+                         Foreground="{DynamicResource Fg.Muted}" />
+                </TextBlock>
                 <TextBlock Text="{Binding BreakdownText}"
                            Style="{StaticResource TextBlock.Subtle}"
                            Margin="0,1,0,0"
@@ -137,7 +152,7 @@
                                               VerticalAlignment="Center"
                                               Margin="0,0,7,0"
                                               Style="{StaticResource FreshIcon}" />
-                    <TextBlock Text="СВЕЖЕЕ"
+                    <TextBlock Text="Свежее"
                                Style="{StaticResource TextBlock.Subtle}"
                                VerticalAlignment="Center"
                                Margin="0,0,7,0" />
@@ -152,20 +167,7 @@
                         VerticalAlignment="Center"
                         Margin="12,0,0,0">
                 <Button Style="{StaticResource Button.Ghost}"
-                        Command="{Binding CycleDirectionCommand}"
-                        MinHeight="{DynamicResource Control.Height.Default}"
-                        MinWidth="0"
-                        Padding="10,6"
-                        Margin="0,0,8,0"
-                        ToolTip="{Binding DirectionTooltip}"
-                        AutomationProperties.Name="Сменить направление">
-                    <iconPacks:PackIconLucide Kind="{Binding DirectionIconKind}"
-                                              Width="15"
-                                              Height="15"
-                                              VerticalAlignment="Center" />
-                </Button>
-                <Button Style="{StaticResource Button.Ghost}"
-                        Command="{Binding DataContext.SyncRowCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                        Command="{Binding DataContext.Batch.SyncRowCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                         CommandParameter="{Binding}"
                         MinHeight="{DynamicResource Control.Height.Default}"
                         Padding="12,6"
@@ -194,6 +196,62 @@
                         <TextBlock Text="Открыть" />
                     </StackPanel>
                 </Button>
+
+                <ToggleButton x:Name="RowMoreToggle"
+                              Style="{StaticResource ToggleButton.Toolbar}"
+                              MinWidth="0"
+                              Padding="9,0"
+                              Margin="8,0,0,0"
+                              VerticalAlignment="Center"
+                              ToolTip="Настройки профиля: участие в пакете, направление, победитель"
+                              AutomationProperties.Name="Настройки профиля">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Ellipsis}"
+                                              Width="15"
+                                              Height="15"
+                                              VerticalAlignment="Center" />
+                </ToggleButton>
+
+                <Popup PlacementTarget="{Binding ElementName=RowMoreToggle}"
+                       Placement="Bottom"
+                       IsOpen="{Binding IsChecked, ElementName=RowMoreToggle, Mode=TwoWay}"
+                       StaysOpen="False"
+                       AllowsTransparency="True"
+                       PopupAnimation="Fade"
+                       HorizontalOffset="-232"
+                       VerticalOffset="4">
+                    <Border Background="{DynamicResource Bg.Surface}"
+                            BorderBrush="{DynamicResource Border.Subtle}"
+                            BorderThickness="1"
+                            CornerRadius="{DynamicResource Radius.M}"
+                            Padding="12"
+                            MinWidth="280">
+                        <StackPanel>
+                            <CheckBox IsChecked="{Binding IncludeInBatch}"
+                                      Content="Участвует в пакетном прогоне"
+                                      ToolTip="{Binding BatchTooltip}" />
+
+                            <TextBlock Text="Направление"
+                                       Style="{StaticResource TextBlock.Subtle}"
+                                       Margin="0,12,0,4" />
+                            <ListBox Style="{StaticResource ListBox.Segmented}"
+                                     ItemsSource="{Binding Modes}"
+                                     SelectedIndex="{Binding SelectedModeIndex}"
+                                     HorizontalAlignment="Stretch"
+                                     AutomationProperties.Name="Направление синхронизации" />
+
+                            <StackPanel Visibility="{Binding WinnerApplicable, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Победитель"
+                                           Style="{StaticResource TextBlock.Subtle}"
+                                           Margin="0,12,0,4" />
+                                <ListBox Style="{StaticResource ListBox.Segmented}"
+                                         ItemsSource="{Binding Winners}"
+                                         SelectedIndex="{Binding SelectedWinnerIndex}"
+                                         HorizontalAlignment="Stretch"
+                                         AutomationProperties.Name="Победитель в двустороннем режиме" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Popup>
             </StackPanel>
         </Grid>
     </Border>

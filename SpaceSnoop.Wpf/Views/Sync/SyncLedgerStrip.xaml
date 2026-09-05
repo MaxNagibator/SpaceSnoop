@@ -2,153 +2,23 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Sync"
-             xmlns:conv="clr-namespace:SpaceSnoop.Wpf.Converters"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
-             d:DataContext="{d:DesignInstance vm:SyncViewModel}"
+             d:DataContext="{d:DesignInstance vm:SyncLedgerViewModel}"
              d:DesignWidth="1040">
 
     <UserControl.Resources>
-        <conv:FractionToWidthConverter x:Key="FractionToWidth" />
-
-        <Style x:Key="TallyValue"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource StatValue}" />
-
-        <Style x:Key="DirTally"
-               TargetType="StackPanel">
-            <Setter Property="Orientation"
-                    Value="Horizontal" />
-            <Setter Property="VerticalAlignment"
-                    Value="Center" />
-            <Setter Property="Margin"
-                    Value="8,0,0,0" />
-        </Style>
-
-        <Style x:Key="DirTallyValue"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource Caption}" />
-
-        <Style x:Key="LedgerStrip"
-               TargetType="Border"
-               BasedOn="{StaticResource Card.Inset}">
-            <Setter Property="Padding"
-                    Value="0" />
-            <Setter Property="MinHeight"
-                    Value="44" />
-            <Setter Property="Visibility"
-                    Value="Collapsed" />
-            <Setter Property="Opacity"
-                    Value="0" />
-            <Setter Property="RenderTransform">
-                <Setter.Value>
-                    <TranslateTransform Y="8" />
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding HasResult}"
-                             Value="True">
-                    <Setter Property="Visibility"
-                            Value="Visible" />
-                    <DataTrigger.EnterActions>
-                        <BeginStoryboard>
-                            <Storyboard>
-                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                 To="1"
-                                                 Duration="0:0:0.24" />
-                                <DoubleAnimation Storyboard.TargetProperty="RenderTransform.(TranslateTransform.Y)"
-                                                 To="0"
-                                                 Duration="0:0:0.30">
-                                    <DoubleAnimation.EasingFunction>
-                                        <CubicEase EasingMode="EaseOut" />
-                                    </DoubleAnimation.EasingFunction>
-                                </DoubleAnimation>
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </DataTrigger.EnterActions>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="CompositionSegment"
-               TargetType="Rectangle">
-            <Setter Property="Height"
-                    Value="8" />
-            <Setter Property="VerticalAlignment"
-                    Value="Center" />
-        </Style>
-
-        <Style x:Key="FreshIcon"
-               TargetType="iconPacks:PackIconLucide">
-            <Setter Property="Foreground"
-                    Value="{DynamicResource Fg.Muted}" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding NewerIsLeft}"
-                             Value="True">
-                    <Setter Property="Foreground"
-                            Value="{DynamicResource State.Success}" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding NewerIsRight}"
-                             Value="True">
-                    <Setter Property="Foreground"
-                            Value="{DynamicResource State.Info}" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="FreshValue"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource TallyValue}">
-            <Setter Property="Foreground"
-                    Value="{DynamicResource Fg.Muted}" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding NewerIsLeft}"
-                             Value="True">
-                    <Setter Property="Foreground"
-                            Value="{DynamicResource State.Success}" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding NewerIsRight}"
-                             Value="True">
-                    <Setter Property="Foreground"
-                            Value="{DynamicResource State.Info}" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="NewerBadge"
-               TargetType="StackPanel">
-            <Setter Property="Orientation"
-                    Value="Horizontal" />
-            <Setter Property="VerticalAlignment"
-                    Value="Center" />
-            <Setter Property="Margin"
-                    Value="20,0,0,0" />
-            <Setter Property="Visibility"
-                    Value="Collapsed" />
-            <Setter Property="Opacity"
-                    Value="0" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding ShowNewerBadge}"
-                             Value="True">
-                    <Setter Property="Visibility"
-                            Value="Visible" />
-                    <DataTrigger.EnterActions>
-                        <BeginStoryboard>
-                            <Storyboard>
-                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                 To="1"
-                                                 Duration="0:0:0.24" />
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </DataTrigger.EnterActions>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/SpaceSnoop.Wpf;component/Views/Sync/SyncLedgerStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource LedgerStrip}"
+    <Border DataContext="{Binding Ledger}"
+            Style="{StaticResource LedgerStrip}"
             Margin="0,0,0,10">
         <Grid>
             <Grid.ColumnDefinitions>
@@ -165,6 +35,49 @@
                        Orientation="Horizontal"
                        VerticalAlignment="Center"
                        Margin="14,8,0,8">
+                <StackPanel Style="{StaticResource PlanVolume}"
+                            ToolTip="{Binding PlanVolumeHint}">
+                    <TextBlock Text="Объём"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <StackPanel Style="{StaticResource PlanCopyPart}">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Copy}"
+                                                  Width="11"
+                                                  Height="11"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,5,0"
+                                                  Foreground="{DynamicResource Accent.Text}" />
+                        <TextBlock Text="{Binding PlanCopyText}"
+                                   Style="{StaticResource TallyValue}" />
+                    </StackPanel>
+                    <StackPanel Style="{StaticResource PlanTrashPart}">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                                  Width="11"
+                                                  Height="11"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,5,0"
+                                                  Foreground="{DynamicResource Fg.Muted}" />
+                        <TextBlock Text="{Binding PlanTrashText}"
+                                   Style="{StaticResource TallyValue}"
+                                   Foreground="{DynamicResource Fg.Muted}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Style="{StaticResource NewerBadge}"
+                            ToolTip="{Binding NewerBadgeTooltip}">
+                    <iconPacks:PackIconLucide Kind="{Binding NewerBadgeIconKind}"
+                                              Width="12"
+                                              Height="12"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,7,0"
+                                              Style="{StaticResource FreshIcon}" />
+                    <TextBlock Text="Свежее"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding NewerBadgeText}"
+                               Style="{StaticResource FreshValue}" />
+                </StackPanel>
+
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center"
                             Margin="0,0,20,0">
@@ -172,8 +85,8 @@
                              Height="8"
                              VerticalAlignment="Center"
                              Margin="0,0,7,0"
-                             Fill="{DynamicResource State.Success}" />
-                    <TextBlock Text="ТОЛЬКО СЛЕВА"
+                             Fill="{DynamicResource Sync.LeftOnly}" />
+                    <TextBlock Text="Только слева"
                                Style="{StaticResource Caption}"
                                Margin="0,0,7,0" />
                     <TextBlock Text="{Binding LeftOnlyCount}"
@@ -210,7 +123,7 @@
                              VerticalAlignment="Center"
                              Margin="0,0,7,0"
                              Fill="{DynamicResource State.Info}" />
-                    <TextBlock Text="ТОЛЬКО СПРАВА"
+                    <TextBlock Text="Только справа"
                                Style="{StaticResource Caption}"
                                Margin="0,0,7,0" />
                     <TextBlock Text="{Binding RightOnlyCount}"
@@ -246,8 +159,8 @@
                              Height="8"
                              VerticalAlignment="Center"
                              Margin="0,0,7,0"
-                             Fill="{DynamicResource State.Warning}" />
-                    <TextBlock Text="ИЗМЕНЕНЫ"
+                             Fill="{DynamicResource Sync.Modified}" />
+                    <TextBlock Text="Изменены"
                                Style="{StaticResource Caption}"
                                Margin="0,0,7,0" />
                     <TextBlock Text="{Binding ModifiedCount}"
@@ -276,15 +189,13 @@
                     </StackPanel>
                 </StackPanel>
 
-                <StackPanel Orientation="Horizontal"
-                            VerticalAlignment="Center"
-                            Margin="0,0,20,0">
+                <StackPanel Style="{StaticResource ConflictTally}">
                     <Ellipse Width="8"
                              Height="8"
                              VerticalAlignment="Center"
                              Margin="0,0,7,0"
                              Fill="{DynamicResource State.Error}" />
-                    <TextBlock Text="КОНФЛИКТЫ"
+                    <TextBlock Text="Конфликты"
                                Style="{StaticResource Caption}"
                                Margin="0,0,7,0" />
                     <TextBlock Text="{Binding ConflictCount}">
@@ -295,7 +206,7 @@
                                     <DataTrigger Binding="{Binding HasConflicts}"
                                                  Value="True">
                                         <Setter Property="Foreground"
-                                                Value="{DynamicResource State.Error}" />
+                                                Value="{DynamicResource State.ErrorText}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -310,11 +221,11 @@
                              VerticalAlignment="Center"
                              Margin="0,0,7,0"
                              Fill="{DynamicResource Border.Strong}" />
-                    <TextBlock Text="ОДИНАКОВЫХ"
+                    <TextBlock Text="Одинаковых"
                                Style="{StaticResource Caption}"
                                Margin="0,0,7,0" />
                     <TextBlock Text="{Binding IdenticalCount}"
-                               Style="{StaticResource TallyValue}"
+                               Style="{StaticResource DirTallyValue}"
                                Foreground="{DynamicResource Fg.Muted}" />
                     <StackPanel>
                         <StackPanel.Style>
@@ -340,29 +251,19 @@
                     </StackPanel>
                 </StackPanel>
 
-                <StackPanel Style="{StaticResource NewerBadge}"
-                            ToolTip="{Binding NewerBadgeTooltip}">
-                    <iconPacks:PackIconLucide Kind="{Binding NewerBadgeIconKind}"
-                                              Width="12"
-                                              Height="12"
-                                              VerticalAlignment="Center"
-                                              Margin="0,0,7,0"
-                                              Style="{StaticResource FreshIcon}" />
-                    <TextBlock Text="СВЕЖЕЕ"
-                               Style="{StaticResource Caption}"
-                               Margin="0,0,7,0" />
-                    <TextBlock Text="{Binding NewerBadgeText}"
-                               Style="{StaticResource FreshValue}" />
-                </StackPanel>
             </WrapPanel>
 
             <StackPanel Grid.Column="2"
                         Orientation="Horizontal"
                         VerticalAlignment="Center"
                         Margin="20,0,14,0"
-                        ToolTip="{Binding CompositionHint}">
-                <TextBlock Text="СОСТАВ"
-                           Style="{StaticResource Caption}"
+                        ToolTip="{Binding CompositionHint}"
+                        Visibility="{Binding HasDifferences, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Text="Различия"
+                           Style="{StaticResource SectionTitle}"
+                           Margin="0,0,7,0" />
+                <TextBlock Text="{Binding DifferingTotal}"
+                           Style="{StaticResource TallyValue}"
                            Margin="0,0,10,0" />
                 <Border x:Name="SyncCompositionTrack"
                         Width="184"
@@ -372,7 +273,7 @@
                         Background="{DynamicResource Bg.SurfaceMute}">
                     <StackPanel Orientation="Horizontal">
                         <Rectangle Style="{StaticResource CompositionSegment}"
-                                   Fill="{DynamicResource State.Success}">
+                                   Fill="{DynamicResource Sync.LeftOnly}">
                             <Rectangle.Width>
                                 <MultiBinding Converter="{StaticResource FractionToWidth}">
                                     <Binding Path="LeftOnlyFraction" />
@@ -392,7 +293,7 @@
                             </Rectangle.Width>
                         </Rectangle>
                         <Rectangle Style="{StaticResource CompositionSegment}"
-                                   Fill="{DynamicResource State.Warning}">
+                                   Fill="{DynamicResource Sync.Modified}">
                             <Rectangle.Width>
                                 <MultiBinding Converter="{StaticResource FractionToWidth}">
                                     <Binding Path="ModifiedFraction" />
@@ -406,16 +307,6 @@
                             <Rectangle.Width>
                                 <MultiBinding Converter="{StaticResource FractionToWidth}">
                                     <Binding Path="ConflictFraction" />
-                                    <Binding Path="ActualWidth"
-                                             ElementName="SyncCompositionTrack" />
-                                </MultiBinding>
-                            </Rectangle.Width>
-                        </Rectangle>
-                        <Rectangle Style="{StaticResource CompositionSegment}"
-                                   Fill="{DynamicResource Border.Strong}">
-                            <Rectangle.Width>
-                                <MultiBinding Converter="{StaticResource FractionToWidth}">
-                                    <Binding Path="IdenticalFraction" />
                                     <Binding Path="ActualWidth"
                                              ElementName="SyncCompositionTrack" />
                                 </MultiBinding>

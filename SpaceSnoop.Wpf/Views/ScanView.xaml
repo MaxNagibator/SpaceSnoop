@@ -23,9 +23,9 @@
         <controls:ScanToolbar Grid.Row="0"
                               Margin="0,0,0,12" />
 
-        <controls:ScanProgressPanel Grid.Row="1" />
+        <controls:ScanProgressPanel Grid.Row="1"
+                                    DataContext="{Binding Progress}" />
 
-        <!--  Плашка отмены: появляется когда сканирование прервано пользователем  -->
         <Border Grid.Row="2"
                 Style="{StaticResource Card.Inset}"
                 Padding="14,10"
@@ -40,7 +40,7 @@
                                           Height="15"
                                           VerticalAlignment="Center"
                                           Margin="0,0,9,0"
-                                          Foreground="{DynamicResource State.Warning}" />
+                                          Foreground="{DynamicResource State.WarningText}" />
                 <TextBlock Text="Сканирование отменено – результаты не построены"
                            VerticalAlignment="Center"
                            FontSize="{DynamicResource Font.Size.S}"
@@ -48,14 +48,29 @@
             </StackPanel>
         </Border>
 
-        <controls:ScanSummaryStrip Grid.Row="3" />
+        <controls:ScanSummaryStrip Grid.Row="3"
+                                   DataContext="{Binding Summary}" />
 
-        <Grid Grid.Row="4">
+        <ScrollViewer Grid.Row="4"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Visibility="{Binding ShowTargetPicker, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+            <controls:ScanTargetPicker HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       MaxWidth="760"
+                                       Margin="0,20" />
+        </ScrollViewer>
+
+        <Grid Grid.Row="4"
+              x:Name="ContentArea"
+              SizeChanged="OnContentAreaSizeChanged"
+              Visibility="{Binding ShowScanResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Visible}">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"
-                                  MinWidth="340" />
+                <ColumnDefinition x:Name="StructureColumn"
+                                  Width="*"
+                                  MinWidth="260" />
                 <ColumnDefinition x:Name="SplitterColumn"
-                                  Width="6" />
+                                  Width="Auto" />
                 <ColumnDefinition x:Name="InspectorColumn"
                                   Width="380"
                                   MinWidth="280" />
@@ -65,13 +80,10 @@
 
             <GridSplitter Grid.Column="1"
                           x:Name="InspectorSplitter"
-                          Width="6"
-                          HorizontalAlignment="Stretch"
-                          VerticalAlignment="Stretch"
                           ResizeBehavior="PreviousAndNext"
                           ResizeDirection="Columns"
-                          Background="{DynamicResource Border.Subtle}"
                           ShowsPreview="False"
+                          AutomationProperties.Name="Ширина панели деталей"
                           DragCompleted="OnInspectorSplitterDragCompleted"
                           ToolTip="Перетащите, чтобы изменить ширину панели"
                           Visibility="{Binding Inspector.IsInspectorCollapsed, Converter={StaticResource InverseBoolToVisibility}}" />

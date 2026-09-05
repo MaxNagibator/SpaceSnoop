@@ -6,7 +6,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
-             d:DataContext="{d:DesignInstance vm:ScanViewModel}"
+             d:DataContext="{d:DesignInstance vm:ScanProgressViewModel}"
              d:DesignWidth="980">
     <Border Style="{StaticResource Card.Inset}"
             Padding="15,12"
@@ -29,24 +29,39 @@
                              VerticalAlignment="Center"
                              Margin="0,0,9,0"
                              Fill="{DynamicResource Accent.Primary}">
-                        <Ellipse.Triggers>
-                            <EventTrigger RoutedEvent="Ellipse.Loaded">
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                         From="1"
-                                                         To="0.25"
-                                                         Duration="0:0:0.75"
-                                                         AutoReverse="True"
-                                                         RepeatBehavior="Forever" />
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </EventTrigger>
-                        </Ellipse.Triggers>
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsScanning}"
+                                                       Value="True" />
+                                            <Condition Binding="{Binding Enabled, Source={x:Static behaviors:SystemAnimations.Current}}"
+                                                       Value="True" />
+                                        </MultiDataTrigger.Conditions>
+                                        <MultiDataTrigger.EnterActions>
+                                            <BeginStoryboard x:Name="ScanPulseBeat">
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                     From="1"
+                                                                     To="0.25"
+                                                                     Duration="0:0:0.75"
+                                                                     AutoReverse="True"
+                                                                     RepeatBehavior="Forever" />
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </MultiDataTrigger.EnterActions>
+                                        <MultiDataTrigger.ExitActions>
+                                            <StopStoryboard BeginStoryboardName="ScanPulseBeat" />
+                                        </MultiDataTrigger.ExitActions>
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
                     </Ellipse>
-                    <TextBlock Text="СКАНИРОВАНИЕ"
+                    <TextBlock Text="Сканирование"
                                Style="{StaticResource Caption}"
-                               Foreground="{DynamicResource Accent.Primary}" />
+                               Foreground="{DynamicResource Accent.Text}" />
                 </StackPanel>
 
                 <TextBlock Grid.Column="1"
@@ -62,7 +77,8 @@
                 <TextBlock Grid.Column="2"
                            Text="{Binding ScanElapsedText}"
                            Style="{StaticResource StatValue}"
-                           Foreground="{DynamicResource Accent.Primary}" />
+                           MinWidth="64"
+                           TextAlignment="Right" />
             </Grid>
 
             <Grid Margin="0,11,0,0">
@@ -83,53 +99,78 @@
                            Margin="10,0,0,0"
                            TextAlignment="Right"
                            VerticalAlignment="Center"
-                           FontFamily="{DynamicResource Font.Mono}"
                            FontSize="{DynamicResource Font.Size.S}"
                            FontWeight="Medium"
-                           Foreground="{DynamicResource Accent.Primary}"
+                           Typography.NumeralAlignment="Tabular"
+                           Foreground="{DynamicResource Fg.Secondary}"
                            Visibility="{Binding ScanHasDeterminateProgress, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
             </Grid>
 
-            <StackPanel Orientation="Horizontal"
-                        Margin="0,11,0,0"
-                        VerticalAlignment="Center">
-                <TextBlock Text="КАТАЛОГОВ"
-                           Style="{StaticResource Caption}"
-                           Margin="0,0,7,0" />
-                <TextBlock Text="{Binding ScanDirCountText}"
-                           Style="{StaticResource StatValue}"
-                           Margin="0,0,18,0" />
+            <WrapPanel Margin="0,7,0,0">
+                <WrapPanel.Resources>
+                    <Style x:Key="Metric"
+                           TargetType="StackPanel">
+                        <Setter Property="Orientation"
+                                Value="Horizontal" />
+                        <Setter Property="Margin"
+                                Value="0,4,18,0" />
+                    </Style>
+                </WrapPanel.Resources>
 
-                <TextBlock Text="ФАЙЛОВ"
-                           Style="{StaticResource Caption}"
-                           Margin="0,0,7,0" />
-                <TextBlock Text="{Binding ScanFileCountText}"
-                           Style="{StaticResource StatValue}"
-                           Margin="0,0,18,0" />
+                <StackPanel Style="{StaticResource Metric}">
+                    <TextBlock Text="Объём"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ScanBytesText}"
+                               Style="{StaticResource StatValue.Lead}"
+                               ToolTip="Логический объём учтённых файлов" />
+                </StackPanel>
 
-                <TextBlock Text="ОБЪЁМ"
-                           Style="{StaticResource Caption}"
-                           Margin="0,0,7,0" />
-                <TextBlock Text="{Binding ScanBytesText}"
-                           Style="{StaticResource StatValue}"
-                           Foreground="{DynamicResource Accent.Primary}"
-                           Margin="0,0,18,0" />
+                <StackPanel Style="{StaticResource Metric}">
+                    <TextBlock Text="Каталогов"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ScanDirCountText}"
+                               Style="{StaticResource StatValue}" />
+                </StackPanel>
 
-                <TextBlock Text="СКОРОСТЬ"
-                           Style="{StaticResource Caption}"
-                           Margin="0,0,7,0" />
-                <TextBlock Text="{Binding ScanThroughputText}"
-                           Style="{StaticResource StatValue}"
-                           Margin="0,0,18,0" />
+                <StackPanel Style="{StaticResource Metric}">
+                    <TextBlock Text="Файлов"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ScanFileCountText}"
+                               Style="{StaticResource StatValue}" />
+                </StackPanel>
 
-                <TextBlock Text="ВЕТКИ"
-                           Style="{StaticResource Caption}"
-                           Margin="0,0,7,0"
-                           Visibility="{Binding ScanHasBranches, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
-                <TextBlock Text="{Binding ScanTopLevelText}"
-                           Style="{StaticResource StatValue}"
-                           Visibility="{Binding ScanHasBranches, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
-            </StackPanel>
+                <StackPanel Style="{StaticResource Metric}">
+                    <TextBlock Text="Скорость"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ScanThroughputText}"
+                               Style="{StaticResource StatValue.Aside}"
+                               ToolTip="Скорость обхода: сколько файлов в секунду учитывает скан" />
+                </StackPanel>
+
+                <StackPanel Style="{StaticResource Metric}"
+                            Visibility="{Binding ScanHasRemaining, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                    <TextBlock Text="Осталось"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ScanRemainingText}"
+                               Style="{StaticResource StatValue.Aside}"
+                               ToolTip="Оценка по средней скорости от начала сканирования" />
+                </StackPanel>
+
+                <StackPanel Style="{StaticResource Metric}"
+                            Visibility="{Binding ScanHasBranches, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                    <TextBlock Text="Верхний уровень"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ScanTopLevelText}"
+                               Style="{StaticResource StatValue.Aside}"
+                               ToolTip="Сколько каталогов верхнего уровня уже обойдено" />
+                </StackPanel>
+            </WrapPanel>
         </StackPanel>
     </Border>
 </UserControl>

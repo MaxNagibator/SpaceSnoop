@@ -5,7 +5,7 @@ namespace SpaceSnoop.Wpf.ViewModels.Overview;
 public sealed partial class OverviewRowViewModel : ObservableObject
 {
     private readonly Action<SyncProfile, ComparisonResult?> _openInSync;
-    private readonly Action _onDirectionChanged;
+    private readonly Action _persist;
 
     private FreshnessSummary _freshness;
 
@@ -43,18 +43,26 @@ public sealed partial class OverviewRowViewModel : ObservableObject
     private int _syncDeleted;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(StatusText), nameof(StatusIconKind), nameof(SyncHadErrors))]
+    [NotifyPropertyChangedFor(nameof(StatusText), nameof(StatusIconKind), nameof(SyncHadErrors), nameof(IsUnchanged), nameof(GroupOrder), nameof(GroupKey))]
     private int _syncErrors;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatusText), nameof(StatusIconKind), nameof(SyncHadErrors), nameof(SyncNotConverged), nameof(IsUnchanged), nameof(GroupOrder), nameof(GroupKey))]
+    private int _syncMismatches;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatusText), nameof(StatusIconKind), nameof(SyncHadErrors), nameof(SyncNotConverged), nameof(IsUnchanged), nameof(GroupOrder), nameof(GroupKey))]
+    private SyncVerifyState _syncVerify;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StatusText))]
     private string? _error;
 
-    public OverviewRowViewModel(SyncProfile profile, Action<SyncProfile, ComparisonResult?> openInSync, Action onDirectionChanged)
+    public OverviewRowViewModel(SyncProfile profile, Action<SyncProfile, ComparisonResult?> openInSync, Action persist)
     {
         Profile = profile;
         _openInSync = openInSync;
-        _onDirectionChanged = onDirectionChanged;
+        _persist = persist;
     }
 
     public SyncProfile Profile { get; }
@@ -66,6 +74,67 @@ public sealed partial class OverviewRowViewModel : ObservableObject
     public string Left => Profile.Left;
 
     public string Right => Profile.Right;
+
+    public bool IncludeInBatch
+    {
+        get => !Profile.SkipInBatch;
+        set
+        {
+            if (value == IncludeInBatch)
+            {
+                return;
+            }
+
+            Profile.SkipInBatch = !value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(BatchTooltip));
+            _persist();
+        }
+    }
+
+    public string BatchTooltip => IncludeInBatch
+        ? "Профиль участвует в «Сравнить все» и «Синхронизировать всё». Клик – исключить из пакета."
+        : "Профиль исключён из пакетных операций. Клик – вернуть в пакет.";
+
+    public IReadOnlyList<SegmentOption> Modes => SyncOptions.Modes;
+
+    public IReadOnlyList<SegmentOption> Winners => SyncOptions.Winners;
+
+    public int SelectedModeIndex
+    {
+        get => Math.Clamp(Profile.Mode, 0, SyncOptions.Modes.Count - 1);
+        set
+        {
+            if (value < 0 || value == Profile.Mode)
+            {
+                return;
+            }
+
+            Profile.Mode = value;
+            OnPropertyChanged();
+            AdvanceDirectionChanged();
+            _persist();
+        }
+    }
+
+    public int SelectedWinnerIndex
+    {
+        get => SyncProfile.IndexOfWinner(Profile.Winner);
+        set
+        {
+            var winner = SyncProfile.WinnerFromIndex(value);
+
+            if (value < 0 || winner == Profile.Winner)
+            {
+                return;
+            }
+
+            Profile.Winner = winner;
+            OnPropertyChanged();
+            AdvanceWinnerChanged();
+            _persist();
+        }
+    }
 
     public PackIconLucideKind DirectionIconKind => Profile.Mode switch
     {
@@ -88,11 +157,36 @@ public sealed partial class OverviewRowViewModel : ObservableObject
         _ => "Направление: слева направо. Клик – сменить.",
     };
 
+    public bool WinnerApplicable => Profile.Mode == 2;
+
+    public PackIconLucideKind WinnerIconKind => Profile.Winner switch
+    {
+        SyncWinner.Left => PackIconLucideKind.ArrowLeftToLine,
+        SyncWinner.Right => PackIconLucideKind.ArrowRightToLine,
+        _ => PackIconLucideKind.Clock,
+    };
+
+    public string WinnerTooltip => Profile.Winner switch
+    {
+        SyncWinner.Left => "Победитель: слева. Клик – сменить.",
+        SyncWinner.Right => "Победитель: справа. Клик – сменить.",
+        _ => "Победитель: новее по дате. Клик – сменить.",
+    };
+
+    public string WinnerText => !WinnerApplicable
+        ? string.Empty
+        : Profile.Winner switch
+        {
+            SyncWinner.Left => " · победитель слева",
+            SyncWinner.Right => " · победитель справа",
+            _ => " · побеждает свежее",
+        };
+
     public int DiffCount => LeftOnlyCount + RightOnlyCount + ModifiedCount + ConflictCount;
 
     public bool IsUnchanged =>
         Status == OverviewRunStatus.Compared && DiffCount == 0
-        || Status == OverviewRunStatus.Synced && SyncErrors == 0 && SyncCopied == 0 && SyncDeleted == 0;
+        || Status == OverviewRunStatus.Synced && SyncErrors == 0 && SyncCopied == 0 && SyncDeleted == 0 && !SyncNotConverged;
 
     public int GroupOrder => IsUnchanged ? 1 : 0;
 
@@ -106,11 +200,21 @@ public sealed partial class OverviewRowViewModel : ObservableObject
         _ => null,
     };
 
-    public int FreshnessSkew => _freshness.LeftNewer - _freshness.RightNewer;
+    public int FreshnessOrder => _freshness.Verdict switch
+    {
+        NewerSide.Left => 0,
+        NewerSide.Right => 1,
+        NewerSide.Tie => 2,
+        _ => 3,
+    };
+
+    public double FreshnessLead => _freshness.LeadSeconds;
 
     public bool HasCounts => Status == OverviewRunStatus.Compared;
 
-    public bool SyncHadErrors => Status == OverviewRunStatus.Synced && SyncErrors > 0;
+    public bool SyncNotConverged => SyncMismatches > 0 || SyncVerify == SyncVerifyState.Interrupted;
+
+    public bool SyncHadErrors => Status == OverviewRunStatus.Synced && (SyncErrors > 0 || SyncNotConverged);
 
     public bool ShowNewerBadge => Status == OverviewRunStatus.Compared && _freshness.Verdict != NewerSide.None;
 
@@ -127,9 +231,9 @@ public sealed partial class OverviewRowViewModel : ObservableObject
 
     public string NewerBadgeText => _freshness.Verdict switch
     {
-        NewerSide.Left => "СЛЕВА",
-        NewerSide.Right => "СПРАВА",
-        NewerSide.Tie => "ПОРОВНУ",
+        NewerSide.Left => "Слева",
+        NewerSide.Right => "Справа",
+        NewerSide.Tie => "Поровну",
         _ => string.Empty,
     };
 
@@ -151,6 +255,7 @@ public sealed partial class OverviewRowViewModel : ObservableObject
         OverviewRunStatus.Synced => SyncSummary(),
         OverviewRunStatus.Unavailable => "Каталог недоступен",
         OverviewRunStatus.Overlap => "Пути пересекаются или вложены",
+        OverviewRunStatus.Skipped => Error ?? "Пропущено",
         OverviewRunStatus.Error => Error ?? "Ошибка",
         _ => "Не сравнивалось",
     };
@@ -160,9 +265,10 @@ public sealed partial class OverviewRowViewModel : ObservableObject
         OverviewRunStatus.Comparing => PackIconLucideKind.Loader,
         OverviewRunStatus.Compared => DiffCount == 0 ? PackIconLucideKind.Check : PackIconLucideKind.GitCompareArrows,
         OverviewRunStatus.Syncing => PackIconLucideKind.RefreshCw,
-        OverviewRunStatus.Synced => SyncErrors > 0 ? PackIconLucideKind.TriangleAlert : PackIconLucideKind.FolderCheck,
+        OverviewRunStatus.Synced => SyncHadErrors ? PackIconLucideKind.TriangleAlert : PackIconLucideKind.FolderCheck,
         OverviewRunStatus.Unavailable => PackIconLucideKind.FolderX,
         OverviewRunStatus.Overlap => PackIconLucideKind.TriangleAlert,
+        OverviewRunStatus.Skipped => PackIconLucideKind.SkipForward,
         OverviewRunStatus.Error => PackIconLucideKind.CircleX,
         _ => PackIconLucideKind.Minus,
     };
@@ -187,11 +293,13 @@ public sealed partial class OverviewRowViewModel : ObservableObject
         OnPropertyChanged(nameof(BreakdownText));
     }
 
-    public void ApplySyncReport(SyncReport report)
+    public void ApplySyncReport(SyncReport report, SyncVerifyState verify)
     {
         SyncCopied = report.CopiedCount;
         SyncDeleted = report.DeletedCount;
         SyncErrors = report.Errors.Count;
+        SyncMismatches = report.Mismatches.Count;
+        SyncVerify = verify;
         Status = OverviewRunStatus.Synced;
     }
 
@@ -206,15 +314,31 @@ public sealed partial class OverviewRowViewModel : ObservableObject
         OnPropertyChanged(nameof(NewerIsLeft));
         OnPropertyChanged(nameof(NewerIsRight));
         OnPropertyChanged(nameof(NewestModified));
-        OnPropertyChanged(nameof(FreshnessSkew));
+        OnPropertyChanged(nameof(FreshnessOrder));
+        OnPropertyChanged(nameof(FreshnessLead));
     }
 
     internal void AdvanceDirection()
     {
-        Profile.Mode = (Profile.Mode + 1) % 3;
+        Profile.Mode = (Profile.Mode + 1) % SyncOptions.Modes.Count;
+        OnPropertyChanged(nameof(SelectedModeIndex));
+        AdvanceDirectionChanged();
+    }
+
+    private void AdvanceDirectionChanged()
+    {
         OnPropertyChanged(nameof(DirectionIconKind));
         OnPropertyChanged(nameof(DirectionArrow));
         OnPropertyChanged(nameof(DirectionTooltip));
+        OnPropertyChanged(nameof(WinnerApplicable));
+        OnPropertyChanged(nameof(WinnerText));
+    }
+
+    private void AdvanceWinnerChanged()
+    {
+        OnPropertyChanged(nameof(WinnerIconKind));
+        OnPropertyChanged(nameof(WinnerTooltip));
+        OnPropertyChanged(nameof(WinnerText));
     }
 
     private static string FormatStamp(DateTime? value)
@@ -241,6 +365,16 @@ public sealed partial class OverviewRowViewModel : ObservableObject
             parts.Add($"ошибок {SyncErrors}");
         }
 
+        if (SyncMismatches > 0)
+        {
+            parts.Add($"расхождений {SyncMismatches}");
+        }
+
+        if (SyncVerify == SyncVerifyState.Interrupted)
+        {
+            parts.Add("проверка прервана");
+        }
+
         return parts.Count > 0 ? $"Синхронизировано: {string.Join(" · ", parts)}" : "Синхронизировано: изменений не потребовалось";
     }
 
@@ -250,10 +384,4 @@ public sealed partial class OverviewRowViewModel : ObservableObject
         _openInSync(Profile, Status == OverviewRunStatus.Compared ? Comparison : null);
     }
 
-    [RelayCommand]
-    private void CycleDirection()
-    {
-        AdvanceDirection();
-        _onDirectionChanged();
-    }
 }

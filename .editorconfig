@@ -13,6 +13,10 @@ charset = utf-8-bom
 end_of_line = crlf
 insert_final_newline = true
 
+[*.sh]
+charset = utf-8
+end_of_line = lf
+
 [*.{yml,json,props,csproj}]
 indent_size = 2
 indent_style = space

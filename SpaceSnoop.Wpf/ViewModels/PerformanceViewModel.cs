@@ -1,0 +1,277 @@
+﻿using KeepShell.Services;
+using System.Collections.Immutable;
+using System.IO;
+
+namespace SpaceSnoop.Wpf.ViewModels;
+
+public sealed partial class PerformanceViewModel : ObservableObject, IPageHeader
+{
+    private readonly PerformanceMonitor _monitor;
+
+    private readonly PerformanceRunTracker _runs;
+
+    private readonly ToastNotifier _notifier;
+
+    private readonly IClipboardService _clipboard;
+
+    private readonly DiagnosticsCollector _diagnostics;
+
+    private readonly IDialogService _dialogs;
+
+    private readonly IShellLauncher _shell;
+
+    private readonly ILogger<PerformanceViewModel> _logger;
+
+    private bool _active;
+
+    private IDisposable? _frames;
+
+    [ObservableProperty]
+    private string _delayText = string.Empty;
+
+    [ObservableProperty]
+    private string _delayHint = string.Empty;
+
+    [ObservableProperty]
+    private bool _isHitch;
+
+    [ObservableProperty]
+    private string _memoryText = string.Empty;
+
+    [ObservableProperty]
+    private string _memoryHint = string.Empty;
+
+    [ObservableProperty]
+    private string _memoryPeakText = string.Empty;
+
+    [ObservableProperty]
+    private string _collectionsText = string.Empty;
+
+    [ObservableProperty]
+    private string _collectionsWindowText = string.Empty;
+
+    [ObservableProperty]
+    private string _startupText = string.Empty;
+
+    [ObservableProperty]
+    private string _startupHint = string.Empty;
+
+    [ObservableProperty]
+    private string _frameText = string.Empty;
+
+    [ObservableProperty]
+    private string _frameHint = string.Empty;
+
+    [ObservableProperty]
+    private bool _isFrameSlow;
+
+    [ObservableProperty]
+    private string _windowText = string.Empty;
+
+    [ObservableProperty]
+    private string? _staleText;
+
+    [ObservableProperty]
+    private string _operationCaption = string.Empty;
+
+    [ObservableProperty]
+    private string _operationText = string.Empty;
+
+    [ObservableProperty]
+    private string _operationVolume = string.Empty;
+
+    [ObservableProperty]
+    private string _operationRate = string.Empty;
+
+    [ObservableProperty]
+    private string? _operationTraversal;
+
+    [ObservableProperty]
+    private string? _operationTraversalDetail;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasHitches))]
+    private ImmutableArray<PerformanceHitchText> _hitches = [];
+
+    [ObservableProperty]
+    private string _hitchesCaption = string.Empty;
+
+    public PerformanceViewModel(
+        PerformanceMonitor monitor,
+        PerformanceRunTracker runs,
+        PerformanceChartViewModel chart,
+        ShellPreferences preferences,
+        ToastNotifier notifier,
+        IClipboardService clipboard,
+        DiagnosticsCollector diagnostics,
+        IDialogService dialogs,
+        IShellLauncher shell,
+        ILogger<PerformanceViewModel> logger)
+    {
+        _monitor = monitor;
+        _runs = runs;
+        _notifier = notifier;
+        _clipboard = clipboard;
+        _diagnostics = diagnostics;
+        _dialogs = dialogs;
+        _shell = shell;
+        _logger = logger;
+
+        Chart = chart;
+        Chart.ChartHeight = AppDefaults.PerformanceChartPageHeight;
+        Chart.Refreshed += OnChartRefreshed;
+        Preferences = preferences;
+
+        _monitor.Updated += OnMonitorUpdated;
+        _runs.Changed += OnRunsChanged;
+        Apply(_monitor.Snapshot);
+        ApplyHitches();
+    }
+
+    public PerformanceChartViewModel Chart { get; }
+
+    public ShellPreferences Preferences { get; }
+
+    public bool HasHitches => Hitches.Length > 0;
+
+    public string HitchesHint => PerformanceFormat.HitchesHint;
+
+    public string PageTitle => "Производительность";
+
+    public string? PageDescription =>
+        $"Задержка UI-потока, память и сборки мусора. Замеры живут {AppDefaults.PerformanceHistorySecondsMax / 60} мин, окно графика выбирается полосой, просадка – от {AppDefaults.PerformanceHitchMs} мс.";
+
+    public void SetActive(bool active)
+    {
+        _active = active;
+        Chart.SetActive(active);
+
+        if (!active)
+        {
+            _frames?.Dispose();
+            _frames = null;
+            return;
+        }
+
+        _monitor.Start();
+        _frames ??= _monitor.WatchFrames();
+        Apply(_monitor.Snapshot);
+    }
+
+    [RelayCommand]
+    private void Reset()
+    {
+        _monitor.Reset();
+        _runs.Clear();
+        Apply(_monitor.Snapshot);
+        Chart.Refresh();
+        _notifier.Notify("Замеры производительности сброшены");
+    }
+
+    [RelayCommand]
+    private void CopySummary()
+    {
+        if (_clipboard.TrySetText(PerformanceReport.Build(_monitor.Snapshot, AppInfo.Version, _runs.Last)))
+        {
+            _notifier.Notify("Сводка скопирована в буфер обмена");
+        }
+        else
+        {
+            _notifier.Notify("Не удалось скопировать сводку", StatusSeverity.Warning);
+        }
+    }
+
+    [RelayCommand]
+    private void SaveDiagnostics()
+    {
+        try
+        {
+            var rawPaths = Preferences.DiagnosticsRawPaths;
+            var entries = _diagnostics.Build(rawPaths);
+
+            if (!_dialogs.Confirm("Пакет диагностики", DiagnosticsBundle.Describe(entries, !rawPaths) + Environment.NewLine + Environment.NewLine + "Сохранить пакет?"))
+            {
+                return;
+            }
+
+            var path = _diagnostics.Save(entries);
+
+            _logger.DiagnosticsBundleSaved(path, entries.Count, rawPaths ? "как есть" : "обезличены");
+            _notifier.Notify("Пакет диагностики сохранён");
+            _shell.Reveal(path);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            _logger.DiagnosticsBundleFailed(exception);
+            _notifier.Notify("Не удалось собрать пакет диагностики", StatusSeverity.Warning);
+        }
+    }
+
+    private void OnMonitorUpdated(object? sender, EventArgs e)
+    {
+        if (_active)
+        {
+            Apply(_monitor.Snapshot);
+        }
+    }
+
+    private void OnChartRefreshed(object? sender, EventArgs e)
+    {
+        StaleText = PerformanceFormat.StaleWarning(_monitor.Snapshot, DateTime.UtcNow);
+        ApplyHitches();
+    }
+
+    private void ApplyHitches()
+    {
+        var hitches = _monitor.CaptureHitches(AppDefaults.PerformanceHitchMs, AppDefaults.PerformanceHitchRowsMax);
+        var rows = ImmutableArray.CreateRange(hitches.Rows, PerformanceFormat.HitchText);
+
+        if (!Hitches.AsSpan().SequenceEqual(rows.AsSpan()))
+        {
+            Hitches = rows;
+        }
+
+        HitchesCaption = PerformanceFormat.HitchesCaption(hitches);
+    }
+
+    private void OnRunsChanged(object? sender, EventArgs e)
+    {
+        ApplyOperation(_monitor.Snapshot.Operation);
+    }
+
+    private void Apply(PerformanceSnapshot snapshot)
+    {
+        DelayText = PerformanceFormat.TileDelay(snapshot);
+        DelayHint = PerformanceFormat.TileDelayHint(snapshot);
+        IsHitch = snapshot.UiPeakMs >= AppDefaults.PerformanceHitchMs;
+
+        MemoryText = PerformanceFormat.TileMemory(snapshot);
+        MemoryHint = PerformanceFormat.TileMemoryHint(snapshot);
+        MemoryPeakText = PerformanceFormat.TileMemoryPeak(snapshot);
+
+        CollectionsText = PerformanceFormat.TileCollections(snapshot);
+        CollectionsWindowText = PerformanceFormat.TileCollectionsWindow(snapshot);
+        StartupText = PerformanceFormat.TileStartup(snapshot);
+        StartupHint = PerformanceFormat.TileStartupHint(snapshot);
+
+        FrameText = PerformanceFormat.TileFrame(snapshot);
+        FrameHint = PerformanceFormat.TileFrameHint(snapshot);
+        IsFrameSlow = snapshot.SlowFrameCount > 0;
+        WindowText = PerformanceFormat.TileWindow(snapshot);
+        StaleText = PerformanceFormat.StaleWarning(snapshot, DateTime.UtcNow);
+
+        ApplyOperation(snapshot.Operation);
+    }
+
+    private void ApplyOperation(PerformanceOperation? current)
+    {
+        var tile = PerformanceFormat.TileOperation(current, _runs.Last);
+
+        OperationCaption = tile.Caption;
+        OperationText = tile.Value;
+        OperationVolume = tile.Volume;
+        OperationRate = tile.Rate;
+        OperationTraversal = tile.Traversal;
+        OperationTraversalDetail = tile.TraversalDetail;
+    }
+}

@@ -1,4 +1,4 @@
-namespace SpaceSnoop.Core.Domain;
+﻿namespace SpaceSnoop.Core.Domain;
 
 public class FileComparison(string name, string relativePath)
 {
@@ -6,6 +6,9 @@ public class FileComparison(string name, string relativePath)
     public string RelativePath { get; } = relativePath;
     public ComparisonStatus Status { get; set; }
     public SyncAction Action { get; set; }
+    public FileTypeConflict TypeConflict { get; set; }
+    public bool DeleteLeftBlocked { get; set; }
+    public bool DeleteRightBlocked { get; set; }
 
     public long? LeftSize { get; set; }
     public long? RightSize { get; set; }

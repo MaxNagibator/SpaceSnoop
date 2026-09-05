@@ -1,128 +1,74 @@
 ﻿using KeepShell.Services;
-using Microsoft.Win32;
+
+using MahApps.Metro.IconPacks;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Windows.Input;
-using System.Windows.Threading;
 
 namespace SpaceSnoop.Wpf.ViewModels.Scan;
 
 public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPageStatus
 {
-    private static readonly TimeSpan ProgressPollInterval = TimeSpan.FromMilliseconds(120);
-
-    private readonly DiskSpaceCalculator _calculator;
+    private readonly ScanRunner _runner;
     private readonly IDialogService _dialogs;
     private readonly ISettingsStore _settings;
-    private readonly OperationPreferences _operations;
     private readonly ScanNodeFactory _nodeFactory;
-    private readonly DeleteProgressDialogFactory _deleteDialogFactory;
-    private readonly ArchiveProgressDialogFactory _archiveDialogFactory;
+    private readonly ScanArchiveViewModel _archive;
     private readonly ILogger<ScanViewModel> _logger;
     private readonly ToastNotifier _notifier;
-    private readonly DispatcherTimer _progressTimer;
-
-    private readonly ScanSortState _sortState = new();
-    private readonly List<ScanNodeViewModel> _treemapPath = [];
+    private readonly PerformanceRunTracker _runs;
+    private readonly IFilePicker _filePicker;
+    private readonly IAppNavigator _navigator;
 
     private CancellationTokenSource? _cts;
     private bool _suppressPersist;
     private ScanNodeViewModel? _highlighted;
 
-    private ScanProgress? _progress;
-    private Stopwatch? _scanStopwatch;
-    private double? _progressFraction;
-    private long? _estimatedTotalBytes;
-    private long _rootTotalSize;
-
     [ObservableProperty]
     private string _selectedDrive = string.Empty;
 
     [ObservableProperty]
-    private ScanSortOption? _selectedSortOption;
-
-    [ObservableProperty]
-    private bool _invertSort = AppDefaults.ScanSortInvertDefault;
-
-    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsBusy))]
+    [NotifyPropertyChangedFor(nameof(ShowTargetPicker))]
+    [NotifyPropertyChangedFor(nameof(ShowScanResult))]
+    [NotifyPropertyChangedFor(nameof(ShowScanningState))]
+    [NotifyCanExecuteChangedFor(nameof(OpenPickerCommand))]
     [NotifyCanExecuteChangedFor(nameof(StartCommand))]
     [NotifyCanExecuteChangedFor(nameof(BrowseCommand))]
     [NotifyCanExecuteChangedFor(nameof(StopCommand))]
-    [NotifyCanExecuteChangedFor(nameof(DeleteMarkedCommand))]
     private bool _isScanning;
 
     [ObservableProperty]
     private string? _statusCaption;
 
     [ObservableProperty]
+    private string _scanTargetPath = string.Empty;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TreeVisible))]
     [NotifyPropertyChangedFor(nameof(TreemapVisible))]
+    [NotifyPropertyChangedFor(nameof(DuplicatesVisible))]
+    [NotifyPropertyChangedFor(nameof(ShowTargetPicker))]
+    [NotifyPropertyChangedFor(nameof(ShowScanResult))]
+    [NotifyPropertyChangedFor(nameof(ShowScanningState))]
+    [NotifyCanExecuteChangedFor(nameof(OpenPickerCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ClosePickerCommand))]
     private bool _hasResult;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowTargetPicker))]
+    [NotifyPropertyChangedFor(nameof(ShowScanResult))]
+    [NotifyCanExecuteChangedFor(nameof(OpenPickerCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ClosePickerCommand))]
+    private bool _isPickerOpen;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TreeVisible))]
     [NotifyPropertyChangedFor(nameof(TreemapVisible))]
-    private bool _showTreemap = AppDefaults.ScanTreemapDefault;
-
-    [ObservableProperty]
-    private ScanNodeViewModel? _treemapRoot;
-
-    [ObservableProperty]
-    private bool _hasTreemapTiles;
-
-    [ObservableProperty]
-    private bool _treemapTruncated;
-
-    [ObservableProperty]
-    private string _treemapTruncatedText = string.Empty;
-
-    [ObservableProperty]
-    private string _resultPath = string.Empty;
-
-    [ObservableProperty]
-    private string _resultSizeText = "–";
-
-    [ObservableProperty]
-    private string _resultFileCountText = "–";
-
-    [ObservableProperty]
-    private string _resultDirCountText = "–";
-
-    [ObservableProperty]
-    private string _resultElapsedText = "–";
-
-    [ObservableProperty]
-    private string _scanCurrentPath = string.Empty;
-
-    [ObservableProperty]
-    private string _scanDirCountText = "0";
-
-    [ObservableProperty]
-    private string _scanFileCountText = "0";
-
-    [ObservableProperty]
-    private string _scanBytesText = "0 байт";
-
-    [ObservableProperty]
-    private string _scanElapsedText = "0,0 с";
-
-    [ObservableProperty]
-    private string _scanThroughputText = "–";
-
-    [ObservableProperty]
-    private string _scanTopLevelText = string.Empty;
-
-    [ObservableProperty]
-    private bool _scanHasBranches;
-
-    [ObservableProperty]
-    private bool _scanHasDeterminateProgress;
-
-    [ObservableProperty]
-    private string _scanPercentText = string.Empty;
+    [NotifyPropertyChangedFor(nameof(DuplicatesVisible))]
+    private int _selectedViewIndex;
 
     [ObservableProperty]
     private ScanNodeViewModel? _selectedNode;
@@ -130,13 +76,8 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     [ObservableProperty]
     private bool _scanWasCancelled;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasMarked))]
-    [NotifyCanExecuteChangedFor(nameof(DeleteMarkedCommand))]
-    private int _markedCount;
-
     public ScanViewModel(
-        DiskSpaceCalculator calculator,
+        ScanRunner runner,
         IDialogService dialogs,
         ISettingsStore settings,
         OperationPreferences operations,
@@ -145,57 +86,100 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         ScanNodeFactory nodeFactory,
         DeleteProgressDialogFactory deleteDialogFactory,
         ArchiveProgressDialogFactory archiveDialogFactory,
+        DuplicateProgressDialogFactory duplicateDialogFactory,
         ILogger<ScanViewModel> logger,
-        ToastNotifier notifier)
+        ToastNotifier notifier,
+        PerformanceMonitor performance,
+        PerformanceRunTracker runs,
+        IFilePicker filePicker,
+        IUiDispatcher uiDispatcher,
+        IAppNavigator navigator)
     {
-        _calculator = calculator;
+        _navigator = navigator;
+        _runner = runner;
+        _runs = runs;
         _dialogs = dialogs;
         _settings = settings;
-        _operations = operations;
         _nodeFactory = nodeFactory;
-        _deleteDialogFactory = deleteDialogFactory;
-        _archiveDialogFactory = archiveDialogFactory;
         _logger = logger;
         _notifier = notifier;
+        _filePicker = filePicker;
 
         Inspector = inspector;
         Preferences = preferences;
         Preferences.PropertyChanged += OnPreferencesChanged;
         Inspector.Intensity = Preferences.Intensity;
 
-        _nodeFactory.MarksChanged += RecountMarked;
-        _nodeFactory.ArchiveRequested += OnArchiveRequested;
+        Sort = new(settings, ResortRoots);
 
-        _progressTimer = new() { Interval = ProgressPollInterval };
-        _progressTimer.Tick += OnProgressTick;
+        Progress = new(performance, uiDispatcher);
+        Progress.PropertyChanged += OnProgressPropertyChanged;
 
-        foreach (var drive in DriveInfo.GetDrives())
-        {
-            AddDrive(drive.Name);
-        }
+        Summary = new();
+
+        Treemap = new(Roots);
+        Treemap.DrilledInto += OnTreemapDrilledInto;
+
+        _nodeFactory.AskAgentRequested += OnAskAgentRequested;
+
+        Drives = new(logger);
+
+        Marks = new(dialogs,
+            deleteDialogFactory,
+            operations,
+            logger,
+            nodeFactory,
+            Roots,
+            Summary,
+            Treemap,
+            () => SelectedNode,
+            value => SelectedNode = value,
+            () => HasResult = false,
+            () => IsScanning,
+            () => Drives.ReloadLabels(SelectedDrive));
+
+        _archive = new(archiveDialogFactory,
+            dialogs,
+            nodeFactory,
+            Roots,
+            Treemap,
+            Inspector,
+            () => SelectedNode,
+            Marks,
+            () => Drives.ReloadLabels(SelectedDrive));
+
+        Duplicates = new(dialogs,
+            duplicateDialogFactory,
+            settings,
+            preferences,
+            notifier,
+            () => CurrentRoot,
+            MarkForAutomation,
+            () => IsScanning);
+
+        ViewModes = BuildViewModes(preferences.DuplicatesEnabled);
 
         LoadSettings();
-        LoadDriveLabels();
+        Drives.LoadDriveLabels();
     }
 
-    public ObservableCollection<DriveItem> Drives { get; } = [];
+    public DriveCatalog Drives { get; }
+
+    public ScanMarksViewModel Marks { get; }
 
     public ObservableCollection<ScanNodeViewModel> Roots { get; } = [];
 
-    public RangeObservableCollection<ScanNodeViewModel> TreemapTiles { get; } = [];
+    public ScanProgressViewModel Progress { get; }
 
-    public RangeObservableCollection<TreemapCrumb> TreemapBreadcrumbs { get; } = [];
+    public ScanSummaryViewModel Summary { get; }
+
+    public ScanTreemapViewModel Treemap { get; }
 
     public ScanInspectorViewModel Inspector { get; }
 
-    public ObservableCollection<ScanSortOption> SortOptions { get; } =
-    [
-        new("По имени", ScanSortField.Name),
-        new("По размеру", ScanSortField.Size),
-        new("По дате создания", ScanSortField.CreationDate),
-        new("По времени последнего доступа", ScanSortField.LastAccessTime),
-        new("По количеству файлов", ScanSortField.FileCount),
-    ];
+    public ScanDuplicatesViewModel Duplicates { get; }
+
+    public ScanSortViewModel Sort { get; }
 
     public ScanPreferences Preferences { get; }
 
@@ -211,28 +195,55 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
     public bool IsBusy => IsScanning;
 
-    public bool HasMarked => MarkedCount > 0;
+    public int MarkedCount => Marks.MarkedCount;
 
-    public bool TreeVisible => HasResult && !ShowTreemap;
+    public IReadOnlyList<SegmentOption> ViewModes { get; }
 
-    public bool TreemapVisible => HasResult && ShowTreemap;
+    public bool DuplicatesEnabled => Preferences.DuplicatesEnabled;
 
-    public bool IsIndeterminate => !_progressFraction.HasValue;
+    public ScanViewMode ViewMode
+    {
+        get => (ScanViewMode)(SelectedViewIndex + 1);
+        set => SelectedViewIndex = Math.Clamp((int)value - 1, 0, ViewModes.Count - 1);
+    }
 
-    public double ProgressValue => _progressFraction ?? 0;
+    public bool TreeVisible => HasResult && ViewMode == ScanViewMode.Tree;
 
-    public double ProgressMax => 1;
+    public bool TreemapVisible => HasResult && ViewMode == ScanViewMode.Treemap;
+
+    public bool DuplicatesVisible => HasResult && ViewMode == ScanViewMode.Duplicates;
+
+    public bool ShowTargetPicker => !IsScanning && (!HasResult || IsPickerOpen);
+
+    public bool ShowScanResult => !ShowTargetPicker;
+
+    public bool ShowScanningState => !HasResult && IsScanning;
+
+    public bool IsIndeterminate => Progress.IsIndeterminate;
+
+    public double ProgressValue => Progress.ProgressValue;
+
+    public double ProgressMax => Progress.ProgressMax;
 
     public ICommand CancelCommand => StopCommand;
 
-    private void RecountMarked()
+    internal DirectorySpace? CurrentRoot => Roots.Count > 0 ? Roots[0].Space as DirectorySpace : null;
+
+    internal TimeSpan LastScanElapsed { get; private set; }
+
+    internal int LastScanParallelism { get; private set; } = 1;
+
+    private void OnProgressPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        MarkedCount = CollectMarked().Count;
+        if (e.PropertyName is nameof(IsIndeterminate) or nameof(ProgressValue))
+        {
+            OnPropertyChanged(e.PropertyName);
+        }
     }
 
-    private void OnProgressTick(object? sender, EventArgs e)
+    private void OnTreemapDrilledInto(ScanNodeViewModel node)
     {
-        UpdateLiveProgress();
+        SelectedNode = node;
     }
 
     private void OnPreferencesChanged(object? sender, PropertyChangedEventArgs e)
@@ -246,212 +257,33 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         OnPropertyChanged(nameof(Intensity));
     }
 
-    private async void OnArchiveRequested(ScanNodeViewModel node)
+    private void OnAskAgentRequested(ScanNodeViewModel node)
     {
-        if (node.Space is not DirectorySpace dir)
+        if (node.Space is not { } space)
         {
             return;
         }
 
-        var dialog = _archiveDialogFactory.Create(dir);
-
-        try
-        {
-            await _dialogs.ShowAsync(dialog);
-        }
-        finally
-        {
-            dialog.RequestStop();
-        }
-
-        if (dialog.CreatedArchivePath is { } archivePath)
-        {
-            AddArchiveToTree(dir, archivePath);
-        }
-
-        if (dialog.OriginalDeleted)
-        {
-            ApplyDeletionResult([dir]);
-        }
+        _navigator.AskAgent(ChatQuestion.ForScanNode(space.AbsolutePath, node.SizeText, node.IsDirectory));
     }
 
-    private static long? EstimateTotalBytes(DirectoryInfo directory)
+    partial void OnIsScanningChanged(bool value)
     {
-        try
-        {
-            var full = directory.FullName.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            var root = directory.Root.FullName.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-
-            if (!string.Equals(full, root, StringComparison.OrdinalIgnoreCase))
-            {
-                return null;
-            }
-
-            var drive = new DriveInfo(directory.Root.FullName);
-
-            if (!drive.IsReady)
-            {
-                return null;
-            }
-
-            var used = drive.TotalSize - drive.TotalFreeSpace;
-            return used > 0 ? used : null;
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
-        {
-            return null;
-        }
+        Progress.IsScanning = value;
+        Summary.IsScanning = value;
+        Marks.DeleteMarkedCommand.NotifyCanExecuteChanged();
+        Duplicates.NotifyScanStateChanged();
     }
 
-    private static string FormatElapsed(TimeSpan elapsed)
+    partial void OnHasResultChanged(bool value)
     {
-        return elapsed.TotalSeconds < 60
-            ? $"{elapsed.TotalSeconds:F1} с"
-            : $"{(int)elapsed.TotalMinutes}:{elapsed.Seconds:D2}";
-    }
-
-    private static void CollectMarked(DirectorySpace dir, List<SpaceBase> list)
-    {
-        foreach (var sub in dir.SubDirectories)
-        {
-            if (sub.IsDeleted)
-            {
-                list.Add(sub);
-            }
-            else
-            {
-                CollectMarked(sub, list);
-            }
-        }
-
-        foreach (var file in dir.Files)
-        {
-            if (file.IsDeleted)
-            {
-                list.Add(file);
-            }
-        }
-    }
-
-    private static void RefreshNodeAfterDeletion(ScanNodeViewModel node, HashSet<SpaceBase> deletedSet)
-    {
-        if (node.Space is null)
-        {
-            return;
-        }
-
-        var hasDeletedChild = node.Children.Any(c => c.Space is not null && deletedSet.Contains(c.Space));
-
-        if (hasDeletedChild)
-        {
-            node.ReloadChildren();
-            node.NotifyPropertiesChanged();
-            return;
-        }
-
-        foreach (var child in node.Children)
-        {
-            RefreshNodeAfterDeletion(child, deletedSet);
-        }
-
-        node.NotifyPropertiesChanged();
-    }
-
-    private static bool RefreshNodeAfterAddition(ScanNodeViewModel node, DirectorySpace parent)
-    {
-        if (ReferenceEquals(node.Space, parent))
-        {
-            node.ReloadChildren();
-            node.NotifyPropertiesChanged();
-            return true;
-        }
-
-        foreach (var child in node.Children)
-        {
-            if (RefreshNodeAfterAddition(child, parent))
-            {
-                node.NotifyPropertiesChanged();
-                return true;
-            }
-        }
-
-        node.NotifyPropertiesChanged();
-        return false;
-    }
-
-    private static string NormalizePath(string path)
-    {
-        return path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-    }
-
-    private void AddArchiveToTree(DirectorySpace source, string archivePath)
-    {
-        if (source.Parent is not DirectorySpace parent || !File.Exists(archivePath))
-        {
-            return;
-        }
-
-        parent.AddFile(new(archivePath));
-
-        foreach (var root in Roots)
-        {
-            RefreshNodeAfterAddition(root, parent);
-        }
-
-        if (TreemapRoot is not null)
-        {
-            RebuildTiles();
-        }
-
-        if (SelectedNode is not null)
-        {
-            Inspector.Show(SelectedNode, _rootTotalSize);
-        }
-    }
-
-    private DriveItem AddDrive(string path)
-    {
-        var item = new DriveItem(path);
-        Drives.Add(item);
-        return item;
-    }
-
-    private bool HasDrive(string path)
-    {
-        return Drives.Any(drive => string.Equals(drive.Path, path, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private void LoadDriveLabels()
-    {
-        _ = Task.WhenAll(Drives.Select(drive => drive.LoadLabelAsync()))
-            .ContinueWith(task => _logger.DriveSizesFailed(task.Exception!),
-                CancellationToken.None,
-                TaskContinuationOptions.OnlyOnFaulted,
-                TaskScheduler.Default);
+        Summary.HasResult = value;
+        Duplicates.NotifyScanStateChanged();
     }
 
     partial void OnSelectedDriveChanged(string value)
     {
         Persist(() => _settings.SetValue(SettingsKeys.ScanLastDrive, value));
-    }
-
-    partial void OnSelectedSortOptionChanged(ScanSortOption? value)
-    {
-        if (value is null)
-        {
-            return;
-        }
-
-        _sortState.Field = value.Field;
-        Persist(() => _settings.SetEnum(SettingsKeys.ScanSortMode, value.Field));
-        ResortRoots();
-    }
-
-    partial void OnInvertSortChanged(bool value)
-    {
-        _sortState.Invert = value;
-        Persist(() => _settings.SetBool(SettingsKeys.ScanSortInvert, value));
-        ResortRoots();
     }
 
     partial void OnSelectedNodeChanged(ScanNodeViewModel? value)
@@ -466,153 +298,36 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         else
         {
             value.IsSelected = true;
-            Inspector.Show(value, _rootTotalSize);
+            Inspector.Show(value);
         }
     }
 
-    partial void OnShowTreemapChanged(bool value)
+    partial void OnSelectedViewIndexChanged(int value)
     {
-        Persist(() => _settings.SetBool(SettingsKeys.ScanTreemap, value));
+        var mode = ViewMode;
 
-        if (value && TreemapRoot is null && Roots.Count > 0)
+        Persist(() => _settings.SetEnum(SettingsKeys.ScanView, mode));
+
+        if (mode == ScanViewMode.Treemap && Treemap.TreemapRoot is null && Roots.Count > 0)
         {
-            SetTreemapRoot(Roots[0]);
+            Treemap.SetRoot(Roots[0]);
         }
     }
 
-    [RelayCommand]
-    private void DrillInto(ScanNodeViewModel? node)
+    internal static IReadOnlyList<SegmentOption> BuildViewModes(bool duplicates)
     {
-        if (node is null || !node.IsDirectory || !node.HasChildren)
+        List<SegmentOption> modes =
+        [
+            new(PackIconLucideKind.FolderTree, "Дерево", "Дерево каталогов с тепловой подсветкой"),
+            new(PackIconLucideKind.Map, "Карта", "Карта занятого места (treemap)"),
+        ];
+
+        if (duplicates)
         {
-            return;
+            modes.Add(new(PackIconLucideKind.CopyCheck, "Дубликаты", "Одинаковые файлы, найденные сличением содержимого"));
         }
 
-        _treemapPath.Add(node);
-        TreemapRoot = node;
-        RebuildBreadcrumbs();
-        RebuildTiles();
-        SelectedNode = node;
-    }
-
-    [RelayCommand]
-    private void DrillToCrumb(ScanNodeViewModel? node)
-    {
-        if (node is null)
-        {
-            return;
-        }
-
-        var index = _treemapPath.IndexOf(node);
-
-        if (index < 0)
-        {
-            return;
-        }
-
-        _treemapPath.RemoveRange(index + 1, _treemapPath.Count - index - 1);
-        TreemapRoot = node;
-        RebuildBreadcrumbs();
-        RebuildTiles();
-    }
-
-    private void SetTreemapRoot(ScanNodeViewModel root)
-    {
-        _treemapPath.Clear();
-        _treemapPath.Add(root);
-        TreemapRoot = root;
-        RebuildBreadcrumbs();
-        RebuildTiles();
-    }
-
-    private void RebuildBreadcrumbs()
-    {
-        var crumbs = new TreemapCrumb[_treemapPath.Count];
-
-        for (var i = 0; i < _treemapPath.Count; i++)
-        {
-            crumbs[i] = new(_treemapPath[i], i > 0);
-        }
-
-        TreemapBreadcrumbs.ReplaceAll(crumbs);
-    }
-
-    private void RebuildTiles()
-    {
-        if (TreemapRoot is null)
-        {
-            TreemapTiles.ReplaceAll([]);
-            HasTreemapTiles = false;
-            TreemapTruncated = false;
-            TreemapTruncatedText = string.Empty;
-            return;
-        }
-
-        TreemapRoot.EnsureLoaded();
-
-        var children = TreemapRoot.Children
-            .Where(static c => c.Space is not null && c.Weight > 0)
-            .OrderByDescending(static c => c.Weight)
-            .ToList();
-
-        var shown = children.Take(AppDefaults.TreemapTileLimit).ToList();
-        TreemapTiles.ReplaceAll(shown);
-        HasTreemapTiles = shown.Count > 0;
-
-        var hidden = children.Count - shown.Count;
-        TreemapTruncated = hidden > 0;
-        TreemapTruncatedText = hidden > 0
-            ? $"Показаны крупнейшие {shown.Count} из {children.Count}"
-            : string.Empty;
-    }
-
-    private void RefreshTreemapAfterDeletion(HashSet<SpaceBase> deletedSet)
-    {
-        if (_treemapPath.Count == 0)
-        {
-            return;
-        }
-
-        var cut = -1;
-
-        for (var i = 0; i < _treemapPath.Count; i++)
-        {
-            var space = _treemapPath[i].Space;
-
-            if (space is null || deletedSet.Contains(space))
-            {
-                cut = i;
-                break;
-            }
-        }
-
-        if (cut == 0)
-        {
-            var fallback = Roots.FirstOrDefault();
-
-            if (fallback is null)
-            {
-                _treemapPath.Clear();
-                TreemapRoot = null;
-                TreemapBreadcrumbs.ReplaceAll([]);
-                RebuildTiles();
-            }
-            else
-            {
-                SetTreemapRoot(fallback);
-            }
-
-            return;
-        }
-
-        if (cut > 0)
-        {
-            _treemapPath.RemoveRange(cut, _treemapPath.Count - cut);
-            TreemapRoot = _treemapPath[^1];
-            RebuildBreadcrumbs();
-        }
-
-        RebuildTiles();
+        return modes;
     }
 
     private void ResortRoots()
@@ -627,30 +342,22 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     {
         _suppressPersist = true;
 
-        var sortField = _settings.GetEnum(SettingsKeys.ScanSortMode, AppDefaults.ScanSortModeDefault);
-        var invertSort = _settings.GetBool(SettingsKeys.ScanSortInvert, AppDefaults.ScanSortInvertDefault);
-        _sortState.Field = sortField;
-        _sortState.Invert = invertSort;
-        InvertSort = invertSort;
-        SelectedSortOption = SortOptions.FirstOrDefault(option => option.Field == sortField)
-                             ?? SortOptions.First(option => option.Field == AppDefaults.ScanSortModeDefault);
-
-        ShowTreemap = _settings.GetBool(SettingsKeys.ScanTreemap);
+        ViewMode = _settings.GetEnum(SettingsKeys.ScanView, AppDefaults.ScanViewDefault);
 
         var lastDrive = _settings.GetStringValue(SettingsKeys.ScanLastDrive);
 
         if (!string.IsNullOrWhiteSpace(lastDrive))
         {
-            if (!HasDrive(lastDrive))
+            if (!Drives.HasDrive(lastDrive))
             {
-                AddDrive(lastDrive);
+                Drives.AddDrive(lastDrive);
             }
 
             SelectedDrive = lastDrive;
         }
         else
         {
-            SelectedDrive = Drives.Count > 0 ? Drives[0].Path : string.Empty;
+            SelectedDrive = Drives.Items.Count > 0 ? Drives.Items[0].Path : string.Empty;
         }
 
         _suppressPersist = false;
@@ -672,32 +379,25 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     [RelayCommand(CanExecute = nameof(CanStart))]
     private async Task StartAsync()
     {
-        await ScanAsync(SelectedDrive?.Trim() ?? string.Empty);
+        await ScanAsync(SelectedDrive?.Trim() ?? string.Empty, CancellationToken.None);
     }
 
     [RelayCommand(CanExecute = nameof(CanStart))]
     private async Task BrowseAsync()
     {
-        var dialog = new OpenFolderDialog
-        {
-            Title = "Выберите каталог для сканирования",
-        };
-
-        if (dialog.ShowDialog() != true)
+        if (_filePicker.PickFolder("Выберите каталог для сканирования") is not { } path)
         {
             return;
         }
 
-        var path = dialog.FolderName;
-
-        if (!HasDrive(path))
+        if (!Drives.HasDrive(path))
         {
-            AddDrive(path);
-            LoadDriveLabels();
+            Drives.AddDrive(path);
+            Drives.LoadDriveLabels();
         }
 
         SelectedDrive = path;
-        await ScanAsync(path);
+        await ScanAsync(path, CancellationToken.None);
     }
 
     private bool CanStop()
@@ -711,7 +411,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         _cts?.Cancel();
     }
 
-    private async Task ScanAsync(string path)
+    private async Task ScanAsync(string path, CancellationToken external = default)
     {
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -726,58 +426,38 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
             return;
         }
 
-        _cts = new();
+        _cts = CancellationTokenSource.CreateLinkedTokenSource(external);
         var token = _cts.Token;
+        IsPickerOpen = false;
         IsScanning = true;
         ScanWasCancelled = false;
+        ScanTargetPath = path;
         StatusCaption = $"Сканирование: {path}";
 
         SelectedNode = null;
 
-        _estimatedTotalBytes = EstimateTotalBytes(directory);
-        _progress = new();
-        _scanStopwatch = Stopwatch.StartNew();
-        ResetLiveProgress(path);
-        _progressTimer.Start();
-
-        var progress = _progress;
-
-        _logger.ScanStarted(path, Preferences.UseMultithreading, Preferences.MaxParallelism);
-
         try
         {
-            var result = await Task.Run(() => Preferences.UseMultithreading
-                    ? _calculator.CalculateMultithreaded(directory, Preferences.MaxParallelism, progress, token)
-                    : _calculator.Calculate(directory, progress, token),
-                token);
+            var parallelism = await Task.Run(() => Preferences.ResolveParallelism(path), token);
+            var progress = Progress.Begin(directory, path, parallelism);
 
-            _scanStopwatch.Stop();
+            if (parallelism == 1 && Preferences.UseMultithreading && Preferences.MaxParallelism > 1)
+            {
+                _logger.ScanMediaLimited(path, Preferences.MaxParallelism);
+            }
 
-            RemoveRoot(path);
+            _logger.ScanStarted(path, parallelism > 1, parallelism);
 
-            _rootTotalSize = result.TotalSize;
+            var outcome = await RunTraversalAsync(directory, parallelism, progress, token);
 
-            var node = _nodeFactory.Create(result, result.TotalSize, result.TotalSize, _sortState);
-            node.IsExpanded = true;
+            var elapsed = Progress.Finish();
+            var applied = Stopwatch.StartNew();
 
-            Roots.Insert(0, node);
-            SetTreemapRoot(node);
+            ApplyScanResult(outcome.Root, elapsed, Progress.Traversal, outcome.Notes);
 
-            ResultPath = result.AbsolutePath;
-            ResultSizeText = result.TotalSizeText;
-            ResultFileCountText = result.TotalFileCount.ToString("N0");
-            ResultDirCountText = result.TotalDirectoryCount.ToString("N0");
-            ResultElapsedText = FormatElapsed(_scanStopwatch.Elapsed);
-            HasResult = true;
-            RecountMarked();
+            _logger.ScanPhases((long)elapsed.TotalMilliseconds, (long)applied.Elapsed.TotalMilliseconds);
 
-            _logger.ScanCompleted(result.AbsolutePath,
-                result.TotalSizeText,
-                result.TotalFileCount,
-                result.TotalDirectoryCount,
-                (long)_scanStopwatch.Elapsed.TotalMilliseconds);
-
-            _notifier.Notify($"Сканирование завершено: {result.AbsolutePath} · {result.TotalSizeText}", StatusSeverity.Success);
+            _notifier.Notify($"Сканирование завершено: {outcome.Root.AbsolutePath} · {outcome.Root.TotalSizeText}", StatusSeverity.Success);
         }
         catch (OperationCanceledException)
         {
@@ -793,223 +473,14 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         }
         finally
         {
-            _progressTimer.Stop();
-            _scanStopwatch?.Stop();
-            _progress = null;
-            _progressFraction = null;
-            _estimatedTotalBytes = null;
+            Progress.Finish();
 
             IsScanning = false;
             StatusCaption = null;
-            OnPropertyChanged(nameof(IsIndeterminate));
-            OnPropertyChanged(nameof(ProgressValue));
 
             _cts?.Dispose();
             _cts = null;
         }
     }
 
-    private void ResetLiveProgress(string path)
-    {
-        _progressFraction = null;
-        ScanCurrentPath = path;
-        ScanDirCountText = "0";
-        ScanFileCountText = "0";
-        ScanBytesText = SizeFormatter.Format(0);
-        ScanElapsedText = FormatElapsed(TimeSpan.Zero);
-        ScanThroughputText = "–";
-        ScanTopLevelText = string.Empty;
-        ScanPercentText = string.Empty;
-        ScanHasBranches = false;
-        ScanHasDeterminateProgress = false;
-
-        OnPropertyChanged(nameof(IsIndeterminate));
-        OnPropertyChanged(nameof(ProgressValue));
-    }
-
-    private void UpdateLiveProgress()
-    {
-        if (_progress is null)
-        {
-            return;
-        }
-
-        var snapshot = _progress.CreateSnapshot();
-        var elapsed = _scanStopwatch?.Elapsed ?? TimeSpan.Zero;
-
-        ScanCurrentPath = string.IsNullOrEmpty(snapshot.CurrentPath) ? ScanCurrentPath : snapshot.CurrentPath;
-        ScanDirCountText = snapshot.DirectoriesScanned.ToString("N0");
-        ScanFileCountText = snapshot.FilesScanned.ToString("N0");
-        ScanBytesText = SizeFormatter.Format(snapshot.BytesScanned);
-        ScanElapsedText = FormatElapsed(elapsed);
-
-        var seconds = elapsed.TotalSeconds;
-
-        if (seconds > 0.25 && snapshot.FilesScanned > 0)
-        {
-            var filesPerSecond = snapshot.FilesScanned / seconds;
-            var bytesPerSecond = (long)(snapshot.BytesScanned / seconds);
-            ScanThroughputText = $"{filesPerSecond:N0} файл/с · {SizeFormatter.Format(bytesPerSecond)}/с";
-        }
-
-        ScanHasBranches = snapshot.TopLevelTotal > 0;
-        ScanTopLevelText = ScanHasBranches
-            ? $"{snapshot.TopLevelCompleted:N0} / {snapshot.TopLevelTotal:N0}"
-            : string.Empty;
-
-        double? fraction = _estimatedTotalBytes is > 0
-            ? Math.Clamp((double)snapshot.BytesScanned / _estimatedTotalBytes.Value, 0d, 1d)
-            : null;
-
-        _progressFraction = fraction;
-        ScanHasDeterminateProgress = fraction.HasValue;
-        ScanPercentText = fraction.HasValue ? $"{fraction.Value * 100:F0} %" : string.Empty;
-
-        OnPropertyChanged(nameof(IsIndeterminate));
-        OnPropertyChanged(nameof(ProgressValue));
-    }
-
-    private bool CanDeleteMarked()
-    {
-        return !IsScanning && MarkedCount > 0;
-    }
-
-    [RelayCommand(CanExecute = nameof(CanDeleteMarked))]
-    private async Task DeleteMarkedAsync()
-    {
-        var marked = CollectMarked();
-
-        if (marked.Count == 0)
-        {
-            _logger.NothingMarkedForDeletion();
-            _dialogs.Info("Удаление", "Нет элементов, помеченных на удаление. Пометьте их через контекстное меню узла.");
-            return;
-        }
-
-        var permanent = _operations.DeleteMode == DeleteMode.Permanent;
-        _logger.DeletionRequested(marked.Count, permanent);
-        var dialog = _deleteDialogFactory.Create(marked, permanent);
-
-        if (!_operations.ConfirmBeforeDelete)
-        {
-            dialog.StartCommand.Execute(null);
-        }
-
-        try
-        {
-            await _dialogs.ShowAsync(dialog);
-        }
-        finally
-        {
-            dialog.RequestStop();
-        }
-
-        ApplyDeletionResult(dialog.DeletedItems);
-    }
-
-    private void ApplyDeletionResult(IReadOnlyList<SpaceBase> deletedItems)
-    {
-        if (deletedItems.Count == 0)
-        {
-            return;
-        }
-
-        _logger.DeletionResultApplied(deletedItems.Count);
-
-        var deletedSet = new HashSet<SpaceBase>(ReferenceEqualityComparer.Instance);
-
-        foreach (var item in deletedItems)
-        {
-            deletedSet.Add(item);
-        }
-
-        if (SelectedNode?.Space is not null && deletedSet.Contains(SelectedNode.Space))
-        {
-            SelectedNode = null;
-        }
-
-        foreach (var item in deletedItems)
-        {
-            if (item.Parent is DirectorySpace parentDir)
-            {
-                parentDir.Remove(item);
-            }
-        }
-
-        var rootsToRemove = new List<ScanNodeViewModel>();
-
-        foreach (var rootVm in Roots)
-        {
-            if (rootVm.Space is not null && deletedSet.Contains(rootVm.Space))
-            {
-                rootsToRemove.Add(rootVm);
-            }
-            else
-            {
-                RefreshNodeAfterDeletion(rootVm, deletedSet);
-            }
-        }
-
-        foreach (var rootVm in rootsToRemove)
-        {
-            Roots.Remove(rootVm);
-        }
-
-        var resultRoot = Roots.FirstOrDefault(r =>
-            string.Equals(NormalizePath(r.AbsolutePath), NormalizePath(ResultPath), StringComparison.OrdinalIgnoreCase));
-
-        if (resultRoot?.Space is DirectorySpace resultDir)
-        {
-            _rootTotalSize = resultDir.TotalSize;
-            ResultSizeText = resultDir.TotalSizeText;
-            ResultFileCountText = resultDir.TotalFileCount.ToString("N0");
-            ResultDirCountText = resultDir.TotalDirectoryCount.ToString("N0");
-        }
-        else if (rootsToRemove.Any(r => string.Equals(NormalizePath(r.AbsolutePath), NormalizePath(ResultPath), StringComparison.OrdinalIgnoreCase)))
-        {
-            HasResult = false;
-        }
-
-        RefreshTreemapAfterDeletion(deletedSet);
-        RecountMarked();
-    }
-
-    private List<SpaceBase> CollectMarked()
-    {
-        var list = new List<SpaceBase>();
-
-        foreach (var root in Roots)
-        {
-            if (root.Space is not DirectorySpace dir)
-            {
-                continue;
-            }
-
-            if (dir.IsDeleted)
-            {
-                list.Add(dir);
-            }
-            else
-            {
-                CollectMarked(dir, list);
-            }
-        }
-
-        return list;
-    }
-
-    private void RemoveRoot(string path)
-    {
-        var normalized = NormalizePath(path);
-
-        for (var i = Roots.Count - 1; i >= 0; i--)
-        {
-            if (string.Equals(NormalizePath(Roots[i].AbsolutePath), normalized, StringComparison.OrdinalIgnoreCase))
-            {
-                Roots.RemoveAt(i);
-            }
-        }
-    }
 }
-
-public sealed record TreemapCrumb(ScanNodeViewModel Node, bool ShowSeparator);

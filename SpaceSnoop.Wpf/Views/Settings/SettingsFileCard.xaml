@@ -3,38 +3,48 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Settings"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
-             d:DesignWidth="900">
+             d:DesignWidth="900"
+             Visibility="{Binding Sections[storage].IsSelected, Converter={StaticResource BoolToVisibility}}">
 
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/Views/Settings/SettingsResources.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/SpaceSnoop.Wpf;component/Views/Settings/SettingsResources.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource Card.Inset}"
-            Margin="0,0,0,2">
+    <HeaderedContentControl Style="{StaticResource Form.Panel}"
+                            Header="{Binding Sections[storage].Title}"
+                            keepshell:Form.ResetCommand="{Binding ResetSectionCommand}"
+                            keepshell:Form.ResetCommandParameter="storage"
+                            keepshell:Form.ResetHint="{Binding ResetPlans[storage].Hint}">
         <StackPanel>
             <TextBlock Text="Расположение данных"
-                       Style="{StaticResource Setting.SectionTitle}" />
+                       Style="{StaticResource Form.SectionTitle}" />
             <CheckBox Content="Хранить файлы приложения в папке AppData"
                       IsChecked="{Binding StoreInAppData, Mode=TwoWay}"
-                      Margin="0,14,0,0"
+                      Margin="0,12,0,0"
                       VerticalAlignment="Center" />
-            <TextBlock Style="{StaticResource Setting.Hint}"
-                       Text="По умолчанию настройки, логи и журналы хранятся в %LOCALAPPDATA%\SpaceSnoop. Выключите, чтобы держать их рядом с программой (portable-режим). Смена расположения перезапустит приложение." />
+            <TextBlock Style="{StaticResource Form.CheckHint}"
+                       Text="Смена расположения перезапустит приложение." />
+            <Expander Style="{StaticResource Setting.Details}"
+                      Header="Где лежат файлы">
+                <TextBlock Style="{StaticResource Setting.DetailsBody}"
+                           Text="По умолчанию настройки, логи и журналы лежат в %LOCALAPPDATA%\SpaceSnoop. Выключите, чтобы держать их рядом с программой – portable-режим. Файлы можно перенести на новое место или оставить на старом, об этом спросит диалог." />
+            </Expander>
             <TextBlock Text="{Binding DataDirectory}"
                        Style="{StaticResource TextBlock.Mono}"
-                       Margin="0,8,0,0"
+                       Margin="26,8,0,0"
                        TextWrapping="Wrap" />
 
             <TextBlock Text="Файл настроек"
-                       Style="{StaticResource Setting.SectionTitle}"
+                       Style="{StaticResource Form.SectionTitle}"
                        Margin="0,20,0,0" />
 
             <Grid>
@@ -48,8 +58,8 @@
                                Style="{StaticResource TextBlock.Mono}"
                                Margin="0,8,0,0"
                                TextWrapping="Wrap" />
-                    <TextBlock Style="{StaticResource Setting.Hint}"
-                               Text="Формат TOML. Можно править вручную, но удобнее через эту форму. Изменения сохраняются автоматически." />
+                    <TextBlock Style="{StaticResource Form.Hint}"
+                               Text="Формат TOML, изменения сохраняются автоматически." />
                 </StackPanel>
 
                 <StackPanel Grid.Column="1"
@@ -80,5 +90,5 @@
                 </StackPanel>
             </Grid>
         </StackPanel>
-    </Border>
+    </HeaderedContentControl>
 </UserControl>

@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 
 namespace SpaceSnoop.Controls;
 
@@ -25,14 +25,15 @@ public sealed class SyncDiffView : UserControl
         [SyncAction.None] = ("\u26A1", Color.Red),
     };
 
-    private static readonly SyncAction[] ActionCycle =
-    [
-        SyncAction.CopyToRight,
-        SyncAction.CopyToLeft,
-        SyncAction.Skip,
-        SyncAction.DeleteLeft,
-        SyncAction.DeleteRight,
-    ];
+    private static readonly SyncAction[] LeftOnlyCycle = [SyncAction.CopyToRight, SyncAction.Skip, SyncAction.DeleteLeft];
+    private static readonly SyncAction[] RightOnlyCycle = [SyncAction.CopyToLeft, SyncAction.Skip, SyncAction.DeleteRight];
+    private static readonly SyncAction[] LeftOnlyCycleNoDelete = [SyncAction.CopyToRight, SyncAction.Skip];
+    private static readonly SyncAction[] RightOnlyCycleNoDelete = [SyncAction.CopyToLeft, SyncAction.Skip];
+    private static readonly SyncAction[] BothSidesCycle = [SyncAction.CopyToRight, SyncAction.CopyToLeft, SyncAction.Skip];
+    private static readonly SyncAction[] ConflictCycle = [SyncAction.Skip];
+
+    private const string DeleteBlockedHint = "противоположную сторону обошли не полностью";
+    private const string TypeConflictHint = "слева и справа объекты разного вида";
 
     private readonly VScrollBar _scrollBar;
     private readonly Font _boldFont;
@@ -88,7 +89,7 @@ public sealed class SyncDiffView : UserControl
         _strikeoutFont = new(Font, FontStyle.Strikeout);
 
         _scrollBar = new()
-            { Dock = DockStyle.Right };
+        { Dock = DockStyle.Right };
 
         _scrollBar.Scroll += (_, _) => Invalidate();
         Controls.Add(_scrollBar);
@@ -267,6 +268,167 @@ public sealed class SyncDiffView : UserControl
         }
     }
 
+    protected override void OnMouseWheel(MouseEventArgs e)
+    {
+        base.OnMouseWheel(e);
+
+        if (!_scrollBar.Visible)
+        {
+            return;
+        }
+
+        var delta = e.Delta > 0 ? -_rowHeight * 3 : _rowHeight * 3;
+        var newValue = Math.Clamp(_scrollBar.Value + delta, _scrollBar.Minimum, Math.Max(0, _scrollBar.Maximum - _scrollBar.LargeChange));
+        _scrollBar.Value = newValue;
+        Invalidate();
+    }
+
+    protected override void OnResize(EventArgs e)
+    {
+        base.OnResize(e);
+        UpdateScrollBar();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _boldFont.Dispose();
+            _actionFont.Dispose();
+            _strikeoutFont.Dispose();
+            _leftAlign.Dispose();
+            _rightAlign.Dispose();
+            _centerAlign.Dispose();
+            _contextMenu?.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
+
+    private static void CycleAction(FileComparison file)
+    {
+        var cycle = CycleFor(file);
+        var currentIndex = Array.IndexOf(cycle, file.Action);
+        file.Action = currentIndex < 0
+            ? cycle[0]
+            : cycle[(currentIndex + 1) % cycle.Length];
+    }
+
+    private static SyncAction[] CycleFor(FileComparison file)
+    {
+        if (file.TypeConflict != FileTypeConflict.None)
+        {
+            return ConflictCycle;
+        }
+
+        return file.Status switch
+        {
+            ComparisonStatus.LeftOnly => file.DeleteLeftBlocked ? LeftOnlyCycleNoDelete : LeftOnlyCycle,
+            ComparisonStatus.RightOnly => file.DeleteRightBlocked ? RightOnlyCycleNoDelete : RightOnlyCycle,
+            _ => BothSidesCycle,
+        };
+    }
+
+    private static bool DeleteBlocked(FileComparison file, SyncAction action)
+    {
+        return action switch
+        {
+            SyncAction.DeleteLeft => file.DeleteLeftBlocked,
+            SyncAction.DeleteRight => file.DeleteRightBlocked,
+            _ => false,
+        };
+    }
+
+    private static bool DeleteBlocked(DirectoryComparison dir, SyncAction action)
+    {
+        return action switch
+        {
+            SyncAction.DeleteLeft => dir.DeleteLeftBlocked || dir.RightIncomplete,
+            SyncAction.DeleteRight => dir.DeleteRightBlocked || dir.LeftIncomplete,
+            _ => false,
+        };
+    }
+
+    private static SyncAction DirActionFor(DirectoryComparison dir, SyncAction requested)
+    {
+        return dir.Status == ComparisonStatus.LeftOnly
+            ? requested switch
+            {
+                SyncAction.CopyToRight => SyncAction.CopyToRight,
+                SyncAction.DeleteLeft => SyncAction.DeleteLeft,
+                _ => SyncAction.Skip,
+            }
+            : requested switch
+            {
+                SyncAction.CopyToLeft => SyncAction.CopyToLeft,
+                SyncAction.DeleteRight => SyncAction.DeleteRight,
+                _ => SyncAction.Skip,
+            };
+    }
+
+    private static long CalcDirectorySize(DirectoryComparison dir, bool isLeft)
+    {
+        long total = 0;
+
+        foreach (var file in dir.Files)
+        {
+            var size = isLeft ? file.LeftSize : file.RightSize;
+
+            if (size.HasValue)
+            {
+                total += size.Value;
+            }
+        }
+
+        foreach (var sub in dir.SubDirectories)
+        {
+            total += CalcDirectorySize(sub, isLeft);
+        }
+
+        return total;
+    }
+
+    private static Color GetStatusColor(ComparisonStatus status)
+    {
+        return status switch
+        {
+            ComparisonStatus.LeftOnly => LeftOnlyColor,
+            ComparisonStatus.RightOnly => RightOnlyColor,
+            ComparisonStatus.Modified => ModifiedColor,
+            ComparisonStatus.Conflict => ConflictColor,
+            ComparisonStatus.Identical => IdenticalColor,
+            _ => Color.Black,
+        };
+    }
+
+    private static void ApplyActionRecursive(DirectoryComparison dir, SyncAction action)
+    {
+        if (dir.Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly && !DeleteBlocked(dir, action))
+        {
+            dir.Action = DirActionFor(dir, action);
+        }
+
+        foreach (var file in dir.Files)
+        {
+            if (file.Status == ComparisonStatus.Identical || DeleteBlocked(file, action))
+            {
+                continue;
+            }
+
+            if (file.TypeConflict != FileTypeConflict.None && action != SyncAction.Skip)
+            {
+                continue;
+            }
+
+            file.Action = action;
+        }
+
+        foreach (var sub in dir.SubDirectories)
+        {
+            ApplyActionRecursive(sub, action);
+        }
+    }
+
     private void HandleLeftClick(RowData row, int x)
     {
         if (row.Directory != null)
@@ -312,86 +474,6 @@ public sealed class SyncDiffView : UserControl
         {
             ShowDirectoryContextMenu(row.Directory, location);
         }
-    }
-
-    protected override void OnMouseWheel(MouseEventArgs e)
-    {
-        base.OnMouseWheel(e);
-
-        if (!_scrollBar.Visible)
-        {
-            return;
-        }
-
-        var delta = e.Delta > 0 ? -_rowHeight * 3 : _rowHeight * 3;
-        var newValue = Math.Clamp(_scrollBar.Value + delta, _scrollBar.Minimum, Math.Max(0, _scrollBar.Maximum - _scrollBar.LargeChange));
-        _scrollBar.Value = newValue;
-        Invalidate();
-    }
-
-    protected override void OnResize(EventArgs e)
-    {
-        base.OnResize(e);
-        UpdateScrollBar();
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        if (disposing)
-        {
-            _boldFont.Dispose();
-            _actionFont.Dispose();
-            _strikeoutFont.Dispose();
-            _leftAlign.Dispose();
-            _rightAlign.Dispose();
-            _centerAlign.Dispose();
-            _contextMenu?.Dispose();
-        }
-
-        base.Dispose(disposing);
-    }
-
-    private static void CycleAction(FileComparison file)
-    {
-        var currentIndex = Array.IndexOf(ActionCycle, file.Action);
-        file.Action = currentIndex < 0
-            ? ActionCycle[0]
-            : ActionCycle[(currentIndex + 1) % ActionCycle.Length];
-    }
-
-    private static long CalcDirectorySize(DirectoryComparison dir, bool isLeft)
-    {
-        long total = 0;
-
-        foreach (var file in dir.Files)
-        {
-            var size = isLeft ? file.LeftSize : file.RightSize;
-
-            if (size.HasValue)
-            {
-                total += size.Value;
-            }
-        }
-
-        foreach (var sub in dir.SubDirectories)
-        {
-            total += CalcDirectorySize(sub, isLeft);
-        }
-
-        return total;
-    }
-
-    private static Color GetStatusColor(ComparisonStatus status)
-    {
-        return status switch
-        {
-            ComparisonStatus.LeftOnly => LeftOnlyColor,
-            ComparisonStatus.RightOnly => RightOnlyColor,
-            ComparisonStatus.Modified => ModifiedColor,
-            ComparisonStatus.Conflict => ConflictColor,
-            ComparisonStatus.Identical => IdenticalColor,
-            _ => Color.Black,
-        };
     }
 
     private void ScaleForDpi()
@@ -497,86 +579,15 @@ public sealed class SyncDiffView : UserControl
         var statusColor = GetStatusColor(dir.Status);
         var sizeReserve = _showSizes ? _sizeColumnWidth + _padding : _padding;
 
-        var leftIndent = indent + _padding;
-        var leftAbsent = dir.Status == ComparisonStatus.RightOnly;
+        DrawDirectoryLeft(g, dir, y, sideWidth, indent, sizeReserve, expandIcon, statusColor);
 
-        if (!leftAbsent || !_showAbsentAsEmpty)
+        if (dir.Status == ComparisonStatus.LeftOnly && _showAbsentAsEmpty)
         {
-            using var brush = new SolidBrush(Color.Gray);
-            g.DrawString(expandIcon, Font, brush, leftIndent, y + (_rowHeight - Font.Height) / 2f);
+            return;
         }
 
-        leftIndent += _iconWidth;
-
-        if (leftAbsent)
-        {
-            if (!_showAbsentAsEmpty)
-            {
-                var leftRect = new Rectangle(leftIndent, y, sideWidth - leftIndent - _padding, _rowHeight);
-
-                using var brush = new SolidBrush(AbsentColor);
-                g.DrawString(dir.Name, _strikeoutFont, brush, leftRect, _leftAlign);
-            }
-        }
-        else
-        {
-            var leftRect = new Rectangle(leftIndent, y, sideWidth - leftIndent - sizeReserve, _rowHeight);
-
-            using var brush = new SolidBrush(statusColor);
-            g.DrawString(dir.Name, _boldFont, brush, leftRect, _leftAlign);
-
-            if (_showSizes)
-            {
-                var leftSize = CalcDirectorySize(dir, true);
-                var sizeRect = new Rectangle(sideWidth - _sizeColumnWidth - _padding, y, _sizeColumnWidth, _rowHeight);
-
-                using var sizeBrush = new SolidBrush(Color.FromArgb(140, 140, 140));
-                g.DrawString(SizeFormatter.Format(leftSize), Font, sizeBrush, sizeRect, _rightAlign);
-            }
-        }
-
-        var rightIndent = actionX + _actionColumnWidth + indent + _padding;
-        var rightAbsent = dir.Status == ComparisonStatus.LeftOnly;
-
-        if (!rightAbsent || !_showAbsentAsEmpty)
-        {
-            using var brush = new SolidBrush(Color.Gray);
-            g.DrawString(expandIcon, Font, brush, rightIndent, y + (_rowHeight - Font.Height) / 2f);
-        }
-
-        rightIndent += _iconWidth;
-
-        if (rightAbsent)
-        {
-            if (_showAbsentAsEmpty)
-            {
-                return;
-            }
-
-            var rightRect = new Rectangle(rightIndent, y, drawWidth - rightIndent - _padding, _rowHeight);
-
-            using var brush = new SolidBrush(AbsentColor);
-            g.DrawString(dir.Name, _strikeoutFont, brush, rightRect, _leftAlign);
-        }
-        else
-        {
-            var rightEnd = drawWidth - _padding;
-            var rightRect = new Rectangle(rightIndent, y, rightEnd - rightIndent - (sizeReserve - _padding), _rowHeight);
-
-            using var brush = new SolidBrush(statusColor);
-            g.DrawString(dir.Name, _boldFont, brush, rightRect, _leftAlign);
-
-            if (!_showSizes)
-            {
-                return;
-            }
-
-            var rightSize = CalcDirectorySize(dir, false);
-            var sizeRect = new Rectangle(rightEnd - _sizeColumnWidth - _padding, y, _sizeColumnWidth, _rowHeight);
-
-            using var sizeBrush = new SolidBrush(Color.FromArgb(140, 140, 140));
-            g.DrawString(SizeFormatter.Format(rightSize), Font, sizeBrush, sizeRect, _rightAlign);
-        }
+        DrawDirectoryRight(g, dir, y, actionX, drawWidth, indent, sizeReserve, expandIcon,
+            statusColor);
     }
 
     private void DrawFileRow(Graphics g, RowData row, int y, int sideWidth, int actionX, int drawWidth)
@@ -586,34 +597,129 @@ public sealed class SyncDiffView : UserControl
         var indent = row.Indent * _indentWidth + _iconWidth + _padding;
         var sizeReserve = _showSizes ? _sizeColumnWidth + _padding : _padding;
 
+        DrawFileLeft(g, file, y, sideWidth, indent, sizeReserve, statusColor);
+        DrawFileAction(g, file, y, actionX);
+        DrawFileRight(g, file, y, drawWidth, actionX, row.Indent, sizeReserve, statusColor);
+    }
+
+    private void DrawDirectoryLeft(
+        Graphics g,
+        DirectoryComparison dir,
+        int y,
+        int sideWidth,
+        int indent,
+        int sizeReserve,
+        string expandIcon,
+        Color statusColor)
+    {
+        var leftIndent = indent + _padding;
+        var absent = dir.Status == ComparisonStatus.RightOnly;
+
+        if (!absent || !_showAbsentAsEmpty)
+        {
+            using var brush = new SolidBrush(Color.Gray);
+            g.DrawString(expandIcon, Font, brush, leftIndent, y + (_rowHeight - Font.Height) / 2f);
+        }
+
+        leftIndent += _iconWidth;
+
+        if (absent)
+        {
+            if (!_showAbsentAsEmpty)
+            {
+                DrawName(g, dir.Name, y, leftIndent, sideWidth - leftIndent - _padding, AbsentColor, _strikeoutFont);
+            }
+
+            return;
+        }
+
+        DrawName(g, dir.Name, y, leftIndent, sideWidth - leftIndent - sizeReserve, statusColor, _boldFont);
+        DrawDirectorySize(g, dir, y, sideWidth, true);
+    }
+
+    private void DrawDirectoryRight(
+        Graphics g,
+        DirectoryComparison dir,
+        int y,
+        int actionX,
+        int drawWidth,
+        int indent,
+        int sizeReserve,
+        string expandIcon,
+        Color statusColor)
+    {
+        var rightIndent = actionX + _actionColumnWidth + indent + _padding;
+        var absent = dir.Status == ComparisonStatus.LeftOnly;
+
+        if (!absent || !_showAbsentAsEmpty)
+        {
+            using var brush = new SolidBrush(Color.Gray);
+            g.DrawString(expandIcon, Font, brush, rightIndent, y + (_rowHeight - Font.Height) / 2f);
+        }
+
+        rightIndent += _iconWidth;
+
+        if (absent)
+        {
+            if (!_showAbsentAsEmpty)
+            {
+                DrawName(g, dir.Name, y, rightIndent, drawWidth - rightIndent - _padding, AbsentColor, _strikeoutFont);
+            }
+
+            return;
+        }
+
+        var rightEnd = drawWidth - _padding;
+        DrawName(g, dir.Name, y, rightIndent, rightEnd - rightIndent - (sizeReserve - _padding), statusColor, _boldFont);
+        DrawDirectorySize(g, dir, y, drawWidth, false);
+    }
+
+    private void DrawName(Graphics g, string name, int y, int x, int width, Color color, Font font)
+    {
+        using var brush = new SolidBrush(color);
+        g.DrawString(name, font, brush, new Rectangle(x, y, width, _rowHeight), _leftAlign);
+    }
+
+    private void DrawDirectorySize(Graphics g, DirectoryComparison dir, int y, int width, bool left)
+    {
+        if (!_showSizes)
+        {
+            return;
+        }
+
+        var size = CalcDirectorySize(dir, left);
+        var x = left
+            ? width - _sizeColumnWidth - _padding
+            : width - _sizeColumnWidth - _padding * 2;
+
+        var sizeRect = new Rectangle(x, y, _sizeColumnWidth, _rowHeight);
+
+        using var brush = new SolidBrush(Color.FromArgb(140, 140, 140));
+        g.DrawString(SizeFormatter.Format(size), Font, brush, sizeRect, _rightAlign);
+    }
+
+    private void DrawFileLeft(Graphics g, FileComparison file, int y, int sideWidth, int indent, int sizeReserve, Color statusColor)
+    {
         if (file.Status == ComparisonStatus.RightOnly)
         {
             if (!_showAbsentAsEmpty)
             {
-                var leftRect = new Rectangle(indent, y, sideWidth - indent - _padding, _rowHeight);
-
-                using var brush = new SolidBrush(AbsentColor);
-                g.DrawString(file.Name, _strikeoutFont, brush, leftRect, _leftAlign);
+                DrawName(g, file.Name, y, indent, sideWidth - indent - _padding, AbsentColor, _strikeoutFont);
             }
+
+            return;
         }
-        else
+
+        DrawName(g, file.Name, y, indent, sideWidth - indent - sizeReserve, statusColor, Font);
+
+        if (_showSizes && file.LeftSize.HasValue)
         {
-            var nameRect = new Rectangle(indent, y, sideWidth - indent - sizeReserve, _rowHeight);
-
-            using (var brush = new SolidBrush(statusColor))
-            {
-                g.DrawString(file.Name, Font, brush, nameRect, _leftAlign);
-            }
-
-            if (_showSizes && file.LeftSize.HasValue)
-            {
-                var sizeRect = new Rectangle(sideWidth - _sizeColumnWidth - _padding, y, _sizeColumnWidth, _rowHeight);
-
-                using var brush = new SolidBrush(Color.FromArgb(140, 140, 140));
-                g.DrawString(SizeFormatter.Format(file.LeftSize.Value), Font, brush, sizeRect, _rightAlign);
-            }
+            DrawFileSize(g, file.LeftSize.Value, y, sideWidth);
         }
+    }
 
+    private void DrawFileAction(Graphics g, FileComparison file, int y, int actionX)
+    {
         var actionRect = new Rectangle(actionX, y, _actionColumnWidth, _rowHeight);
 
         if (file.Status == ComparisonStatus.Identical)
@@ -626,43 +732,37 @@ public sealed class SyncDiffView : UserControl
             using var brush = new SolidBrush(style.Color);
             g.DrawString(style.Symbol, _actionFont, brush, actionRect, _centerAlign);
         }
+    }
 
-        var rightIndent = actionX + _actionColumnWidth + row.Indent * _indentWidth + _iconWidth + _padding;
+    private void DrawFileRight(Graphics g, FileComparison file, int y, int drawWidth, int actionX, int indent, int sizeReserve, Color statusColor)
+    {
+        var rightIndent = actionX + _actionColumnWidth + indent * _indentWidth + _iconWidth + _padding;
 
         if (file.Status == ComparisonStatus.LeftOnly)
         {
-            if (_showAbsentAsEmpty)
+            if (!_showAbsentAsEmpty)
             {
-                return;
+                DrawName(g, file.Name, y, rightIndent, drawWidth - rightIndent - _padding, AbsentColor, _strikeoutFont);
             }
 
-            var rightRect = new Rectangle(rightIndent, y, drawWidth - rightIndent - _padding, _rowHeight);
-
-            using var brush = new SolidBrush(AbsentColor);
-            g.DrawString(file.Name, _strikeoutFont, brush, rightRect, _leftAlign);
+            return;
         }
-        else
+
+        var rightEnd = drawWidth - _padding;
+        DrawName(g, file.Name, y, rightIndent, rightEnd - rightIndent - sizeReserve, statusColor, Font);
+
+        if (_showSizes && file.RightSize.HasValue)
         {
-            var rightEnd = drawWidth - _padding;
-            var nameRect = new Rectangle(rightIndent, y, rightEnd - rightIndent - sizeReserve, _rowHeight);
-
-            using (var brush = new SolidBrush(statusColor))
-            {
-                g.DrawString(file.Name, Font, brush, nameRect, _leftAlign);
-            }
-
-            if (!_showSizes || !file.RightSize.HasValue)
-            {
-                return;
-            }
-
-            {
-                var sizeRect = new Rectangle(rightEnd - _sizeColumnWidth - _padding, y, _sizeColumnWidth, _rowHeight);
-
-                using var brush = new SolidBrush(Color.FromArgb(140, 140, 140));
-                g.DrawString(SizeFormatter.Format(file.RightSize.Value), Font, brush, sizeRect, _rightAlign);
-            }
+            DrawFileSize(g, file.RightSize.Value, y, rightEnd);
         }
+    }
+
+    private void DrawFileSize(Graphics g, long size, int y, int x)
+    {
+        var sizeRect = new Rectangle(x - _sizeColumnWidth - _padding, y, _sizeColumnWidth, _rowHeight);
+
+        using var brush = new SolidBrush(Color.FromArgb(140, 140, 140));
+        g.DrawString(SizeFormatter.Format(size), Font, brush, sizeRect, _rightAlign);
     }
 
     private void ShowContextMenu(FileComparison file, Point location)
@@ -671,39 +771,29 @@ public sealed class SyncDiffView : UserControl
         var menu = new ContextMenuStrip();
         _contextMenu = menu;
 
-        menu.Items.Add("Копировать \u2192", null, (_, _) =>
-        {
-            file.Action = SyncAction.CopyToRight;
-            Invalidate();
-            ActionChanged?.Invoke(this, EventArgs.Empty);
-        });
+        var copyRight = menu.Items.Add("Копировать \u2192", null, (_, _) => AssignAction(file, SyncAction.CopyToRight));
+        var copyLeft = menu.Items.Add("\u2190 Копировать", null, (_, _) => AssignAction(file, SyncAction.CopyToLeft));
 
-        menu.Items.Add("\u2190 Копировать", null, (_, _) =>
+        if (file.TypeConflict != FileTypeConflict.None)
         {
-            file.Action = SyncAction.CopyToLeft;
-            Invalidate();
-            ActionChanged?.Invoke(this, EventArgs.Empty);
-        });
+            Block(copyRight, TypeConflictHint);
+            Block(copyLeft, TypeConflictHint);
+        }
 
-        menu.Items.Add("Пропустить", null, (_, _) =>
-        {
-            file.Action = SyncAction.Skip;
-            Invalidate();
-            ActionChanged?.Invoke(this, EventArgs.Empty);
-        });
+        menu.Items.Add("Пропустить", null, (_, _) => AssignAction(file, SyncAction.Skip));
 
-        if (file.Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly)
+        if (file.TypeConflict == FileTypeConflict.None && file.Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly)
         {
             var deleteSide = file.Status == ComparisonStatus.LeftOnly
                 ? SyncAction.DeleteLeft
                 : SyncAction.DeleteRight;
 
-            menu.Items.Add("Удалить", null, (_, _) =>
+            var delete = menu.Items.Add("Удалить", null, (_, _) => AssignAction(file, deleteSide));
+
+            if (DeleteBlocked(file, deleteSide))
             {
-                file.Action = deleteSide;
-                Invalidate();
-                ActionChanged?.Invoke(this, EventArgs.Empty);
-            });
+                Block(delete, DeleteBlockedHint);
+            }
         }
 
         menu.Show(this, location);
@@ -715,20 +805,20 @@ public sealed class SyncDiffView : UserControl
         var menu = new ContextMenuStrip();
         _contextMenu = menu;
 
-        menu.Items.Add($"Папка «{dir.Name}»:") .Enabled = false;
+        menu.Items.Add($"Папка «{dir.Name}»:").Enabled = false;
         menu.Items.Add(new ToolStripSeparator());
 
-        menu.Items.Add("Всё копировать \u2192", null, (_, _) => ApplyActionToDirectory(dir, SyncAction.CopyToRight));
-        menu.Items.Add("\u2190 Всё копировать", null, (_, _) => ApplyActionToDirectory(dir, SyncAction.CopyToLeft));
+        menu.Items.Add("Всё копировать \u2192", null, (_, _) => ApplyActionToDirectory(dir, SyncAction.CopyToRight)).Enabled = dir.Status != ComparisonStatus.RightOnly;
+        menu.Items.Add("\u2190 Всё копировать", null, (_, _) => ApplyActionToDirectory(dir, SyncAction.CopyToLeft)).Enabled = dir.Status != ComparisonStatus.LeftOnly;
         menu.Items.Add("Всё пропустить", null, (_, _) => ApplyActionToDirectory(dir, SyncAction.Skip));
 
         if (dir.Status is ComparisonStatus.LeftOnly)
         {
-            menu.Items.Add("Всё удалить слева", null, (_, _) => ApplyActionToDirectory(dir, SyncAction.DeleteLeft));
+            AddDirectoryDelete(menu, dir, SyncAction.DeleteLeft, "Всё удалить слева");
         }
         else if (dir.Status is ComparisonStatus.RightOnly)
         {
-            menu.Items.Add("Всё удалить справа", null, (_, _) => ApplyActionToDirectory(dir, SyncAction.DeleteRight));
+            AddDirectoryDelete(menu, dir, SyncAction.DeleteRight, "Всё удалить справа");
         }
 
         menu.Show(this, location);
@@ -741,20 +831,27 @@ public sealed class SyncDiffView : UserControl
         ActionChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private static void ApplyActionRecursive(DirectoryComparison dir, SyncAction action)
+    private void AssignAction(FileComparison file, SyncAction action)
     {
-        foreach (var file in dir.Files)
-        {
-            if (file.Status != ComparisonStatus.Identical)
-            {
-                file.Action = action;
-            }
-        }
+        file.Action = action;
+        Invalidate();
+        ActionChanged?.Invoke(this, EventArgs.Empty);
+    }
 
-        foreach (var sub in dir.SubDirectories)
+    private void AddDirectoryDelete(ContextMenuStrip menu, DirectoryComparison dir, SyncAction action, string header)
+    {
+        var item = menu.Items.Add(header, null, (_, _) => ApplyActionToDirectory(dir, action));
+
+        if (DeleteBlocked(dir, action))
         {
-            ApplyActionRecursive(sub, action);
+            Block(item, DeleteBlockedHint);
         }
+    }
+
+    private static void Block(ToolStripItem item, string reason)
+    {
+        item.Text = $"{item.Text} – {reason}";
+        item.Enabled = false;
     }
 
     private int GetRowAtY(int y)

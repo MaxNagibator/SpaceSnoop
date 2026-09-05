@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using SpaceSnoop.Wpf.Views;
+using System.Diagnostics;
 using System.IO;
 
 namespace SpaceSnoop.Wpf;
@@ -10,15 +11,21 @@ public partial class App : Application
 {
     private ServiceProvider? _services;
     private KeepShellLogging? _logging;
+    private ISettingsStore? _settings;
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        var startedAt = Stopwatch.GetTimestamp();
+
         base.OnStartup(e);
+
+        AppResources.InstallInto(this);
 
         _logging = KeepShellLogging.Bootstrap(new()
         {
             LogsDirectory = Path.Combine(AppStorage.DataDirectory, AppStorage.LogsFolderName),
             FileNamePrefix = AppInfo.LogFilePrefix,
+            MinimumLevelOverrides = AppDefaults.LogLevelOverrides,
         });
 
         var syncIndex = Array.FindIndex(e.Args, static arg => string.Equals(arg, AppInfo.SyncArgument, StringComparison.OrdinalIgnoreCase));
@@ -27,6 +34,14 @@ public partial class App : Application
         {
             var profileId = syncIndex + 1 < e.Args.Length ? e.Args[syncIndex + 1] : null;
             RunHeadlessSync(profileId);
+            return;
+        }
+
+        var galleryIndex = Array.FindIndex(e.Args, static arg => string.Equals(arg, AppInfo.GalleryArgument, StringComparison.OrdinalIgnoreCase));
+
+        if (galleryIndex >= 0)
+        {
+            RunGallery(e.Args.Skip(galleryIndex + 1));
             return;
         }
 
@@ -42,6 +57,7 @@ public partial class App : Application
         {
             var settingsPath = Path.Combine(AppStorage.DataDirectory, TomlSettingsFile.PrimaryFileName);
             ISettingsStore settings = new SettingsStore(settingsPath);
+            _settings = settings;
             AppThemes.Register();
             var themeKey = settings.GetStringValue(SettingsKeys.Theme);
             ThemeManager.Apply(string.IsNullOrWhiteSpace(themeKey) ? AppThemes.LightKey : themeKey);
@@ -49,7 +65,7 @@ public partial class App : Application
 
             ViewLocator.InstallIntoApplication();
 
-            Log.Information(AppInfo.SessionStartMarker + "...");
+            Log.Information("{Marker}...", AppInfo.SessionStartMarker);
 
             if (TryRestartAsAdministrator(settings))
             {
@@ -64,6 +80,8 @@ public partial class App : Application
                 _services = ConfigureServices(settings, _logging);
             }
 
+            ReportSettingsWriteFailures(settings, _services);
+
             using (splash.StartSpan("Открытие главного окна..."))
             {
                 var window = _services.GetRequiredService<MainWindow>();
@@ -72,6 +90,16 @@ public partial class App : Application
 
                 ShutdownMode = ShutdownMode.OnMainWindowClose;
             }
+
+            var monitor = _services.GetRequiredService<PerformanceMonitor>();
+            monitor.ReportStartup(Stopwatch.GetElapsedTime(startedAt));
+
+            var diagnostics = _services.GetRequiredService<DiagnosticsCollector>();
+            diagnostics.CaptureMachine(MainWindow!);
+            _logging.CreateLogger<MachineProfile>().MachineProfileCaptured(string.Join(" · ", diagnostics.Machine.Describe()));
+
+            _services.GetRequiredService<McpServerHost>().Apply();
+            monitor.Start();
 
             _ = Task.Run(() => ScheduleReconciler.Reconcile(settings, _logging.CreateLogger<ScheduleViewModel>()));
 
@@ -89,11 +117,27 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        _services?.GetService<ISettingsStore>()?.Flush();
+        _settings?.Close();
 
         _services?.Dispose();
         _logging?.Dispose();
         base.OnExit(e);
+    }
+
+    private void ReportSettingsWriteFailures(ISettingsStore settings, ServiceProvider services)
+    {
+        var logger = _logging!.CreateLogger<App>();
+        var dispatcher = services.GetRequiredService<IUiDispatcher>();
+        var notifier = services.GetRequiredService<ToastNotifier>();
+
+        settings.WriteFailed += (_, failure) =>
+        {
+            logger.SettingsWriteFailed(failure.Exception, failure.FilePath);
+
+            dispatcher.Invoke(() => notifier.Notify(
+                $"Настройка не сохранена: файл «{failure.FilePath}» не записан. Значение осталось только в окне и пропадёт при следующем запуске.",
+                StatusSeverity.Error));
+        };
     }
 
     private static bool TryRestartAsAdministrator(ISettingsStore settings)
@@ -125,7 +169,7 @@ public partial class App : Application
         return result == MessageBoxResult.Yes && AdminElevation.TryRestartAsAdmin();
     }
 
-    private static ServiceProvider ConfigureServices(ISettingsStore settings, KeepShellLogging logging)
+    internal static ServiceProvider ConfigureServices(ISettingsStore settings, KeepShellLogging logging)
     {
         var services = new ServiceCollection();
 
@@ -133,8 +177,15 @@ public partial class App : Application
         services.AddKeepShellLogging(logging);
 
         services.AddSingleton<DiskSpaceCalculator>();
+        services.AddSingleton<MftScanner>();
+        services.AddSingleton<ScanRunner>();
+
+        services.AddSingleton<DuplicateFinder>();
         services.AddSingleton<DockerService>();
         services.AddSingleton<ArchiveService>();
+        services.AddSingleton<CleanupService>();
+        services.AddSingleton<CompareDirectoriesUseCase>();
+        services.AddSingleton<ExecuteSyncUseCase>();
 
         services.AddKeepShell();
         services.AddKeepShellToasts();
@@ -154,16 +205,37 @@ public partial class App : Application
 
         services.AddSingleton<ErrorReportService>();
 
+        services.AddSingleton<PerformanceMonitor>();
+        services.AddSingleton<DiagnosticsCollector>();
+        services.AddSingleton<PerformanceRunTracker>();
+        services.AddSingleton<PerformanceHudViewModel>();
+
         services.AddSingleton<ScanInspectorViewModel>();
         services.AddSingleton<ScanNodeFactory>();
         services.AddSingleton<DeleteProgressDialogFactory>();
         services.AddSingleton<ArchiveProgressDialogFactory>();
+        services.AddSingleton<CleanupProgressDialogFactory>();
+
+        services.AddSingleton<DuplicateProgressDialogFactory>();
+
+        services.AddSingleton<AppNavigator>();
+        services.AddSingleton<IAppNavigator>(static provider => provider.GetRequiredService<AppNavigator>());
 
         services.AddSingleton<ScanViewModel>();
+        services.AddSingleton<IScanAutomation>(static provider => provider.GetRequiredService<ScanViewModel>());
         services.AddSingleton<SyncViewModel>();
+        services.AddSingleton<ISyncAutomation>(static provider => provider.GetRequiredService<SyncViewModel>());
         services.AddSingleton<OverviewViewModel>();
+        services.AddSingleton<IScheduleRunner, ScheduleRunner>();
         services.AddSingleton<ScheduleViewModel>();
         services.AddSingleton<DockerViewModel>();
+        services.AddSingleton<CleanupViewModel>();
+        services.AddSingleton<ICleanupAutomation>(static provider => provider.GetRequiredService<CleanupViewModel>());
+        services.AddSingleton<CleanupPageViewModel>();
+        services.AddSingleton<ChatViewModel>();
+        services.AddTransient<PerformanceChartViewModel>();
+        services.AddSingleton<ILogsPanel>(static provider => provider.GetRequiredService<PerformanceChartViewModel>());
+        services.AddSingleton<PerformanceViewModel>();
         services.AddSingleton<LogsViewModel>();
         services.AddSingleton<AboutViewModel>();
         services.AddSingleton<SettingsViewModel>();
@@ -172,7 +244,67 @@ public partial class App : Application
         services.AddSingleton<ShellViewModel>();
         services.AddSingleton<MainWindow>();
 
-        return services.BuildServiceProvider();
+        services.AddSingleton<AgentPreferences>();
+        services.AddSingleton<AgentModelSelector>();
+        services.AddSingleton(provider => new ChatHistoryStore(provider.GetRequiredService<ILogger<ChatHistoryStore>>()));
+        services.AddSingleton(provider => new AgentTranscriptStore(
+            provider.GetRequiredService<AgentPreferences>(),
+            provider.GetRequiredService<ILogger<AgentTranscriptStore>>()));
+        services.AddSingleton<ClaudeAgentBackend>();
+        services.AddSingleton<CodexAgentBackend>();
+        services.AddSingleton<OpenCodeAgentBackend>();
+        services.AddSingleton<AgentBackends>();
+
+        services.AddSingleton<McpPreferences>();
+        services.AddSingleton<McpBridge>();
+        services.AddSingleton<McpServerHost>();
+
+        return services.BuildServiceProvider(new ServiceProviderOptions
+        {
+            ValidateOnBuild = true,
+            ValidateScopes = true,
+        });
+    }
+
+    private void RunGallery(IEnumerable<string> args)
+    {
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+        AppThemes.Register();
+
+        var directory = Path.Combine(AppStorage.DataDirectory, GalleryRunner.FolderName);
+        var options = GalleryOptions.Parse(args, directory);
+
+        _ = Dispatcher.InvokeAsync(async () =>
+        {
+            var exitCode = 1;
+
+            try
+            {
+                var fixture = GalleryFixtures.Create();
+                var settingsPath = Path.Combine(fixture.Root, TomlSettingsFile.PrimaryFileName);
+                ISettingsStore settings = new SettingsStore(settingsPath);
+                _settings = settings;
+                SyncProfileStore.Save(settings, GalleryFixtures.Profiles(fixture));
+
+                ThemeManager.Apply(AppThemes.LightKey);
+                FontScaleManager.Initialize(options.Arguments.FontScale);
+                ViewLocator.InstallIntoApplication();
+
+                _services = ConfigureServices(settings, _logging!);
+
+                var logger = _logging!.CreateLogger<App>();
+                var host = GalleryHost.Create(_services, fixture, options, logger);
+
+                exitCode = await GalleryRunner.RunAsync(host, options.Arguments, new GalleryJournal(logger));
+            }
+            catch (Exception ex)
+            {
+                Log.Fatal(ex.Unwrap(), "Галерея не отрисована");
+            }
+
+            Shutdown(exitCode);
+        });
     }
 
     private void RunHeadlessSync(string? profileId)
@@ -183,6 +315,7 @@ public partial class App : Application
         {
             var settingsPath = Path.Combine(AppStorage.DataDirectory, TomlSettingsFile.PrimaryFileName);
             ISettingsStore settings = new SettingsStore(settingsPath);
+            _settings = settings;
             exitCode = HeadlessSync.Run(settings, _logging!, profileId);
         }
         catch (Exception ex)

@@ -1,0 +1,206 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Cleanup.CleanupTargetList"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Cleanup"
+             xmlns:conv="clr-namespace:SpaceSnoop.Wpf.Converters"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:CleanupViewModel}">
+    <UserControl.Resources>
+        <conv:FractionToWidthConverter x:Key="FractionToWidth" />
+
+        <Style x:Key="Cleanup.Row"
+               TargetType="Border">
+            <Setter Property="Padding"
+                    Value="0,10" />
+            <Setter Property="BorderBrush"
+                    Value="{DynamicResource Border.Subtle}" />
+            <Setter Property="BorderThickness"
+                    Value="0,1,0,0" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasAvailabilityIssue}"
+                             Value="True">
+                    <Setter Property="Opacity"
+                            Value="0.6" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="Cleanup.SecondaryActions"
+               TargetType="StackPanel">
+            <Setter Property="Opacity"
+                    Value="0.55" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Border}}"
+                             Value="True">
+                    <Setter Property="Opacity"
+                            Value="1" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource Self}}"
+                             Value="True">
+                    <Setter Property="Opacity"
+                            Value="1" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Border Style="{StaticResource Card}">
+        <StackPanel>
+            <TextBlock Text="Что можно освободить"
+                       Style="{StaticResource SectionTitle}"
+                       Margin="0,0,0,10" />
+
+            <ItemsControl ItemsSource="{Binding Targets}"
+                          Grid.IsSharedSizeScope="True">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:CleanupTargetViewModel}">
+                        <Border Style="{StaticResource Cleanup.Row}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="140" />
+                                    <ColumnDefinition Width="Auto"
+                                                      SharedSizeGroup="CleanupNumbers" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <CheckBox Grid.Column="0"
+                                          IsChecked="{Binding IsSelected}"
+                                          IsEnabled="{Binding IsAvailable}"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,10,0"
+                                          AutomationProperties.Name="{Binding Name}" />
+
+                                <iconPacks:PackIconLucide Grid.Column="1"
+                                                          Kind="{Binding IconKind}"
+                                                          Width="16"
+                                                          Height="16"
+                                                          VerticalAlignment="Center"
+                                                          Margin="0,0,12,0"
+                                                          Foreground="{DynamicResource Fg.Muted}" />
+
+                                <StackPanel Grid.Column="2"
+                                            VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Name}"
+                                               Foreground="{DynamicResource Fg.Primary}"
+                                               FontWeight="Medium"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Description}"
+                                               Style="{StaticResource TextBlock.Subtle}"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding Path}" />
+                                    <TextBlock Text="{Binding AvailabilityText}"
+                                               Margin="0,2,0,0"
+                                               FontSize="{DynamicResource Font.Size.S}"
+                                               Foreground="{DynamicResource State.WarningText}"
+                                               Visibility="{Binding HasAvailabilityIssue, Converter={StaticResource BoolToVisibility}}" />
+                                    <TextBlock Text="{Binding UnreadableText}"
+                                               Margin="0,2,0,0"
+                                               TextTrimming="CharacterEllipsis"
+                                               Style="{StaticResource Caption}"
+                                               Visibility="{Binding HasUnreadable, Converter={StaticResource BoolToVisibility}}" />
+                                </StackPanel>
+
+                                <Border x:Name="ShareTrack"
+                                        Grid.Column="3"
+                                        Height="8"
+                                        Margin="16,0"
+                                        Background="{DynamicResource Bg.SurfaceMute}"
+                                        CornerRadius="{DynamicResource Radius.S}"
+                                        VerticalAlignment="Center"
+                                        Visibility="{Binding ShowNumbers, Converter={StaticResource BoolToVisibility}}"
+                                        ToolTip="Доля от того, что можно очистить">
+                                    <Rectangle HorizontalAlignment="Left"
+                                               Height="8"
+                                               RadiusX="4"
+                                               RadiusY="4"
+                                               Fill="{DynamicResource Accent.Primary}">
+                                        <Rectangle.Width>
+                                            <MultiBinding Converter="{StaticResource FractionToWidth}">
+                                                <Binding Path="Share" />
+                                                <Binding Path="ActualWidth"
+                                                         ElementName="ShareTrack" />
+                                            </MultiBinding>
+                                        </Rectangle.Width>
+                                    </Rectangle>
+                                </Border>
+
+                                <Grid Grid.Column="4"
+                                      VerticalAlignment="Center">
+                                    <StackPanel Visibility="{Binding ShowNumbers, Converter={StaticResource BoolToVisibility}}">
+                                        <TextBlock Text="{Binding SizeText}"
+                                                   Style="{StaticResource TextBlock.Mono}"
+                                                   TextAlignment="Right"
+                                                   Foreground="{DynamicResource Fg.Primary}" />
+                                        <TextBlock Text="{Binding FilesText}"
+                                                   Style="{StaticResource Caption}"
+                                                   TextAlignment="Right"
+                                                   HorizontalAlignment="Right" />
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding PendingText}"
+                                               Style="{StaticResource Caption}"
+                                               TextAlignment="Right"
+                                               HorizontalAlignment="Right"
+                                               Visibility="{Binding ShowPending, Converter={StaticResource BoolToVisibility}}" />
+                                </Grid>
+
+                                <StackPanel Grid.Column="5"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center"
+                                            Margin="12,0,0,0">
+                                    <StackPanel Orientation="Horizontal"
+                                                Style="{StaticResource Cleanup.SecondaryActions}">
+                                        <Button Style="{StaticResource Button.Icon}"
+                                                Command="{Binding DataContext.MeasureOneCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                AutomationProperties.Name="Замерить заново"
+                                                ToolTip="Замерить заново">
+                                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.RefreshCw}"
+                                                                      Width="15"
+                                                                      Height="15" />
+                                        </Button>
+                                        <Button Style="{StaticResource Button.Icon}"
+                                                Command="{Binding DataContext.OpenFolderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                IsEnabled="{Binding HasPath}"
+                                                AutomationProperties.Name="Открыть папку"
+                                                ToolTip="Открыть папку">
+                                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderOpen}"
+                                                                      Width="15"
+                                                                      Height="15" />
+                                        </Button>
+                                    </StackPanel>
+                                    <Button Style="{StaticResource Button.Icon}"
+                                            Command="{Binding DataContext.OpenSystemToolCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            Visibility="{Binding IsUnsupported, Converter={StaticResource BoolToVisibility}}"
+                                            AutomationProperties.Name="Открыть «Очистку диска» Windows"
+                                            ToolTip="Открыть «Очистку диска» Windows – она умеет удалять предыдущую установку">
+                                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ExternalLink}"
+                                                                  Width="15"
+                                                                  Height="15" />
+                                    </Button>
+                                    <Button Style="{StaticResource Button.Icon}"
+                                            Command="{Binding DataContext.CleanOneCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            IsEnabled="{Binding CanClean}"
+                                            AutomationProperties.Name="Очистить"
+                                            ToolTip="Очистить безвозвратно">
+                                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                                                  Width="15"
+                                                                  Height="15" />
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </Border>
+</UserControl>

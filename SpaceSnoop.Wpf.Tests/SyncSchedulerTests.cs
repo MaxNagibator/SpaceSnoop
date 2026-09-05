@@ -1,5 +1,6 @@
 ﻿using SpaceSnoop.Core.Domain;
 using SpaceSnoop.Wpf.Bootstrap;
+using SpaceSnoop.Wpf.Bootstrap.Schedule;
 using SpaceSnoop.Wpf.ViewModels.Schedule;
 
 namespace SpaceSnoop.Wpf.Tests;
@@ -98,6 +99,7 @@ public class SyncSchedulerTests
     [TestCase(1, "Завершилась с ошибками")]
     [TestCase(3, "Каталог недоступен")]
     [TestCase(5, "Каталоги пересекаются")]
+    [TestCase(6, "Проверка нашла расхождения")]
     [TestCase(ScheduleStatus.NeverRun, "Ещё не запускалась")]
     [TestCase(ScheduleStatus.Running, "Выполняется")]
     [TestCase(12345, "Код 12345")]
@@ -127,16 +129,6 @@ public class SyncSchedulerTests
     public void Без_явного_состояния_задача_считается_включённой(string xml)
     {
         Assert.That(ScheduleStatus.ParseEnabled(xml), Is.True);
-    }
-
-    [TestCase("...: 5 успешно, 0 ошибок", false)]
-    [TestCase("...: 0 успешно, 0 ошибок", false)]
-    [TestCase("...: 5 успешно, 3 ошибок", true)]
-    [TestCase("...: 5 успешно, 20 ошибок", true)]
-    [TestCase("...: 5 успешно, 100 ошибок", true)]
-    public void Строка_истории_подсвечивается_только_при_реальных_ошибках(string line, bool hasErrors)
-    {
-        Assert.That(ScheduleViewModel.LineHasErrors(line), Is.EqualTo(hasErrors));
     }
 
     [TestCase(@"C:\A", @"C:\B", false)]

@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Dialogs"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:behaviors="clr-namespace:SpaceSnoop.Wpf.Views.Behaviors"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
@@ -10,7 +11,8 @@
              d:DesignHeight="320"
              d:DesignWidth="640"
              Width="{DynamicResource Dialog.Width.Medium}"
-             MinHeight="200">
+             MinHeight="200"
+             AutomationProperties.Name="{Binding Title}">
 
     <Grid Margin="22">
         <Grid.RowDefinitions>
@@ -27,9 +29,9 @@
                                       Height="20"
                                       VerticalAlignment="Center"
                                       Margin="0,0,10,0"
-                                      Foreground="{DynamicResource Accent.Primary}" />
+                                      Foreground="{DynamicResource Accent.Text}" />
             <TextBlock Text="{Binding Title}"
-                       Style="{StaticResource TextBlock.Heading}"
+                       Style="{StaticResource DialogTitle}"
                        VerticalAlignment="Center" />
         </StackPanel>
 
@@ -54,6 +56,7 @@
                                                   Foreground="{DynamicResource Fg.Muted}" />
                         <TextBlock Grid.Column="1"
                                    Text="{Binding SourceName}"
+                                   AutomationProperties.Name="Исходный каталог"
                                    VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis"
                                    FontWeight="Medium"
@@ -62,7 +65,6 @@
                                    Text="{Binding SourceSize}"
                                    VerticalAlignment="Center"
                                    Margin="12,0,0,0"
-                                   FontFamily="{DynamicResource Font.Mono}"
                                    FontSize="{DynamicResource Font.Size.S}"
                                    Foreground="{DynamicResource Fg.Muted}" />
                     </Grid>
@@ -78,9 +80,10 @@
                                                   Height="15"
                                                   VerticalAlignment="Center"
                                                   Margin="0,0,9,0"
-                                                  Foreground="{DynamicResource Accent.Primary}" />
+                                                  Foreground="{DynamicResource Accent.Text}" />
                         <TextBlock Grid.Column="1"
                                    Text="{Binding TargetName}"
+                                   AutomationProperties.Name="Файл архива"
                                    VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis"
                                    FontFamily="{DynamicResource Font.Mono}"
@@ -98,6 +101,7 @@
             <TextBlock Text="{Binding StatusText}"
                        Style="{StaticResource TextBlock.Subtle}"
                        TextWrapping="Wrap"
+                       AutomationProperties.LiveSetting="Polite"
                        Visibility="{Binding IsIdle, Converter={StaticResource InverseBoolToVisibility}}" />
         </Grid>
 
@@ -115,20 +119,23 @@
                              Minimum="0"
                              Maximum="1"
                              IsIndeterminate="{Binding IsIndeterminate}"
+                             AutomationProperties.Name="Ход архивации"
                              Value="{Binding ProgressValue, Mode=OneWay}" />
                 <TextBlock Grid.Column="1"
                            Text="{Binding CountText}"
+                           AutomationProperties.Name="{Binding CountLabel}"
+                           AutomationProperties.LiveSetting="Polite"
                            Margin="12,0,0,0"
                            VerticalAlignment="Center"
-                           FontFamily="{DynamicResource Font.Mono}"
                            FontSize="{DynamicResource Font.Size.S}"
                            FontWeight="Medium"
-                           Foreground="{DynamicResource Accent.Primary}" />
+                           Foreground="{DynamicResource Accent.Text}" />
             </Grid>
 
-            <TextBlock Text="{Binding CurrentPath}"
+            <TextBlock behaviors:PathTrimmer.FullPath="{Binding CurrentPath}"
+                       AutomationProperties.Name="Текущий файл"
                        Margin="0,8,0,0"
-                       TextTrimming="CharacterEllipsis"
+                       TextWrapping="NoWrap"
                        FontFamily="{DynamicResource Font.Mono}"
                        FontSize="{DynamicResource Font.Size.S}"
                        Foreground="{DynamicResource Fg.Muted}"
@@ -141,7 +148,7 @@
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Visibility="{Binding IsIdle, Converter={StaticResource BoolToVisibility}}">
-                <Button Style="{StaticResource Button.Ghost}"
+                <Button Style="{StaticResource Button.Secondary}"
                         Command="{Binding CloseCommand}"
                         Content="Отмена"
                         MinWidth="96"
@@ -168,7 +175,7 @@
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
-                <Button Style="{StaticResource Button.Ghost}"
+                <Button Style="{StaticResource Button.Secondary}"
                         Command="{Binding CancelRunCommand}"
                         Content="Отменить"
                         MinWidth="96"
@@ -179,7 +186,7 @@
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Visibility="{Binding IsFinished, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
-                <Button Style="{StaticResource Button.Primary}"
+                <Button Style="{StaticResource Button.Secondary}"
                         Command="{Binding CloseCommand}"
                         Content="Закрыть"
                         MinWidth="96"

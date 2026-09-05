@@ -1,0 +1,381 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.PerformanceView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
+             xmlns:converters="clr-namespace:SpaceSnoop.Wpf.Converters"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:PerformanceViewModel}"
+             d:DesignHeight="760"
+             d:DesignWidth="900">
+
+    <UserControl.Resources>
+        <converters:TileColumnsConverter x:Key="TileColumns" />
+
+        <Style x:Key="Performance.Tile"
+               TargetType="Border"
+               BasedOn="{StaticResource Card}">
+            <Setter Property="Padding"
+                    Value="14" />
+            <Setter Property="Margin"
+                    Value="0,0,10,10" />
+            <Setter Property="MinWidth"
+                    Value="200" />
+        </Style>
+
+        <Style x:Key="Performance.TileCaption"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource TextBlock.Subtle}">
+            <Setter Property="Margin"
+                    Value="0,0,0,4" />
+            <Setter Property="TextWrapping"
+                    Value="Wrap" />
+        </Style>
+
+        <Style x:Key="Performance.TileValue"
+               TargetType="TextBlock">
+            <Setter Property="FontSize"
+                    Value="{DynamicResource Font.Size.XL}" />
+            <Setter Property="FontWeight"
+                    Value="SemiBold" />
+        </Style>
+
+        <Style x:Key="Performance.TileHint"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource TextBlock.Subtle}">
+            <Setter Property="Margin"
+                    Value="0,4,0,0" />
+            <Setter Property="TextWrapping"
+                    Value="Wrap" />
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  Padding="0,0,12,0">
+        <StackPanel>
+
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <CheckBox Grid.Column="1"
+                          Content="Показывать поверх окна"
+                          IsChecked="{Binding Preferences.ShowPerformanceHud}"
+                          VerticalAlignment="Center"
+                          Margin="16,0,0,0"
+                          ToolTip="Небольшая плашка с откликом и памятью в углу окна" />
+
+                <WrapPanel Grid.Column="0">
+                    <Button Style="{StaticResource Button.Secondary}"
+                            Command="{Binding ResetCommand}"
+                            ToolTip="Обнулить окно замеров, историю графика и счётчики сборок мусора"
+                            MinHeight="0"
+                            Height="32"
+                            Margin="0,2,0,2"
+                            Padding="10,0">
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.RotateCcw}"
+                                                      Width="16"
+                                                      Height="16"
+                                                      Margin="0,0,8,0" />
+                            <TextBlock Text="Сбросить" />
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource Button.Secondary}"
+                            Command="{Binding CopySummaryCommand}"
+                            ToolTip="Скопировать текстовую сводку замеров: её удобно приложить к issue"
+                            Margin="8,2,0,2"
+                            MinHeight="0"
+                            Height="32"
+                            Padding="10,0">
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Copy}"
+                                                      Width="16"
+                                                      Height="16"
+                                                      Margin="0,0,8,0" />
+                            <TextBlock Text="Скопировать сводку" />
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource Button.Secondary}"
+                            Command="{Binding SaveDiagnosticsCommand}"
+                            ToolTip="Собрать zip с профилем машины, замерами, просадками, настройками и хвостом журнала – файл, который можно приложить к обращению"
+                            Margin="8,2,0,2"
+                            MinHeight="0"
+                            Height="32"
+                            Padding="10,0">
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FileArchive}"
+                                                      Width="16"
+                                                      Height="16"
+                                                      Margin="0,0,8,0" />
+                            <TextBlock Text="Собрать пакет" />
+                        </StackPanel>
+                    </Button>
+
+                    <CheckBox Content="Пути как есть"
+                              IsChecked="{Binding Preferences.DiagnosticsRawPaths}"
+                              VerticalAlignment="Center"
+                              Margin="12,2,0,2"
+                              ToolTip="По умолчанию из путей в пакете остаются только диск и имя объекта, а имя пользователя и имя машины заменяются. Снимите обезличивание, если разбор упирается в конкретный каталог" />
+                </WrapPanel>
+            </Grid>
+
+            <Border Style="{StaticResource Card.Inset}"
+                    Padding="12,8"
+                    Margin="0,0,0,10"
+                    Visibility="{Binding StaleText, Converter={StaticResource NullToVisibility}, TargetNullValue=Collapsed}">
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
+                                              Width="16"
+                                              Height="16"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,8,0"
+                                              Foreground="{DynamicResource State.WarningText}" />
+
+                    <TextBlock Text="{Binding StaleText}"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource State.WarningText}" />
+                </StackPanel>
+            </Border>
+
+            <UniformGrid Margin="0,0,-10,0">
+                <UniformGrid.Columns>
+                    <MultiBinding Converter="{StaticResource TileColumns}">
+                        <Binding Path="ActualWidth"
+                                 RelativeSource="{RelativeSource Self}" />
+                        <Binding Path="(TextElement.FontSize)"
+                                 RelativeSource="{RelativeSource Self}" />
+                    </MultiBinding>
+                </UniformGrid.Columns>
+
+                <Border Style="{StaticResource Performance.Tile}">
+                    <StackPanel>
+                        <TextBlock Text="Пик отклика UI-потока"
+                                   Style="{StaticResource Performance.TileCaption}" />
+
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Width="18"
+                                                      Height="18"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,8,0">
+                                <iconPacks:PackIconLucide.Style>
+                                    <Style TargetType="iconPacks:PackIconLucide">
+                                        <Setter Property="Kind"
+                                                Value="{x:Static iconPacks:PackIconLucideKind.Activity}" />
+                                        <Setter Property="Foreground"
+                                                Value="{DynamicResource Fg.Muted}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsHitch}"
+                                                         Value="True">
+                                                <Setter Property="Kind"
+                                                        Value="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}" />
+                                                <Setter Property="Foreground"
+                                                        Value="{DynamicResource State.WarningText}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </iconPacks:PackIconLucide.Style>
+                            </iconPacks:PackIconLucide>
+
+                            <TextBlock Text="{Binding DelayText}"
+                                       VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock"
+                                           BasedOn="{StaticResource Performance.TileValue}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsHitch}"
+                                                         Value="True">
+                                                <Setter Property="Foreground"
+                                                        Value="{DynamicResource State.WarningText}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+
+                        <TextBlock Text="{Binding DelayHint}"
+                                   Style="{StaticResource Performance.TileHint}" />
+
+                        <TextBlock Text="{Binding WindowText}"
+                                   Style="{StaticResource Performance.TileHint}"
+                                   Margin="0,2,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Performance.Tile}">
+                    <StackPanel>
+                        <TextBlock Text="Память процесса"
+                                   Style="{StaticResource Performance.TileCaption}" />
+
+                        <TextBlock Text="{Binding MemoryText}"
+                                   Style="{StaticResource Performance.TileValue}" />
+
+                        <TextBlock Text="{Binding MemoryHint}"
+                                   Style="{StaticResource Performance.TileHint}" />
+
+                        <TextBlock Text="{Binding MemoryPeakText}"
+                                   Style="{StaticResource Performance.TileHint}"
+                                   Margin="0,2,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Performance.Tile}">
+                    <StackPanel>
+                        <TextBlock Text="Самый долгий кадр окна"
+                                   Style="{StaticResource Performance.TileCaption}" />
+
+                        <TextBlock Text="{Binding FrameText}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock"
+                                       BasedOn="{StaticResource Performance.TileValue}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsFrameSlow}"
+                                                     Value="True">
+                                            <Setter Property="Foreground"
+                                                    Value="{DynamicResource State.WarningText}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <TextBlock Text="{Binding FrameHint}"
+                                   Style="{StaticResource Performance.TileHint}" />
+
+                        <TextBlock Text="промежуток между кадрами всего окна"
+                                   Style="{StaticResource Performance.TileHint}"
+                                   Margin="0,2,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Performance.Tile}">
+                    <StackPanel>
+                        <TextBlock Text="Сборки мусора"
+                                   Style="{StaticResource Performance.TileCaption}" />
+
+                        <TextBlock Text="{Binding CollectionsText}"
+                                   Style="{StaticResource Performance.TileValue}" />
+
+                        <TextBlock Text="поколения 0 / 1 / 2 с начала сбора"
+                                   Style="{StaticResource Performance.TileHint}" />
+
+                        <TextBlock Text="{Binding CollectionsWindowText}"
+                                   Style="{StaticResource Performance.TileHint}"
+                                   Margin="0,2,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Performance.Tile}">
+                    <StackPanel>
+                        <TextBlock Text="Старт приложения"
+                                   Style="{StaticResource Performance.TileCaption}" />
+
+                        <TextBlock Text="{Binding StartupText}"
+                                   Style="{StaticResource Performance.TileValue}" />
+
+                        <TextBlock Text="{Binding StartupHint}"
+                                   Style="{StaticResource Performance.TileHint}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Performance.Tile}">
+                    <StackPanel>
+                        <TextBlock Text="{Binding OperationCaption}"
+                                   Style="{StaticResource Performance.TileCaption}" />
+
+                        <TextBlock Text="{Binding OperationText}"
+                                   Style="{StaticResource Performance.TileValue}" />
+
+                        <TextBlock Text="{Binding OperationVolume}"
+                                   Style="{StaticResource Performance.TileHint}" />
+
+                        <TextBlock Text="{Binding OperationRate}"
+                                   Style="{StaticResource Performance.TileHint}"
+                                   Margin="0,2,0,0" />
+
+                        <TextBlock Text="{Binding OperationTraversal}"
+                                   Style="{StaticResource Performance.TileHint}"
+                                   Margin="0,2,0,0"
+                                   Visibility="{Binding OperationTraversal, Converter={StaticResource NullToVisibility}, TargetNullValue=Collapsed}" />
+
+                        <TextBlock Text="{Binding OperationTraversalDetail}"
+                                   Style="{StaticResource Performance.TileHint}"
+                                   Visibility="{Binding OperationTraversalDetail, Converter={StaticResource NullToVisibility}, TargetNullValue=Collapsed}" />
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+
+            <Border Style="{StaticResource Card}"
+                    Padding="14">
+                <StackPanel>
+                    <TextBlock Text="Окно наблюдения"
+                               Style="{StaticResource TextBlock.Heading}"
+                               Margin="0,0,0,10" />
+
+                    <ContentPresenter Content="{Binding Chart}" />
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}"
+                    Padding="14"
+                    Margin="0,10,0,0">
+                <StackPanel>
+                    <TextBlock Text="Просадки"
+                               Style="{StaticResource TextBlock.Heading}"
+                               Margin="0,0,0,8" />
+
+                    <TextBlock Text="{Binding HitchesCaption}"
+                               Style="{StaticResource TextBlock.Subtle}"
+                               TextWrapping="Wrap" />
+
+                    <TextBlock Text="{Binding HitchesHint}"
+                               Style="{StaticResource TextBlock.Subtle}"
+                               TextWrapping="Wrap"
+                               Margin="0,2,0,0" />
+
+                    <ItemsControl ItemsSource="{Binding Hitches}"
+                                  Grid.IsSharedSizeScope="True"
+                                  Margin="0,12,0,0"
+                                  Visibility="{Binding HasHitches, Converter={StaticResource BoolToVisibility}}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"
+                                                          SharedSizeGroup="HitchTime" />
+                                        <ColumnDefinition Width="Auto"
+                                                          SharedSizeGroup="HitchDelay" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Text="{Binding Time}"
+                                               Foreground="{DynamicResource Fg.Muted}" />
+
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding Delay}"
+                                               FontWeight="SemiBold"
+                                               TextAlignment="Right"
+                                               Margin="14,0,0,0" />
+
+                                    <TextBlock Grid.Column="2"
+                                               Text="{Binding Operation}"
+                                               Foreground="{DynamicResource Fg.Secondary}"
+                                               TextTrimming="CharacterEllipsis"
+                                               Margin="14,0,0,0" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

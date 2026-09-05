@@ -21,7 +21,7 @@ public partial class OverviewView : UserControl, IView<OverviewViewModel>
         {
             if (ViewModel is { } vm)
             {
-                Scroller.ScrollToVerticalOffset(vm.ScrollOffset);
+                Scroller.ScrollToVerticalOffset(vm.Rows.ScrollOffset);
             }
 
             _restored = true;
@@ -32,7 +32,7 @@ public partial class OverviewView : UserControl, IView<OverviewViewModel>
     {
         if (_restored && ViewModel is { } vm)
         {
-            vm.ScrollOffset = Scroller.VerticalOffset;
+            vm.Rows.ScrollOffset = Scroller.VerticalOffset;
         }
     }
 }

@@ -7,9 +7,9 @@
         <Setter Property="FontFamily"
                 Value="{DynamicResource Font.Sans}" />
         <Setter Property="FontSize"
-                Value="{DynamicResource Font.Size.XS}" />
+                Value="{DynamicResource Font.Size.S}" />
         <Setter Property="FontWeight"
-                Value="SemiBold" />
+                Value="Normal" />
         <Setter Property="Foreground"
                 Value="{DynamicResource Fg.Muted}" />
         <Setter Property="TextWrapping"
@@ -18,10 +18,40 @@
                 Value="Center" />
     </Style>
 
+    <Style x:Key="SectionTitle"
+           TargetType="TextBlock">
+        <Setter Property="FontFamily"
+                Value="{DynamicResource Font.Sans}" />
+        <Setter Property="FontSize"
+                Value="{DynamicResource Font.Size.M}" />
+        <Setter Property="FontWeight"
+                Value="SemiBold" />
+        <Setter Property="Foreground"
+                Value="{DynamicResource Fg.Primary}" />
+        <Setter Property="TextWrapping"
+                Value="NoWrap" />
+        <Setter Property="VerticalAlignment"
+                Value="Center" />
+    </Style>
+
+    <Style x:Key="DialogTitle"
+           TargetType="TextBlock">
+        <Setter Property="FontFamily"
+                Value="{DynamicResource Font.Display}" />
+        <Setter Property="FontSize"
+                Value="{DynamicResource Font.Size.XL}" />
+        <Setter Property="FontWeight"
+                Value="SemiBold" />
+        <Setter Property="Foreground"
+                Value="{DynamicResource Fg.Primary}" />
+        <Setter Property="TextWrapping"
+                Value="Wrap" />
+    </Style>
+
     <Style x:Key="StatValue"
            TargetType="TextBlock">
         <Setter Property="FontFamily"
-                Value="{DynamicResource Font.Mono}" />
+                Value="{DynamicResource Font.Sans}" />
         <Setter Property="FontSize"
                 Value="{DynamicResource Font.Size.M}" />
         <Setter Property="FontWeight"
@@ -32,6 +62,26 @@
                 Value="Center" />
         <Setter Property="TextWrapping"
                 Value="NoWrap" />
+        <Setter Property="Typography.NumeralAlignment"
+                Value="Tabular" />
+    </Style>
+
+    <Style x:Key="StatValue.Lead"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource StatValue}">
+        <Setter Property="FontSize"
+                Value="{DynamicResource Font.Size.L}" />
+        <Setter Property="Foreground"
+                Value="{DynamicResource Accent.Text}" />
+    </Style>
+
+    <Style x:Key="StatValue.Aside"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource StatValue}">
+        <Setter Property="FontWeight"
+                Value="Medium" />
+        <Setter Property="Foreground"
+                Value="{DynamicResource Fg.Secondary}" />
     </Style>
 
     <Style x:Key="NodeIcon"
@@ -54,24 +104,45 @@
                 <Setter Property="Kind"
                         Value="Folder" />
                 <Setter Property="Foreground"
-                        Value="{DynamicResource Accent.Primary}" />
+                        Value="{DynamicResource Fg.Secondary}" />
             </DataTrigger>
         </Style.Triggers>
     </Style>
 
-    <Color x:Key="Heat.Color0">#4FD165</Color>
-    <Color x:Key="Heat.Color1">#C6D14F</Color>
-    <Color x:Key="Heat.Color2">#D1A64F</Color>
-    <Color x:Key="Heat.Color3">#D14F4F</Color>
+    <Color x:Key="Heat.Color0">#E0C9C1</Color>
+    <Color x:Key="Heat.Color1">#CE9886</Color>
+    <Color x:Key="Heat.Color2">#BB6C52</Color>
+    <Color x:Key="Heat.Color3">#A84625</Color>
+
+    <SolidColorBrush x:Key="Sync.LeftOnly"
+                     Color="{StaticResource Heat.Color3}" />
+
+    <SolidColorBrush x:Key="Sync.Modified"
+                     Color="{StaticResource Heat.Color1}" />
+
+    <SolidColorBrush x:Key="Diff.RemovedBg"
+                     Color="#38A84625" />
+
+    <SolidColorBrush x:Key="Diff.AddedBg"
+                     Color="#4D6E8CA8" />
+
+    <SolidColorBrush x:Key="Diff.RemovedStrong"
+                     Color="#70A84625" />
+
+    <SolidColorBrush x:Key="Diff.AddedStrong"
+                     Color="#856E8CA8" />
+
+    <SolidColorBrush x:Key="Diff.EmptyBg"
+                     Color="#14808080" />
 
     <LinearGradientBrush x:Key="HeatSpectrum"
                          StartPoint="0,0"
                          EndPoint="1,0">
         <GradientStop Offset="0"
                       Color="{StaticResource Heat.Color0}" />
-        <GradientStop Offset="0.45"
+        <GradientStop Offset="0.33"
                       Color="{StaticResource Heat.Color1}" />
-        <GradientStop Offset="0.72"
+        <GradientStop Offset="0.66"
                       Color="{StaticResource Heat.Color2}" />
         <GradientStop Offset="1"
                       Color="{StaticResource Heat.Color3}" />
@@ -82,23 +153,43 @@
                          EndPoint="0,1">
         <GradientStop Offset="0"
                       Color="{StaticResource Heat.Color3}" />
-        <GradientStop Offset="0.28"
+        <GradientStop Offset="0.33"
                       Color="{StaticResource Heat.Color2}" />
-        <GradientStop Offset="0.55"
+        <GradientStop Offset="0.66"
                       Color="{StaticResource Heat.Color1}" />
         <GradientStop Offset="1"
                       Color="{StaticResource Heat.Color0}" />
     </LinearGradientBrush>
 
+    <Style x:Key="ToggleButton.Filter"
+           TargetType="ToggleButton"
+           BasedOn="{StaticResource ToggleButton.Toolbar}">
+        <Setter Property="MinWidth"
+                Value="0" />
+        <Setter Property="Padding"
+                Value="9,0" />
+        <Setter Property="Margin"
+                Value="0,0,8,4" />
+        <Setter Property="BorderBrush"
+                Value="{DynamicResource Border.Subtle}" />
+        <Style.Triggers>
+            <Trigger Property="IsChecked"
+                     Value="True">
+                <Setter Property="FontWeight"
+                        Value="{DynamicResource Font.Weight.Bold}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <LinearGradientBrush x:Key="DiffSpectrumVertical"
                          StartPoint="0,0"
                          EndPoint="0,1">
         <GradientStop Offset="0"
-                      Color="#6EBF8E" />
+                      Color="{StaticResource Heat.Color3}" />
         <GradientStop Offset="0.34"
-                      Color="#7BA8E0" />
+                      Color="#93A6BA" />
         <GradientStop Offset="0.67"
-                      Color="#E0B055" />
+                      Color="{StaticResource Heat.Color1}" />
         <GradientStop Offset="1"
                       Color="#E07878" />
     </LinearGradientBrush>

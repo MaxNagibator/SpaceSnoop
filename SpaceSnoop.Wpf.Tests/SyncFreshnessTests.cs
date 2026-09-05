@@ -121,6 +121,21 @@ public class SyncFreshnessTests
         }
     }
 
+    [Test]
+    public void Перевес_свежести_измеряется_в_секундах_и_бесконечен_для_односторонних()
+    {
+        var both = SyncFreshness.Compute(Dir("", Modified("a.txt", New, New.AddMinutes(-5))));
+        var oneSided = SyncFreshness.Compute(Dir("", new FileComparison("l.txt", "l.txt") { Status = ComparisonStatus.LeftOnly, LeftModified = Old }));
+        var nothing = SyncFreshness.Compute(Dir("", Modified("a.txt", New, New)));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(both.LeadSeconds, Is.EqualTo(300));
+            Assert.That(oneSided.LeadSeconds, Is.EqualTo(double.MaxValue));
+            Assert.That(nothing.LeadSeconds, Is.Zero);
+        }
+    }
+
     private static FileComparison Modified(string path, DateTime left, DateTime right)
     {
         return new(path, path)

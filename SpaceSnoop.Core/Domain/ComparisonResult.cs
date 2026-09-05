@@ -32,9 +32,25 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
         return stats;
     }
 
-    public void ApplyMode(SyncMode mode, bool mirror = false)
+    public void ApplyMode(SyncMode mode, bool mirror = false, SyncWinner winner = SyncWinner.Newest)
     {
-        ApplyModeRecursive(Root, mode, mirror);
+        ApplyModeRecursive(Root, mode, mirror, winner, DeleteBlocks.None);
+    }
+
+    public IReadOnlyList<string> IncompleteDirectories()
+    {
+        var paths = new List<string>();
+        CollectIncomplete(Root, paths);
+
+        return paths;
+    }
+
+    public IReadOnlyList<string> SkippedLinks()
+    {
+        var paths = new List<string>();
+        CollectSkippedLinks(Root, paths);
+
+        return paths;
     }
 
     public bool HasUnresolvedConflicts()
@@ -54,59 +70,74 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
 
     public PlannedActions CountPlannedActions()
     {
-        var newCopies = 0;
-        var modifiedCopies = 0;
-        var deletes = 0;
-        var dirCopies = 0;
-        var dirDeletes = 0;
-        CountPlannedRecursive(Root, ref newCopies, ref modifiedCopies, ref deletes, ref dirCopies, ref dirDeletes);
-        return new(newCopies, modifiedCopies, deletes, dirCopies, dirDeletes);
+        var tally = new PlanTally();
+        CountPlannedRecursive(Root, tally);
+
+        return new(tally.NewCopies, tally.ModifiedCopies, tally.Deletes, tally.DirCopies, tally.DirDeletes)
+        {
+            NewCopyBytes = tally.NewCopyBytes,
+            ModifiedCopyBytes = tally.ModifiedCopyBytes,
+            CopyToLeftBytes = tally.CopyToLeftBytes,
+            CopyToRightBytes = tally.CopyToRightBytes,
+            OverwriteLeftBytes = tally.OverwriteLeftBytes,
+            OverwriteRightBytes = tally.OverwriteRightBytes,
+            DeleteFileBytes = tally.DeleteFileBytes,
+            DeleteDirBytes = tally.DeleteDirBytes,
+        };
     }
 
-    private static void CountPlannedRecursive(
-        DirectoryComparison dir,
-        ref int newCopies,
-        ref int modifiedCopies,
-        ref int deletes,
-        ref int dirCopies,
-        ref int dirDeletes)
+    private static void CountPlannedRecursive(DirectoryComparison dir, PlanTally tally)
     {
         foreach (var file in dir.Files)
         {
-            switch (file.Action)
-            {
-                case SyncAction.CopyToRight or SyncAction.CopyToLeft:
-                    if (file.Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly)
-                    {
-                        newCopies++;
-                    }
-                    else
-                    {
-                        modifiedCopies++;
-                    }
-
-                    break;
-
-                case SyncAction.DeleteLeft or SyncAction.DeleteRight:
-                    deletes++;
-                    break;
-            }
+            AddFilePlan(file, tally);
         }
 
         foreach (var sub in dir.SubDirectories)
         {
-            if (sub.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
-            {
-                dirDeletes++;
-                continue;
-            }
+            AddDirectoryPlan(sub, tally);
+        }
+    }
 
-            if (sub.Action is SyncAction.CopyToRight or SyncAction.CopyToLeft)
-            {
-                dirCopies++;
-            }
+    private static void AddFilePlan(FileComparison file, PlanTally tally)
+    {
+        if (file.Action is SyncAction.CopyToRight or SyncAction.CopyToLeft)
+        {
+            tally.AddCopy(file);
+        }
+        else if (file.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
+        {
+            tally.AddDelete(file);
+        }
+    }
 
-            CountPlannedRecursive(sub, ref newCopies, ref modifiedCopies, ref deletes, ref dirCopies, ref dirDeletes);
+    private static void AddDirectoryPlan(DirectoryComparison dir, PlanTally tally)
+    {
+        if (dir.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight)
+        {
+            tally.DirDeletes++;
+            AddSubtreeDeleteBytes(dir, dir.Action, tally);
+            return;
+        }
+
+        if (dir.Action is SyncAction.CopyToRight or SyncAction.CopyToLeft)
+        {
+            tally.DirCopies++;
+        }
+
+        CountPlannedRecursive(dir, tally);
+    }
+
+    private static void AddSubtreeDeleteBytes(DirectoryComparison dir, SyncAction action, PlanTally tally)
+    {
+        foreach (var file in dir.Files)
+        {
+            tally.AddSubtreeFileBytes(action, file);
+        }
+
+        foreach (var sub in dir.SubDirectories)
+        {
+            AddSubtreeDeleteBytes(sub, action, tally);
         }
     }
 
@@ -125,6 +156,11 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
             if (file.Status != ComparisonStatus.Conflict
                 && (file.Status is not (ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly)
                     || file.Action != SyncAction.None))
+            {
+                continue;
+            }
+
+            if (file.TypeConflict != FileTypeConflict.None && action != SyncAction.Skip)
             {
                 continue;
             }
@@ -160,37 +196,113 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
         }
     }
 
-    private static void ApplyModeRecursive(DirectoryComparison dir, SyncMode mode, bool mirror)
+    private static void CollectIncomplete(DirectoryComparison dir, List<string> paths)
     {
-        foreach (var file in dir.Files)
+        if (dir.IsIncomplete)
         {
-            file.Action = mode switch
-            {
-                SyncMode.LeftToRight => ApplyLeftToRight(file, mirror),
-                SyncMode.RightToLeft => ApplyRightToLeft(file, mirror),
-                SyncMode.Bidirectional => ApplyBidirectional(file),
-                _ => SyncAction.Skip,
-            };
+            paths.Add(string.IsNullOrEmpty(dir.RelativePath) ? dir.Name : dir.RelativePath);
         }
 
         foreach (var sub in dir.SubDirectories)
         {
-            sub.Action = ApplyDirMode(sub, mode, mirror);
-            ApplyModeRecursive(sub, mode, mirror);
+            CollectIncomplete(sub, paths);
         }
     }
 
-    private static SyncAction ApplyDirMode(DirectoryComparison dir, SyncMode mode, bool mirror)
+    private static void CollectSkippedLinks(DirectoryComparison dir, List<string> paths)
+    {
+        foreach (var name in dir.SkippedLinks)
+        {
+            paths.Add(string.IsNullOrEmpty(dir.RelativePath) ? name : Path.Combine(dir.RelativePath, name));
+        }
+
+        foreach (var sub in dir.SubDirectories)
+        {
+            CollectSkippedLinks(sub, paths);
+        }
+    }
+
+    private static void ApplyModeRecursive(DirectoryComparison dir, SyncMode mode, bool mirror, SyncWinner winner, DeleteBlocks blocks)
+    {
+        blocks = blocks.Add(dir);
+        dir.DeleteLeftBlocked = blocks.Left;
+        dir.DeleteRightBlocked = blocks.Right;
+
+        foreach (var file in dir.Files)
+        {
+            ApplyFileMode(file, mode, mirror, winner, blocks);
+        }
+
+        foreach (var sub in dir.SubDirectories)
+        {
+            ApplyDirectoryMode(sub, mode, mirror, winner, blocks);
+        }
+    }
+
+    private static void ApplyFileMode(FileComparison file, SyncMode mode, bool mirror, SyncWinner winner, DeleteBlocks blocks)
+    {
+        file.DeleteLeftBlocked = blocks.Left;
+        file.DeleteRightBlocked = blocks.Right;
+
+        if (file.TypeConflict != FileTypeConflict.None)
+        {
+            file.Status = ComparisonStatus.Conflict;
+            file.Action = SyncAction.None;
+            return;
+        }
+
+        if (file.Status == ComparisonStatus.Conflict)
+        {
+            file.Status = ComparisonStatus.Modified;
+        }
+
+        var action = mode switch
+        {
+            SyncMode.LeftToRight => ApplyLeftToRight(file, mirror),
+            SyncMode.RightToLeft => ApplyRightToLeft(file, mirror),
+            SyncMode.Bidirectional => ApplyBidirectional(file, mirror, winner),
+            _ => SyncAction.Skip,
+        };
+
+        file.Action = blocks.Allows(action) ? action : SyncAction.Skip;
+    }
+
+    private static void ApplyDirectoryMode(DirectoryComparison dir, SyncMode mode, bool mirror, SyncWinner winner, DeleteBlocks blocks)
+    {
+        blocks = blocks.Add(dir);
+
+        var action = ApplyDirMode(dir, mode, mirror, winner);
+        dir.Action = blocks.Allows(action) ? action : SyncAction.Skip;
+        ApplyModeRecursive(dir, mode, mirror, winner, blocks);
+    }
+
+    private static SyncAction ApplyDirMode(DirectoryComparison dir, SyncMode mode, bool mirror, SyncWinner winner)
     {
         return dir.Status switch
         {
-            ComparisonStatus.LeftOnly => mode == SyncMode.RightToLeft
-                ? mirror ? SyncAction.DeleteLeft : SyncAction.Skip
-                : SyncAction.CopyToRight,
-            ComparisonStatus.RightOnly => mode == SyncMode.LeftToRight
-                ? mirror ? SyncAction.DeleteRight : SyncAction.Skip
-                : SyncAction.CopyToLeft,
+            ComparisonStatus.LeftOnly => LeftOnlyDirAction(mode, mirror, winner),
+            ComparisonStatus.RightOnly => RightOnlyDirAction(mode, mirror, winner),
             _ => SyncAction.None,
+        };
+    }
+
+    private static SyncAction LeftOnlyDirAction(SyncMode mode, bool mirror, SyncWinner winner)
+    {
+        return mode switch
+        {
+            SyncMode.RightToLeft => mirror ? SyncAction.DeleteLeft : SyncAction.Skip,
+            SyncMode.Bidirectional => mirror && winner == SyncWinner.Right ? SyncAction.DeleteLeft : SyncAction.CopyToRight,
+            _ => SyncAction.CopyToRight,
+        };
+    }
+
+    private static SyncAction RightOnlyDirAction(SyncMode mode, bool mirror, SyncWinner winner)
+    {
+        return mode switch
+        {
+            SyncMode.LeftToRight => mirror ? SyncAction.DeleteRight : SyncAction.Skip,
+            SyncMode.Bidirectional => mirror && winner == SyncWinner.Left ? SyncAction.DeleteRight : SyncAction.CopyToLeft,
+            _ => SyncAction.CopyToLeft,
         };
     }
 
@@ -216,33 +328,43 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
         };
     }
 
-    private static SyncAction ApplyBidirectional(FileComparison file)
+    private static SyncAction ApplyBidirectional(FileComparison file, bool mirror, SyncWinner winner)
     {
         switch (file.Status)
         {
             case ComparisonStatus.Modified:
-                if (file.LeftModified > file.RightModified)
+                return winner switch
                 {
-                    return SyncAction.CopyToRight;
-                }
-
-                if (file.RightModified > file.LeftModified)
-                {
-                    return SyncAction.CopyToLeft;
-                }
-
-                file.Status = ComparisonStatus.Conflict;
-                return SyncAction.None;
+                    SyncWinner.Left => SyncAction.CopyToRight,
+                    SyncWinner.Right => SyncAction.CopyToLeft,
+                    _ => ResolveModifiedByNewest(file),
+                };
 
             case ComparisonStatus.LeftOnly:
-                return SyncAction.CopyToRight;
+                return mirror && winner == SyncWinner.Right ? SyncAction.DeleteLeft : SyncAction.CopyToRight;
 
             case ComparisonStatus.RightOnly:
-                return SyncAction.CopyToLeft;
+                return mirror && winner == SyncWinner.Left ? SyncAction.DeleteRight : SyncAction.CopyToLeft;
 
             default:
                 return SyncAction.Skip;
         }
+    }
+
+    private static SyncAction ResolveModifiedByNewest(FileComparison file)
+    {
+        if (file.LeftModified > file.RightModified)
+        {
+            return SyncAction.CopyToRight;
+        }
+
+        if (file.RightModified > file.LeftModified)
+        {
+            return SyncAction.CopyToLeft;
+        }
+
+        file.Status = ComparisonStatus.Conflict;
+        return SyncAction.None;
     }
 
     private static bool HasUnresolvedConflictsRecursive(DirectoryComparison dir)
@@ -250,11 +372,119 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
         return dir.Files.Any(x => x.Status == ComparisonStatus.Conflict && x.Action == SyncAction.None)
                || dir.SubDirectories.Any(HasUnresolvedConflictsRecursive);
     }
+
+    private readonly record struct DeleteBlocks(bool Left, bool Right)
+    {
+        public static DeleteBlocks None { get; } = new(false, false);
+
+        public DeleteBlocks Add(DirectoryComparison dir)
+        {
+            return new(Left || dir.RightIncomplete, Right || dir.LeftIncomplete);
+        }
+
+        public bool Allows(SyncAction action)
+        {
+            return action switch
+            {
+                SyncAction.DeleteLeft => !Left,
+                SyncAction.DeleteRight => !Right,
+                _ => true,
+            };
+        }
+    }
+
+    private sealed class PlanTally
+    {
+        public int NewCopies { get; private set; }
+        public int ModifiedCopies { get; private set; }
+        public int Deletes { get; private set; }
+        public int DirCopies { get; set; }
+        public int DirDeletes { get; set; }
+        public long NewCopyBytes { get; private set; }
+        public long ModifiedCopyBytes { get; private set; }
+        public long CopyToLeftBytes { get; private set; }
+        public long CopyToRightBytes { get; private set; }
+        public long OverwriteLeftBytes { get; private set; }
+        public long OverwriteRightBytes { get; private set; }
+        public long DeleteFileBytes { get; private set; }
+        public long DeleteDirBytes { get; private set; }
+
+        public void AddCopy(FileComparison file)
+        {
+            var isNew = file.Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly;
+            var toRight = file.Action == SyncAction.CopyToRight;
+            var source = toRight ? file.LeftSize ?? 0 : file.RightSize ?? 0;
+
+            if (isNew)
+            {
+                NewCopies++;
+                NewCopyBytes += source;
+            }
+            else
+            {
+                ModifiedCopies++;
+                ModifiedCopyBytes += source;
+            }
+
+            if (toRight)
+            {
+                CopyToRightBytes += source;
+                OverwriteRightBytes += isNew ? 0 : file.RightSize ?? 0;
+            }
+            else
+            {
+                CopyToLeftBytes += source;
+                OverwriteLeftBytes += isNew ? 0 : file.LeftSize ?? 0;
+            }
+        }
+
+        public void AddDelete(FileComparison file)
+        {
+            Deletes++;
+            DeleteFileBytes += SideBytes(file.Action, file);
+        }
+
+        public void AddSubtreeFileBytes(SyncAction action, FileComparison file)
+        {
+            DeleteDirBytes += SideBytes(action, file);
+        }
+
+        private static long SideBytes(SyncAction action, FileComparison file)
+        {
+            return action == SyncAction.DeleteLeft ? file.LeftSize ?? 0 : file.RightSize ?? 0;
+        }
+    }
 }
 
 public sealed record PlannedActions(int NewCopies, int ModifiedCopies, int Deletes, int DirCopies, int DirDeletes)
 {
+    public static PlannedActions Empty { get; } = new(0, 0, 0, 0, 0);
+
+    public long NewCopyBytes { get; init; }
+
+    public long ModifiedCopyBytes { get; init; }
+
+    public long CopyToLeftBytes { get; init; }
+
+    public long CopyToRightBytes { get; init; }
+
+    public long OverwriteLeftBytes { get; init; }
+
+    public long OverwriteRightBytes { get; init; }
+
+    public long DeleteFileBytes { get; init; }
+
+    public long DeleteDirBytes { get; init; }
+
     public int Copies => NewCopies + ModifiedCopies;
 
     public int Total => Copies + Deletes + DirCopies + DirDeletes;
+
+    public long CopyBytes => CopyToLeftBytes + CopyToRightBytes;
+
+    public long DeleteBytes => DeleteFileBytes + DeleteDirBytes;
+
+    public long RequiredLeftBytes => CopyToLeftBytes - OverwriteLeftBytes;
+
+    public long RequiredRightBytes => CopyToRightBytes - OverwriteRightBytes;
 }

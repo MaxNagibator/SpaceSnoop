@@ -16,7 +16,7 @@ public class SyncFlatFilesTests
         var root = Dir("", rootFile);
         root.SubDirectories.Add(Dir("a", nested));
 
-        var files = SyncViewModel.CollectVisibleFiles(root, false, false, NoOutcomes).ToList();
+        var files = SyncRowsProjector.CollectVisibleFiles(root, false, false, NoOutcomes).ToList();
 
         Assert.That(files, Is.EqualTo([nested, rootFile]));
     }
@@ -28,8 +28,8 @@ public class SyncFlatFilesTests
         var diff = File("diff.txt", ComparisonStatus.Modified);
         var root = Dir("", same, diff);
 
-        var hidden = SyncViewModel.CollectVisibleFiles(root, false, false, NoOutcomes).ToList();
-        var shown = SyncViewModel.CollectVisibleFiles(root, true, false, NoOutcomes).ToList();
+        var hidden = SyncRowsProjector.CollectVisibleFiles(root, false, false, NoOutcomes).ToList();
+        var shown = SyncRowsProjector.CollectVisibleFiles(root, true, false, NoOutcomes).ToList();
 
         using (Assert.EnterMultipleScope())
         {
@@ -50,7 +50,7 @@ public class SyncFlatFilesTests
             [failed] = SyncOutcome.Failed,
         };
 
-        var files = SyncViewModel.CollectVisibleFiles(root, false, true, outcomes).ToList();
+        var files = SyncRowsProjector.CollectVisibleFiles(root, false, true, outcomes).ToList();
 
         Assert.That(files, Is.EqualTo([failed]));
     }
@@ -62,8 +62,8 @@ public class SyncFlatFilesTests
         var big = new FileComparison("b.txt", "b.txt") { LeftSize = 100, RightSize = 0 };
         var mid = new FileComparison("m.txt", "m.txt") { LeftSize = null, RightSize = 50 };
 
-        var asc = SyncViewModel.SortFlatFiles([small, big, mid], SyncFlatSortField.Size, false).ToList();
-        var desc = SyncViewModel.SortFlatFiles([small, big, mid], SyncFlatSortField.Size, true).ToList();
+        var asc = SyncRowsProjector.SortFiles([small, big, mid], SyncSortField.Size, false).ToList();
+        var desc = SyncRowsProjector.SortFiles([small, big, mid], SyncSortField.Size, true).ToList();
 
         using (Assert.EnterMultipleScope())
         {
@@ -78,7 +78,7 @@ public class SyncFlatFilesTests
         var a = new FileComparison("a.txt", "alpha/Zebra.txt");
         var b = new FileComparison("b.txt", "alpha/apple.txt");
 
-        var sorted = SyncViewModel.SortFlatFiles([a, b], SyncFlatSortField.Path, false).ToList();
+        var sorted = SyncRowsProjector.SortFiles([a, b], SyncSortField.Path, false).ToList();
 
         Assert.That(sorted, Is.EqualTo([b, a]));
     }
@@ -90,9 +90,61 @@ public class SyncFlatFilesTests
         var modifiedA = new FileComparison("a.txt", "a.txt") { Status = ComparisonStatus.Modified };
         var leftOnly = new FileComparison("l.txt", "l.txt") { Status = ComparisonStatus.LeftOnly };
 
-        var sorted = SyncViewModel.SortFlatFiles([modifiedZ, leftOnly, modifiedA], SyncFlatSortField.Status, false).ToList();
+        var sorted = SyncRowsProjector.SortFiles([modifiedZ, leftOnly, modifiedA], SyncSortField.Status, false).ToList();
 
         Assert.That(sorted, Is.EqualTo([leftOnly, modifiedA, modifiedZ]));
+    }
+
+    [Test]
+    public void Сортировка_по_дате_берёт_позднюю_из_сторон()
+    {
+        var old = new FileComparison("o.txt", "o.txt") { LeftModified = new(2026, 1, 1), RightModified = new(2025, 1, 1) };
+        var fresh = new FileComparison("f.txt", "f.txt") { LeftModified = null, RightModified = new(2026, 6, 1) };
+        var never = new FileComparison("n.txt", "n.txt");
+
+        var asc = SyncRowsProjector.SortFiles([old, fresh, never], SyncSortField.Modified, false).ToList();
+        var desc = SyncRowsProjector.SortFiles([old, fresh, never], SyncSortField.Modified, true).ToList();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(asc, Is.EqualTo([never, old, fresh]));
+            Assert.That(desc, Is.EqualTo([fresh, old, never]));
+        }
+    }
+
+    [Test]
+    public void Фильтр_дерева_помечает_ветки_с_совпадением_в_глубине()
+    {
+        var deep = Dir("deep", File("keep/deep/target.txt", ComparisonStatus.Modified));
+        var keep = Dir("keep");
+        keep.SubDirectories.Add(deep);
+        var other = Dir("other", File("other/plain.txt", ComparisonStatus.Modified));
+        var root = Dir("");
+        root.SubDirectories.Add(keep);
+        root.SubDirectories.Add(other);
+
+        var hits = new HashSet<object>();
+        SyncRowsProjector.CollectSearchHits(root, "target", hits);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(hits, Does.Contain(keep));
+            Assert.That(hits, Does.Contain(deep));
+            Assert.That(hits, Does.Not.Contain(other));
+        }
+    }
+
+    [Test]
+    public void Фильтр_дерева_принимает_совпадение_по_имени_каталога()
+    {
+        var assets = Dir("assets", File("assets/plain.txt", ComparisonStatus.Modified));
+        var root = Dir("");
+        root.SubDirectories.Add(assets);
+
+        var hits = new HashSet<object>();
+        SyncRowsProjector.CollectSearchHits(root, "ASSETS", hits);
+
+        Assert.That(hits, Does.Contain(assets));
     }
 
     [Test]
@@ -109,7 +161,7 @@ public class SyncFlatFilesTests
         root.SubDirectories.Add(branch);
         root.SubDirectories.Add(solo);
 
-        var dirs = SyncViewModel.CollectEmptyDirs(root, false, NoOutcomes).ToList();
+        var dirs = SyncRowsProjector.CollectEmptyDirs(root, false, NoOutcomes).ToList();
 
         Assert.That(dirs, Is.EqualTo([branch, solo]));
     }

@@ -17,7 +17,7 @@
         <Setter Property="Height"
                 Value="22" />
         <Setter Property="Foreground"
-                Value="{DynamicResource Accent.Primary}" />
+                Value="{DynamicResource Accent.Text}" />
         <Setter Property="VerticalAlignment"
                 Value="Center" />
     </Style>
