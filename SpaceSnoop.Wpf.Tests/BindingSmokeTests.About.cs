@@ -86,6 +86,7 @@ public partial class BindingSmokeTests
     [TestCase(AppThemes.LightKey)]
     [TestCase(AppThemes.DarkKey)]
     [TestCase(AppThemes.TarkovKey)]
+    [TestCase(AppThemes.SublimeKey)]
     public void Плитка_возможностей_О_программе_разрешает_токен_фона_при_наведении(string theme)
     {
         try

@@ -35,6 +35,7 @@ public class ThemeTilesTests
     [TestCase(AppTheme.Dark)]
     [TestCase(AppTheme.Tarkov)]
     [TestCase(AppTheme.System)]
+    [TestCase(AppTheme.Sublime)]
     public void Палитра_темы_несёт_все_цвета_превью(AppTheme theme)
     {
         var palette = ThemeSwatchBrushConverter.PaletteOf(theme);

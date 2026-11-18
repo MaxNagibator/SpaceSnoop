@@ -8,6 +8,7 @@ public static class AppThemes
     public const string DarkKey = "dark";
     public const string TarkovKey = TarkovTheme.Key;
     public const string SystemKey = "system";
+    public const string SublimeKey = ThemeManager.SublimeKey;
 
     public static string ToKey(AppTheme theme)
     {
@@ -16,6 +17,7 @@ public static class AppThemes
             AppTheme.Dark => DarkKey,
             AppTheme.Tarkov => TarkovKey,
             AppTheme.System => SystemKey,
+            AppTheme.Sublime => SublimeKey,
             _ => LightKey,
         };
     }
@@ -27,6 +29,7 @@ public static class AppThemes
             DarkKey => AppTheme.Dark,
             TarkovKey => AppTheme.Tarkov,
             SystemKey => AppTheme.System,
+            SublimeKey => AppTheme.Sublime,
             _ => AppTheme.Light,
         };
     }
@@ -37,6 +40,7 @@ public static class AppThemes
         ThemeManager.Register(ThemeManager.DefaultDark);
 
         TarkovTheme.Register();
+        ThemeManager.Register(ThemeManager.Sublime);
 
         RegisterSystem(SystemTheme.AppsUseLightTheme());
     }

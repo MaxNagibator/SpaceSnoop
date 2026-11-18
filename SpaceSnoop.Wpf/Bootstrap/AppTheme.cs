@@ -9,4 +9,6 @@ public enum AppTheme
     Tarkov = 2,
 
     System = 3,
+
+    Sublime = 4,
 }

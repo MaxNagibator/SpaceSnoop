@@ -6,6 +6,7 @@ public sealed class ThemeViewModel(ISettingsStore store) : ThemeViewModelBase<Ap
     public bool IsDark => Current == AppTheme.Dark;
     public bool IsTarkov => Current == AppTheme.Tarkov;
     public bool IsSystem => Current == AppTheme.System;
+    public bool IsSublime => Current == AppTheme.Sublime;
 
     protected override string ToKey(AppTheme theme)
     {
@@ -23,5 +24,6 @@ public sealed class ThemeViewModel(ISettingsStore store) : ThemeViewModelBase<Ap
         OnPropertyChanged(nameof(IsDark));
         OnPropertyChanged(nameof(IsTarkov));
         OnPropertyChanged(nameof(IsSystem));
+        OnPropertyChanged(nameof(IsSublime));
     }
 }

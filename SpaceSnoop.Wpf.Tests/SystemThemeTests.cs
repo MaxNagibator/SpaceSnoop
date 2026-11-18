@@ -127,6 +127,7 @@ public class SystemThemeTests
     [TestCase(AppThemes.LightKey)]
     [TestCase(AppThemes.DarkKey)]
     [TestCase(AppThemes.TarkovKey)]
+    [TestCase(AppThemes.SublimeKey)]
     public void Явно_выбранная_тема_не_перезаписывается(string chosen)
     {
         var settings = new MemorySettings();

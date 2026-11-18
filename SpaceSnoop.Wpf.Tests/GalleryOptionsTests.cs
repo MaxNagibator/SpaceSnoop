@@ -218,18 +218,19 @@ public class GalleryOptionsTests
         });
     }
 
-    [Test]
-    public void Тема_Tarkov_снимается_только_по_явной_просьбе()
+    [TestCase(AppThemes.TarkovKey)]
+    [TestCase(AppThemes.SublimeKey)]
+    public void Дополнительная_тема_снимается_только_по_явной_просьбе(string theme)
     {
         Assert.Multiple(() =>
         {
-            Assert.That(GalleryOptions.Parse([], Default).Themes, Does.Not.Contain(AppThemes.TarkovKey));
+            Assert.That(GalleryOptions.Parse([], Default).Themes, Does.Not.Contain(theme));
             Assert.That(
-                GalleryOptions.Parse(["--themes", AppThemes.TarkovKey], Default).Themes,
+                GalleryOptions.Parse(["--themes", theme], Default).Themes,
                 Is.EqualTo(
                     new[]
                     {
-                        AppThemes.TarkovKey,
+                        theme,
                     }));
         });
     }

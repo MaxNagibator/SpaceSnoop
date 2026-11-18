@@ -38,7 +38,7 @@
                     <TextBlock Text="Тема оформления"
                                Style="{StaticResource Form.Label}"
                                TextWrapping="Wrap" />
-                    <TextBlock Text="Как в Windows, светлая, тёмная или игровая Tarkov."
+                    <TextBlock Text="Выберите палитру или используйте тему Windows."
                                Style="{StaticResource Form.Hint}"
                                Margin="0,2,0,0" />
                 </StackPanel>

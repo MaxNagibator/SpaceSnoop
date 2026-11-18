@@ -247,6 +247,18 @@
                                                   Width="16"
                                                   Height="16" />
                     </Button>
+                    <Button Style="{StaticResource Theme.SegmentButton}"
+                            Command="{Binding Theme.ApplyCommand}"
+                            CommandParameter="{x:Static bs:AppTheme.Sublime}"
+                            Tag="{Binding Theme.IsSublime}"
+                            Width="36"
+                            Margin="2,0,0,0"
+                            ToolTip="Тема Sublime"
+                            AutomationProperties.Name="Тема Sublime">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Code}"
+                                                  Width="16"
+                                                  Height="16" />
+                    </Button>
                 </StackPanel>
                 <Border Width="1"
                         Background="{DynamicResource Border.Subtle}"

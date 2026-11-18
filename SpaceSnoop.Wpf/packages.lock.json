@@ -10,9 +10,9 @@
       },
       "KeepShell": {
         "type": "Direct",
-        "requested": "[0.1.272, )",
-        "resolved": "0.1.272",
-        "contentHash": "dcTyFEG8x12f2QbaAkeG3y/1Dgn32UZql5uDc4VDBZDB6hXYCH1z7t0iCKH3hG2f8ZNaS7N7lUOKkCT2kgs4vA==",
+        "requested": "[0.1.276-sublime.2, )",
+        "resolved": "0.1.276-sublime.2",
+        "contentHash": "Pf34t86DVpvEoUw6HhOXt+SveL9J2kQjfy8J7jy3LCZHEm5Shs8ExiRxojE+8zRWSjHXYbHLUIiZSCsBzVZyMA==",
         "dependencies": {
           "CommunityToolkit.Mvvm": "8.4.2",
           "MahApps.Metro.IconPacks.Lucide": "6.2.1",
