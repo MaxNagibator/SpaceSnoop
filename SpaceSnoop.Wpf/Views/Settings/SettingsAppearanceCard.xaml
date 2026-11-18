@@ -48,14 +48,12 @@
                         Command="{Binding ResetCommand}"
                         ToolTip="{Binding Hint}"
                         AutomationProperties.Name="{Binding AutomationName}" />
-                <ListBox Grid.Row="1"
-                         Grid.ColumnSpan="2"
-                         Style="{StaticResource ListBox.ThemeTiles}"
-                         ItemsSource="{Binding ThemeOptions}"
-                         SelectedItem="{Binding SelectedThemeOption}"
-                         AutomationProperties.Name="Тема оформления"
-                         HorizontalAlignment="Left"
-                         Margin="-8,10,0,-8" />
+                <keepshell:ThemeSwitcher Grid.Row="1"
+                                       Grid.ColumnSpan="2"
+                                       DataContext="{Binding Theme}"
+                                       ShowPreviews="True"
+                                       HorizontalAlignment="Left"
+                                       Margin="-8,10,0,-8" />
             </Grid>
 
             <keepshell:SettingRowPanel Margin="0,16,0,0">

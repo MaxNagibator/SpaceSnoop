@@ -48,7 +48,7 @@ public partial class App : Application
         services.AddSingleton<OperationPreferences>();
         services.AddSingleton<ScanPreferences>();
         services.AddSingleton<UpdatePreferences>();
-        services.AddSingleton<ThemeViewModel>();
+        services.AddSingleton<ThemeSelectionViewModel>();
         services.AddSingleton<SystemTheme>();
 
         services.AddSingleton(
@@ -250,7 +250,7 @@ public partial class App : Application
                 elevationRefused = true;
             }
 
-            AppThemes.Register();
+            AppThemes.Register(typeof(App).Assembly);
             ThemeManager.Apply(AppThemes.StartupKey(settings, freshProfile));
             FontScaleManager.Initialize(settings.GetDouble(SettingsKeys.FontScale, FontScaleManager.DefaultScale));
 
@@ -420,7 +420,7 @@ public partial class App : Application
     {
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-        AppThemes.Register();
+        AppThemes.Register(typeof(App).Assembly);
 
         var directory = Path.Combine(AppStorage.DataDirectory, GalleryRunner.FolderName);
         var options = GalleryOptions.Parse(args, directory);

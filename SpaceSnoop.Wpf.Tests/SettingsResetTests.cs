@@ -599,7 +599,8 @@ public class SettingsResetTests
     {
         PackScheme.Ensure();
 
-        var theme = new ThemeViewModel(store);
+        AppThemes.Register();
+        var theme = new KeepShell.ViewModels.ThemeSelectionViewModel(store);
         var shell = new ShellPreferences(store);
         var scan = new ScanPreferences(store);
         var operations = new OperationPreferences(store);

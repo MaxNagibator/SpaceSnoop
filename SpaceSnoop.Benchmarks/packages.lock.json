@@ -53,8 +53,8 @@
       },
       "KeepShell": {
         "type": "Transitive",
-        "resolved": "0.1.276-sublime.2",
-        "contentHash": "Pf34t86DVpvEoUw6HhOXt+SveL9J2kQjfy8J7jy3LCZHEm5Shs8ExiRxojE+8zRWSjHXYbHLUIiZSCsBzVZyMA==",
+        "resolved": "0.1.277-themes.3",
+        "contentHash": "HyJa0zKadv2VlI72DgdtQJZjcr5BnfMY+7esKMeu4ooWECa25rDgVZXRk5pZAqI+5qdwuZMcLRZSZKIU6uQuPw==",
         "dependencies": {
           "CommunityToolkit.Mvvm": "8.4.2",
           "MahApps.Metro.IconPacks.Lucide": "6.2.1",
@@ -82,12 +82,20 @@
           "KeepShell": "0.1.272"
         }
       },
+      "KeepShell.Themes.Sublime": {
+        "type": "Transitive",
+        "resolved": "0.1.277-themes.3",
+        "contentHash": "c5M/hOcrfM3YjY/Z6pyUAyb9WtyYlrimSo6bthwiJZaK8wFlOZLouCPEdN950BxnxffgIEC/5mufgt9C93eodw==",
+        "dependencies": {
+          "KeepShell": "0.1.277-themes.3"
+        }
+      },
       "KeepShell.Themes.Tarkov": {
         "type": "Transitive",
-        "resolved": "0.1.272",
-        "contentHash": "Rp9edOKNJ7/3gXG03cgr3oZry5jPAJrB3zUwezcmBmZlKaYqRJkY6lN6csVYNiAbSvr8J67CFapJmaTqh91KOQ==",
+        "resolved": "0.1.277-themes.3",
+        "contentHash": "e4gW+dgmFRySQzXzGjJnx06vXF2lsoLqFoel1tduYT+Xr2dwXGXusCwlC3L4XLV+frBuAKWvot/7qVAqHU7i8Q==",
         "dependencies": {
-          "KeepShell": "0.1.272"
+          "KeepShell": "0.1.277-themes.3"
         }
       },
       "MahApps.Metro.IconPacks.Core": {
@@ -359,10 +367,11 @@
         "type": "Project",
         "dependencies": {
           "CommunityToolkit.Mvvm": "[8.4.2, )",
-          "KeepShell": "[0.1.276-sublime.2, )",
+          "KeepShell": "[0.1.277-themes.3, )",
           "KeepShell.Agents": "[0.1.272, )",
           "KeepShell.Automation": "[0.1.272, )",
-          "KeepShell.Themes.Tarkov": "[0.1.272, )",
+          "KeepShell.Themes.Sublime": "[0.1.277-themes.3, )",
+          "KeepShell.Themes.Tarkov": "[0.1.277-themes.3, )",
           "MahApps.Metro.IconPacks.Lucide": "[6.2.1, )",
           "Microsoft.Extensions.DependencyInjection": "[10.0.15, )",
           "ModelContextProtocol.AspNetCore": "[2.4.0, )",

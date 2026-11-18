@@ -3,7 +3,6 @@ using KeepShell.Testing;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Bootstrap.Platform;
 using SpaceSnoop.Wpf.Bootstrap.Storage;
-using SpaceSnoop.Wpf.ViewModels.Settings;
 
 namespace SpaceSnoop.Wpf.Tests;
 
@@ -19,17 +18,6 @@ public class SystemThemeTests
     public void Значение_AppsUseLightTheme_решает_светлая_или_тёмная(object? registryValue, bool expectedLight)
     {
         Assert.That(SystemTheme.IsLight(registryValue), Is.EqualTo(expectedLight));
-    }
-
-    [Test]
-    public void Ключ_системной_темы_переживает_круг_через_перечисление()
-    {
-        Assert.Multiple(() =>
-        {
-            Assert.That(AppThemes.ToKey(AppTheme.System), Is.EqualTo(AppThemes.SystemKey));
-            Assert.That(AppThemes.FromKey(AppThemes.SystemKey), Is.EqualTo(AppTheme.System));
-            Assert.That((int)AppTheme.Light, Is.EqualTo(0), "Значения тем лежат в файлах настроек – переименование или сдвиг меняют выбор пользователя.");
-        });
     }
 
     [Test]
@@ -119,17 +107,17 @@ public class SystemThemeTests
     {
         Assert.Multiple(() =>
         {
-            Assert.That(AppDefaults.ThemeDefault, Is.EqualTo(AppTheme.System));
-            Assert.That(SettingsOptions.Themes[0].Value, Is.EqualTo(AppTheme.System));
+            AppThemes.Register();
+            Assert.That(AppDefaults.ThemeDefault, Is.EqualTo(AppThemes.SystemKey));
+            Assert.That(ThemeManager.Themes.First().Key, Is.EqualTo(AppThemes.SystemKey));
         });
     }
 
     [TestCase(AppThemes.LightKey)]
     [TestCase(AppThemes.DarkKey)]
-    [TestCase(AppThemes.TarkovKey)]
-    [TestCase(AppThemes.SublimeKey)]
     public void Явно_выбранная_тема_не_перезаписывается(string chosen)
     {
+        AppThemes.Register();
         var settings = new MemorySettings();
         settings.SetValue(SettingsKeys.Theme, chosen);
 
@@ -140,5 +128,19 @@ public class SystemThemeTests
             Assert.That(key, Is.EqualTo(chosen));
             Assert.That(settings.GetStringValue(SettingsKeys.Theme), Is.EqualTo(chosen));
         });
+    }
+    [Test]
+    public void Сохранённый_ключ_остаётся_при_отсутствии_пакета_и_работает_после_регистрации()
+    {
+        AppThemes.Register();
+        const string key = "startup-test-theme";
+        var settings = new MemorySettings();
+        settings.SetValue(SettingsKeys.Theme, key);
+
+        Assert.That(AppThemes.StartupKey(settings, false), Is.EqualTo(AppThemes.SystemKey));
+        Assert.That(settings.GetStringValue(SettingsKeys.Theme), Is.EqualTo(key));
+
+        ThemeManager.Register(ThemeManager.DefaultDark with { Key = key });
+        Assert.That(AppThemes.StartupKey(settings, false), Is.EqualTo(key));
     }
 }

@@ -5,7 +5,6 @@
         xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
         xmlns:views="clr-namespace:SpaceSnoop.Wpf.Views"
         xmlns:keepshell="https://schemas.keepshell.dev/wpf"
-        xmlns:tarkov="https://schemas.keepshell.dev/wpf/tarkov"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
@@ -61,8 +60,5 @@
         <keepshell:ShellLayout.ContentOverlay>
             <keepshell:ToastHost DataContext="{Binding Toasts}" />
         </keepshell:ShellLayout.ContentOverlay>
-        <keepshell:ShellLayout.WindowOverlay>
-            <tarkov:TarkovBootOverlay IsActive="{Binding IsTarkovBootPlaying, Mode=TwoWay}" />
-        </keepshell:ShellLayout.WindowOverlay>
     </keepshell:ShellLayout>
 </Window>

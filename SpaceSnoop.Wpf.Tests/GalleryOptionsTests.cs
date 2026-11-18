@@ -218,10 +218,11 @@ public class GalleryOptionsTests
         });
     }
 
-    [TestCase(AppThemes.TarkovKey)]
-    [TestCase(AppThemes.SublimeKey)]
-    public void Дополнительная_тема_снимается_только_по_явной_просьбе(string theme)
+    [Test]
+    public void Зарегистрированная_дополнительная_тема_снимается_по_ключу()
     {
+        const string theme = "gallery-test-theme";
+        ThemeManager.Register(ThemeManager.DefaultDark with { Key = theme });
         Assert.Multiple(() =>
         {
             Assert.That(GalleryOptions.Parse([], Default).Themes, Does.Not.Contain(theme));

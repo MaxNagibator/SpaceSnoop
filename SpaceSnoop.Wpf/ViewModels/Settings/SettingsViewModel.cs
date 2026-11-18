@@ -34,7 +34,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
 
     public SettingsSectionList Sections { get; } = CreateSections();
 
-    public ThemeViewModel Theme { get; }
+    public ThemeSelectionViewModel Theme { get; }
 
     public ShellPreferences Shell { get; }
 
@@ -104,8 +104,6 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
 
     public string PageDescription => "Параметры приложения. Изменения сохраняются автоматически.";
 
-    public IReadOnlyList<EnumOption<AppTheme>> ThemeOptions => SettingsOptions.Themes;
-
     public IReadOnlyList<EnumOption<StartupPage>> StartupOptions => SettingsOptions.StartupPages;
 
     public IReadOnlyList<EnumOption<StartupAdminMode>> StartupAdminOptions => SettingsOptions.StartupAdminModes;
@@ -115,24 +113,6 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     public IReadOnlyList<EnumOption<CompressionLevel>> CompressionOptions => SettingsOptions.CompressionLevels;
 
     public IReadOnlyList<EnumOption<GitFolderPromptChoice>> GitFolderOptions => SettingsOptions.GitFolders;
-
-    public EnumOption<AppTheme> SelectedThemeOption
-    {
-        get => ThemeOptions.First(o => o.Value == Theme.Current);
-        set
-        {
-            if (value is null)
-            {
-                OnPropertyChanged();
-                return;
-            }
-
-            if (value.Value != Theme.Current)
-            {
-                Theme.ApplyCommand.Execute(value.Value);
-            }
-        }
-    }
 
     public EnumOption<StartupPage> SelectedStartupOption
     {
@@ -198,7 +178,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     }
 
     public SettingsViewModel(
-        ThemeViewModel theme,
+        ThemeSelectionViewModel theme,
         ShellPreferences shell,
         OperationPreferences operations,
         ScanPreferences scan,
@@ -358,11 +338,6 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     private void OnThemePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         RefreshResetAvailability();
-
-        if (e.PropertyName == nameof(ThemeViewModel.Current))
-        {
-            OnPropertyChanged(nameof(SelectedThemeOption));
-        }
     }
 
     private void NotifyAgentBackendChanged()

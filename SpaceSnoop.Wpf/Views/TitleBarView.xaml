@@ -4,7 +4,6 @@
              xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
              xmlns:keepshell="https://schemas.keepshell.dev/wpf"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
-             xmlns:bs="clr-namespace:SpaceSnoop.Wpf.Bootstrap"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -197,69 +196,9 @@
                         Margin="0,8,8,8"
                         Visibility="{Binding CurrentPageRefresh, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
 
-                <StackPanel Orientation="Horizontal"
-                            VerticalAlignment="Center"
-                            Margin="0,0,8,0">
-                    <Button Style="{StaticResource Theme.SegmentButton}"
-                            Command="{Binding Theme.ApplyCommand}"
-                            CommandParameter="{x:Static bs:AppTheme.System}"
-                            Tag="{Binding Theme.IsSystem}"
-                            Width="36"
-                            ToolTip="Тема как в системе"
-                            AutomationProperties.Name="Тема как в системе">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Monitor}"
-                                                  Width="16"
-                                                  Height="16" />
-                    </Button>
-                    <Button Style="{StaticResource Theme.SegmentButton}"
-                            Command="{Binding Theme.ApplyCommand}"
-                            CommandParameter="{x:Static bs:AppTheme.Light}"
-                            Tag="{Binding Theme.IsLight}"
-                            Width="36"
-                            Margin="2,0,0,0"
-                            ToolTip="Светлая тема"
-                            AutomationProperties.Name="Светлая тема">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Sun}"
-                                                  Width="16"
-                                                  Height="16" />
-                    </Button>
-                    <Button Style="{StaticResource Theme.SegmentButton}"
-                            Command="{Binding Theme.ApplyCommand}"
-                            CommandParameter="{x:Static bs:AppTheme.Dark}"
-                            Tag="{Binding Theme.IsDark}"
-                            Width="36"
-                            Margin="2,0,0,0"
-                            ToolTip="Тёмная тема"
-                            AutomationProperties.Name="Тёмная тема">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Moon}"
-                                                  Width="16"
-                                                  Height="16" />
-                    </Button>
-                    <Button Style="{StaticResource Theme.SegmentButton}"
-                            Command="{Binding Theme.ApplyCommand}"
-                            CommandParameter="{x:Static bs:AppTheme.Tarkov}"
-                            Tag="{Binding Theme.IsTarkov}"
-                            Width="36"
-                            Margin="2,0,0,0"
-                            ToolTip="Тема Tarkov (игровая)"
-                            AutomationProperties.Name="Тема Tarkov (игровая)">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Target}"
-                                                  Width="16"
-                                                  Height="16" />
-                    </Button>
-                    <Button Style="{StaticResource Theme.SegmentButton}"
-                            Command="{Binding Theme.ApplyCommand}"
-                            CommandParameter="{x:Static bs:AppTheme.Sublime}"
-                            Tag="{Binding Theme.IsSublime}"
-                            Width="36"
-                            Margin="2,0,0,0"
-                            ToolTip="Тема Sublime"
-                            AutomationProperties.Name="Тема Sublime">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Code}"
-                                                  Width="16"
-                                                  Height="16" />
-                    </Button>
-                </StackPanel>
+                <keepshell:ThemeSwitcher DataContext="{Binding Theme}"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0" />
                 <Border Width="1"
                         Background="{DynamicResource Border.Subtle}"
                         Margin="0,8" />

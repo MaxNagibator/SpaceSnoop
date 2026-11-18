@@ -153,7 +153,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         IUiDispatcher uiDispatcher,
         IAppNavigator navigator,
         IApplicationLifetime lifetime,
-        ThemeViewModel theme,
+        ThemeSelectionViewModel theme,
         UpdatePreferences updates)
     {
         _navigator = navigator;

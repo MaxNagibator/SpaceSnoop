@@ -43,7 +43,6 @@ public sealed partial class SettingsViewModel
 
     private void NotifyDerivedOptions()
     {
-        OnPropertyChanged(nameof(SelectedThemeOption));
         OnPropertyChanged(nameof(SelectedStartupOption));
         OnPropertyChanged(nameof(SelectedStartupAdminOption));
         OnPropertyChanged(nameof(SelectedDeleteModeOption));

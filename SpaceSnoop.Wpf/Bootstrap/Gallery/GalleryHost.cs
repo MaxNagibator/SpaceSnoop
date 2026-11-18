@@ -75,13 +75,6 @@ internal sealed class GalleryHost : IGalleryHost
         return ArrangeAsync(_services, _fixture);
     }
 
-    public Task ThemeAppliedAsync(string themeKey)
-    {
-        _shell.IsTarkovBootPlaying = false;
-
-        return Task.CompletedTask;
-    }
-
     public async Task<GalleryShot> CaptureAsync(GalleryCase item, GalleryContext context)
     {
         _shell.Toasts.Toasts.Clear();

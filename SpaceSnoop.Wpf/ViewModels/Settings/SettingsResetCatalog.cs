@@ -5,7 +5,7 @@ public static class SettingsResetCatalog
     private const double ScaleTolerance = 0.005;
 
     public static IReadOnlyDictionary<string, SettingsResetPlan> Build(
-        ThemeViewModel theme,
+        ThemeSelectionViewModel theme,
         ShellPreferences shell,
         ScanPreferences scan,
         OperationPreferences operations,
@@ -38,9 +38,10 @@ public static class SettingsResetCatalog
                     Field(
                         SettingsKeys.Theme,
                         "тема оформления",
-                        SettingsOptions.LabelOf(SettingsOptions.Themes, AppDefaults.ThemeDefault),
-                        () => theme.Current == AppDefaults.ThemeDefault,
-                        () => theme.ApplyCommand.Execute(AppDefaults.ThemeDefault)),
+                        AppThemes.SystemDisplayName,
+                        () => string.IsNullOrWhiteSpace(theme.PreferredKey)
+                              || string.Equals(theme.PreferredKey, AppDefaults.ThemeDefault, StringComparison.OrdinalIgnoreCase),
+                        () => theme.Select(AppDefaults.ThemeDefault)),
                     Field(
                         SettingsKeys.FontScale,
                         "масштаб шрифта",

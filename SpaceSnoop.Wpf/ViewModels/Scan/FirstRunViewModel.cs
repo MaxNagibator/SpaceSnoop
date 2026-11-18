@@ -6,7 +6,6 @@ public sealed partial class FirstRunViewModel : ObservableObject
 {
     private readonly ISettingsStore _settings;
     private readonly ScanPreferences _scan;
-    private readonly ThemeViewModel _theme;
     private readonly UpdatePreferences _updates;
     private readonly Func<Task<bool>> _restart;
 
@@ -27,25 +26,7 @@ public sealed partial class FirstRunViewModel : ObservableObject
         set => _scan.MftEnabled = value;
     }
 
-    public IReadOnlyList<EnumOption<AppTheme>> ThemeOptions => SettingsOptions.Themes;
-
-    public int SelectedThemeIndex
-    {
-        get => IndexOf(_theme.Current);
-        set
-        {
-            if (value < 0)
-            {
-                OnPropertyChanged();
-                return;
-            }
-
-            if (value < SettingsOptions.Themes.Count && SettingsOptions.Themes[value].Value != _theme.Current)
-            {
-                _theme.ApplyCommand.Execute(SettingsOptions.Themes[value].Value);
-            }
-        }
-    }
+    public ThemeSelectionViewModel Theme { get; }
 
     public bool CheckUpdates
     {
@@ -56,14 +37,14 @@ public sealed partial class FirstRunViewModel : ObservableObject
     public FirstRunViewModel(
         ISettingsStore settings,
         ScanPreferences scan,
-        ThemeViewModel theme,
+        ThemeSelectionViewModel theme,
         UpdatePreferences updates,
         bool isElevated,
         Func<Task<bool>> restart)
     {
         _settings = settings;
         _scan = scan;
-        _theme = theme;
+        Theme = theme;
         _updates = updates;
         _restart = restart;
 
@@ -71,7 +52,6 @@ public sealed partial class FirstRunViewModel : ObservableObject
         IsVisible = settings.GetBool(SettingsKeys.WelcomePending);
 
         scan.PropertyChanged += OnScanChanged;
-        theme.PropertyChanged += OnThemeChanged;
         updates.PropertyChanged += OnUpdatesChanged;
     }
 
@@ -111,32 +91,11 @@ public sealed partial class FirstRunViewModel : ObservableObject
         _settings.SetBool(SettingsKeys.WelcomePending, false);
     }
 
-    private static int IndexOf(AppTheme theme)
-    {
-        for (var i = 0; i < SettingsOptions.Themes.Count; i++)
-        {
-            if (SettingsOptions.Themes[i].Value == theme)
-            {
-                return i;
-            }
-        }
-
-        return -1;
-    }
-
     private void OnScanChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(ScanPreferences.MftEnabled))
         {
             OnPropertyChanged(nameof(FastScan));
-        }
-    }
-
-    private void OnThemeChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(ThemeViewModel.Current))
-        {
-            OnPropertyChanged(nameof(SelectedThemeIndex));
         }
     }
 

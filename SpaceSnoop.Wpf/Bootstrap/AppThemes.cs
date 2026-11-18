@@ -1,4 +1,4 @@
-﻿using KeepShell.Themes.Tarkov;
+﻿using System.Reflection;
 
 namespace SpaceSnoop.Wpf.Bootstrap;
 
@@ -6,43 +6,19 @@ public static class AppThemes
 {
     public const string LightKey = "light";
     public const string DarkKey = "dark";
-    public const string TarkovKey = TarkovTheme.Key;
     public const string SystemKey = "system";
-    public const string SublimeKey = ThemeManager.SublimeKey;
+    public const string SystemDisplayName = "Как в системе";
 
-    public static string ToKey(AppTheme theme)
+    public static void Register(Assembly? themeModules = null)
     {
-        return theme switch
-        {
-            AppTheme.Dark => DarkKey,
-            AppTheme.Tarkov => TarkovKey,
-            AppTheme.System => SystemKey,
-            AppTheme.Sublime => SublimeKey,
-            _ => LightKey,
-        };
-    }
-
-    public static AppTheme FromKey(string? key)
-    {
-        return key?.Trim().ToLowerInvariant() switch
-        {
-            DarkKey => AppTheme.Dark,
-            TarkovKey => AppTheme.Tarkov,
-            SystemKey => AppTheme.System,
-            SublimeKey => AppTheme.Sublime,
-            _ => AppTheme.Light,
-        };
-    }
-
-    public static void Register()
-    {
+        RegisterSystem(SystemTheme.AppsUseLightTheme());
         ThemeManager.Register(ThemeManager.DefaultLight);
         ThemeManager.Register(ThemeManager.DefaultDark);
 
-        TarkovTheme.Register();
-        ThemeManager.Register(ThemeManager.Sublime);
-
-        RegisterSystem(SystemTheme.AppsUseLightTheme());
+        if (themeModules is not null)
+        {
+            ThemeManager.RegisterModules(themeModules);
+        }
     }
 
     public static void RegisterSystem(bool appsUseLightTheme)
@@ -52,6 +28,9 @@ public static class AppThemes
             source with
             {
                 Key = SystemKey,
+                DisplayName = SystemDisplayName,
+                PreviewPalette = ThemeManager.DefaultLight.Palette,
+                AlternatePreviewPalette = ThemeManager.DefaultDark.Palette,
             });
     }
 
@@ -61,11 +40,13 @@ public static class AppThemes
 
         if (freshProfile)
         {
-            settings.SetValue(SettingsKeys.Theme, ToKey(AppDefaults.ThemeDefault));
+            settings.SetValue(SettingsKeys.Theme, AppDefaults.ThemeDefault);
         }
 
         var stored = settings.GetStringValue(SettingsKeys.Theme);
-        return string.IsNullOrWhiteSpace(stored) ? LightKey : stored;
+        return string.IsNullOrWhiteSpace(stored)
+            ? LightKey
+            : ThemeManager.Find(stored.Trim())?.Key ?? AppDefaults.ThemeDefault;
     }
 
     public static void FollowSystem(bool appsUseLightTheme)

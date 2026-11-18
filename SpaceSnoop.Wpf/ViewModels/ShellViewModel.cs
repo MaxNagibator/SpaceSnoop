@@ -35,16 +35,13 @@ public sealed partial class ShellViewModel : ShellViewModelBase, IAppNavigator
 
     private readonly NavigationItem _syncItem;
 
-    [ObservableProperty]
-    private bool _isTarkovBootPlaying;
-
     public bool IsNavigationLocked => _scan.IsExporting;
 
     public ToastHostViewModel Toasts { get; }
 
     public PerformanceHudViewModel Hud { get; }
 
-    public ThemeViewModel Theme { get; }
+    public ThemeSelectionViewModel Theme { get; }
 
     public ShellPreferences Preferences { get; }
 
@@ -59,7 +56,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase, IAppNavigator
     public string? CurrentSectionKey => Selected?.Key is { Length: > 0 } key ? key : null;
 
     public ShellViewModel(
-        ThemeViewModel theme,
+        ThemeSelectionViewModel theme,
         ScanViewModel scan,
         SyncViewModel sync,
         OverviewViewModel overview,
@@ -86,7 +83,6 @@ public sealed partial class ShellViewModel : ShellViewModelBase, IAppNavigator
         Toasts = toasts;
         Hud = hud;
         Theme = theme;
-        Theme.PropertyChanged += OnThemePropertyChanged;
         Preferences = preferences;
         Preferences.PropertyChanged += OnPreferencesPropertyChanged;
         AppUpdate = appUpdate;
@@ -275,16 +271,6 @@ public sealed partial class ShellViewModel : ShellViewModelBase, IAppNavigator
 
         OnPropertyChanged(nameof(EffectivePageHeader));
         OnPropertyChanged(nameof(ContentMargin));
-    }
-
-    private void OnThemePropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName != nameof(ThemeViewModel.Current) || Theme.Current != AppTheme.Tarkov)
-        {
-            return;
-        }
-
-        IsTarkovBootPlaying = true;
     }
 
     [RelayCommand]
