@@ -88,15 +88,13 @@ public sealed class DockerCompactTests
     [Test]
     public async Task Ожидание_занятого_файла_повторяет_проверку_до_освобождения()
     {
-        var runner = CreateSuccessfulRunner();
-        var service = CreateService(
-            runner,
-            new(VhdxPath, [new(1000, 800), new(1000, 600)], availability: [false, true]));
+        var fileSystem = new FakeFileSystem(VhdxPath, [new(1000, 800), new(1000, 600)], availability: [false, true]);
+        var runner = CreateSuccessfulRunner(beforeDiskpart: () => Assert.That(fileSystem.AvailabilityConfirmed, Is.True));
+        var service = CreateService(runner, fileSystem);
 
         var result = await service.CompactAsync();
 
         Assert.That(result.Status, Is.EqualTo(DockerCompactStatus.Succeeded));
-        Assert.That(runner.Calls.Count(call => call.FileName == "docker" && call.Arguments == "desktop status"), Is.EqualTo(2));
     }
 
     [TestCase("Docker Desktop is not running")]
@@ -366,15 +364,25 @@ public sealed class DockerCompactTests
             administratorCheck ?? (() => true));
     }
 
-    private static ScriptedProcessRunner CreateSuccessfulRunner(string diskpartOutput = "DiskPart successfully compacted the virtual disk file.")
+    private static ScriptedProcessRunner CreateSuccessfulRunner(
+        string diskpartOutput = "DiskPart successfully compacted the virtual disk file.",
+        Action? beforeDiskpart = null)
     {
-        return new((fileName, arguments) => (fileName, arguments) switch
+        return new((fileName, arguments) =>
         {
-            ("wsl", "--list --quiet") => Success("docker-desktop\0"),
-            ("docker", "desktop stop") => Success(),
-            ("docker", "desktop status") => Success("Status: stopped"),
-            ("diskpart", "") => Success(diskpartOutput),
-            _ => throw new AssertionException($"Неожиданная команда: {fileName} {arguments}"),
+            if (fileName == "diskpart")
+            {
+                beforeDiskpart?.Invoke();
+            }
+
+            return (fileName, arguments) switch
+            {
+                ("wsl", "--list --quiet") => Success("docker-desktop\0"),
+                ("docker", "desktop stop") => Success(),
+                ("docker", "desktop status") => Success("Status: stopped"),
+                ("diskpart", "") => Success(diskpartOutput),
+                _ => throw new AssertionException($"Неожиданная команда: {fileName} {arguments}"),
+            };
         });
     }
 
@@ -411,6 +419,8 @@ public sealed class DockerCompactTests
         private readonly Queue<bool> _availability = new(availability ?? []);
         private int _metricsRead;
 
+        public bool AvailabilityConfirmed { get; private set; }
+
         public bool FileExists(string path)
         {
             return string.Equals(path, expectedPath, StringComparison.OrdinalIgnoreCase);
@@ -419,7 +429,8 @@ public sealed class DockerCompactTests
         public bool IsAvailable(string path)
         {
             Assert.That(path, Is.EqualTo(expectedPath));
-            return _availability.Count > 0 ? _availability.Dequeue() : FileExists(path);
+            AvailabilityConfirmed = _availability.Count > 0 ? _availability.Dequeue() : FileExists(path);
+            return AvailabilityConfirmed;
         }
 
         public DockerFileMetrics GetMetrics(string path)

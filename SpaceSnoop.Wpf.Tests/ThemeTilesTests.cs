@@ -1,7 +1,11 @@
-﻿using KeepShell.Testing;
+﻿using KeepShell.Bootstrap;
+using KeepShell.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Bootstrap.Platform;
-using KeepShell.Bootstrap;
+using SpaceSnoop.Wpf.Bootstrap.Storage;
+using SpaceSnoop.Wpf.ViewModels.Settings;
+using SpaceSnoop.Wpf.Views.Settings;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -9,88 +13,107 @@ using System.Windows.Input;
 
 namespace SpaceSnoop.Wpf.Tests;
 
-[TestFixture]
-[Apartment(ApartmentState.STA)]
-[NonParallelizable]
-public class ThemeTilesTests
+public partial class BindingSmokeTests
 {
-    [OneTimeSetUp]
-    public void OneTimeSetUp()
+    [TestCase(true, TestName = "Настройки показывают обе половины системной темы при светлом режиме Windows")]
+    [TestCase(false, TestName = "Настройки показывают обе половины системной темы при тёмном режиме Windows")]
+    public void Настройки_показывают_обе_половины_системной_темы(bool appsUseLightTheme)
     {
-        _ = TestApplication.Ensure(AppResources.Sources);
-        AppThemes.Register();
-    }
+        var settings = _services.GetRequiredService<SettingsViewModel>();
+        var sections = settings.Sections;
+        var previous = sections.SelectedPath;
 
-    [OneTimeTearDown]
-    public void OneTimeTearDown()
-    {
-        AppThemes.RegisterSystem(SystemTheme.AppsUseLightTheme());
-    }
-
-    [TestCase(true, TestName = "Превью «Как в системе» – светлая и тёмная половины при светлом режиме Windows")]
-    [TestCase(false, TestName = "Превью «Как в системе» – светлая и тёмная половины при тёмном режиме Windows")]
-    public void Превью_системной_темы_не_зависит_от_режима_Windows(bool appsUseLightTheme)
-    {
-        AppThemes.RegisterSystem(appsUseLightTheme);
-        using var host = Show(out var list);
-
-        using (Assert.EnterMultipleScope())
+        try
         {
-            for (var i = 0; i < list.Items.Count; i++)
-            {
-                var option = (ThemeDefinition)list.Items[i];
-                var tile = (ListBoxItem)list.ItemContainerGenerator.ContainerFromIndex(i);
-                var preview = (ContentControl)tile.Template.FindName("Preview", tile);
-                var darkHalf = (ContentControl)tile.Template.FindName("DarkHalf", tile);
-                var isSystem = option.Key == AppThemes.SystemKey;
+            AppThemes.RegisterSystem(appsUseLightTheme);
+            sections.SelectCommand.Execute(sections["appearance"]);
+            using var host = ShowAppearance(settings);
+            var list = ThemeList(host);
+            var option = list.Items.OfType<ThemeDefinition>().Single(item => item.Key == AppThemes.SystemKey);
+            var tile = (ListBoxItem)list.ItemContainerGenerator.ContainerFromItem(option);
+            var preview = (ContentControl)tile.Template.FindName("Preview", tile);
+            var darkHalf = (ContentControl)tile.Template.FindName("DarkHalf", tile);
 
-                Assert.That(preview.Content, Is.EqualTo(isSystem ? ThemeManager.DefaultLight.Palette : option.Palette), option.DisplayName);
-                Assert.That(darkHalf.IsVisible, Is.EqualTo(isSystem), option.DisplayName);
-                Assert.That(darkHalf.Content, Is.EqualTo(isSystem ? ThemeManager.DefaultDark.Palette : null), option.DisplayName);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(preview.IsVisible, Is.True);
+                Assert.That(preview.Content, Is.EqualTo(ThemeManager.DefaultLight.Palette));
+                Assert.That(darkHalf.IsVisible, Is.True);
+                Assert.That(darkHalf.Content, Is.EqualTo(ThemeManager.DefaultDark.Palette));
                 Assert.That(AutomationProperties.GetName(tile), Is.EqualTo($"Тема: {option.DisplayName}"));
             }
+        }
+        finally
+        {
+            AppThemes.RegisterSystem(SystemTheme.AppsUseLightTheme());
+            sections.Restore(previous);
+            Settle();
         }
     }
 
     [Test]
-    public void Стрелка_вправо_выбирает_соседнюю_плитку()
+    public void Стрелка_вправо_применяет_соседнюю_тему_в_настройках()
     {
-        using var host = Show(out var list);
-        list.SelectedIndex = 0;
-        host.Settle();
+        var settings = _services.GetRequiredService<SettingsViewModel>();
+        var sections = settings.Sections;
+        var previousSection = sections.SelectedPath;
+        var previousTheme = ThemeManager.Current!.Key;
+        var store = _services.GetRequiredService<ISettingsStore>();
+        var previousPreference = store.GetStringValue(SettingsKeys.Theme) ?? string.Empty;
 
-        var first = (ListBoxItem)list.ItemContainerGenerator.ContainerFromIndex(0);
-        first.Focus();
-        first.RaiseEvent(
-            new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(first)!, 0, Key.Right)
+        try
+        {
+            sections.SelectCommand.Execute(sections["appearance"]);
+            settings.Theme.Select(AppThemes.SystemKey);
+            using var host = ShowAppearance(settings, keyboardFocus: true);
+            var list = ThemeList(host);
+            Assert.That(list.SelectedIndex, Is.Zero);
+            var next = (ThemeDefinition)list.Items[1];
+
+            var first = (ListBoxItem)list.ItemContainerGenerator.ContainerFromIndex(0);
+            first.Focus();
+            first.RaiseEvent(
+                new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(first)!, 0, Key.Right)
+                {
+                    RoutedEvent = Keyboard.KeyDownEvent,
+                });
+
+            host.Settle();
+
+            using (Assert.EnterMultipleScope())
             {
-                RoutedEvent = Keyboard.KeyDownEvent,
-            });
-
-        host.Settle();
-
-        Assert.That(list.SelectedIndex, Is.EqualTo(1));
+                Assert.That(list.SelectedValue, Is.EqualTo(next.Key));
+                Assert.That(ThemeManager.Current?.Key, Is.EqualTo(next.Key));
+                Assert.That(store.GetStringValue(SettingsKeys.Theme), Is.EqualTo(next.Key));
+            }
+        }
+        finally
+        {
+            ThemeManager.Apply(previousTheme);
+            store.SetValue(SettingsKeys.Theme, previousPreference);
+            sections.Restore(previousSection);
+            Settle();
+        }
     }
 
-    private static VisualTestHost Show(out ListBox list)
+    private static VisualTestHost ShowAppearance(SettingsViewModel settings, bool keyboardFocus = false)
     {
-        list = new()
-        {
-            Style = (Style)Application.Current.FindResource("ListBox.ThemeTiles"),
-            ItemsSource = ThemeManager.Themes,
-        };
-
         var host = VisualTestHost.Show(
-            new()
+            new Window
             {
-                Content = list,
+                Content = new SettingsAppearanceCard { DataContext = settings },
             },
-            640,
-            240,
-            true);
-
+            900,
+            550,
+            keyboardFocus);
         host.Settle();
 
         return host;
+    }
+
+    private static ListBox ThemeList(VisualTestHost host)
+    {
+        return Descendants<ListBox>(host.Window).Single(list =>
+            list.IsVisible && AutomationProperties.GetName(list) == "Тема оформления");
     }
 }

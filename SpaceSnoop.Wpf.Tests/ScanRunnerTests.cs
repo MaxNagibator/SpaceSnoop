@@ -74,16 +74,11 @@ public class ScanRunnerTests
     {
         var outcome = Runner(mftEnabled: false).Run(new(_tempDir), 4, new(), CancellationToken.None);
 
-        Assert.That(outcome.Notes.Parallelism, Is.EqualTo(4));
-    }
-
-    [Test]
-    public void Обход_каталогами_остаётся_доступен_при_любом_параллелизме()
-    {
-        var single = Runner(mftEnabled: false).Run(new(_tempDir), 1, new(), CancellationToken.None);
-        var parallel = Runner(mftEnabled: false).Run(new(_tempDir), 4, new(), CancellationToken.None);
-
-        Assert.That(parallel.Root.TotalSize, Is.EqualTo(single.Root.TotalSize));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(outcome.Notes.Parallelism, Is.EqualTo(4));
+            Assert.That(outcome.Root.TotalSize, Is.EqualTo(2048));
+        }
     }
 
     [Test]

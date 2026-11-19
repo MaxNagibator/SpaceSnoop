@@ -16,6 +16,7 @@ using SpaceSnoop.Wpf.Views;
 using SpaceSnoop.Wpf.Views.Overview;
 using SpaceSnoop.Wpf.Views.Scan;
 using SpaceSnoop.Wpf.Views.Schedule;
+using SpaceSnoop.Wpf.Views.Sync;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -25,6 +26,45 @@ namespace SpaceSnoop.Wpf.Tests;
 
 public partial class BindingSmokeTests
 {
+    [TestCase(1000, false)]
+    [TestCase(620, true)]
+    public void Направление_синхронизации_остаётся_между_полями_при_переносе(double width, bool wraps)
+    {
+        var row = new SyncEndpointsRow
+        {
+            DataContext = _services.GetRequiredService<SyncViewModel>(),
+        };
+        using var host = VisualTestHost.Show(new Window { Content = row }, width, 240);
+        var fields = Descendants<TextBox>(row).Where(static box => box.IsVisible).ToArray();
+        Assert.That(fields, Has.Length.EqualTo(2));
+        var left = fields.Single(static box => Equals(box.ToolTip, "Каталог слева"));
+        var right = fields.Single(static box => Equals(box.ToolTip, "Каталог справа"));
+        var direction = Descendants<Button>(row).Single(static button =>
+            AutomationProperties.GetName(button)?.StartsWith("Направление:", StringComparison.Ordinal) == true);
+
+        var leftBounds = left.TransformToAncestor(row).TransformBounds(new(left.RenderSize));
+        var rightBounds = right.TransformToAncestor(row).TransformBounds(new(right.RenderSize));
+        var directionBounds = direction.TransformToAncestor(row).TransformBounds(new(direction.RenderSize));
+
+        using (Assert.EnterMultipleScope())
+        {
+            if (wraps)
+            {
+                Assert.That(directionBounds.Top, Is.GreaterThanOrEqualTo(leftBounds.Bottom));
+                Assert.That(directionBounds.Bottom, Is.LessThanOrEqualTo(rightBounds.Top));
+            }
+            else
+            {
+                Assert.That(directionBounds.Left, Is.GreaterThanOrEqualTo(leftBounds.Right));
+                Assert.That(directionBounds.Right, Is.LessThanOrEqualTo(rightBounds.Left));
+                Assert.That(leftBounds.Top, Is.EqualTo(rightBounds.Top).Within(1));
+            }
+
+            Assert.That(direction.IsEnabled, Is.True);
+            Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
+        }
+    }
+
     [Test]
     public void Обзор_при_ширине_1280_и_идущем_сравнении_переносит_кнопки_сводки_единой_группой()
     {

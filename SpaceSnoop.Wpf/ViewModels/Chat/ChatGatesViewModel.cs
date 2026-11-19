@@ -169,7 +169,7 @@ public sealed partial class ChatGatesViewModel : ObservableObject
     /// поставщику модели. И то и другое обязано остановить идущий ход – иначе баннер говорит
     /// «согласие отозвано», а ответ на уже отправленное сообщение всё равно доедет до истории.
     /// </summary>
-    internal static bool CancelsActiveTurn(string? propertyName, AgentPreferences preferences)
+    private static bool CancelsActiveTurn(string? propertyName, AgentPreferences preferences)
     {
         return propertyName switch
         {

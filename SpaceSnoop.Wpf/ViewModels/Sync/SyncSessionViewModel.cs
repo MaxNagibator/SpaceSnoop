@@ -6,8 +6,6 @@ namespace SpaceSnoop.Wpf.ViewModels.Sync;
 
 public sealed partial class SyncSessionViewModel : ObservableObject
 {
-    internal static readonly TimeSpan ProgressPollInterval = UiProgressPoller.DefaultInterval;
-
     private readonly IDialogService _dialogs;
     private readonly ILogger _logger;
     private readonly ToastNotifier _notifier;
@@ -80,7 +78,7 @@ public sealed partial class SyncSessionViewModel : ObservableObject
         _notifier = notifier;
         _performance = performance;
         _reportSummary = reportSummary;
-        _progressPoller = new(uiDispatcher, OnProgressTick, ProgressPollInterval);
+        _progressPoller = new(uiDispatcher, OnProgressTick);
     }
 
     internal static string DescribeRate(string name, SyncReport report, TimeSpan elapsed)

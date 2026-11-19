@@ -9,7 +9,6 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
 {
     internal const string MeasuringStatus = "Замеряю…";
 
-    private readonly CleanupService _service;
     private readonly CleanupProgressDialogFactory _dialogFactory;
     private readonly IDialogService _dialogs;
     private readonly ModalHostViewModel _modals;
@@ -19,8 +18,8 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
     private readonly ToastNotifier _notifier;
     private readonly ILogger<CleanupViewModel> _logger;
 
-    private Func<TimeSpan, IReadOnlyList<CleanupTarget>> _catalog = static minAge => CleanupCatalog.BuildDefault(minAge);
-    private Func<CleanupTarget, CancellationToken, Task<CleanupMeasurement>> _measure;
+    private readonly Func<TimeSpan, IReadOnlyList<CleanupTarget>> _catalog;
+    private readonly Func<CleanupTarget, CancellationToken, Task<CleanupMeasurement>> _measure;
     private CancellationTokenSource? _measureCts;
     private bool _loadedOnce;
     private bool _suppressPersist;
@@ -102,9 +101,34 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
         IUiDispatcher uiDispatcher,
         ToastNotifier notifier,
         ILogger<CleanupViewModel> logger)
+        : this(
+            dialogFactory,
+            dialogs,
+            modals,
+            shell,
+            settings,
+            uiDispatcher,
+            notifier,
+            logger,
+            static minAge => CleanupCatalog.BuildDefault(minAge),
+            service.MeasureAsync)
     {
-        _service = service;
-        _measure = service.MeasureAsync;
+    }
+
+    internal CleanupViewModel(
+        CleanupProgressDialogFactory dialogFactory,
+        IDialogService dialogs,
+        ModalHostViewModel modals,
+        IShellLauncher shell,
+        ISettingsStore settings,
+        IUiDispatcher uiDispatcher,
+        ToastNotifier notifier,
+        ILogger<CleanupViewModel> logger,
+        Func<TimeSpan, IReadOnlyList<CleanupTarget>> catalog,
+        Func<CleanupTarget, CancellationToken, Task<CleanupMeasurement>> measure)
+    {
+        _catalog = catalog;
+        _measure = measure;
         _dialogFactory = dialogFactory;
         _dialogs = dialogs;
         _modals = modals;
@@ -115,16 +139,6 @@ public sealed partial class CleanupViewModel : ObservableObject, IPageHeader, IP
         _logger = logger;
 
         LoadSettings();
-        BuildTargets();
-    }
-
-    internal void UseTestBackend(
-        Func<TimeSpan, IReadOnlyList<CleanupTarget>> catalog,
-        Func<CleanupTarget, CancellationToken, Task<CleanupMeasurement>>? measure = null)
-    {
-        _catalog = catalog;
-        _measure = measure ?? _service.MeasureAsync;
-        StatusText = null;
         BuildTargets();
     }
 

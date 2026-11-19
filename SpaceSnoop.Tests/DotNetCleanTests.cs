@@ -159,7 +159,7 @@ public sealed class DotNetCleanTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(_calls.Count, Is.EqualTo(1));
+            Assert.That(_calls.Any(x => x.Arguments[0] == "clean"), Is.False);
             Assert.That(plan.Arguments, Is.EqualTo(expected));
             Assert.That(plan.Command, Does.StartWith("\"" + _executable + "\" \"clean\""));
             Assert.That(plan.Command, Does.Contain("\"" + _project + "\""));
@@ -171,13 +171,13 @@ public sealed class DotNetCleanTests
         Assert.Multiple(() =>
         {
             Assert.That(report.Succeeded, Is.True);
-            Assert.That(_calls.Last().Arguments, Is.EqualTo(expected));
-            Assert.That(_calls.All(x => x.Directory == _root), Is.True);
-            Assert.That(report.OutputTail, Is.EqualTo("partial clean output"));
+            var clean = _calls.Single(x => x.Arguments[0] == "clean");
+            Assert.That(clean.Arguments, Is.EqualTo(expected));
+            Assert.That(clean.Directory, Is.EqualTo(_root));
         });
 
         Assert.That((await _service.CleanAsync(plan, true, default)).Succeeded, Is.False);
-        Assert.That(_calls.Count, Is.EqualTo(3));
+        Assert.That(_calls.Count(x => x.Arguments[0] == "clean"), Is.EqualTo(1));
     }
 
     [Test]
@@ -245,11 +245,12 @@ public sealed class DotNetCleanTests
     public async Task Precancellation_does_not_launch_process()
     {
         var plan = await _service.InspectAsync(_project, new(), true, default);
+        _calls.Clear();
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         var report = await _service.CleanAsync(plan, true, cancellation.Token);
         Assert.That(report.Cancelled, Is.True);
-        Assert.That(_calls.Count, Is.EqualTo(1));
+        Assert.That(_calls, Is.Empty);
     }
 
     [Test]

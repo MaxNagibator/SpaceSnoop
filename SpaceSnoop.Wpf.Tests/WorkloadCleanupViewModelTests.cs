@@ -233,13 +233,16 @@ public sealed class WorkloadCleanupViewModelTests
             Assert.That(parent.RefreshCommand.CanExecute(null), Is.False);
             Assert.That(parent.CleanCommand.CanExecute(null), Is.False);
             Assert.That(projects.FindCommand.CanExecute(null), Is.False);
-            Assert.That(projects.IsHostBusy, Is.True);
-            Assert.That(workload.IsHostBusy, Is.False);
-            Assert.That(parent.CancelCommand, Is.SameAs(workload.CancelCommand));
+            Assert.That(parent.CancelCommand?.CanExecute(null), Is.True);
+
+            parent.CancelCommand!.Execute(null);
+            dialogs.Confirmation.SetResult(true);
+            await cleaning;
+            Assert.That(_calls.Any(args => args.SequenceEqual(["workload", "clean"])), Is.False);
         }
         finally
         {
-            dialogs.Confirmation.SetResult(false);
+            dialogs.Confirmation.TrySetResult(false);
             await cleaning;
         }
 

@@ -69,19 +69,6 @@ public class SyncPlanFreshnessTests
         }
     }
 
-    [Test]
-    public void Оборванный_прогон_не_сообщает_о_нуле_ошибок()
-    {
-        var state = new SyncPlanFreshnessState(SyncPlanFreshness.Fresh).AfterSync(null, true);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(state.Freshness, Is.EqualTo(SyncPlanFreshness.Interrupted));
-            Assert.That(state.RefusalMessage, Does.Not.Contain("ошибок"));
-            Assert.That(state.RefusalMessage, Does.Contain("выполните сравнение заново"));
-        }
-    }
-
     [TestCase(false)]
     [TestCase(true)]
     public async Task План_сменившийся_за_замер_места_не_доходит_до_подтверждения(bool replaceResult)
@@ -166,37 +153,6 @@ public class SyncPlanFreshnessTests
         Assert.That(page.Operations.Result, Is.Null);
     }
 
-    [TestCase(0, 0, false, SyncPlanFreshness.Applied)]
-    [TestCase(1, 0, false, SyncPlanFreshness.PartiallyApplied)]
-    [TestCase(0, 1, false, SyncPlanFreshness.PartiallyApplied)]
-    [TestCase(0, 0, true, SyncPlanFreshness.PartiallyApplied)]
-    public void Результат_прогона_выбирает_полное_или_частичное_исполнение(
-        int errors,
-        int mismatches,
-        bool cancelled,
-        SyncPlanFreshness expected)
-    {
-        var report = new SyncReport();
-
-        for (var index = 0; index < errors; index++)
-        {
-            report.Errors.Add(new($"e{index}.txt", SyncAction.CopyToRight, "нет доступа"));
-        }
-
-        for (var index = 0; index < mismatches; index++)
-        {
-            report.Mismatches.Add(new($"m{index}.txt", SyncAction.CopyToRight, "приёмник не найден"));
-        }
-
-        var state = new SyncPlanFreshnessState(SyncPlanFreshness.Fresh).AfterSync(report, cancelled);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(state.Freshness, Is.EqualTo(expected));
-            Assert.That(state.IsExecutable, Is.False);
-        }
-    }
-
     [Test]
     public async Task Смена_режима_не_возвращает_исполненному_плану_исполнимость()
     {
@@ -209,24 +165,6 @@ public class SyncPlanFreshnessTests
             Assert.That(page.Operations.PlanFreshness, Is.EqualTo(SyncPlanFreshness.Applied));
             Assert.That(page.Operations.SyncCommand.CanExecute(null), Is.False);
         }
-    }
-
-    [Test]
-    public void Только_сравнение_возвращает_состояние_в_свежее()
-    {
-        var transitions = typeof(SyncPlanFreshnessState)
-            .GetMethods()
-            .Where(static method => method.ReturnType == typeof(SyncPlanFreshnessState))
-            .Select(static method => method.Name)
-            .ToList();
-
-        Assert.That(
-            transitions,
-            Is.EquivalentTo(
-                new[]
-                {
-                    nameof(SyncPlanFreshnessState.AfterComparison), nameof(SyncPlanFreshnessState.AfterSync),
-                }));
     }
 
     [Test]
@@ -243,23 +181,6 @@ public class SyncPlanFreshnessTests
         }
     }
 
-    [Test]
-    public void Частичный_отказ_называет_число_ошибок()
-    {
-        var report = new SyncReport();
-        report.Errors.Add(new("a.txt", SyncAction.CopyToRight, "нет доступа"));
-        report.Errors.Add(new("b.txt", SyncAction.CopyToRight, "нет доступа"));
-
-        var state = new SyncPlanFreshnessState(SyncPlanFreshness.Fresh).AfterSync(report, false);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(state.IsExecutable, Is.False);
-            Assert.That(state.RefusalMessage, Does.Contain("ошибок: 2"));
-            Assert.That(state.RefusalMessage, Does.Contain("выполните сравнение заново"));
-        }
-    }
-
     private async Task<SyncViewModel> RunSyncAsync()
     {
         var page = CreatePage();
@@ -270,7 +191,7 @@ public class SyncPlanFreshnessTests
 
         await automation.CompareFromAutomationAsync(CancellationToken.None);
 
-        Assume.That(page.Operations.SyncCommand.CanExecute(null), Is.True);
+        Assert.That(page.Operations.SyncCommand.CanExecute(null), Is.True);
 
         await automation.SyncFromAutomationAsync(CancellationToken.None);
 

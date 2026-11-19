@@ -34,7 +34,6 @@ public class ScanMultiSelectionTests
     private ShellViewModel _shell = null!;
     private ScanViewModel _scan = null!;
     private ScanNodeFactory _factory = null!;
-    private ToastNotifier _notifier = null!;
     private ToastHostViewModel _toasts = null!;
     private ModalHostViewModel _modals = null!;
 
@@ -65,7 +64,6 @@ public class ScanMultiSelectionTests
         _shell = _services.GetRequiredService<ShellViewModel>();
         _scan = _services.GetRequiredService<ScanViewModel>();
         _factory = _services.GetRequiredService<ScanNodeFactory>();
-        _notifier = _services.GetRequiredService<ToastNotifier>();
         _toasts = _services.GetRequiredService<ToastHostViewModel>();
         _modals = _services.GetRequiredService<ModalHostViewModel>();
         _window = _services.GetRequiredService<MainWindow>();
@@ -158,7 +156,8 @@ public class ScanMultiSelectionTests
         outsideFile.MarkDeletedCommand.Execute(null);
         _host.Settle();
         SaveFrame(_window, $"scan-multi-toast-undo-{themeName}");
-        _notifier.UndoLast();
+        var undo = UndoToast();
+        undo.ActionCommand!.Execute(undo);
         _host.Settle();
 
         using (Assert.EnterMultipleScope())
@@ -366,14 +365,17 @@ public class ScanMultiSelectionTests
         _scan.ToggleSelection(outsideFile);
         _host.Settle();
 
-        var recountEvents = 0;
+        var countUpdates = new List<int>();
 
-        void OnMarksChanged(ScanMarkSnapshot _)
+        void OnMarksChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            recountEvents += 1;
+            if (e.PropertyName == nameof(ScanMarksViewModel.MarkedCount))
+            {
+                countUpdates.Add(_scan.Marks.MarkedCount);
+            }
         }
 
-        _factory.MarksChanged += OnMarksChanged;
+        _scan.Marks.PropertyChanged += OnMarksChanged;
 
         try
         {
@@ -386,22 +388,21 @@ public class ScanMultiSelectionTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(recountEvents, Is.EqualTo(1));
+                Assert.That(countUpdates, Is.EqualTo(new[] { 2 }));
                 Assert.That(branchNode.IsMarkedDeleted, Is.True);
                 Assert.That(outsideFile.IsMarkedDeleted, Is.True);
                 Assert.That(_scan.Marks.MarkedCount, Is.EqualTo(2));
                 Assert.That(_scan.Marks.MarkedSizeText, Is.EqualTo(SizeFormatter.Format(208)));
-                Assert.That(_notifier.CanUndo, Is.True);
                 Assert.That(undoButtons, Has.Count.EqualTo(1));
             }
 
-            recountEvents = 0;
+            countUpdates.Clear();
             undoButtons[0].Command.Execute(null);
             _host.Settle();
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(recountEvents, Is.EqualTo(1));
+                Assert.That(countUpdates, Is.EqualTo(new[] { 1 }));
                 Assert.That(branchNode.IsMarkedDeleted, Is.False);
                 Assert.That(outsideFile.IsMarkedDeleted, Is.False);
                 Assert.That(firstFile.IsMarkedDeleted, Is.True);
@@ -409,17 +410,16 @@ public class ScanMultiSelectionTests
                 Assert.That(_scan.Marks.MarkedCount, Is.EqualTo(1));
                 Assert.That(_scan.Marks.MarkedSizeText, Is.EqualTo(SizeFormatter.Format(64)));
                 Assert.That(_toasts.Toasts, Is.Empty);
-                Assert.That(_notifier.CanUndo, Is.False);
             }
 
             _scan.UnmarkSelectedDeleted();
             _host.Settle();
-            Assert.That(_notifier.CanUndo, Is.True);
+            var undoUnmark = UndoToast();
             _scan.SelectSingle(secondFile);
             secondFile.MarkDeletedCommand.Execute(null);
             _host.Settle();
             _scan.Marks.ApplyDeletionResult([firstFile.Space!]);
-            _notifier.UndoLast();
+            undoUnmark.ActionCommand!.Execute(undoUnmark);
             _host.Settle();
             Assert.That(secondFile.IsMarkedDeleted, Is.True);
             Assert.That(_scan.Marks.MarkedCount, Is.EqualTo(1));
@@ -427,15 +427,23 @@ public class ScanMultiSelectionTests
             _scan.SelectSingle(outsideFile);
             _scan.MarkSelectedDeleted();
             _host.Settle();
-            Assert.That(_notifier.CanUndo, Is.True);
-            _toasts.Toasts.Clear();
-            Assert.That(_notifier.CanUndo, Is.False);
+            var dismissed = UndoToast();
+            _toasts.DismissCommand.Execute(dismissed);
+            dismissed.ActionCommand!.Execute(dismissed);
+            _host.Settle();
+            Assert.That(outsideFile.IsMarkedDeleted, Is.True);
+            Assert.That(_toasts.Toasts.Any(static toast => toast.HasAction), Is.False);
             Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
         }
         finally
         {
-            _factory.MarksChanged -= OnMarksChanged;
+            _scan.Marks.PropertyChanged -= OnMarksChanged;
         }
+    }
+
+    private ToastViewModel UndoToast()
+    {
+        return _toasts.Toasts.Single(static toast => toast.HasAction && toast.ActionText == "Отменить");
     }
 
     [Test]

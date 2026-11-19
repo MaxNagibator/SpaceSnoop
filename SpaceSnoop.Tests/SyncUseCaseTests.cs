@@ -57,9 +57,9 @@ public class SyncUseCaseTests
         return report.Verified;
     }
 
-    [TestCase(SyncConflictPolicy.SkipUnresolved, ExpectedResult = false)]
-    [TestCase(SyncConflictPolicy.None, ExpectedResult = true)]
-    public bool Синхронизация_разрешает_конфликты_только_по_политике(SyncConflictPolicy policy)
+    [TestCase(SyncConflictPolicy.SkipUnresolved, ExpectedResult = SyncAction.Skip)]
+    [TestCase(SyncConflictPolicy.None, ExpectedResult = SyncAction.None)]
+    public SyncAction Синхронизация_разрешает_конфликты_только_по_политике(SyncConflictPolicy policy)
     {
         var root = new DirectoryComparison("root", "");
         root.Files.Add(
@@ -72,7 +72,7 @@ public class SyncUseCaseTests
         var comparison = new ComparisonResult(_leftDir, _rightDir, root);
         Sync().Execute(new(comparison, policy), CancellationToken.None);
 
-        return comparison.HasUnresolvedConflicts();
+        return root.Files.Single().Action;
     }
 
     [Test]

@@ -1,6 +1,7 @@
 ﻿using KeepShell.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using SpaceSnoop.Wpf.Agent;
+using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Bootstrap.Storage;
 using SpaceSnoop.Wpf.ViewModels.Settings;
 using System.Text.Json;
@@ -54,34 +55,30 @@ public class AgentTranscriptTests
         });
     }
 
-    [TestCase(AgentBackendKind.Claude, "claude")]
-    [TestCase(AgentBackendKind.Codex, "codex")]
-    [TestCase(AgentBackendKind.OpenCode, "opencode")]
-    [TestCase(AgentBackendKind.Antigravity, "antigravity")]
-    public void Имя_файла_называет_время_и_бэкенд(AgentBackendKind backend, string expected)
-    {
-        var name = AgentTranscriptStore.FileName(backend, new(2026, 7, 27, 16, 38, 54, 123, TimeSpan.Zero));
-
-        Assert.That(name, Is.EqualTo($"turn-20260727-163854-123-{expected}.jsonl"));
-    }
-
     [Test]
-    public void Лишними_считаются_самые_старые_файлы()
+    public void Новый_транскрипт_вытесняет_только_самый_старый()
     {
-        string[] files =
-        [
-            @"C:\logs\chat\turn-20260727-163854-123-codex.jsonl",
-            @"C:\logs\chat\turn-20260725-090000-000-claude.jsonl",
-            @"C:\logs\chat\turn-20260726-120000-000-codex.jsonl",
-        ];
+        var store = Store(enabled: true);
+        Directory.CreateDirectory(store.DirectoryPath);
+        var existing = Enumerable.Range(0, AppDefaults.AgentTranscriptLimit)
+            .Select(index => Path.Combine(store.DirectoryPath, $"turn-20000101-000000-{index:D3}-codex.jsonl"))
+            .ToArray();
+        foreach (var path in existing.Reverse())
+        {
+            File.WriteAllText(path, "предыдущий ход");
+        }
 
-        Assert.That(
-            AgentTranscriptStore.Obsolete(files, 1),
-            Is.EqualTo(
-                new[]
-                {
-                    @"C:\logs\chat\turn-20260726-120000-000-codex.jsonl", @"C:\logs\chat\turn-20260725-090000-000-claude.jsonl",
-                }));
+        var notes = Path.Combine(store.DirectoryPath, "notes.txt");
+        File.WriteAllText(notes, "заметка");
+
+        string current;
+        using (var transcript = store.Begin(AgentBackendKind.Codex, null))
+        {
+            Assert.That(transcript, Is.Not.Null);
+            current = transcript!.Path;
+        }
+
+        Assert.That(Directory.GetFiles(store.DirectoryPath), Is.EquivalentTo(existing.Skip(1).Append(current).Append(notes)));
     }
 
     [Test]

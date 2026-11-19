@@ -1,7 +1,6 @@
 ﻿using KeepShell.Bootstrap;
 using KeepShell.Testing;
 using Microsoft.Extensions.DependencyInjection;
-using SpaceSnoop.Core;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Bootstrap.Storage;
 using SpaceSnoop.Wpf.ViewModels.Scan;
@@ -15,7 +14,9 @@ public class ScanTipsTests
     public void Отметка_переживает_перезапуск_и_показанный_совет_не_повторяется()
     {
         var settings = FreshProfile();
-        new ScanTipsViewModel(settings, () => false).OnScanCompleted();
+        var firstSession = new ScanTipsViewModel(settings, () => false);
+        firstSession.OnScanCompleted();
+        Assert.That(firstSession.IsVisible, Is.True);
 
         var restarted = new ScanTipsViewModel(settings, () => false);
 
@@ -23,7 +24,8 @@ public class ScanTipsTests
 
         restarted.OnScanCompleted();
 
-        Assert.That(restarted.Current, Is.SameAs(ScanTipsViewModel.All[1]));
+        Assert.That(restarted.Title, Is.Not.Empty.And.Not.EqualTo(firstSession.Title));
+        Assert.That(restarted.Counter, Does.StartWith("Совет 2 из "));
     }
 
     [Test]
@@ -33,14 +35,12 @@ public class ScanTipsTests
         var tips = new ScanTipsViewModel(settings, () => false);
 
         tips.OnScanCompleted();
+        var shown = tips.Title;
         tips.OnScanCompleted();
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(tips.Current, Is.SameAs(ScanTipsViewModel.All[0]));
-            Assert.That(tips.Counter, Is.EqualTo($"Совет 1 из {ScanTipsViewModel.All.Count}"));
-            Assert.That(settings.GetInt(SettingsKeys.ScanTipsShown, -1), Is.EqualTo(1));
-        }
+        Assert.That(shown, Is.Not.Empty);
+        Assert.That(tips.Title, Is.EqualTo(shown));
+        Assert.That(tips.Counter, Does.StartWith("Совет 1 из "));
     }
 
     [Test]
@@ -71,28 +71,27 @@ public class ScanTipsTests
         welcome = false;
         tips.OnScanCompleted();
 
-        Assert.That(tips.Current, Is.SameAs(ScanTipsViewModel.All[0]));
+        Assert.That(tips.Counter, Does.StartWith("Совет 1 из "));
     }
 
     [Test]
     public void Советы_идут_по_порядку_по_одному_на_завершённый_скан()
     {
-        var settings = FreshProfile();
-        var tips = new ScanTipsViewModel(settings, () => false);
-        var seen = new List<ScanTip?>();
+        string[] titles = ["Меню по правой кнопке", "Карта вместо списка", "Долгий скан можно прервать"];
+        var tips = new ScanTipsViewModel(FreshProfile(), () => false);
 
-        for (var scan = 0; scan <= ScanTipsViewModel.All.Count; scan++)
+        for (var index = 0; index < titles.Length; index++)
         {
             tips.OnScanCompleted();
-            seen.Add(tips.Current);
+            Assert.That(tips.Title, Is.EqualTo(titles[index]));
+            Assert.That(tips.Counter, Is.EqualTo($"Совет {index + 1} из 3"));
+
             tips.DismissCommand.Execute(null);
+            Assert.That(tips.IsVisible, Is.False);
         }
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(seen, Is.EqualTo(ScanTipsViewModel.All.Append(null)));
-            Assert.That(settings.GetInt(SettingsKeys.ScanTipsShown, -1), Is.EqualTo(ScanTipsViewModel.All.Count));
-        }
+        tips.OnScanCompleted();
+        Assert.That(tips.IsVisible, Is.False);
     }
 
     private static ISettingsStore FreshProfile()
@@ -161,23 +160,11 @@ public class ScanTipsPageTests
     [Test]
     public async Task Отменённый_скан_совета_не_даёт()
     {
-        var originalProbe = StorageMedia.Probe;
-        using var release = new ManualResetEventSlim();
-        StorageMedia.ResetCache();
-        StorageMedia.Probe = _ =>
-        {
-            release.Wait(TimeSpan.FromSeconds(5));
-            return StorageKind.SolidState;
-        };
+        _scan.PropertyChanged += StopWhenScanning;
 
         try
         {
-            var run = _scan.StartCommand.ExecuteAsync(null);
-            Assert.That(_scan.IsScanning, Is.True, "Скан должен идти к моменту отмены.");
-
-            _scan.StopCommand.Execute(null);
-            release.Set();
-            await run;
+            await _scan.StartCommand.ExecuteAsync(null);
 
             using (Assert.EnterMultipleScope())
             {
@@ -187,9 +174,15 @@ public class ScanTipsPageTests
         }
         finally
         {
-            release.Set();
-            StorageMedia.Probe = originalProbe;
-            StorageMedia.ResetCache();
+            _scan.PropertyChanged -= StopWhenScanning;
+        }
+
+        void StopWhenScanning(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(ScanViewModel.IsScanning) && _scan.IsScanning)
+            {
+                _scan.StopCommand.Execute(null);
+            }
         }
     }
 
@@ -201,7 +194,7 @@ public class ScanTipsPageTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(_scan.HasResult, Is.True);
-            Assert.That(_scan.Tips.Current, Is.SameAs(ScanTipsViewModel.All[0]));
+            Assert.That(_scan.Tips.Counter, Does.StartWith("Совет 1 из "));
         }
     }
 
@@ -228,7 +221,7 @@ public class ScanTipsPageTests
         {
             Assert.That(_scan.FirstRun.IsVisible, Is.True);
             Assert.That(_scan.ShowTargetPicker, Is.False);
-            Assert.That(_scan.Tips.Current, Is.SameAs(ScanTipsViewModel.All[0]));
+            Assert.That(_scan.Tips.Counter, Does.StartWith("Совет 1 из "));
         }
     }
 

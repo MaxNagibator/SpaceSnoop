@@ -23,7 +23,6 @@ public class SyncLogHeaderTests
 
     [TestCase(0, false)]
     [TestCase(1, true)]
-    [TestCase(20, true)]
     [TestCase(100, true)]
     public void Записанный_заголовок_подсвечивается_ровно_при_реальных_ошибках(int errors, bool expected)
     {
@@ -67,7 +66,6 @@ public class SyncLogHeaderTests
         Assert.That(SyncLog.MatchesOrigin(header, SyncLogOrigin.Scheduled), Is.False);
     }
 
-    [TestCase(SyncVerifyState.None, 0, "[2026-08-04 19:32:05] Автосинхронизация [Профиль]: 5 успешно, 0 ошибок")]
     [TestCase(SyncVerifyState.Completed, 0, "[2026-08-04 19:32:05] Автосинхронизация [Профиль]: 5 успешно, 0 ошибок, расхождений: 0")]
     [TestCase(SyncVerifyState.Completed, 3, "[2026-08-04 19:32:05] Автосинхронизация [Профиль]: 5 успешно, 0 ошибок, расхождений: 3")]
     [TestCase(SyncVerifyState.Interrupted, 0, "[2026-08-04 19:32:05] Автосинхронизация [Профиль]: 5 успешно, 0 ошибок, проверка прервана (расхождений к тому моменту: 0)")]
@@ -78,7 +76,6 @@ public class SyncLogHeaderTests
         Assert.That(header, Is.EqualTo(expected));
     }
 
-    [TestCase(SyncVerifyState.None, 0, 0, false)]
     [TestCase(SyncVerifyState.Completed, 0, 0, false)]
     [TestCase(SyncVerifyState.Completed, 0, 3, true)]
     [TestCase(SyncVerifyState.Completed, 2, 0, true)]

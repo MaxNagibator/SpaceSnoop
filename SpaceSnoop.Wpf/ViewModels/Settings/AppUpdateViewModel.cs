@@ -156,20 +156,6 @@ public sealed partial class AppUpdateViewModel : ObservableObject
         return ReleaseChangelog.BuildUpdateDialog(_latestTag, _assetName, _assetUrl, PendingEntries, ReleaseNotes);
     }
 
-    internal void ApplyPendingForAutomation(string tag, string? assetName, string? assetUrl, string? releaseUrl, IReadOnlyList<ReleaseNoteViewModel> entries)
-    {
-        _latestTag = tag;
-        _assetName = assetName;
-        _assetUrl = assetUrl;
-        _releaseUrl = releaseUrl;
-        _downloadedPath = null;
-        VersionLabel = tag;
-        CheckStatus = $"Доступна версия {tag}";
-        PendingEntries = entries;
-        ReleaseNotes = ReleaseChangelog.BuildChangelog(entries);
-        HasPendingUpdate = true;
-    }
-
     internal void ApplyChangelogForAutomation(IReadOnlyList<ReleaseNoteViewModel> entries)
     {
         CheckStatus = $"Установлена последняя версия ({AppInfo.Version})";

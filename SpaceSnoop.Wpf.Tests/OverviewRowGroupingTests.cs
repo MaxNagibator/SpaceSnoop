@@ -7,7 +7,7 @@ namespace SpaceSnoop.Wpf.Tests;
 public class OverviewRowGroupingTests
 {
     [Test]
-    public void GroupKey_и_GroupOrder_согласованы_с_IsUnchanged()
+    public void Профили_с_изменениями_показываются_перед_группой_без_изменений()
     {
         var unchanged = Row();
         unchanged.Status = OverviewRunStatus.Compared;
@@ -18,9 +18,8 @@ public class OverviewRowGroupingTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(unchanged.GroupOrder, Is.EqualTo(1));
+            Assert.That(changed.GroupOrder, Is.LessThan(unchanged.GroupOrder));
             Assert.That(unchanged.GroupKey, Is.EqualTo("Без изменений"));
-            Assert.That(changed.GroupOrder, Is.Zero);
             Assert.That(changed.GroupKey, Is.EqualTo("Профили"));
         }
     }

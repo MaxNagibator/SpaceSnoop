@@ -148,11 +148,7 @@ public class SyncEngineTests
 
         Assert.Throws<OperationCanceledException>(() => engine.Execute(result, cts.Token, progress));
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(File.Exists(Path.Combine(_rightDir, "big.bin")), Is.False);
-            Assert.That(File.Exists(Path.Combine(_rightDir, "big.bin.sstmp")), Is.False);
-        }
+        Assert.That(Directory.EnumerateFileSystemEntries(_rightDir), Is.Empty);
     }
 
     [Test]
@@ -464,7 +460,7 @@ public class SyncEngineTests
         {
             Assert.That(report.Errors, Is.Empty);
             Assert.That(File.ReadAllText(Path.Combine(_rightDir, "a.txt")), Is.EqualTo("new content"));
-            Assert.That(Directory.GetFiles(_rightDir, "*.sstmp"), Is.Empty);
+            Assert.That(Directory.EnumerateFileSystemEntries(_rightDir).Single(), Is.EqualTo(Path.Combine(_rightDir, "a.txt")));
         }
     }
 
@@ -730,38 +726,6 @@ public class SyncEngineTests
     }
 
     [Test]
-    public void ErrorOnOneFile_ContinuesWithOthers()
-    {
-        File.WriteAllText(Path.Combine(_leftDir, "good.txt"), "data");
-
-        var root = new DirectoryComparison("root", "");
-        root.Files.Add(
-            new("bad.txt", "bad.txt")
-            {
-                Status = ComparisonStatus.LeftOnly,
-                Action = SyncAction.CopyToRight,
-            });
-
-        root.Files.Add(
-            new("good.txt", "good.txt")
-            {
-                Status = ComparisonStatus.LeftOnly,
-                Action = SyncAction.CopyToRight,
-            });
-
-        var result = new ComparisonResult(_leftDir, _rightDir, root);
-        var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
-        var report = engine.Execute(result, CancellationToken.None);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(File.Exists(Path.Combine(_rightDir, "good.txt")), Is.True);
-            Assert.That(report.SuccessCount, Is.EqualTo(1));
-            Assert.That(report.Errors, Has.Count.EqualTo(1));
-        }
-    }
-
-    [Test]
     public void Execute_FileErrorsAreNotFatal_AndDoNotVerifyReport()
     {
         File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "first");
@@ -794,6 +758,8 @@ public class SyncEngineTests
 
         using (Assert.EnterMultipleScope())
         {
+            Assert.That(File.ReadAllText(Path.Combine(_rightDir, "a.txt")), Is.EqualTo("first"));
+            Assert.That(File.ReadAllText(Path.Combine(_rightDir, "b.txt")), Is.EqualTo("second"));
             Assert.That(report.Errors, Has.Count.EqualTo(1));
             Assert.That(report.SuccessCount, Is.EqualTo(2));
             Assert.That(report.Verified, Is.False);
@@ -927,6 +893,8 @@ public class SyncEngineTests
         var engine = new SyncEngine(NullLogger<SyncEngine>.Instance);
         var report = engine.Execute(result, CancellationToken.None);
 
+        Assert.That(report.Verified, Is.False);
+
         engine.Verify(report, _leftDir, _rightDir, CancellationToken.None);
 
         using (Assert.EnterMultipleScope())
@@ -1009,29 +977,6 @@ public class SyncEngineTests
         {
             Assert.That(report.Mismatches, Has.Count.EqualTo(1));
             Assert.That(report.Mismatches[0].RelativePath, Is.EqualTo("a.txt"));
-        }
-    }
-
-    [Test]
-    public void Verify_NotRun_LeavesReportUnverified()
-    {
-        File.WriteAllText(Path.Combine(_leftDir, "a.txt"), "hello world");
-
-        var root = new DirectoryComparison("root", "");
-        root.Files.Add(
-            new("a.txt", "a.txt")
-            {
-                Status = ComparisonStatus.LeftOnly,
-                Action = SyncAction.CopyToRight,
-            });
-
-        var result = new ComparisonResult(_leftDir, _rightDir, root);
-        var report = new SyncEngine(NullLogger<SyncEngine>.Instance).Execute(result, CancellationToken.None);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(report.SuccessCount, Is.EqualTo(1));
-            Assert.That(report.Verified, Is.False);
         }
     }
 

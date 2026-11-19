@@ -1,4 +1,6 @@
-﻿using SpaceSnoop.Wpf.Views.Behaviors;
+﻿using KeepShell.Testing;
+using SpaceSnoop.Wpf.Views.Behaviors;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -6,6 +8,7 @@ using System.Windows.Threading;
 namespace SpaceSnoop.Wpf.Tests;
 
 [TestFixture]
+[Apartment(ApartmentState.STA)]
 [NonParallelizable]
 public class PathSuggestTests
 {
@@ -30,7 +33,6 @@ public class PathSuggestTests
     }
 
     [Test]
-    [Apartment(ApartmentState.STA)]
     public void Ввод_сетевого_пути_в_поле_не_блокирует_поток_интерфейса_и_отбрасывает_устаревшую_подсказку()
     {
         var previous = PathSuggest.DirectoryReader;
@@ -77,17 +79,22 @@ public class PathSuggestTests
         }
     }
 
-    [TestCase("Mu", "Music")]
-    [TestCase("mus", "Music")]
-    public void Единственное_совпадение_по_префиксу_без_учёта_регистра(string typed, string expected)
+    [TestCase("M", "u", "sic")]
+    [TestCase("mu", "s", "ic")]
+    public void Единственное_совпадение_дополняет_ввод_без_учёта_регистра(string initial, string typed, string suffix)
     {
-        var matches = PathSuggest.Matches(Path.Combine(_tempDir, typed));
+        var box = new TextBox();
+        TypeInto(box, Path.Combine(_tempDir, initial), typed);
 
-        Assert.That(matches, Is.EqualTo([Path.Combine(_tempDir, expected)]));
+        Assert.That(PumpUntil(() => box.SelectionLength > 0, TimeSpan.FromSeconds(5)), Is.True);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(box.Text, Is.EqualTo(Path.Combine(_tempDir, "Music")));
+            Assert.That(box.SelectedText, Is.EqualTo(suffix));
+        }
     }
 
     [Test]
-    [Apartment(ApartmentState.STA)]
     public void Завершение_фонового_чтения_применяет_подсказку_если_ввод_не_менялся()
     {
         var previous = PathSuggest.DirectoryReader;
@@ -131,17 +138,41 @@ public class PathSuggestTests
     }
 
     [Test]
-    public void Несколько_совпадений_возвращаются_по_порядку_для_перебора()
+    public void Первый_запрос_к_недоступному_серверу_не_блокирует_ввод()
     {
-        var matches = PathSuggest.Matches(Path.Combine(_tempDir, "P"));
+        var box = new TextBox();
+        var server = Guid.NewGuid().ToString("N");
+        var initial = $@"\\{server}\s";
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-        Assert.That(matches, Is.EqualTo([Path.Combine(_tempDir, "Pictures"), Path.Combine(_tempDir, "Projects")]));
+        TypeInto(box, initial, "h");
+        stopwatch.Stop();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(1)));
+            Assert.That(box.Text, Is.EqualTo($@"\\{server}\sh"));
+            Assert.That(box.SelectedText, Is.Empty);
+        }
+
+        PathSuggest.SetEnabled(box, false);
     }
 
     [Test]
-    public void Первый_запрос_к_недоступному_серверу_не_блокирует_ввод()
+    public void Стрелка_перебирает_подсказки_в_алфавитном_порядке()
     {
-        Assert.That(PathSuggest.Matches($@"\\{Guid.NewGuid():N}\sh"), Is.Empty);
+        var box = new TextBox();
+        using var host = VisualTestHost.Show(new() { Content = box }, 400, 150);
+        TypeInto(box, _tempDir + Path.DirectorySeparatorChar, "P");
+
+        Assert.That(PumpUntil(() => box.SelectionLength > 0, TimeSpan.FromSeconds(5)), Is.True);
+        Assert.That(box.Text, Is.EqualTo(Path.Combine(_tempDir, "Pictures")));
+        box.RaiseEvent(
+            new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(box)!, 0, Key.Down)
+            {
+                RoutedEvent = Keyboard.PreviewKeyDownEvent,
+            });
+        Assert.That(box.Text, Is.EqualTo(Path.Combine(_tempDir, "Projects")));
     }
 
     [TestCase("nosep")]
@@ -149,14 +180,29 @@ public class PathSuggestTests
     [TestCase("nomatch")]
     public void Совпадений_нет(string scenario)
     {
-        var input = scenario switch
+        var (initial, typed) = scenario switch
         {
-            "nosep" => "Music",
-            "emptyprefix" => _tempDir + Path.DirectorySeparatorChar,
-            _ => Path.Combine(_tempDir, "zzz"),
+            "nosep" => ("Musi", "c"),
+            "emptyprefix" => (_tempDir, Path.DirectorySeparatorChar.ToString()),
+            _ => (Path.Combine(_tempDir, "zz"), "z"),
         };
+        var box = new TextBox();
+        TypeInto(box, initial, typed);
 
-        Assert.That(PathSuggest.Matches(input), Is.Empty);
+        PumpFor(TimeSpan.FromMilliseconds(60));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(box.Text, Is.EqualTo(initial + typed));
+            Assert.That(box.SelectedText, Is.Empty);
+        }
+    }
+
+    private static void TypeInto(TextBox box, string initial, string typed)
+    {
+        box.Text = initial;
+        box.CaretIndex = initial.Length;
+        PathSuggest.SetEnabled(box, true);
+        TextCompositionManager.StartComposition(new(InputManager.Current, box, typed));
     }
 
     private static void PumpFor(TimeSpan duration)

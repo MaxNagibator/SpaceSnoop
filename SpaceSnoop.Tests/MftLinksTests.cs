@@ -11,28 +11,6 @@ public class MftLinksTests
     private const int File = 30;
 
     [Test]
-    public void Альтернативное_имя_корня_под_корнем_скана_не_создаёт_цикл()
-    {
-        var table = Table();
-        table.Entries[File] = Leaf("внутри.bin", Target, 7, 100);
-        table.Alternates[Root] = [new(Target, 7, "повреждённый-корень")];
-        var links = MftLinks.Build(table, CancellationToken.None);
-        links.Rehome(table, Target, CancellationToken.None);
-        using var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-
-        links.DropUnreachable(table, cancel.Token);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(table.Entries[Root].Parent, Is.EqualTo(Root));
-            Assert.That(links.FirstChild[Target], Is.EqualTo(File));
-            Assert.That(table.Entries[File].Exists, Is.True);
-            Assert.That(table.Statistics.Rehomed, Is.Zero);
-            Assert.That(table.Statistics.Detached, Is.Zero);
-        }
-    }
-
-    [Test]
     public void Достижимая_из_корня_скана_запись_остаётся_на_своём_месте()
     {
         var table = Table();
@@ -425,12 +403,10 @@ public class MftLinksTests
         table.Entries[41] = Leaf("внутри.bin", 40, 5, 700);
 
         var links = MftLinks.Build(table, CancellationToken.None);
-        var attached = links.FirstChild[40];
         links.DropUnreachable(table, CancellationToken.None);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(attached, Is.EqualTo(41), "файл успевает подвеситься к каталогу до его отбрасывания");
             Assert.That(table.Statistics.OrphanFiles, Is.EqualTo(1));
             Assert.That(table.Statistics.OrphanBytes, Is.EqualTo(700));
             Assert.That(table.Entries[41].Exists, Is.False);

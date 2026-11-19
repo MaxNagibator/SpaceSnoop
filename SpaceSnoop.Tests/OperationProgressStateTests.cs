@@ -5,14 +5,13 @@ namespace SpaceSnoop.Tests;
 [TestFixture]
 public class OperationProgressStateTests
 {
-    [TestCase(5, 500)]
-    [TestCase(9, 100)]
-    public void Отставший_отчёт_счётчики_назад_не_откатывает(int completed, long bytes)
+    [Test]
+    public void Отставший_отчёт_счётчики_назад_не_откатывает()
     {
         var state = new OperationProgressState();
 
         state.Report(new(10, @"C:\десятый", 1000));
-        state.Report(new(completed, @"C:\отставший", bytes));
+        state.Report(new(5, @"C:\отставший", 500));
 
         var snapshot = state.CreateSnapshot();
 

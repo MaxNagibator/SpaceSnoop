@@ -59,7 +59,7 @@ public class MftLayoutTests
     [Test]
     public void Обрубленный_список_отрезков_не_роняет_разбор()
     {
-        var runs = MftLayout.DecodeRuns([0x22, 0x10]);
+        var runs = MftLayout.DecodeRuns([0x22, 0x10], out _);
 
         Assert.That(runs, Is.Empty);
     }
@@ -67,15 +67,19 @@ public class MftLayoutTests
     [Test]
     public void Обрубленный_список_отрезков_объявляется_неполным()
     {
-        MftLayout.DecodeRuns([0x11, 0x10, 0x20, 0x22, 0x10], out var truncated);
+        var runs = MftLayout.DecodeRuns([0x11, 0x10, 0x20, 0x22, 0x10], out var truncated);
 
-        Assert.That(truncated, Is.True);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(truncated, Is.True);
+            Assert.That(runs, Has.Count.EqualTo(1));
+        }
     }
 
     [Test]
     public void Один_отрезок_разбирается_в_кластер_и_длину()
     {
-        var runs = MftLayout.DecodeRuns([0x21, 0x18, 0x34, 0x56, 0x00]);
+        var runs = MftLayout.DecodeRuns([0x21, 0x18, 0x34, 0x56, 0x00], out _);
 
         Assert.That(runs, Has.Count.EqualTo(1));
         Assert.That(runs[0].Count, Is.EqualTo(0x18));
@@ -85,7 +89,7 @@ public class MftLayoutTests
     [Test]
     public void Отрицательное_смещение_уводит_отрезок_назад()
     {
-        var runs = MftLayout.DecodeRuns([0x11, 0x10, 0x40, 0x11, 0x08, 0xF0, 0x00]);
+        var runs = MftLayout.DecodeRuns([0x11, 0x10, 0x40, 0x11, 0x08, 0xF0, 0x00], out _);
 
         Assert.That(
             runs.Select(static run => run.Cluster),
@@ -111,7 +115,7 @@ public class MftLayoutTests
     [Test]
     public void Разреженный_отрезок_не_попадает_в_список_и_не_сдвигает_адрес()
     {
-        var runs = MftLayout.DecodeRuns([0x11, 0x10, 0x40, 0x01, 0x08, 0x11, 0x04, 0x10, 0x00]);
+        var runs = MftLayout.DecodeRuns([0x11, 0x10, 0x40, 0x01, 0x08, 0x11, 0x04, 0x10, 0x00], out _);
 
         Assert.That(
             runs.Select(static run => run.Cluster),
@@ -133,7 +137,9 @@ public class MftLayoutTests
     [Test]
     public void Смещения_отрезков_складываются_а_не_задают_адрес_заново()
     {
-        var runs = MftLayout.DecodeRuns([0x11, 0x10, 0x20, 0x11, 0x08, 0x10, 0x00]);
+        var runs = MftLayout.DecodeRuns([0x11, 0x10, 0x20, 0x11, 0x08, 0x10, 0x00], out var truncated);
+
+        Assert.That(truncated, Is.False);
 
         Assert.That(
             runs.Select(static run => run.Cluster),
@@ -150,18 +156,6 @@ public class MftLayoutTests
                 {
                     0x10, 0x08,
                 }));
-    }
-
-    [Test]
-    public void Целый_список_отрезков_неполным_не_объявляется()
-    {
-        var runs = MftLayout.DecodeRuns([0x11, 0x10, 0x20, 0x11, 0x08, 0x10, 0x00], out var truncated);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(truncated, Is.False);
-            Assert.That(runs, Has.Count.EqualTo(2));
-        }
     }
 
     [TestCase((ushort)1, TestName = "Массив короче числа секторов отвергается")]

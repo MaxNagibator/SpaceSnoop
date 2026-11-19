@@ -35,43 +35,15 @@ public class FileHasherTests
         Assert.Throws<OperationCanceledException>(() => FileHasher.ComputeHash(file, cts.Token));
     }
 
-    [Test]
-    public void DifferentFiles_ProduceDifferentHash()
-    {
-        var file1 = Path.Combine(_tempDir, "a.txt");
-        var file2 = Path.Combine(_tempDir, "b.txt");
-        File.WriteAllText(file1, "hello");
-        File.WriteAllText(file2, "world");
-
-        var hash1 = FileHasher.ComputeHash(file1, CancellationToken.None);
-        var hash2 = FileHasher.ComputeHash(file2, CancellationToken.None);
-
-        Assert.That(hash2, Is.Not.EqualTo(hash1));
-    }
-
-    [Test]
-    public void Hash_IsHexString()
+    [TestCase("hello", "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824")]
+    [TestCase("world", "486ea46224d1bb4fb680f34f7c9ad96a8f24ec88be73ea8e5a6c65260e9cb8a7")]
+    public void ComputeHash_ReturnsSha256OfFileContents(string contents, string expected)
     {
         var file = Path.Combine(_tempDir, "a.txt");
-        File.WriteAllText(file, "test");
+        File.WriteAllText(file, contents);
 
         var hash = FileHasher.ComputeHash(file, CancellationToken.None);
 
-        Assert.That(hash, Has.Length.EqualTo(64));
-        Assert.That(hash, Does.Match("^[0-9a-f]+$"));
-    }
-
-    [Test]
-    public void IdenticalFiles_ProduceSameHash()
-    {
-        var file1 = Path.Combine(_tempDir, "a.txt");
-        var file2 = Path.Combine(_tempDir, "b.txt");
-        File.WriteAllText(file1, "hello world");
-        File.WriteAllText(file2, "hello world");
-
-        var hash1 = FileHasher.ComputeHash(file1, CancellationToken.None);
-        var hash2 = FileHasher.ComputeHash(file2, CancellationToken.None);
-
-        Assert.That(hash2, Is.EqualTo(hash1));
+        Assert.That(hash, Is.EqualTo(expected));
     }
 }

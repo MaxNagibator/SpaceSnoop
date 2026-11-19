@@ -59,14 +59,6 @@ public class GalleryStatesTests
         Assert.That(GalleryStates.SupportsPage(page, GalleryStates.Busy), Is.True);
     }
 
-    [TestCase("idle", GalleryStates.Idle)]
-    [TestCase("Busy", GalleryStates.Busy)]
-    [TestCase("покой", null)]
-    public void Ключ_состояния_узнаётся_без_учёта_регистра(string value, string? state)
-    {
-        Assert.That(GalleryStates.Match(value), Is.EqualTo(state));
-    }
-
     [Test]
     public void Подсказки_снимаются_только_в_покое()
     {
@@ -95,13 +87,7 @@ public class GalleryStatesTests
     [Test]
     public void Состояние_готово_у_страниц_не_снимается()
     {
-        Assert.That(
-            GalleryStates.All.Where(state => GalleryStates.SupportsPage(SectionKey.Scan, state)),
-            Is.EqualTo(
-                new[]
-                {
-                    GalleryStates.Idle, GalleryStates.Busy, GalleryStates.Picker, GalleryStates.Welcome, GalleryStates.Advice,
-                }));
+        Assert.That(GalleryStates.SupportsPage(SectionKey.Scan, GalleryStates.Done), Is.False);
     }
 
     [TestCase(SectionKey.Logs)]

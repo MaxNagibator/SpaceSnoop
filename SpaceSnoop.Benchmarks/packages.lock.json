@@ -20,6 +20,15 @@
           "System.Management": "9.0.5"
         }
       },
+      "KeepShell.Testing": {
+        "type": "Direct",
+        "requested": "[0.1.272, )",
+        "resolved": "0.1.272",
+        "contentHash": "sH/nHGk4CGLcsBTcM9zMzKdvonxRagP9X+3nwkX+vWXm0Qm2sbBwU2RKIWDiDkKEqlGjQ7tTkLoX2Feoz5YRow==",
+        "dependencies": {
+          "KeepShell": "0.1.272"
+        }
+      },
       "SonarAnalyzer.CSharp": {
         "type": "Direct",
         "requested": "[10.36.0.15337, )",

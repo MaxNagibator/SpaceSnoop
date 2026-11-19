@@ -95,11 +95,11 @@ public class ScanTreemapViewModelTests
     [Test]
     public void Плитки_обрезаются_до_предела_а_подпись_называет_остаток()
     {
-        const int extra = 3;
+        const int total = 153;
 
         var space = new DirectorySpace(_tempDir, null, DateTime.Now, DateTime.Now);
 
-        for (var i = 0; i < (AppDefaults.TreemapTileLimit + extra); i++)
+        for (var i = 0; i < total; i++)
         {
             space.AddFile(MakeFile($"tile{i}", i + 1));
         }
@@ -111,11 +111,11 @@ public class ScanTreemapViewModelTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(treemap.TreemapTiles, Has.Count.EqualTo(AppDefaults.TreemapTileLimit));
+            Assert.That(treemap.TreemapTiles, Has.Count.EqualTo(150));
             Assert.That(treemap.TreemapTruncated, Is.True);
             Assert.That(
                 treemap.TreemapTruncatedText,
-                Is.EqualTo($"Показаны крупнейшие {AppDefaults.TreemapTileLimit} из {AppDefaults.TreemapTileLimit + extra}"));
+                Is.EqualTo("Показаны крупнейшие 150 из 153"));
         }
     }
 

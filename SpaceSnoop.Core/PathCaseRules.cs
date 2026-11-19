@@ -2,10 +2,6 @@
 
 public readonly record struct PathCaseRules(StringComparer Left, StringComparer Right)
 {
-    public static PathCaseRules Insensitive { get; } = new(StringComparer.OrdinalIgnoreCase, StringComparer.OrdinalIgnoreCase);
-
-    public static PathCaseRules Sensitive { get; } = new(StringComparer.Ordinal, StringComparer.Ordinal);
-
     public StringComparer Match => PathCase.Stricter(Left, Right);
 
     public bool MatchIsSensitive => PathCase.IsSensitive(Match);

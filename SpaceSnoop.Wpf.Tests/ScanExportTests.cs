@@ -97,7 +97,7 @@ public class ScanExportTests
             Assert.That(_scan.IsExporting, Is.False);
             Assert.That(_scan.IsBusy, Is.False);
             Assert.That(_scan.StatusCaption, Is.Null);
-            Assert.That(_scan.CancelCommand, Is.SameAs(_scan.StopCommand));
+            Assert.That(((IPageStatus)_scan).CancelCommand?.CanExecute(null), Is.False);
             Assert.That(_scan.ExportFullScanCommand.CanExecute(null), Is.True);
         }
     }
@@ -160,7 +160,7 @@ public class ScanExportTests
             Assert.That(_scan.IsExporting, Is.False);
             Assert.That(_scan.IsBusy, Is.False);
             Assert.That(_scan.StatusCaption, Is.Null);
-            Assert.That(_scan.CancelCommand, Is.SameAs(_scan.StopCommand));
+            Assert.That(((IPageStatus)_scan).CancelCommand?.CanExecute(null), Is.False);
             Assert.That(_scan.CancelFullScanExportCommand.CanExecute(null), Is.False);
             Assert.That(_shell.IsNavigationLocked, Is.False);
             Assert.That(_shell.TryNavigate(SectionKey.Logs), Is.True);
@@ -199,7 +199,7 @@ public class ScanExportTests
             Assert.That(_scan.IsExporting, Is.False);
             Assert.That(_scan.IsBusy, Is.False);
             Assert.That(_scan.StatusCaption, Is.Null);
-            Assert.That(_scan.CancelCommand, Is.SameAs(_scan.StopCommand));
+            Assert.That(((IPageStatus)_scan).CancelCommand?.CanExecute(null), Is.False);
         }
     }
 

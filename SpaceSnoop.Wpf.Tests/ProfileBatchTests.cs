@@ -56,8 +56,7 @@ public class ProfileBatchTests
                         "A", "B",
                     }));
 
-            Assert.That(rows.All(row => row.Right.StartsWith(dest, StringComparison.Ordinal)), Is.True);
-            Assert.That(rows.All(row => row.DestWillBeCreated), Is.True);
+            Assert.That(rows.Select(static row => row.Right), Is.EquivalentTo(new[] { Path.Combine(dest, "A"), Path.Combine(dest, "B") }));
             Assert.That(rows.All(row => row.Include), Is.True);
         }
     }
@@ -69,25 +68,14 @@ public class ProfileBatchTests
     {
         var rows = new List<BatchPairRow>
         {
-            new("B", "l", "r", false, true),
-            new("A", "l", "r", true, true),
-            new("C", "l", "r", false, true),
+            new("B", "l", "r", false),
+            new("A", "l", "r", true),
+            new("C", "l", "r", false),
         };
 
         var sorted = ProfileBatch.Sort(rows, mode);
 
         Assert.That(string.Join(",", sorted.Select(row => row.Name)), Is.EqualTo(expected));
-    }
-
-    [Test]
-    public void Существующий_подкаталог_приёмника_не_помечается_к_созданию()
-    {
-        var source = Make("src", "A");
-        var dest = Make("dst", "A");
-
-        var row = ProfileBatch.BuildPairs(source, dest, []).Single();
-
-        Assert.That(row.DestWillBeCreated, Is.False);
     }
 
     [Test]

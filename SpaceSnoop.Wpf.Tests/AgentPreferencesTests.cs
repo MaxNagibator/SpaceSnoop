@@ -30,63 +30,6 @@ public class AgentPreferencesTests
         }
     }
 
-    [Test]
-    public void Глубина_рассуждений_живёт_в_ключе_своего_бэкенда()
-    {
-        var store = Open();
-
-        var preferences = new AgentPreferences(store)
-        {
-            Effort = "xhigh",
-            Backend = AgentBackendKind.Codex,
-        };
-
-        preferences.Effort = "ultra";
-        store.Flush();
-
-        var reopened = new AgentPreferences(Open());
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(reopened.EffortFor(AgentBackendKind.Claude), Is.EqualTo("xhigh"));
-            Assert.That(reopened.EffortFor(AgentBackendKind.Codex), Is.EqualTo("ultra"));
-            Assert.That(reopened.Effort, Is.EqualTo("ultra"));
-        }
-    }
-
-    [Test]
-    public void Настройки_бэкендов_не_затирают_друг_друга()
-    {
-        var store = Open();
-
-        var preferences = new AgentPreferences(store)
-        {
-            Model = "sonnet",
-            CliPath = @"D:\tools\claude.exe",
-            Backend = AgentBackendKind.Codex,
-        };
-
-        preferences.Model = "gpt-5.6";
-        preferences.CliPath = @"D:\tools\codex.exe";
-        preferences.Backend = AgentBackendKind.OpenCode;
-        preferences.Model = "opencode/big-pickle";
-        preferences.CliPath = @"D:\tools\opencode.exe";
-        store.Flush();
-
-        var reopened = new AgentPreferences(Open());
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(reopened.Backend, Is.EqualTo(AgentBackendKind.OpenCode));
-            Assert.That(reopened.ModelFor(AgentBackendKind.Claude), Is.EqualTo("sonnet"));
-            Assert.That(reopened.ModelFor(AgentBackendKind.Codex), Is.EqualTo("gpt-5.6"));
-            Assert.That(reopened.ModelFor(AgentBackendKind.OpenCode), Is.EqualTo("opencode/big-pickle"));
-            Assert.That(reopened.CliPathFor(AgentBackendKind.Claude), Is.EqualTo(@"D:\tools\claude.exe"));
-            Assert.That(reopened.CliPathFor(AgentBackendKind.Codex), Is.EqualTo(@"D:\tools\codex.exe"));
-            Assert.That(reopened.CliPathFor(AgentBackendKind.OpenCode), Is.EqualTo(@"D:\tools\opencode.exe"));
-        }
-    }
-
     [TestCase("true", "true", ExpectedResult = true)]
     [TestCase("true", "false", ExpectedResult = false)]
     [TestCase("false", "true", ExpectedResult = false)]
@@ -251,28 +194,6 @@ public class AgentPreferencesTests
         preferences.Backend = AgentBackendKind.Codex;
 
         Assert.That(consentAtBackendNotice, Is.False);
-    }
-
-    [Test]
-    public void Согласие_одного_бэкенда_не_распространяется_на_другие()
-    {
-        var store = Open();
-
-        _ = new AgentPreferences(store)
-        {
-            Consent = true,
-        };
-
-        store.Flush();
-
-        var reopened = new AgentPreferences(Open());
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(reopened.ConsentFor(AgentBackendKind.Claude), Is.True);
-            Assert.That(reopened.ConsentFor(AgentBackendKind.Codex), Is.False);
-            Assert.That(reopened.ConsentFor(AgentBackendKind.OpenCode), Is.False);
-        }
     }
 
     private void Seed(Action<ISettingsStore> configure)

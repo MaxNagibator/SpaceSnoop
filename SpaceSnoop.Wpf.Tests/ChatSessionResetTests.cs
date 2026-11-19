@@ -64,6 +64,31 @@ public class ChatSessionResetTests
     }
 
     [Test]
+    public void Снятие_доступа_останавливает_идущий_ход()
+    {
+        var history = History(out var settings, out var preferences, out var backends);
+        preferences.Enabled = true;
+        preferences.Consent = true;
+        var cancellations = 0;
+        _ = Gates(settings, preferences, backends, history, () => cancellations++);
+
+        preferences.Transcript = !preferences.Transcript;
+        Assert.That(cancellations, Is.Zero);
+
+        preferences.Consent = false;
+        Assert.That(cancellations, Is.EqualTo(1));
+
+        preferences.Consent = true;
+        Assert.That(cancellations, Is.EqualTo(1));
+
+        preferences.Enabled = false;
+        Assert.That(cancellations, Is.EqualTo(2));
+
+        preferences.Enabled = true;
+        Assert.That(cancellations, Is.EqualTo(2));
+    }
+
+    [Test]
     public void История_с_None_возобновляет_сессию_только_в_Claude()
     {
         var history = History(out _, out var preferences, out _);
@@ -79,16 +104,6 @@ public class ChatSessionResetTests
         history.SelectConversationCommand.Execute(history.Conversations[0]);
 
         Assert.That(history.SessionId, Is.Null);
-    }
-
-    [Test]
-    public void Сброс_сессии_посреди_хода_помечает_её_брошенной()
-    {
-        var history = History();
-
-        history.DropSession(busy: true);
-
-        Assert.That(history.SessionDropped, Is.True);
     }
 
     [Test]

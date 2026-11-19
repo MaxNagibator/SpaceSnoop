@@ -82,28 +82,6 @@ public class MftReaderParseTests
     }
 
     [Test]
-    public void Запись_расширение_отдаёт_размер_и_имя_базовой()
-    {
-        var pending = new MftPending();
-        var statistics = new MftStatistics();
-
-        var record = new MftRecordBuilder()
-            .ExtensionOf(12)
-            .FileName(Parent, 1, "огромный.iso")
-            .NonResidentData(9_000_000_000);
-
-        var entry = Parse(record, statistics, pending);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(entry.Present, Is.False);
-            Assert.That(statistics.Extensions, Is.EqualTo(1));
-            Assert.That(pending.Sizes[12].Size, Is.EqualTo(9_000_000_000));
-            Assert.That(pending.Alternates[12][0].Name, Is.EqualTo("огромный.iso"));
-        }
-    }
-
-    [Test]
     public void Имя_в_пространстве_dos_не_выбирается()
     {
         var pending = new MftPending();

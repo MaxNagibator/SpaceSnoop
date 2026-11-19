@@ -18,7 +18,7 @@ public class ScanLinkNoteTests
     {
         var hint = ScanLinkNote.Explain("≈13 ГБ");
 
-        Assert.That(hint, Does.Contain("≈13 ГБ").And.Contain(ScanLinkNote.Hint));
+        Assert.That(hint, Does.Contain("≈13 ГБ").And.Contain("жёсткие ссылки").And.Contain("байты один раз"));
     }
 
     [Test]
@@ -81,15 +81,18 @@ public class ScanVolumeNoteTests
     {
         var hint = ScanVolumeNote.Explain("≈7 ГБ");
 
-        Assert.That(hint, Does.Contain("≈7 ГБ").And.Contain(ScanVolumeNote.Hint));
+        Assert.That(hint, Does.Contain("≈7 ГБ").And.Contain("жёстких ссылках").And.Contain("Compact OS").And.Contain("разреженных"));
     }
 
     [Test]
     public void Превышение_в_пределах_порога_молчит()
     {
-        var note = ScanVolumeNote.Describe(@"C:\", Used + (long)(Used * AppDefaults.ScanVolumeNoteFraction / 2), new DriveCapacity("C:", Total, Used));
+        var drive = new DriveCapacity("C:", 200_000, 100_000);
 
-        Assert.That(note, Is.Null);
+        Assert.That(ScanVolumeNote.Describe(@"C:\", 101_000, drive), Is.Null);
+        var note = ScanVolumeNote.Describe(@"C:\", 101_001, drive);
+
+        Assert.That(note, Is.Not.Null);
     }
 }
 
@@ -126,7 +129,7 @@ public class ScanDropNoteTests
     {
         var hint = ScanDropNote.Explain(2, 4096, 3, 0);
 
-        Assert.That(hint, Does.Contain("нет в дереве").And.Contain("размер не прочитан").And.Contain(ScanDropNote.Hint));
+        Assert.That(hint, Does.Contain("нет в дереве").And.Contain("размер не прочитан").And.Contain("ко всему тому"));
     }
 
     [Test]

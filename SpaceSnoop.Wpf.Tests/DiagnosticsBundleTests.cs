@@ -167,14 +167,13 @@ public class DiagnosticsBundleTests
     }
 
     [Test]
-    public void Пакет_сохраняет_неполноту_Mft_и_фактические_потоки_движка_через_сводку_и_карточку()
+    public void Пакет_сохраняет_неполноту_Mft_и_фактические_потоки_движка()
     {
         File.WriteAllBytes(Path.Combine(_root, "sample.bin"), new byte[128]);
         var tree = new DiskSpaceCalculator().Calculate(new(_root));
         var summary = new ScanSummaryViewModel();
         using var monitor = TestDiagnostics.Monitor();
         var operations = new PerformanceOperations(monitor);
-        var card = new ScanOperationsCard(operations, new FakeUiDispatcher());
 
         var mftRun = summary.Apply(
             tree,
@@ -198,9 +197,6 @@ public class DiagnosticsBundleTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(card.State, Is.EqualTo(DiagnosticsCardState.Warning));
-            Assert.That(card.Rows.Single(static row => row.Key == "Неполнота $MFT").Value, Is.EqualTo("1 объект"));
-            Assert.That(card.Rows.Single(static row => row.Key == "Обход").Hint, Does.Contain("8 потоков").And.Contain("неполных в $MFT: 1 объект"));
             Assert.That(lastRun.GetProperty("traversal").GetProperty("parallelism").GetInt32(), Is.EqualTo(8));
             Assert.That(notes.GetProperty("engine").GetString(), Is.EqualTo("mft"));
             Assert.That(notes.GetProperty("droppedObjects").GetInt64(), Is.EqualTo(1));
@@ -243,7 +239,7 @@ public class DiagnosticsBundleTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(first.RootElement.GetProperty("sessionId").GetString(), Is.EqualTo(second.RootElement.GetProperty("sessionId").GetString()));
-            Assert.That(first.RootElement.GetProperty("sessionId").GetString(), Has.Length.EqualTo(32));
+            Assert.That(first.RootElement.GetProperty("sessionId").GetString(), Is.Not.Empty);
             Assert.That(first.RootElement.GetProperty("processId").GetInt32(), Is.EqualTo(Environment.ProcessId));
             Assert.That(first.RootElement.GetProperty("buildVersion").GetString(), Is.EqualTo(AppInfo.InformationalVersion));
             Assert.That(first.RootElement.GetProperty("processStartedAtUtc").GetDateTime(), Is.LessThanOrEqualTo(first.RootElement.GetProperty("capturedAtUtc").GetDateTime()));

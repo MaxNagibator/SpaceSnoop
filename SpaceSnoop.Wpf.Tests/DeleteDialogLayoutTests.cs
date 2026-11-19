@@ -8,7 +8,9 @@ using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Bootstrap.Storage;
 using SpaceSnoop.Wpf.ViewModels.Dialogs;
 using SpaceSnoop.Wpf.Views;
+using SpaceSnoop.Wpf.Views.Dialogs;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -124,27 +126,68 @@ public class DeleteDialogLayoutTests
     }
 
     [Test]
-    public void Идущее_удаление_не_теряет_биндингов()
+    public void Идущее_удаление_показывает_состояние_пачки_отмену_и_причину_отказа()
     {
         using var sink = BindingErrorSink.Attach();
-
-        var dialog = _services.GetRequiredService<DeleteProgressDialogFactory>().Create(BuildItems(), false);
+        const string error = "Файл занят";
+        var dialog = _services.GetRequiredService<DeleteProgressDialogFactory>().Create(BuildItems(3), false);
 
         _ = _modals.ShowAsync(dialog);
         _host.Settle();
 
         try
         {
-            dialog.ShowRunningForAutomation(2);
+            dialog.IsRunning = true;
+            dialog.StatusText = "Удаление…";
+            dialog.CountText = "1 / 3";
+            dialog.IsChunkRunning = true;
+            dialog.BatchCaption = "объекты 2–3 из 3";
+            dialog.DiagnosticsText = "118 файлов/с";
+            dialog.Items[0].State = DeleteRowState.Failed;
+            dialog.Items[0].Error = error;
             _host.Settle();
 
+            var view = Descendant<DeleteProgressDialogView>(_window)!;
+            var progress = Descendants<ProgressBar>(view).Single();
+            Assert.That(progress.IsIndeterminate, Is.False);
+
+            var cancel = Descendants<Button>(view).Single(button => Equals(button.Content, "Остановить удаление"));
+            Assert.That(cancel.IsVisible && cancel.IsEnabled, Is.True);
+            Assert.That(cancel.ToolTip, Does.Contain("в конце текущей пачки"));
+
+            dialog.ChunkElapsedText = "идёт 3 с";
+            dialog.CancelRequested = true;
+            _host.Settle();
+
+            var text = Descendants<TextBlock>(view).Where(static block => block.IsVisible).ToList();
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(dialog.BatchCaption, Is.Not.Null, "Подпись пачки не подставилась – проверять её разметку не на чем.");
-                Assert.That(dialog.ChunkElapsedText, Is.Not.Null, "Время текущей операции не подставилось – строка секунд в кадр не попадёт.");
-                Assert.That(dialog.IsChunkStalled, Is.True, "Затянувшаяся пачка не включила пульс – полоса на кадре останется в процентах.");
+                Assert.That(progress.IsIndeterminate, Is.True);
+                Assert.That(cancel.Content, Is.EqualTo("Остановка запрошена…"));
+                Assert.That(cancel.IsEnabled, Is.True);
+                Assert.That(text.Any(block => block.Text == error), Is.True);
+                Assert.That(
+                    Descendants<FrameworkElement>(view).Any(element => element.ToolTip is string tip && tip.Contains(error, StringComparison.Ordinal)),
+                    Is.True);
+                Assert.That(
+                    text.Any(block => block.Text == "118 файлов/с" && AutomationProperties.GetName(block) == "Диагностика удаления"),
+                    Is.True);
+
+                foreach (var announcement in new[] { "Удаление…", "1 / 3", "объекты 2–3 из 3", "идёт 3 с" })
+                {
+                    Assert.That(
+                        text.Any(block => block.Text == announcement && AutomationProperties.GetLiveSetting(block) == AutomationLiveSetting.Polite),
+                        Is.True,
+                        announcement);
+                }
+
                 Assert.That(sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, sink.Errors));
             }
+
+            dialog.IsChunkRunning = false;
+            dialog.ChunkElapsedText = null;
+            _host.Settle();
+            Assert.That(progress.IsIndeterminate, Is.False);
         }
         finally
         {
@@ -393,12 +436,12 @@ public class DeleteDialogLayoutTests
         return null;
     }
 
-    private static IReadOnlyList<SpaceBase> BuildItems()
+    private static IReadOnlyList<SpaceBase> BuildItems(int count = Rows)
     {
         var root = new DirectorySpace(@"C:\Стенд", null, DateTime.Now, DateTime.Now);
-        var items = new List<SpaceBase>(Rows);
+        var items = new List<SpaceBase>(count);
 
-        for (var index = 0; index < Rows; index++)
+        for (var index = 0; index < count; index++)
         {
             items.Add(new DirectorySpace($"объект-{index:D5}", root, DateTime.Now, DateTime.Now));
         }
@@ -460,23 +503,25 @@ public class DeleteDialogLayoutTests
     private static T? Descendant<T>(DependencyObject root)
         where T : DependencyObject
     {
-        var count = VisualTreeHelper.GetChildrenCount(root);
+        return Descendants<T>(root).FirstOrDefault();
+    }
 
-        for (var index = 0; index < count; index++)
+    private static IEnumerable<T> Descendants<T>(DependencyObject root)
+        where T : DependencyObject
+    {
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
         {
             var child = VisualTreeHelper.GetChild(root, index);
 
             if (child is T found)
             {
-                return found;
+                yield return found;
             }
 
-            if (Descendant<T>(child) is { } nested)
+            foreach (var nested in Descendants<T>(child))
             {
-                return nested;
+                yield return nested;
             }
         }
-
-        return null;
     }
 }

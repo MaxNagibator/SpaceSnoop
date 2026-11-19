@@ -4,7 +4,6 @@ using SpaceSnoop.Core;
 using SpaceSnoop.Core.Domain;
 using SpaceSnoop.Core.Export;
 using SpaceSnoop.Wpf.Bootstrap;
-using SpaceSnoop.Wpf.Bootstrap.Schedule;
 using SpaceSnoop.Wpf.Diagnostics;
 using SpaceSnoop.Wpf.Mcp;
 using SpaceSnoop.Wpf.ViewModels.Sync;
@@ -93,29 +92,9 @@ public class McpBridgeTests
     }
 
     [Test]
-    public void Дефолтная_глубина_скана_проходит_кламп_без_изменений()
-    {
-        Assert.That(McpGuards.ClampDepth(ScanExport.DefaultDepth), Is.EqualTo(ScanExport.DefaultDepth));
-    }
-
-    [Test]
-    public void Дефолтный_лимит_экспорта_проходит_кламп_без_изменений()
-    {
-        Assert.That(McpGuards.ClampEntryLimit(ComparisonExport.DefaultEntryLimit), Is.EqualTo(ComparisonExport.DefaultEntryLimit));
-    }
-
-    [Test]
     public void До_первого_замера_окно_наблюдения_не_обещает_секунд()
     {
         Assert.That(McpFormat.DescribeWindow(PerformanceSnapshot.Empty), Is.EqualTo("замеров ещё нет"));
-    }
-
-    [TestCase(SyncMode.LeftToRight)]
-    [TestCase(SyncMode.RightToLeft)]
-    [TestCase(SyncMode.Bidirectional)]
-    public void Индекс_режима_обратим_маппингу_профиля(SyncMode mode)
-    {
-        Assert.That(HeadlessSync.MapMode(SyncProfile.IndexOfMode(mode)), Is.EqualTo(mode));
     }
 
     [Test]
@@ -131,8 +110,10 @@ public class McpBridgeTests
             Assert.That(history.GetProperty("folded").GetInt32(), Is.EqualTo(3));
             Assert.That(history.GetProperty("requestedSeconds").GetInt32(), Is.EqualTo(60));
             Assert.That(history.GetProperty("requestedPoints").GetInt32(), Is.EqualTo(240));
+            Assert.That(json.GetProperty("gen0CollectionsTotal").GetInt32(), Is.EqualTo(5));
             Assert.That(history.GetProperty("gen0CollectionsInWindow").GetInt32(), Is.EqualTo(4));
             Assert.That(timeline[0].GetProperty("gen0CollectionsTotal").GetInt32(), Is.EqualTo(1));
+            Assert.That(json.GetProperty("workingSetPeakBytes").GetInt64(), Is.EqualTo(4096));
             Assert.That(timeline.GetArrayLength(), Is.EqualTo(2));
             Assert.That(timeline[0].GetProperty("operation").GetString(), Is.EqualTo("Сканирование"));
             Assert.That(timeline[1].TryGetProperty("operation", out _), Is.False);
@@ -175,20 +156,6 @@ public class McpBridgeTests
     public void Лимит_записей_от_агента_зажимается_в_диапазон(int requested, int expected)
     {
         Assert.That(McpGuards.ClampEntryLimit(requested), Is.EqualTo(expected));
-    }
-
-    [Test]
-    public void Накопительные_и_оконные_счётчики_GC_названы_по_разному()
-    {
-        var json = JsonDocument.Parse(McpFormat.Serialize(Performance(McpFormat.DescribeHistory(History(), 60, 240)))).RootElement;
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(json.GetProperty("gen0CollectionsTotal").GetInt32(), Is.EqualTo(4));
-            Assert.That(json.TryGetProperty("gen0Collections", out _), Is.False);
-            Assert.That(json.GetProperty("history").TryGetProperty("gen0Collections", out _), Is.False);
-            Assert.That(json.GetProperty("workingSetPeakBytes").GetInt64(), Is.EqualTo(4096));
-        });
     }
 
     [Test]
@@ -357,7 +324,7 @@ public class McpBridgeTests
             "1 КБ",
             4096,
             "4 КБ",
-            4,
+            5,
             1,
             0,
             1.25,

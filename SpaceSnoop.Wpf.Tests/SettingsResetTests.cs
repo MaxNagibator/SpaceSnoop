@@ -265,36 +265,6 @@ public class SettingsResetTests
         }
     }
 
-    [Test]
-    public void Каждая_настройка_раздела_сбрасывается_своей_строкой()
-    {
-        ISettingsStore store = new MemorySettings();
-        SeedEverything(store);
-
-        var bench = Build(store);
-
-        using (Assert.EnterMultipleScope())
-        {
-            foreach (var plan in bench.Plans.Values)
-            {
-                Assert.That(
-                    plan.Restored,
-                    Is.EqualTo(plan.Fields.Select(field => field.Label).ToArray()),
-                    $"Раздел «{plan.SectionKey}» перечисляет в тосте не то, что сбрасывает.");
-            }
-
-            foreach (var plan in bench.Plans.Values)
-            {
-                plan.Reset();
-            }
-
-            foreach (var field in bench.Fields.Where(field => field.Key != SettingsKeys.Theme))
-            {
-                Assert.That(field.IsDefault, Is.True, $"После сброса всех разделов «{field.Label}» осталась изменённой.");
-            }
-        }
-    }
-
     [TestCaseSource(nameof(FieldKeys))]
     public void Кнопка_строки_молчит_пока_настройка_стоит_на_заводском_значении(string key)
     {

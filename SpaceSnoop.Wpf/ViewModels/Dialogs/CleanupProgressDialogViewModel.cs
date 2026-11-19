@@ -10,8 +10,6 @@ public readonly record struct CleanupRequest(
 
 public sealed partial class CleanupProgressDialogViewModel : OperationDialogViewModelBase
 {
-    internal static readonly TimeSpan ProgressPollInterval = UiProgressPoller.DefaultInterval;
-
     private readonly CleanupRequest _request;
     private readonly CleanupService _service;
     private readonly ILogger _logger;
@@ -104,7 +102,7 @@ public sealed partial class CleanupProgressDialogViewModel : OperationDialogView
         _operations = operations;
         _service = service;
         _logger = logger;
-        _progressPoller = new(uiDispatcher, OnProgressTick, ProgressPollInterval);
+        _progressPoller = new(uiDispatcher, OnProgressTick);
 
         TargetName = request.Targets.Count == 1
             ? request.Targets[0].Name

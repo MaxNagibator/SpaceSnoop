@@ -53,11 +53,6 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
         return paths;
     }
 
-    public bool HasUnresolvedConflicts()
-    {
-        return HasUnresolvedConflictsRecursive(Root);
-    }
-
     public bool HasPendingResolution()
     {
         return HasPendingResolutionRecursive(Root);
@@ -365,12 +360,6 @@ public sealed class ComparisonResult(string leftPath, string rightPath, Director
 
         file.Status = ComparisonStatus.Conflict;
         return SyncAction.None;
-    }
-
-    private static bool HasUnresolvedConflictsRecursive(DirectoryComparison dir)
-    {
-        return dir.Files.Any(x => x.Status == ComparisonStatus.Conflict && x.Action == SyncAction.None)
-            || dir.SubDirectories.Any(HasUnresolvedConflictsRecursive);
     }
 
     private readonly record struct DeleteBlocks(bool Left, bool Right)

@@ -22,12 +22,6 @@ public class AgentToolPolicyTests
     }
 
     [Test]
-    public void Дефолтный_промпт_равен_read_only_редакции_без_оболочки()
-    {
-        Assert.That(AgentPrompt.System, Is.EqualTo(AgentPrompt.Build(false, false)));
-    }
-
-    [Test]
     public void Запуск_команды_помечается_как_изменяющий_вызов()
     {
         Assert.That(ChatToolCall.From(AgentPrompt.ShellTool).IsMutating, Is.True);
@@ -82,12 +76,6 @@ public class AgentToolPolicyTests
     public void Незнакомый_инструмент_показывается_коротким_именем()
     {
         Assert.That(AgentPrompt.Describe("mcp__spacesnoop__future_tool"), Is.EqualTo("future_tool"));
-    }
-
-    [Test]
-    public void Обе_редакции_промпта_несут_общую_часть()
-    {
-        Assert.That(AgentPrompt.Build(true, false), Does.StartWith($"Тебя зовут {AgentPersona.Name}"));
     }
 
     [TestCase(true)]

@@ -1,44 +1,58 @@
 ﻿using KeepShell.Testing;
+using KeepShell.ViewModels;
 using SpaceSnoop.Core;
-using SpaceSnoop.Wpf.ViewModels.Dialogs;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Threading;
 
-namespace SpaceSnoop.Wpf.Tests;
+namespace SpaceSnoop.Benchmarks;
 
-[TestFixture]
-[Apartment(ApartmentState.STA)]
-[NonParallelizable]
-[Explicit("Замер, а не гард: числа зависят от машины, порог в CI флакует. Гоняется руками при правке прогресса.")]
-public class ProgressChannelMeasurement
+internal sealed class ProgressChannelMeasurement
 {
-    private const int Reports = 497_227;
+    private const int UnpacedReports = 497_227;
     private const int ProductionRate = 2170;
     private const int PacedSeconds = 8;
     private const double LateThresholdMs = 100;
 
-    private static readonly TimeSpan PollInterval = DuplicateProgressDialogViewModel.ProgressPollInterval;
+    private static readonly TimeSpan PollInterval = UiProgressPoller.DefaultInterval;
     private static readonly TimeSpan SampleInterval = TimeSpan.FromMilliseconds(50);
     private static readonly string[] Paths = [.. Enumerable.Range(0, 64).Select(static index => $@"C:\Sources\проект\узел-{index:D4}\файл-{index:D4}.bin")];
 
-    private Dispatcher _dispatcher = null!;
+    private readonly Dispatcher _dispatcher = Dispatcher.CurrentDispatcher;
 
-    [SetUp]
-    public void SetUp()
+    public static void Run()
     {
-        _dispatcher = Dispatcher.CurrentDispatcher;
-        SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(_dispatcher));
+        var thread = new Thread(RunScenarios);
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
     }
 
-    [TestCase(0, false)]
-    [TestCase(0, true)]
-    [TestCase(ProductionRate, false)]
-    [TestCase(ProductionRate, true)]
-    [TestCase(50_000, true)]
-    public void Опрос_состояния_таймером(int rate, bool bound)
+    private static void RunScenarios()
+    {
+        var measurement = new ProgressChannelMeasurement();
+        SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(measurement._dispatcher));
+
+        foreach (var rate in new[] { 0, ProductionRate })
+        {
+            foreach (var bound in new[] { false, true })
+            {
+                measurement.Poll(rate, bound);
+                measurement.Push(rate, bound);
+            }
+        }
+
+        measurement.Poll(50_000, true);
+
+        foreach (var rate in new[] { 5_000, 10_000, 25_000, 50_000 })
+        {
+            measurement.Push(rate, true);
+        }
+    }
+
+    private void Poll(int rate, bool bound)
     {
         var sink = new Sink();
         var state = new OperationProgressState();
@@ -53,15 +67,7 @@ public class ProgressChannelMeasurement
         Report("опрос таймером", rate, bound, sample, sink);
     }
 
-    [TestCase(0, false)]
-    [TestCase(0, true)]
-    [TestCase(ProductionRate, false)]
-    [TestCase(ProductionRate, true)]
-    [TestCase(5_000, true)]
-    [TestCase(10_000, true)]
-    [TestCase(25_000, true)]
-    [TestCase(50_000, true)]
-    public void Пуш_каждого_объекта_в_очередь_диспетчера(int rate, bool bound)
+    private void Push(int rate, bool bound)
     {
         var sink = new Sink();
         var progress = new Progress<OperationProgress>(sink.Apply);
@@ -78,7 +84,7 @@ public class ProgressChannelMeasurement
         var pace = rate > 0 ? $"{rate:N0} объектов/с" : "без ограничения темпа";
         var screen = bound ? "с биндингами" : "без биндингов";
 
-        TestContext.Out.WriteLine(
+        Console.WriteLine(
             $"{channel}, {pace}, {screen}: отчётов {sample.Reports:N0} за {sample.ElapsedMs:N0} мс, "
             + $"обновлений UI {sink.Updates:N0}, наибольшее опоздание тика {sample.MaxDelayMs:N0} мс "
             + $"на {sample.MaxDelayAtMs:N0}-й мс, опозданий свыше 100 мс {sample.LateTicks:N0} из {sample.Ticks:N0}, "
@@ -87,7 +93,7 @@ public class ProgressChannelMeasurement
 
     private Sample Flood(IProgress<OperationProgress> progress, int rate, DispatcherTimer? timer)
     {
-        var total = rate > 0 ? rate * PacedSeconds : Reports;
+        var total = rate > 0 ? rate * PacedSeconds : UnpacedReports;
         using var watchdog = new Watchdog(_dispatcher);
         var frame = new DispatcherFrame();
         var clock = Stopwatch.StartNew();

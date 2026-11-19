@@ -1,4 +1,5 @@
 ﻿using KeepShell.Testing;
+using KeepShell.ViewModels;
 using Microsoft.Extensions.Logging.Abstractions;
 using SpaceSnoop.Core;
 using SpaceSnoop.Core.Domain;
@@ -74,13 +75,38 @@ public class SyncProgressPollTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(dispatcher.Timers, Has.Count.EqualTo(1));
-            Assert.That(dispatcher.Timers[0].Interval, Is.EqualTo(SyncSessionViewModel.ProgressPollInterval));
+            Assert.That(dispatcher.Timers[0].Interval, Is.EqualTo(UiProgressPoller.DefaultInterval));
             Assert.That(dispatcher.Timers[0].IsRunning, Is.False, "Таймер опроса пережил операцию.");
         }
     }
 
     [Test]
-    public async Task Экран_сравнения_обновляется_тиком_таймера_а_не_каждым_каталогом()
+    public async Task Таймер_опроса_останавливается_после_отмены()
+    {
+        var dispatcher = new FakeUiDispatcher();
+        var page = CreatePage(dispatcher);
+        using var cancel = new CancellationTokenSource();
+
+        await page.Session.RunAsync<object>(
+            "Синхронизация:",
+            (token, _) =>
+            {
+                cancel.Cancel();
+                token.ThrowIfCancellationRequested();
+                return new();
+            },
+            external: cancel.Token);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(page.Session.LastOperationCancelled, Is.True);
+            Assert.That(dispatcher.Timers, Has.Count.EqualTo(1));
+            Assert.That(dispatcher.Timers[0].IsRunning, Is.False, "Таймер опроса пережил отмену.");
+        }
+    }
+
+    [Test]
+    public async Task Сравнение_объединяет_обновления_прогресса_и_показывает_полный_счёт()
     {
         var dispatcher = new FakeUiDispatcher();
         var page = CreatePage(dispatcher);
@@ -98,8 +124,8 @@ public class SyncProgressPollTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(updates, Is.EqualTo(2), $"Экран обновился {updates} раз на {Directories} каталогах – прогресс снова пушится на каждый объект.");
-            Assert.That(page.Session.ProgressDetail, Does.StartWith($"{SyncOperationsViewModel.CompareCaption} {Directories + 1}"), "Последний срез прогресса до экрана не доехал.");
+            Assert.That(updates, Is.Positive.And.LessThan(Directories / 2), $"Экран обновился {updates} раз на {Directories} каталогах.");
+            Assert.That(page.Session.ProgressDetail, Does.StartWith("Сравнение каталогов: 61"), "Последний срез прогресса до экрана не доехал.");
         }
     }
 

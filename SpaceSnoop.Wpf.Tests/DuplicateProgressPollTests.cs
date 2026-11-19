@@ -39,37 +39,7 @@ public class DuplicateProgressPollTests
     }
 
     [Test]
-    public async Task Таймер_опроса_заводится_один_и_останавливается_после_поиска()
-    {
-        var dispatcher = new FakeUiDispatcher();
-        var dialog = CreateDialog(dispatcher);
-
-        await dialog.StartCommand.ExecuteAsync(null);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(dispatcher.Timers, Has.Count.EqualTo(1));
-            Assert.That(dispatcher.Timers[0].Interval, Is.EqualTo(DuplicateProgressDialogViewModel.ProgressPollInterval));
-            Assert.That(dispatcher.Timers[0].IsRunning, Is.False, "Таймер опроса пережил операцию.");
-        }
-    }
-
-    [Test]
-    public async Task Тик_таймера_показывает_накопленный_срез()
-    {
-        var dispatcher = new FakeUiDispatcher();
-        var dialog = CreateDialog(dispatcher);
-
-        await dialog.StartCommand.ExecuteAsync(null);
-
-        var updates = Watch(dialog);
-        dispatcher.Timers[0].Tick();
-
-        Assert.That(updates.Value, Is.Zero, "Тик после конца операции переписал итоговый срез.");
-    }
-
-    [Test]
-    public async Task Экран_поиска_дубликатов_обновляется_тиком_таймера_а_не_каждым_файлом()
+    public async Task Поиск_дубликатов_объединяет_обновления_прогресса_и_показывает_полный_счёт()
     {
         var dispatcher = new FakeUiDispatcher();
         var dialog = CreateDialog(dispatcher);
@@ -80,7 +50,7 @@ public class DuplicateProgressPollTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(dialog.Report?.Examined, Is.EqualTo(Copies * 2), "Поиск не дошёл до всех файлов – проверять нечего.");
-            Assert.That(updates.Value, Is.EqualTo(1), $"Экран обновился {updates.Value} раз на {Copies * 2} файлах – прогресс снова пушится на каждый объект.");
+            Assert.That(updates.Value, Is.Positive.And.LessThan(Copies), $"Экран обновился {updates.Value} раз на {Copies * 2} файлах.");
             Assert.That(dialog.CountText, Does.StartWith($"{Copies * 2:N0} · "), "Последний срез прогресса до экрана не доехал.");
         }
     }

@@ -23,7 +23,7 @@ public class ScanDuplicatesTests
     }
 
     [Test]
-    public void Каталог_вне_корня_остаётся_полным()
+    public void Длинный_путь_внутри_корня_не_обрезается()
     {
         var nested = @"C:\Data\" + new string('и', 200);
 
@@ -58,9 +58,9 @@ public class ScanDuplicatesTests
         Assert.That(ScanDuplicatesViewModel.DescribeReport(report), Is.EqualTo("Дубликатов не найдено · проверено файлов: 128"));
     }
 
-    [TestCase(true, ExpectedResult = 3)]
-    [TestCase(false, ExpectedResult = 2)]
-    public int Режим_дубликатов_появляется_в_панели_только_по_настройке(bool enabled)
+    [TestCase(true)]
+    [TestCase(false)]
+    public void Режим_дубликатов_появляется_в_панели_только_по_настройке(bool enabled)
     {
         var modes = ScanViewModel.BuildViewModes(enabled);
 
@@ -68,8 +68,6 @@ public class ScanDuplicatesTests
             modes.Any(mode => mode.Text == "Дубликаты"),
             Is.EqualTo(enabled),
             "Состав сегментов разошёлся с настройкой режима дубликатов.");
-
-        return modes.Count;
     }
 
     [TestCase("", 0, ExpectedResult = "2|Дубликатов не найдено|Искать от 0 МБ|3")]

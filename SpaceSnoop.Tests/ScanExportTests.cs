@@ -117,7 +117,7 @@ public partial class ScanExportTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(model.Directories.Select(x => x.TotalBytes), Is.EqualTo(sizes.OrderDescending().Take(take)));
+            Assert.That(model.Directories.Select(x => x.TotalBytes), Is.EqualTo(Enumerable.Repeat(40L, 5)));
             Assert.That(model.Directories.Select(x => x.Path).Distinct().Count(), Is.EqualTo(take));
             Assert.That(model.OmittedDirectories, Is.EqualTo(count - take));
             Assert.That(model.OmittedFiles, Is.EqualTo(count - take));
@@ -125,51 +125,32 @@ public partial class ScanExportTests
         }
     }
 
-    [TestCase(0, false)]
-    [TestCase(1, false)]
-    [TestCase(20, false)]
-    [TestCase(20, true)]
-    [TestCase(500, true)]
-    public void Build_TopKPreservesLargestWeightsIncludingTiesAndZero(int requested, bool equal)
+    [TestCase(0, 1, 0, 0)]
+    [TestCase(20, 15, 5, 0)]
+    [TestCase(20, 0, 0, 20)]
+    [TestCase(500, 0, 0, 256)]
+    public void Build_TopKPreservesLargestWeightsIncludingTiesAndZero(int requested, int largest, int nextLargest, int empty)
     {
         const int count = 256;
         var root = new DirectorySpace(@"C:\synthetic", null, default, default);
-        var sizes = Enumerable.Range(0, count).Select(i => equal ? 0L : i * 37 % 17 * 100L).ToArray();
+        var sizes = Enumerable.Range(0, count).Select(i => empty > 0 ? 0L : i * 37 % 17 * 100L).ToArray();
         var files = sizes.Select((size, i) => FileSpace.Create(new ScanEntry($"f{i}.bin", size, default, default, FileAttributes.Normal, false), root)).ToList();
         root.SetScanned(files, []);
         root.AggregateTotals();
 
         var model = ScanExport.Build(root, root.Name, Options, entryLimit: requested);
-        var take = Math.Min(count, Math.Max(1, requested));
+        var expectedCount = largest + nextLargest + empty;
+        var expectedBytes = Enumerable.Repeat(1600L, largest)
+            .Concat(Enumerable.Repeat(1500L, nextLargest))
+            .Concat(Enumerable.Repeat(0L, empty));
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(model.Files.Select(x => x.Bytes), Is.EqualTo(sizes.OrderDescending().Take(take)));
-            Assert.That(model.Files.Select(x => x.Path).Distinct().Count(), Is.EqualTo(take));
-            Assert.That(model.OmittedFiles, Is.EqualTo(count - take));
+            Assert.That(model.Files.Select(x => x.Bytes), Is.EqualTo(expectedBytes));
+            Assert.That(model.Files.Select(x => x.Path).Distinct().Count(), Is.EqualTo(expectedCount));
+            Assert.That(model.OmittedFiles, Is.EqualTo(count - expectedCount));
             Assert.That(model.Totals.Files, Is.EqualTo(count));
             Assert.That(model.Totals.Bytes, Is.EqualTo(sizes.Sum()));
-        }
-    }
-
-    [Test]
-    public void Build_TruncatesToLargestAndReportsOmitted()
-    {
-        var model = Build(Options, 2);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                model.Files.Select(x => x.Bytes),
-                Is.EqualTo(
-                    new[]
-                    {
-                        5000L, 700L,
-                    }));
-
-            Assert.That(model.OmittedFiles, Is.EqualTo(2));
-            Assert.That(model.Directories, Has.Count.EqualTo(2));
-            Assert.That(model.OmittedDirectories, Is.EqualTo(2));
         }
     }
 
@@ -217,10 +198,10 @@ public partial class ScanExportTests
     [GeneratedRegex("\"generatedAt\": *\"[^\"]*\"")]
     private static partial Regex GeneratedAt();
 
-    private ScanExportModel Build(ScanExportOptions options, int entryLimit = ScanExport.DefaultEntryLimit)
+    private ScanExportModel Build(ScanExportOptions options)
     {
         var root = new DiskSpaceCalculator().Calculate(new(_root), CancellationToken.None);
 
-        return ScanExport.Build(root, _root, options, "{version}", entryLimit);
+        return ScanExport.Build(root, _root, options, "{version}");
     }
 }

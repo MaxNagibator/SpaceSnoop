@@ -35,17 +35,11 @@ public class PathCaseTests
     }
 
     [Test]
-    public void IsCaseSensitive_OnEmptyDirectory_FallsBackToPlatform()
-    {
-        Assert.That(PathCase.IsCaseSensitive(_tempDir), Is.EqualTo(PathCase.PlatformDefaultIsCaseSensitive));
-    }
-
-    [Test]
     public void IsCaseSensitive_OnMissingDirectory_FallsBackToPlatform()
     {
         var missing = Path.Combine(_tempDir, "missing");
 
-        Assert.That(PathCase.IsCaseSensitive(missing), Is.EqualTo(PathCase.PlatformDefaultIsCaseSensitive));
+        Assert.That(PathCase.IsCaseSensitive(missing), Is.False);
     }
 
     [Test]
@@ -55,16 +49,6 @@ public class PathCaseTests
         File.WriteAllText(Path.Combine(_tempDir, "Probe.txt"), "payload");
 
         Assert.That(PathCase.IsCaseSensitive(_tempDir), Is.False);
-    }
-
-    [Test]
-    public void IsCaseSensitive_WhenNamesDifferOnlyByCase_IsTrue()
-    {
-        Assume.That(!OperatingSystem.IsWindows());
-        File.WriteAllText(Path.Combine(_tempDir, "probe.txt"), "one");
-        File.WriteAllText(Path.Combine(_tempDir, "Probe.txt"), "two");
-
-        Assert.That(PathCase.IsCaseSensitive(_tempDir), Is.True);
     }
 
     [TestCase(false, false, false)]

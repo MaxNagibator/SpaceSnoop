@@ -116,28 +116,17 @@ public class ArchiveDialogTests
     }
 
     [Test]
-    public async Task Таймер_опроса_заводится_один_и_останавливается_после_упаковки()
+    public async Task Упаковка_объединяет_обновления_прогресса_и_показывает_полный_счёт()
     {
-        var dispatcher = new FakeUiDispatcher();
-        var dialog = Dialog(false, dispatcher);
+        const int added = 30;
 
-        await RunInlineAsync(dialog);
-
-        using (Assert.EnterMultipleScope())
+        for (var index = 0; index < added; index++)
         {
-            Assert.That(dispatcher.Timers, Has.Count.EqualTo(1));
-            Assert.That(dispatcher.Timers[0].Interval, Is.EqualTo(ArchiveProgressDialogViewModel.ProgressPollInterval));
-            Assert.That(dispatcher.Timers[0].IsRunning, Is.False, "Таймер опроса пережил операцию.");
+            await File.WriteAllTextAsync(Path.Combine(_source, $"file{index}.txt"), "data");
         }
-    }
 
-    [Test]
-    public async Task Экран_упаковки_обновляется_тиком_таймера_а_не_каждой_записью()
-    {
-        var dispatcher = new FakeUiDispatcher();
-        var dialog = Dialog(false, dispatcher);
+        var dialog = Dialog(deleteOriginal: false);
         var updates = 0;
-
         dialog.PropertyChanged += (_, arguments) =>
         {
             if (arguments.PropertyName == nameof(dialog.CountText))
@@ -146,18 +135,6 @@ public class ArchiveDialogTests
             }
         };
 
-        await RunInlineAsync(dialog);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(updates, Is.EqualTo(1), $"Экран обновился {updates} раз на двух записях – прогресс снова пушится на каждый объект.");
-            Assert.That(dialog.CountText, Is.EqualTo("2 / 2"), "Последний срез прогресса до экрана не доехал.");
-            Assert.That(dialog.CountLabel, Is.EqualTo("Упаковано"));
-        }
-    }
-
-    private static async Task RunInlineAsync(ArchiveProgressDialogViewModel dialog)
-    {
         var previous = SynchronizationContext.Current;
         SynchronizationContext.SetSynchronizationContext(new InlineSynchronizationContext());
 
@@ -169,9 +146,16 @@ public class ArchiveDialogTests
         {
             SynchronizationContext.SetSynchronizationContext(previous);
         }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(updates, Is.Positive.And.LessThan(added / 2));
+            Assert.That(dialog.CountText, Is.EqualTo("32 / 32"));
+            Assert.That(dialog.CountLabel, Is.EqualTo("Упаковано"));
+        }
     }
 
-    private ArchiveProgressDialogViewModel Dialog(bool deleteOriginal, FakeUiDispatcher? dispatcher = null)
+    private ArchiveProgressDialogViewModel Dialog(bool deleteOriginal)
     {
         ArchiveRequest request = new(
             _source,
@@ -182,7 +166,7 @@ public class ArchiveDialogTests
             CompressionLevel.Optimal,
             false);
 
-        return new(request, new(), dispatcher ?? new FakeUiDispatcher(), NullLogger<ArchiveProgressDialogViewModel>.Instance);
+        return new(request, new(), new FakeUiDispatcher(), NullLogger<ArchiveProgressDialogViewModel>.Instance);
     }
 
     private static bool CreateJunction(string path, string target)

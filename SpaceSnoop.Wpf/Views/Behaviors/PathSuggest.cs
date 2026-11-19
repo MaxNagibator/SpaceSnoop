@@ -35,21 +35,6 @@ public static class PathSuggest
         element.SetValue(EnabledProperty, value);
     }
 
-    internal static IReadOnlyList<string> Matches(string text)
-    {
-        if (!TrySplitQuery(text, out var directory, out var prefix))
-        {
-            return [];
-        }
-
-        if (ServerName(directory) is { } server)
-        {
-            return ShareMatches(server, directory, prefix);
-        }
-
-        return DirectoryReader(directory, prefix);
-    }
-
     internal static string? ServerName(string directory)
     {
         if (directory.Length < 3 || directory[0] is not ('\\' or '/') || directory[1] is not ('\\' or '/'))
@@ -104,17 +89,6 @@ public static class PathSuggest
         }
     }
 
-    private static IReadOnlyList<string> ShareMatches(string server, string directory, string prefix)
-    {
-        if (!Shares.TryGetValue(server, out var shares))
-        {
-            RequestShares(server);
-            return [];
-        }
-
-        return FilterShares(shares, directory, prefix);
-    }
-
     private static IReadOnlyList<string> FilterShares(IReadOnlyList<string> shares, string directory, string prefix)
     {
         var matches = shares
@@ -127,7 +101,7 @@ public static class PathSuggest
         return matches;
     }
 
-    private static void RequestShares(string server, Action? onLoaded = null)
+    private static void RequestShares(string server, Action onLoaded)
     {
         if (!PendingShares.TryAdd(server, true))
         {
@@ -141,7 +115,7 @@ public static class PathSuggest
             if (shares.Count > 0)
             {
                 Shares[server] = shares;
-                onLoaded?.Invoke();
+                onLoaded();
             }
             else
             {

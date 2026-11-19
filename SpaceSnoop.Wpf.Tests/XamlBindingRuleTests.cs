@@ -6,10 +6,13 @@ namespace SpaceSnoop.Wpf.Tests;
 [TestFixture]
 public class XamlBindingRuleTests
 {
-    [TestCaseSource(nameof(MarkupFiles))]
-    public void Pack_URI_несёт_имя_сборки(string file)
+    [Test]
+    public void Pack_URI_несёт_имя_сборки()
     {
-        var offenders = MarkupRules.PackUris(Path.Combine(Frontend(), file), Frontend());
+        var frontend = Frontend();
+        var offenders = MarkupFiles(frontend)
+            .SelectMany(file => MarkupRules.PackUris(file, frontend))
+            .ToList();
 
         Assert.That(
             offenders,
@@ -17,10 +20,13 @@ public class XamlBindingRuleTests
             () => $"Запись без ;component/ резолвится через Application.ResourceAssembly, а в тест-процессе это testhost – ресурс не находится:{Environment.NewLine}{RuleViolation.Report(offenders)}");
     }
 
-    [TestCaseSource(nameof(MarkupFiles))]
-    public void Полоса_прогресса_привязана_только_на_чтение(string file)
+    [Test]
+    public void Полоса_прогресса_привязана_только_на_чтение()
     {
-        var offenders = MarkupRules.ReadOnlyBindings(Path.Combine(Frontend(), file), Frontend());
+        var frontend = Frontend();
+        var offenders = MarkupFiles(frontend)
+            .SelectMany(file => MarkupRules.ReadOnlyBindings(file, frontend))
+            .ToList();
 
         Assert.That(
             offenders,
@@ -28,16 +34,14 @@ public class XamlBindingRuleTests
             () => $"Привязка Value без Mode=OneWay бросает InvalidOperationException при отрисовке, если свойство только для чтения:{Environment.NewLine}{RuleViolation.Report(offenders)}");
     }
 
-    public static IEnumerable<string> MarkupFiles()
+    private static IEnumerable<string> MarkupFiles(string frontend)
     {
-        var views = Frontend();
-
-        if (!Directory.Exists(views))
+        if (!Directory.Exists(frontend))
         {
-            Assert.Fail($"Каталог разметки не найден: {views}");
+            Assert.Fail($"Каталог разметки не найден: {frontend}");
         }
 
-        return ProjectFiles.Enumerate(views, "*.xaml").Select(path => Path.GetRelativePath(views, path));
+        return ProjectFiles.Enumerate(frontend, "*.xaml");
     }
 
     private static string Frontend()

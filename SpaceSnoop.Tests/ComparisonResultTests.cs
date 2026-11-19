@@ -467,6 +467,12 @@ public class ComparisonResultTests
     public void CountPlannedActions_CountsBytesInsideDeletedDirectory()
     {
         var root = new DirectoryComparison("root", "");
+        root.Files.Add(
+            new("keep.txt", "keep.txt")
+            {
+                Status = ComparisonStatus.LeftOnly,
+            });
+
         var extra = new DirectoryComparison("extra", "extra")
         {
             Status = ComparisonStatus.RightOnly,
@@ -500,7 +506,10 @@ public class ComparisonResultTests
 
         using (Assert.EnterMultipleScope())
         {
+            Assert.That(planned.NewCopies, Is.EqualTo(1));
+            Assert.That(planned.Deletes, Is.Zero);
             Assert.That(planned.DirDeletes, Is.EqualTo(1));
+            Assert.That(planned.Total, Is.EqualTo(2));
             Assert.That(planned.DeleteFileBytes, Is.Zero);
             Assert.That(planned.DeleteDirBytes, Is.EqualTo(1000));
         }
@@ -666,60 +675,6 @@ public class ComparisonResultTests
         }
     }
 
-    [Test]
-    public void HasUnresolvedConflicts_ReturnsTrueWhenConflictsWithNoAction()
-    {
-        var root = new DirectoryComparison("root", "");
-        root.Files.Add(
-            new("a.txt", "a.txt")
-            {
-                Status = ComparisonStatus.Conflict,
-                Action = SyncAction.None,
-            });
-
-        var result = new ComparisonResult("C:\\Left", "C:\\Right", root);
-        Assert.That(result.HasUnresolvedConflicts(), Is.True);
-
-        root.Files[0].Action = SyncAction.CopyToRight;
-        Assert.That(result.HasUnresolvedConflicts(), Is.False);
-    }
-
-    [Test]
-    public void MirrorCount_CountsDirDeleteOnce_NotNestedFiles()
-    {
-        var root = new DirectoryComparison("root", "");
-        root.Files.Add(
-            new("keep.txt", "keep.txt")
-            {
-                Status = ComparisonStatus.LeftOnly,
-            });
-
-        var extra = new DirectoryComparison("extra", "extra")
-        {
-            Status = ComparisonStatus.RightOnly,
-        };
-
-        extra.Files.Add(
-            new("nested.txt", "extra\\nested.txt")
-            {
-                Status = ComparisonStatus.RightOnly,
-            });
-
-        root.SubDirectories.Add(extra);
-
-        var result = new ComparisonResult("C:\\Left", "C:\\Right", root);
-        result.ApplyMode(SyncMode.LeftToRight, true);
-        var planned = result.CountPlannedActions();
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(planned.NewCopies, Is.EqualTo(1));
-            Assert.That(planned.Deletes, Is.Zero);
-            Assert.That(planned.DirDeletes, Is.EqualTo(1));
-            Assert.That(planned.Total, Is.EqualTo(2));
-        }
-    }
-
     [TestCase(SyncMode.LeftToRight, ComparisonStatus.RightOnly, SyncAction.DeleteRight)]
     [TestCase(SyncMode.RightToLeft, ComparisonStatus.LeftOnly, SyncAction.DeleteLeft)]
     public void Mirror_DeletesOppositeSideOnlyItems(SyncMode mode, ComparisonStatus orphanStatus, SyncAction expected)
@@ -798,6 +753,7 @@ public class ComparisonResultTests
         root.SubDirectories.Add(sub);
 
         var result = new ComparisonResult("C:\\Left", "C:\\Right", root);
+
         var count = result.ResolveAllConflicts(SyncAction.CopyToRight);
 
         using (Assert.EnterMultipleScope())
@@ -809,7 +765,6 @@ public class ComparisonResultTests
             Assert.That(root.Files[3].Action, Is.EqualTo(SyncAction.Skip));
             Assert.That(root.Files[4].Action, Is.EqualTo(SyncAction.CopyToRight));
             Assert.That(sub.Files[0].Action, Is.EqualTo(SyncAction.CopyToRight));
-            Assert.That(result.HasUnresolvedConflicts(), Is.False);
         }
     }
 

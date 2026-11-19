@@ -49,12 +49,13 @@ public sealed class CleanupViewModelTests
     {
         var service = new CleanupService();
         using var monitor = TestDiagnostics.Monitor();
-        var vm = CreateViewModel(service, monitor);
         var missingPath = Path.Combine(_root, "absent");
         var failingPath = Path.Combine(_root, "broken");
         Directory.CreateDirectory(failingPath);
 
-        vm.UseTestBackend(
+        var vm = CreateViewModel(
+            service,
+            monitor,
             minAge =>
             [
                 Target("Missing", "Отсутствующий", missingPath, minAge),
@@ -98,12 +99,13 @@ public sealed class CleanupViewModelTests
 
         var service = new CleanupService();
         using var monitor = TestDiagnostics.Monitor();
-        var vm = CreateViewModel(service, monitor, initialMinAgeHours: 1);
         var firstPassStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseFirstPass = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var pauseFirstPass = true;
 
-        vm.UseTestBackend(
+        var vm = CreateViewModel(
+            service,
+            monitor,
             minAge => [Target("AgeTarget", "Временные файлы", directory, minAge)],
             async (target, token) =>
             {
@@ -115,7 +117,8 @@ public sealed class CleanupViewModelTests
                 }
 
                 return await service.MeasureAsync(target, token);
-            });
+            },
+            initialMinAgeHours: 1);
 
         var run = vm.RefreshCommand.ExecuteAsync(null);
         await firstPassStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
@@ -126,7 +129,6 @@ public sealed class CleanupViewModelTests
         var row = vm.Targets.Single();
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(row.Model.MinimumAge, Is.EqualTo(TimeSpan.FromHours(24)));
             Assert.That(row.IsMeasured, Is.True);
             Assert.That(row.SizeBytes, Is.EqualTo(1024));
             Assert.That(vm.TotalBytes, Is.EqualTo(1024));
@@ -156,12 +158,13 @@ public sealed class CleanupViewModelTests
         var service = new CleanupService();
         using var monitor = TestDiagnostics.Monitor();
         var dialogs = new AutoRunCleanupDialogs();
-        var vm = CreateViewModel(service, monitor, dialogs: dialogs);
         var remeasureStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var blockRemeasure = new TaskCompletionSource<CleanupMeasurement>(TaskCreationOptions.RunContinuationsAsynchronously);
         var blockNextMeasure = false;
 
-        vm.UseTestBackend(
+        var vm = CreateViewModel(
+            service,
+            monitor,
             minAge => [Target("PostClean", "Кэш приложения", directory, minAge)],
             async (target, token) =>
             {
@@ -172,7 +175,8 @@ public sealed class CleanupViewModelTests
                 }
 
                 return await service.MeasureAsync(target, token);
-            });
+            },
+            dialogs: dialogs);
 
         await vm.RefreshCommand.ExecuteAsync(null);
         vm.Targets.Single().IsSelected = true;
@@ -216,13 +220,14 @@ public sealed class CleanupViewModelTests
 
         var service = new CleanupService();
         using var monitor = TestDiagnostics.Monitor();
-        var vm = CreateViewModel(service, monitor);
         var pause = true;
         var calls = 0;
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var blocked = new TaskCompletionSource<CleanupMeasurement>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        vm.UseTestBackend(
+        var vm = CreateViewModel(
+            service,
+            monitor,
             minAge => [Target("InitialLoad", "Кэш Windows", directory, minAge)],
             async (target, token) =>
             {
@@ -263,6 +268,8 @@ public sealed class CleanupViewModelTests
     private static CleanupViewModel CreateViewModel(
         CleanupService service,
         PerformanceMonitor monitor,
+        Func<TimeSpan, IReadOnlyList<CleanupTarget>> catalog,
+        Func<CleanupTarget, CancellationToken, Task<CleanupMeasurement>> measure,
         int initialMinAgeHours = 24,
         IDialogService? dialogs = null)
     {
@@ -278,7 +285,6 @@ public sealed class CleanupViewModelTests
         var notifier = new ToastNotifier(new ToastHostViewModel(), new ShellPreferences(settings));
 
         return new(
-            service,
             factory,
             dialogs ?? new NoopDialogs(),
             new ModalHostViewModel(),
@@ -286,7 +292,9 @@ public sealed class CleanupViewModelTests
             settings,
             dispatcher,
             notifier,
-            NullLogger<CleanupViewModel>.Instance);
+            NullLogger<CleanupViewModel>.Instance,
+            catalog,
+            measure);
     }
 
     private static CleanupTarget Target(string id, string name, string path, TimeSpan minAge)

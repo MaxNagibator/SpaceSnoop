@@ -11,8 +11,6 @@ public sealed class ToastNotifier
     private Action? _lastUndo;
     private ToastViewModel? _lastUndoToast;
 
-    public bool CanUndo => _lastUndo is not null;
-
     public ToastNotifier(ToastHostViewModel toasts, ShellPreferences prefs)
     {
         _toasts = toasts;
@@ -64,24 +62,6 @@ public sealed class ToastNotifier
 
         toast = _toasts.Show(message, severity, null, UndoCaption, undo);
         _lastUndoToast = toast;
-    }
-
-    public bool UndoLast()
-    {
-        if (_lastUndoToast is { ActionCommand: { } command } toast && command.CanExecute(toast))
-        {
-            command.Execute(toast);
-            return true;
-        }
-
-        if (_lastUndo is not { } undo)
-        {
-            return false;
-        }
-
-        ClearUndo();
-        undo();
-        return true;
     }
 
     private void OnToastsChanged(object? sender, NotifyCollectionChangedEventArgs e)

@@ -3,63 +3,44 @@
 namespace SpaceSnoop.Tests;
 
 [TestFixture]
-[NonParallelizable]
 public class StorageMediaTests
 {
     private static readonly TimeSpan Ceiling = TimeSpan.FromSeconds(10);
 
-    private Func<string, StorageKind> _originalProbe = null!;
-
-    [SetUp]
-    public void SetUp()
-    {
-        _originalProbe = StorageMedia.Probe;
-        StorageMedia.ResetCache();
-    }
-
-    [TearDown]
-    public void TearDown()
-    {
-        StorageMedia.Probe = _originalProbe;
-        StorageMedia.ResetCache();
-    }
-
     [Test]
     public async Task Повторные_проверки_медленного_тома_делят_одну_пробу_в_полёте()
     {
-        using var entered = new ManualResetEventSlim();
-        using var release = new ManualResetEventSlim();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var calls = 0;
+        var timeout = TimeSpan.FromMilliseconds(50);
 
-        StorageMedia.Probe = _ =>
+        var probe = new StorageMedia.VolumeProbe(
+            _ =>
+            {
+                Interlocked.Increment(ref calls);
+                entered.TrySetResult();
+                release.Task.GetAwaiter().GetResult();
+                return StorageKind.Rotational;
+            });
+
+        try
         {
-            Interlocked.Increment(ref calls);
-            entered.Set();
-            release.Wait(Ceiling);
-            return StorageKind.Rotational;
-        };
+            var first = probe.LimitParallelismAsync(@"Z:\first", 8, timeout);
+            await entered.Task.WaitAsync(Ceiling);
 
-        var first = StorageMedia.LimitParallelismAsync(@"Z:\first", 8, TimeSpan.FromMilliseconds(50));
-        Assert.That(entered.Wait(Ceiling), Is.True, "проба носителя так и не началась");
-
-        var firstResult = await first;
-        var secondResult = await StorageMedia.LimitParallelismAsync(@"z:\second", 8, TimeSpan.FromMilliseconds(50));
-        var concurrentDetect = Task.Run(() => StorageMedia.Detect(@"Z:\third"));
-
-        Assert.That(Volatile.Read(ref calls), Is.EqualTo(1));
-
-        release.Set();
-
-        var detectResult = await concurrentDetect;
-        var afterRelease = await StorageMedia.LimitParallelismAsync(@"Z:\fourth", 8, TimeSpan.FromMilliseconds(50));
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(firstResult, Is.EqualTo(8));
-            Assert.That(secondResult, Is.EqualTo(8));
-            Assert.That(detectResult, Is.EqualTo(StorageKind.Rotational));
-            Assert.That(afterRelease, Is.EqualTo(1));
-            Assert.That(Volatile.Read(ref calls), Is.EqualTo(1));
+            Assert.That(await first.WaitAsync(Ceiling), Is.EqualTo(8));
+            Assert.That(await probe.LimitParallelismAsync(@"z:\second", 8, timeout).WaitAsync(Ceiling), Is.EqualTo(8));
         }
+        finally
+        {
+            release.SetResult();
+        }
+
+        var detected = await Task.Run(() => probe.Detect(@"Z:\third")).WaitAsync(Ceiling);
+
+        Assert.That(detected, Is.EqualTo(StorageKind.Rotational));
+        Assert.That(await probe.LimitParallelismAsync(@"Z:\fourth", 8, timeout).WaitAsync(Ceiling), Is.EqualTo(1));
+        Assert.That(Volatile.Read(ref calls), Is.EqualTo(1));
     }
 }

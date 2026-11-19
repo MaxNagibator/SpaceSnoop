@@ -210,18 +210,30 @@ public sealed class DotNetCleanViewModelTests
         vm.ProjectPath = _project;
         vm.IsTrusted = true;
         var inspect = vm.InspectCommand.ExecuteAsync(null);
-        await started.Task;
-        Assert.Multiple(() =>
+        try
         {
-            Assert.That(parent.IsBusy, Is.True);
-            Assert.That(parent.RefreshCommand.CanExecute(null), Is.False);
-            Assert.That(workloads.IsHostBusy, Is.True);
-            Assert.That(projects.IsHostBusy, Is.True);
-            Assert.That(parent.CancelCommand, Is.SameAs(vm.CancelCommand));
-        });
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.Multiple(() =>
+            {
+                Assert.That(parent.IsBusy, Is.True);
+                Assert.That(parent.RefreshCommand.CanExecute(null), Is.False);
+                Assert.That(workloads.InspectCommand.CanExecute(null), Is.False);
+                Assert.That(projects.FindCommand.CanExecute(null), Is.False);
+            });
 
-        vm.CancelCommand!.Execute(null);
-        await inspect;
+            Assert.That(parent.CancelCommand?.CanExecute(null), Is.True);
+            parent.CancelCommand!.Execute(null);
+            await inspect.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.That(vm.StatusText, Is.EqualTo("Проверка отменена."));
+        }
+        finally
+        {
+            if (!inspect.IsCompleted)
+            {
+                vm.CancelCommand?.Execute(null);
+                await inspect;
+            }
+        }
     }
 
     [Test]

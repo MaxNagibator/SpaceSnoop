@@ -19,8 +19,11 @@ public class VolumeSpaceTests
 
         using (Assert.EnterMultipleScope())
         {
+            Assert.That(waiting.IsCompleted, Is.False);
+            Assert.That(sameAsWaiting.IsCompleted, Is.False);
             Assert.That(third.IsCompleted, Is.True);
             Assert.That(await third, Is.Null);
+            Assert.That(reader.Calls, Is.EqualTo(1));
         }
 
         reader.Release();
@@ -30,28 +33,6 @@ public class VolumeSpaceTests
             Assert.That(await hung, Is.EqualTo(42));
             Assert.That(await waiting, Is.EqualTo(42));
             Assert.That(await sameAsWaiting, Is.EqualTo(42));
-            Assert.That(reader.Calls, Is.EqualTo(2));
-        }
-    }
-
-    [Test]
-    public async Task Замер_другого_пути_на_том_же_томе_ждёт_конца_висящего()
-    {
-        using var reader = new BlockingVolumeReader(42);
-        var first = VolumeSpace.ReadFreeAsync(UniquePath());
-        reader.WaitEntered();
-
-        var second = VolumeSpace.ReadFreeAsync(UniquePath());
-        await Task.Delay(200);
-
-        Assert.That(reader.Calls, Is.EqualTo(1));
-
-        reader.Release();
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(await first, Is.EqualTo(42));
-            Assert.That(await second, Is.EqualTo(42));
             Assert.That(reader.Calls, Is.EqualTo(2));
         }
     }

@@ -128,8 +128,7 @@ public class UpdateCheckTests
             - Исправлена синхронизация
             """;
 
-        Assert.That(ReleaseChangelog.ExtractChanges(body), Is.EqualTo("- Добавлена карта\r\n  Карта теперь рисуется пиксельным буфером.\r\n- Исправлена синхронизация"));
-        var items = ReleaseChangelog.ExtractChangeItems(body);
+        var items = ReleaseChangelog.ExtractChangeGroups(body).Single().Items;
 
         using (Assert.EnterMultipleScope())
         {
@@ -166,7 +165,7 @@ public class UpdateCheckTests
             **Полный список:** https://github.com/x/y/compare/v2.8.70...v2.8.71
             """;
 
-        var items = ReleaseChangelog.ExtractChangeItems(body);
+        var items = ReleaseChangelog.ExtractChangeGroups(body).Single().Items;
 
         using (Assert.EnterMultipleScope())
         {
@@ -324,7 +323,7 @@ public class UpdateCheckTests
             - Второй пункт
             """;
 
-        var items = ReleaseChangelog.ExtractChangeItems(body);
+        var items = ReleaseChangelog.ExtractChangeGroups(body).Single().Items;
 
         using (Assert.EnterMultipleScope())
         {
@@ -342,11 +341,10 @@ public class UpdateCheckTests
             Вторая строка.
             """;
 
-        var items = ReleaseChangelog.ExtractChangeItems(body);
+        var items = ReleaseChangelog.ExtractChangeGroups(body).Single().Items;
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(ReleaseChangelog.ExtractChanges(body), Is.EqualTo("Просто текст без заголовков.\r\nВторая строка."));
             Assert.That(items, Has.Count.EqualTo(1));
             Assert.That(items[0].Summary, Is.EqualTo("Просто текст без заголовков."));
             Assert.That(items[0].Details, Is.EqualTo(["Вторая строка."]));
@@ -368,8 +366,7 @@ public class UpdateCheckTests
             Скачиваний: [![всего](badge)](url)
             """;
 
-        Assert.That(ReleaseChangelog.ExtractChanges(body), Is.Empty);
-        Assert.That(ReleaseChangelog.ExtractChangeItems(body), Is.Empty);
+        Assert.That(ReleaseChangelog.ExtractChangeGroups(body), Is.Empty);
     }
 
     [Test]
@@ -389,7 +386,6 @@ public class UpdateCheckTests
             """;
 
         var groups = ReleaseChangelog.ExtractChangeGroups(body);
-        var items = ReleaseChangelog.ExtractChangeItems(body);
 
         using (Assert.EnterMultipleScope())
         {
@@ -402,19 +398,12 @@ public class UpdateCheckTests
             Assert.That(groups[1].Title, Is.EqualTo("Очистка и разработка"));
             Assert.That(groups[1].Items, Has.Count.EqualTo(1));
             Assert.That(groups[1].Items[0].Summary, Is.EqualTo("В «Очистке» появился раздел «Разработка»."));
-
-            Assert.That(items, Has.Count.EqualTo(3));
-            Assert.That(items.Select(static item => item.Section), Is.EqualTo(["Сканирование и дерево", "Сканирование и дерево", "Очистка и разработка"]));
         }
     }
 
     [Test]
     public void Модальное_окно_обновления_строит_группы_и_пункты_без_обрезки_по_длине_и_с_глагольными_кнопками()
     {
-        var settings = new MemorySettings();
-        var preferences = new UpdatePreferences(settings);
-        var updater = new AppUpdateViewModel(preferences, settings, new NoopDialogs(), new StubShellLauncher(), NullLogger<AppUpdateViewModel>.Instance);
-
         var longParagraph = new string('А', 900);
         const string tailItem = "Выгрузку результата сканирования в JSON теперь можно остановить по кнопке или клавише Escape.";
 
@@ -437,11 +426,13 @@ public class UpdateCheckTests
             new("v99.9.0", "2026-11-09", groups.SelectMany(static g => g.Items).ToList(), "https://github.com/x/y/compare/v99.8.0...v99.9.0", groups),
         ];
 
-        updater.ApplyPendingForAutomation("v99.9.0", "SpaceSnoop-v99.9.0.exe", "https://github.com/x/y/releases/download/v99.9.0/SpaceSnoop-v99.9.0.exe", "https://github.com/x/y/releases/tag/v99.9.0", entries);
-        var withAsset = updater.BuildUpdateDialog();
-
-        updater.ApplyPendingForAutomation("v99.9.0", null, null, "https://github.com/x/y/releases/tag/v99.9.0", entries);
-        var withoutAsset = updater.BuildUpdateDialog();
+        var withAsset = ReleaseChangelog.BuildUpdateDialog(
+            "v99.9.0",
+            "SpaceSnoop-v99.9.0.exe",
+            "https://github.com/x/y/releases/download/v99.9.0/SpaceSnoop-v99.9.0.exe",
+            entries,
+            string.Empty);
+        var withoutAsset = ReleaseChangelog.BuildUpdateDialog("v99.9.0", null, null, entries, string.Empty);
 
         var plainText = ConfirmDialogViewModel.AsText(withAsset.Lines);
 

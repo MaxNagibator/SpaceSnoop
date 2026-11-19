@@ -76,7 +76,7 @@ public class ScanLookupTests
             var root = new DirectorySpace(directory.FullName, null, DateTime.Now, DateTime.Now);
             root.AddFile(new(filePath));
 
-            Assert.That(ScanLookup.Find([root], filePath), Is.TypeOf<FileSpace>());
+            Assert.That(ScanLookup.Find([root], filePath)?.AbsolutePath, Is.EqualTo(filePath));
         }
         finally
         {

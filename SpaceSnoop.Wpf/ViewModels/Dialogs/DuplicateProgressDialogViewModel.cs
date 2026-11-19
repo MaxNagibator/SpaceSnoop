@@ -7,8 +7,6 @@ public readonly record struct DuplicateRequest(
 
 public sealed class DuplicateProgressDialogViewModel : OperationDialogViewModelBase
 {
-    internal static readonly TimeSpan ProgressPollInterval = UiProgressPoller.DefaultInterval;
-
     private readonly DuplicateRequest _request;
     private readonly DuplicateFinder _finder;
     private readonly ILogger _logger;
@@ -42,7 +40,7 @@ public sealed class DuplicateProgressDialogViewModel : OperationDialogViewModelB
         _request = request;
         _finder = finder;
         _logger = logger;
-        _progressPoller = new(uiDispatcher, OnProgressTick, ProgressPollInterval);
+        _progressPoller = new(uiDispatcher, OnProgressTick);
 
         RootPath = request.Root.AbsolutePath;
         ThresholdText = $"от {SizeFormatter.Format(request.Options.MinSize)}";

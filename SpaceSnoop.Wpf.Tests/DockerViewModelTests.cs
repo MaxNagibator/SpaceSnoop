@@ -17,19 +17,23 @@ public sealed class DockerViewModelTests
         var vm = new DockerViewModel(
             IsolatedService(runner), new NoopDialogs(), new FakeUiDispatcher(), NullLogger<DockerViewModel>.Instance);
         var first = vm.EnsureLoadedAsync();
+        var second = Task.CompletedTask;
         try
         {
             await runner.Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
-            Assert.That(vm.ShowUnavailable, Is.False);
-            var second = vm.EnsureLoadedAsync();
-            Assert.That(second, Is.SameAs(first));
+            second = vm.EnsureLoadedAsync();
             Assert.That(second.IsCompleted, Is.False);
+            Assert.That(runner.Calls, Is.EqualTo(1));
         }
         finally
         {
-            runner.Completion.TrySetResult(new(0, string.Empty, string.Empty));
-            await first;
+            runner.Pause = false;
+            runner.Completion.TrySetResult(
+                Success("""{"Type":"Images","TotalCount":"1","Active":"0","Size":"1GB","Reclaimable":"1GB (100%)"}"""));
+            await Task.WhenAll(first, second);
         }
+
+        Assert.That(vm.Buckets.Select(bucket => bucket.Title), Does.Contain("Образы"));
     }
 
     [TestCase(false)]

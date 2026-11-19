@@ -153,7 +153,7 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator>? logger = null)
         return IsReparsePoint(directory, out _);
     }
 
-    internal static string ToEnumerationPath(string path)
+    private static string ToEnumerationPath(string path)
     {
         if (!Path.IsPathFullyQualified(path)
             || path.Contains('/')

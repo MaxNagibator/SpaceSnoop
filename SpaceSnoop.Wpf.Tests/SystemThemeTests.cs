@@ -103,14 +103,11 @@ public class SystemThemeTests
     }
 
     [Test]
-    public void Умолчание_темы_как_в_системе_и_стоит_первым_в_выборе()
+    public void Системная_тема_стоит_первой_в_выборе()
     {
-        Assert.Multiple(() =>
-        {
-            AppThemes.Register();
-            Assert.That(AppDefaults.ThemeDefault, Is.EqualTo(AppThemes.SystemKey));
-            Assert.That(ThemeManager.Themes.First().Key, Is.EqualTo(AppThemes.SystemKey));
-        });
+        AppThemes.Register();
+
+        Assert.That(ThemeManager.Themes.First().Key, Is.EqualTo(AppThemes.SystemKey));
     }
 
     [TestCase(AppThemes.LightKey)]

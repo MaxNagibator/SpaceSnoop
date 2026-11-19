@@ -30,8 +30,6 @@ public partial class BindingSmokeTests
         using var host = VisualTestHost.Show(window, 900, 600);
         var unavailable = ((StackPanel)((ScrollViewer)view.Content).Content)
             .Children.OfType<DockerUnavailableView>().Single();
-        var captureDirectory = ColdDockerDirectory();
-        var existedBefore = Directory.Exists(captureDirectory);
         try
         {
             VisualTestHost.Run(async () =>
@@ -64,10 +62,6 @@ public partial class BindingSmokeTests
                 Assert.That(vm.CanRun, Is.False);
                 SaveDockerFrame(window, $"failed-poll-{theme}");
             });
-            if (!TestContext.Parameters.Get("CaptureColdDocker", false) && !existedBefore)
-            {
-                Assert.That(Directory.Exists(captureDirectory), Is.False);
-            }
             Assert.That(sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, sink.Errors));
         }
         finally

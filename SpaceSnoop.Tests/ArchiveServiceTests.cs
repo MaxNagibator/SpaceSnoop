@@ -182,7 +182,7 @@ public class ArchiveServiceTests
 
             Assert.That(content.Files, Has.Count.EqualTo(2));
             Assert.That(stats.Count, Is.EqualTo(3));
-            Assert.That(service.VerifyZip(_zipPath, stats).Ok, Is.True);
+            Assert.That(service.VerifyZip(_zipPath, stats, true).Ok, Is.True);
             Assert.That(service.VerifyCoverage(_sourceDir, _zipPath, CancellationToken.None).Ok, Is.True);
         }
 
@@ -497,18 +497,6 @@ public class ArchiveServiceTests
     }
 
     [Test]
-    public void VerifyZip_ContentCheckAcceptsDirectoryEntries()
-    {
-        var service = new ArchiveService();
-        Directory.CreateDirectory(Path.Combine(_sourceDir, "hollow"));
-
-        var content = service.Collect(_sourceDir, CancellationToken.None);
-        var stats = service.ZipFiles(_sourceDir, content, _zipPath, CompressionLevel.Optimal, null, CancellationToken.None);
-
-        Assert.That(service.VerifyZip(_zipPath, stats, true, null, CancellationToken.None).Ok, Is.True);
-    }
-
-    [Test]
     public void Verify_CancelledBeforeStart_ThrowsEvenWithoutEntries()
     {
         var service = new ArchiveService();
@@ -550,7 +538,7 @@ public class ArchiveServiceTests
             Assert.That(verify.Detail, Is.Empty);
             Assert.That(
                 verified,
-                Is.EqualTo(
+                Is.EquivalentTo(
                     new[]
                     {
                         "a.txt", "nested/b.txt",

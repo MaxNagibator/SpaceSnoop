@@ -106,13 +106,8 @@ internal static partial class ReleaseChangelog
         return groups
             .Select(static group => new ReleaseChangeGroupViewModel(
                 group.Title,
-                group.Items.Select(item => new ReleaseChangeViewModel(item.Summary, item.Details, group.Title)).ToList()))
+                group.Items.Select(item => new ReleaseChangeViewModel(item.Summary, item.Details)).ToList()))
             .ToList();
-    }
-
-    internal static IReadOnlyList<ReleaseChangeViewModel> ExtractChangeItems(string? body)
-    {
-        return ExtractChangeGroups(body).SelectMany(static group => group.Items).ToList();
     }
 
     internal static string BuildReleaseNotes(JsonElement releases)
@@ -403,4 +398,4 @@ public sealed record ReleaseChangeGroupViewModel(string? Title, IReadOnlyList<Re
     public bool HasTitle => !string.IsNullOrWhiteSpace(Title);
 }
 
-public sealed record ReleaseChangeViewModel(string Summary, IReadOnlyList<string> Details, string? Section = null);
+public sealed record ReleaseChangeViewModel(string Summary, IReadOnlyList<string> Details);

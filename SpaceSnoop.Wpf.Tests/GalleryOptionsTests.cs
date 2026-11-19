@@ -1,11 +1,7 @@
 ﻿using KeepShell.Bootstrap;
-using KeepShell.Services.Platform;
 using KeepShell.Testing;
-using Microsoft.Extensions.Logging;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Bootstrap.Gallery;
-using SpaceSnoop.Wpf.Bootstrap.Schedule;
-using SpaceSnoop.Wpf.Bootstrap.Storage;
 
 namespace SpaceSnoop.Wpf.Tests;
 
@@ -249,76 +245,40 @@ public class GalleryOptionsTests
     }
 
     [Test]
-    public async Task Параллельные_запуски_галереи_получают_разные_корни_с_собственными_настройками_и_логами()
+    public async Task Параллельные_запуски_галереи_используют_разные_деревья_для_сканирования_и_сравнения()
     {
-        GalleryFixture? first = null;
-        GalleryFixture? second = null;
+        var first = Task.Run(GalleryFixtures.Create);
+        var second = Task.Run(GalleryFixtures.Create);
 
         try
         {
-            var created = await Task.WhenAll(
-                Task.Run(CreateIsolatedGalleryFixture),
-                Task.Run(CreateIsolatedGalleryFixture));
+            await Task.WhenAll(first, second);
+            var firstFixture = await first;
+            var secondFixture = await second;
+            var probe = Guid.NewGuid().ToString("N");
+            await File.WriteAllTextAsync(Path.Combine(firstFixture.Left, probe), "только в первом запуске");
 
-            first = created[0];
-            second = created[1];
-
-            WriteIsolatedGalleryLog(first);
-            WriteIsolatedGalleryLog(second);
-
-            Assert.Multiple(() =>
+            using (Assert.EnterMultipleScope())
             {
-                Assert.That(first.Root, Is.Not.EqualTo(second.Root));
-                Assert.That(File.Exists(Path.Combine(first.Root, TomlSettingsFile.PrimaryFileName)), Is.True);
-                Assert.That(File.Exists(Path.Combine(second.Root, TomlSettingsFile.PrimaryFileName)), Is.True);
-                Assert.That(Directory.GetFiles(Path.Combine(first.Root, AppStorage.LogsFolderName), "wpf-*.log"), Is.Not.Empty);
-                Assert.That(Directory.GetFiles(Path.Combine(second.Root, AppStorage.LogsFolderName), "wpf-*.log"), Is.Not.Empty);
-            });
+                Assert.That(firstFixture.Root, Is.Not.EqualTo(secondFixture.Root).IgnoreCase);
+                Assert.That(Directory.Exists(secondFixture.Left), Is.True);
+                Assert.That(File.Exists(Path.Combine(secondFixture.Left, probe)), Is.False);
+                Assert.That(firstFixture.Right, Is.Not.EqualTo(secondFixture.Right).IgnoreCase);
+                Assert.That(Directory.Exists(secondFixture.Right), Is.True);
+            }
         }
         finally
         {
-            DeleteIfExists(first?.Root);
-            DeleteIfExists(second?.Root);
+            DeleteIfCreated(first);
+            DeleteIfCreated(second);
         }
     }
 
-    private static GalleryFixture CreateIsolatedGalleryFixture()
+    private static void DeleteIfCreated(Task<GalleryFixture> fixture)
     {
-        var fixture = GalleryFixtures.Create();
-        var settingsPath = Path.Combine(fixture.Root, TomlSettingsFile.PrimaryFileName);
-
-        ISettingsStore settings = new SettingsStore(settingsPath);
-
-        try
+        if (fixture.IsCompletedSuccessfully && Directory.Exists(fixture.Result.Root))
         {
-            SyncProfileStore.Save(settings, GalleryFixtures.Profiles(fixture));
-            settings.SetDouble(SettingsKeys.FontScale, 1.25);
-        }
-        finally
-        {
-            settings.Close();
-        }
-
-        return fixture;
-    }
-
-    private static void WriteIsolatedGalleryLog(GalleryFixture fixture)
-    {
-        using var logging = KeepShellLogging.Bootstrap(
-            new()
-            {
-                LogsDirectory = Path.Combine(fixture.Root, AppStorage.LogsFolderName),
-                FileNamePrefix = AppInfo.LogFilePrefix,
-            });
-
-        logging.CreateLogger<GalleryOptionsTests>().LogInformation("Проверка изолированного журнала галереи");
-    }
-
-    private static void DeleteIfExists(string? root)
-    {
-        if (root is not null && Directory.Exists(root))
-        {
-            Directory.Delete(root, true);
+            Directory.Delete(fixture.Result.Root, true);
         }
     }
 }

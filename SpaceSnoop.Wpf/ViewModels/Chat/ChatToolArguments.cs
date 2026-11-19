@@ -4,7 +4,7 @@ namespace SpaceSnoop.Wpf.ViewModels.Chat;
 
 public static class ChatToolArguments
 {
-    public const int MaxValueLength = 120;
+    private const int MaxValueLength = 120;
 
     public static string Describe(string arguments)
     {

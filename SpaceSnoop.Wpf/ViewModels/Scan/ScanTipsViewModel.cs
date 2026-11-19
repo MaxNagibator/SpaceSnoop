@@ -25,8 +25,6 @@ public sealed partial class ScanTipsViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(Counter))]
     private ScanTip? _current;
 
-    public static IReadOnlyList<ScanTip> All => Tips;
-
     public bool IsVisible => Current is not null;
 
     public string Title => Current?.Title ?? string.Empty;

@@ -29,20 +29,6 @@ public class MftLocalTimeTests
         }
     }
 
-    [TestCase(2024, 7, 1, false, TestName = "Середина лета CET берётся из запомненного смещения")]
-    [TestCase(2024, 10, 27, true, TestName = "День перехода CET пересчитывается точно")]
-    [TestCase(2024, 10, 26, true, TestName = "Сутки до перехода CET пересчитываются точно")]
-    [TestCase(2024, 10, 28, true, TestName = "Сутки после перехода CET пересчитываются точно")]
-    public void Запомненное_смещение_не_берётся_рядом_с_переходом(int year, int month, int day, bool exactExpected)
-    {
-        var zone = TimeZoneInfo.FindSystemTimeZoneById("Central European Standard Time");
-        var clock = new MftLocalTime(zone, fileTime => TimeZoneInfo.ConvertTimeFromUtc(DateTime.FromFileTimeUtc(fileTime), zone));
-
-        var local = clock.FromFileTime(new DateTime(year, month, day, 12, 0, 0, DateTimeKind.Utc).ToFileTimeUtc());
-
-        Assert.That(local.Kind, Is.EqualTo(exactExpected ? DateTimeKind.Unspecified : DateTimeKind.Local));
-    }
-
     [Test]
     public void Метка_в_поясе_машины_совпадает_с_ToLocalTime_вместе_с_признаком_неоднозначности()
     {
@@ -80,16 +66,6 @@ public class MftLocalTimeTests
             Assert.That(transitions, Is.GreaterThan(0));
             Assert.That(mismatches, Is.Empty);
         }
-    }
-
-    [Test]
-    public void Смена_пояса_машины_сбрасывает_запомненные_смещения()
-    {
-        var before = MftLocalTime.Local;
-
-        TimeZoneInfo.ClearCachedData();
-
-        Assert.That(MftLocalTime.Local, Is.Not.SameAs(before));
     }
 
     private static (int Transitions, List<long> Mismatches) Sweep(

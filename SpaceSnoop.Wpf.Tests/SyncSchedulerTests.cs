@@ -25,6 +25,14 @@ public class SyncSchedulerTests
         Assert.That(ScheduleStatus.ParseEnabled(xml), Is.True);
     }
 
+    [TestCase(SyncMode.LeftToRight)]
+    [TestCase(SyncMode.RightToLeft)]
+    [TestCase(SyncMode.Bidirectional)]
+    public void Индекс_режима_обратим_маппингу_профиля(SyncMode mode)
+    {
+        Assert.That(HeadlessSync.MapMode(SyncProfile.IndexOfMode(mode)), Is.EqualTo(mode));
+    }
+
     [TestCase(0, SyncMode.LeftToRight)]
     [TestCase(1, SyncMode.RightToLeft)]
     [TestCase(2, SyncMode.Bidirectional)]

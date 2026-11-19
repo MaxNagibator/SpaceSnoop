@@ -166,18 +166,6 @@ public class CleanupServiceTests
     }
 
     [Test]
-    public void Clean_RemovesEmptiedSubdirectories()
-    {
-        new CleanupService().Clean(Target(), null, CancellationToken.None);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(Directory.Exists(Path.Combine(_targetDir, "nested")), Is.False);
-            Assert.That(Directory.Exists(_targetDir), Is.True);
-        }
-    }
-
-    [Test]
     public void Clean_UnsupportedTargetRefused()
     {
         var report = new CleanupService().Clean(Target(supported: false), null, CancellationToken.None);

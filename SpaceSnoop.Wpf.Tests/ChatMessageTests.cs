@@ -64,11 +64,11 @@ public class ChatMessageTests
     [Test]
     public void Длинное_значение_аргумента_обрезается()
     {
-        var path = new string('д', ChatToolArguments.MaxValueLength + 20);
+        var path = new string('д', 140);
 
         var text = ChatToolArguments.Describe($$"""{"path":"{{path}}"}""");
 
-        Assert.That(text, Is.EqualTo($"path: {new string('д', ChatToolArguments.MaxValueLength)}…"));
+        Assert.That(text, Is.EqualTo($"path: {new string('д', 120)}…"));
     }
 
     [TestCase("Нашёл виновника: node_modules на 12 ГБ.")]

@@ -85,9 +85,8 @@ public class ScanPreferencesTests
     {
         var preferences = new ScanPreferences(new MemorySettings());
 
-        Assert.That(preferences.ParallelismCeiling, Is.EqualTo(preferences.ProcessorCount * AppDefaults.ScanParallelismPerCore));
-        Assert.That(preferences.MaxParallelism, Is.EqualTo(Math.Min(preferences.ParallelismCeiling, AppDefaults.ScanParallelismDefaultCeiling)));
-        Assert.That(preferences.MaxParallelism, Is.EqualTo(preferences.DefaultParallelism));
+        Assert.That(preferences.ParallelismCeiling, Is.EqualTo(Environment.ProcessorCount * 2));
+        Assert.That(preferences.MaxParallelism, Is.EqualTo(Math.Min(Environment.ProcessorCount * 2, 16)));
     }
 
     [Test]
@@ -98,7 +97,7 @@ public class ScanPreferencesTests
 
         var preferences = new ScanPreferences(settings);
 
-        Assert.That(preferences.MaxParallelism, Is.EqualTo(preferences.ParallelismCeiling));
+        Assert.That(preferences.MaxParallelism, Is.EqualTo(Environment.ProcessorCount * 2));
     }
 
     [TestCase(0, 1)]
@@ -118,7 +117,7 @@ public class ScanPreferencesTests
     {
         var preferences = new ScanPreferences(new MemorySettings());
 
-        Assert.That(preferences.MftRootOnly, Is.EqualTo(AppDefaults.ScanMftRootOnlyDefault));
+        Assert.That(preferences.MftRootOnly, Is.True);
     }
 
     private static bool ReadMemoryFlag(ScanPreferences preferences, string key)

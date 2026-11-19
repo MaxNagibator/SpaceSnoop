@@ -61,26 +61,25 @@ public sealed class DockerRefreshThreadTests
                 : new(0, Usage, string.Empty);
         }
     }
+}
 
-    private sealed class DispatcherUiDispatcher(Dispatcher dispatcher) : IUiDispatcher
+internal sealed class DispatcherUiDispatcher(Dispatcher dispatcher) : IUiDispatcher
+{
+    public bool HasAccess => dispatcher.CheckAccess();
+
+    public void Invoke(Action action)
     {
-        public bool HasAccess => dispatcher.CheckAccess();
-
-        public void Invoke(Action action)
+        if (dispatcher.CheckAccess())
         {
-            if (dispatcher.CheckAccess())
-            {
-                action();
-
-                return;
-            }
-
-            dispatcher.BeginInvoke(action);
+            action();
+            return;
         }
 
-        public IUiTimer CreateTimer(TimeSpan interval, Action tick)
-        {
-            return new FakeUiTimer(interval, tick);
-        }
+        dispatcher.BeginInvoke(action);
+    }
+
+    public IUiTimer CreateTimer(TimeSpan interval, Action tick)
+    {
+        return new FakeUiTimer(interval, tick);
     }
 }

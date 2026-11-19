@@ -3,6 +3,7 @@ using SpaceSnoop.Wpf.Agent;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Bootstrap.Storage;
 using SpaceSnoop.Wpf.ViewModels.Chat;
+using System.Text.Json;
 
 namespace SpaceSnoop.Wpf.Tests;
 
@@ -65,21 +66,23 @@ public class ChatHistoryTests
         List<ChatConversationRecord> conversations =
         [
             Conversation("свежий", "Куда делось место?"),
-            .. Enumerable.Range(0, AppDefaults.AgentHistoryLimit + 5).Select(index => Conversation($"старый-{index}", "Вопрос")),
             new()
             {
                 Id = "пустой",
             },
+            .. Enumerable.Range(0, AppDefaults.AgentHistoryLimit + 5).Select(index => Conversation($"старый-{index}", "Вопрос")),
         ];
+        var store = new ChatHistoryStore(NullLogger<ChatHistoryStore>.Instance, _path);
+        store.Save(conversations);
 
-        var trimmed = ChatHistoryStore.Trim(conversations);
+        using var document = JsonDocument.Parse(File.ReadAllText(_path));
+        var savedIds = document.RootElement.GetProperty("conversations").EnumerateArray()
+            .Select(conversation => conversation.GetProperty("id").GetString())
+            .ToArray();
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(trimmed, Has.Count.EqualTo(AppDefaults.AgentHistoryLimit));
-            Assert.That(trimmed[0].Id, Is.EqualTo("свежий"));
-            Assert.That(trimmed.Exists(conversation => conversation.Id == "пустой"), Is.False);
-        }
+        Assert.That(savedIds, Is.EqualTo(conversations.Where(conversation => conversation.Id != "пустой")
+            .Select(conversation => conversation.Id)
+            .Take(AppDefaults.AgentHistoryLimit)));
     }
 
     [Test]
@@ -123,7 +126,7 @@ public class ChatHistoryTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(record.Backend, Is.EqualTo(AppDefaults.AgentBackendDefault));
+            Assert.That(record.Backend, Is.EqualTo(AgentBackendKind.Claude));
             Assert.That(record.SessionId, Is.EqualTo("old-session"));
         });
     }
@@ -147,7 +150,7 @@ public class ChatHistoryTests
             Assert.That(restored.Text, Is.EqualTo("Нашёл виновника"));
             Assert.That(restored.CostUsd, Is.EqualTo(0.0123));
             Assert.That(restored.Tokens, Is.EqualTo(4200));
-            Assert.That(restored.ToolCalls[0].Text, Is.EqualTo(AgentPrompt.Describe("scan_directory")));
+            Assert.That(restored.ToolCalls[0].Name, Is.EqualTo("scan_directory"));
             Assert.That(restored.ToolCalls[0].IsMutating, Is.False);
             Assert.That(restored.ToolCalls[1].IsMutating, Is.True);
         }

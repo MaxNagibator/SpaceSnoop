@@ -4,8 +4,6 @@ namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
 
 public sealed partial class ArchiveProgressDialogViewModel : OperationDialogViewModelBase
 {
-    internal static readonly TimeSpan ProgressPollInterval = UiProgressPoller.DefaultInterval;
-
     private readonly ArchiveRequest _request;
     private readonly ArchiveService _service;
     private readonly ILogger _logger;
@@ -55,7 +53,7 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
         _request = request;
         _service = service;
         _logger = logger;
-        _progressPoller = new(uiDispatcher, OnProgressTick, ProgressPollInterval);
+        _progressPoller = new(uiDispatcher, OnProgressTick);
 
         SourceName = Path.GetFileName(request.SourcePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
         SourceSize = $"≈ {SizeFormatter.Format(request.TotalBytes)} · ≈ {request.EstimatedFiles:N0} {Plural.Word(request.EstimatedFiles, "файл", "файла", "файлов")}";

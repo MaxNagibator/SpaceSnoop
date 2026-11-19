@@ -1,12 +1,5 @@
 ﻿namespace SpaceSnoop.Wpf.Views;
 
-public enum CompactSlot
-{
-    None = 0,
-    First = 1,
-    Second = 2,
-}
-
 public sealed class CompactWrapPanel : WrapPanel
 {
     public static readonly DependencyProperty SingleLineProperty = DependencyProperty.Register(
@@ -58,7 +51,7 @@ public sealed class CompactWrapPanel : WrapPanel
         element.SetValue(KeepProperty, value);
     }
 
-    public static CompactSlot[] Plan(double available, IReadOnlyList<double> widths, IReadOnlyList<bool> optional, IReadOnlyList<bool> keep)
+    private static CompactSlot[] Plan(double available, IReadOnlyList<double> widths, IReadOnlyList<bool> optional, IReadOnlyList<bool> keep)
     {
         var slots = new CompactSlot[widths.Count];
         Array.Fill(slots, CompactSlot.First);
@@ -217,6 +210,13 @@ public sealed class CompactWrapPanel : WrapPanel
         child.Arrange(new(x, y, fitted, height));
 
         return fitted;
+    }
+
+    private enum CompactSlot
+    {
+        None = 0,
+        First = 1,
+        Second = 2,
     }
 
     private static void Reveal(UIElementCollection children, Func<int, bool> shown)

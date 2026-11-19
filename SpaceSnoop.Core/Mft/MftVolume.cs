@@ -26,8 +26,6 @@ internal sealed class MftFileVolume : IMftVolume
 
     private SafeFileHandle? _buffered;
 
-    internal bool Downgraded => Volatile.Read(ref _buffered) is not null;
-
     private MftFileVolume(SafeFileHandle unbuffered, string path, string name)
     {
         _unbuffered = unbuffered;

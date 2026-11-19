@@ -31,6 +31,7 @@ public class MftRehomeImageTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(table.Entries[5].Parent, Is.EqualTo(5));
+            Assert.That(links.FirstChild[start], Is.EqualTo(30));
             Assert.That(table.Entries[30].Exists, Is.True);
             Assert.That(table.Statistics.Rehomed, Is.Zero);
             Assert.That(table.Statistics.Detached, Is.Zero);

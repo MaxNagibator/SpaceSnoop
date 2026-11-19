@@ -77,18 +77,6 @@ public class PerformanceTests
         });
     }
 
-    [Test]
-    public void Время_старта_переживает_первую_публикацию_снимка()
-    {
-        using var monitor = TestDiagnostics.Monitor();
-
-        monitor.ReportStartup(TimeSpan.FromSeconds(1.25));
-        monitor.Start();
-        monitor.Stop();
-
-        Assert.That(monitor.Snapshot.StartupSeconds, Is.EqualTo(1.25));
-    }
-
     [TestCase(0, 0, "0:00")]
     [TestCase(0, 75, "1:15")]
     [TestCase(1, 5, "1:00:05")]
@@ -534,24 +522,6 @@ public class PerformanceTests
             Assert.That(afterStop, Is.SameAs(page));
             Assert.That(stillBusy, Is.True);
             Assert.That(monitor.Snapshot.Phase, Is.Null);
-        });
-    }
-
-    [Test]
-    public void Остановка_не_оставляет_наблюдение_прежним()
-    {
-        using var monitor = TestDiagnostics.Monitor();
-
-        monitor.ReportStartup(TimeSpan.FromSeconds(2));
-        monitor.Start();
-        monitor.Stop();
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(monitor.IsRunning, Is.False);
-            Assert.That(monitor.Snapshot.SampleCount, Is.Zero);
-            Assert.That(monitor.Snapshot.CapturedAtUtc, Is.EqualTo(DateTime.MinValue));
-            Assert.That(monitor.Snapshot.StartupSeconds, Is.EqualTo(2));
         });
     }
 

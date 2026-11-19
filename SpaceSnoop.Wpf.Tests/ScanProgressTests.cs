@@ -76,14 +76,6 @@ public class ScanProgressTests
         Assert.That(ScanProgressViewModel.EstimateTotalBytes(new($@"{free}:\")), Is.Null);
     }
 
-    [TestCase(0, 0, ScanProgressViewModel.MeasuringText)]
-    [TestCase(3, 0, "0 байт")]
-    [TestCase(1, 1536, "1,5 КБ")]
-    public void Объём_до_первого_замера_не_выдаёт_себя_за_ноль(long files, long bytes, string expected)
-    {
-        Assert.That(ScanProgressViewModel.BytesText(files, bytes), Is.EqualTo(expected));
-    }
-
     [Test]
     public void Оценка_объёма_есть_только_у_корня_диска()
     {
@@ -232,7 +224,7 @@ public class ScanProgressTests
     }
 
     [Test]
-    public void Строка_хода_говорит_считаем_от_старта_до_первого_учтённого_файла()
+    public void Строка_хода_различает_отсутствие_замера_ноль_и_накопленный_объём()
     {
         var dispatcher = new FakeUiDispatcher();
         var viewModel = new ScanProgressViewModel(new(TestDiagnostics.Monitor()), dispatcher);
@@ -246,13 +238,18 @@ public class ScanProgressTests
 
         var beforeFiles = viewModel.ScanBytesText;
 
+        progress.AddFiles(1, 0);
+        timer.Tick();
+        var afterEmptyFile = viewModel.ScanBytesText;
+
         progress.AddFiles(1, 1536);
         timer.Tick();
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(atStart, Is.EqualTo(ScanProgressViewModel.MeasuringText));
-            Assert.That(beforeFiles, Is.EqualTo(ScanProgressViewModel.MeasuringText));
+            Assert.That(atStart, Is.EqualTo("считаем…"));
+            Assert.That(beforeFiles, Is.EqualTo("считаем…"));
+            Assert.That(afterEmptyFile, Is.EqualTo("0 байт"));
             Assert.That(viewModel.ScanBytesText, Is.EqualTo("1,5 КБ"));
         }
     }

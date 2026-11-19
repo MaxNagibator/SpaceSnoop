@@ -47,8 +47,8 @@ public class SyncPlanFreshnessStateTests
         }
     }
 
-    [TestCase(1, 0, false, TestName = "AfterSync_ReportWithErrors_IsPartial")]
-    [TestCase(0, 1, false, TestName = "AfterSync_ReportWithMismatches_IsPartial")]
+    [TestCase(2, 0, false, TestName = "AfterSync_ReportWithErrors_IsPartial")]
+    [TestCase(0, 3, false, TestName = "AfterSync_ReportWithMismatches_IsPartial")]
     [TestCase(0, 0, true, TestName = "AfterSync_CancelledWithReport_IsPartial")]
     public void AfterSync_IncompleteRun_IsPartiallyApplied(int errors, int mismatches, bool cancelled)
     {
@@ -73,6 +73,8 @@ public class SyncPlanFreshnessStateTests
             Assert.That(state.ErrorCount, Is.EqualTo(errors));
             Assert.That(state.MismatchCount, Is.EqualTo(mismatches));
             Assert.That(state.RefusalMessage, Does.Contain("исполнен частично"));
+            Assert.That(state.RefusalMessage, Does.Contain($"ошибок: {errors}, расхождений проверки: {mismatches}"));
+            Assert.That(state.RefusalMessage, Does.Contain("выполните сравнение заново"));
         }
     }
 
@@ -87,6 +89,8 @@ public class SyncPlanFreshnessStateTests
             Assert.That(state.Freshness, Is.EqualTo(SyncPlanFreshness.Interrupted));
             Assert.That(state.IsExecutable, Is.False);
             Assert.That(state.RefusalMessage, Does.Contain(expected));
+            Assert.That(state.RefusalMessage, Does.Not.Contain("ошибок:"));
+            Assert.That(state.RefusalMessage, Does.Contain("выполните сравнение заново"));
         }
     }
 

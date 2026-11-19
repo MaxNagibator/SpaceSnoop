@@ -72,11 +72,6 @@ internal static class MftLayout
         return true;
     }
 
-    public static List<MftRun> DecodeRuns(ReadOnlySpan<byte> data)
-    {
-        return DecodeRuns(data, out _);
-    }
-
     public static List<MftRun> DecodeRuns(ReadOnlySpan<byte> data, out bool truncated)
     {
         var runs = new List<MftRun>();

@@ -53,18 +53,6 @@ public class DiskSpaceCalculatorSkipLogTests
     }
 
     [Test]
-    public void Каждый_скан_получает_свой_стек()
-    {
-        var logger = new CapturingLogger<DiskSpaceCalculator>();
-        var calculator = new DiskSpaceCalculator(logger);
-
-        calculator.Calculate(new(_root));
-        calculator.Calculate(new(_root));
-
-        Assert.That(logger.Entries.Count(entry => entry.Exception is not null), Is.EqualTo(2));
-    }
-
-    [Test]
     public void Сравнение_пишет_стек_один_раз_и_итог_числом()
     {
         var right = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), $"SpaceSnoopSkipLogRight_{Guid.NewGuid():N}"));
@@ -100,19 +88,24 @@ public class DiskSpaceCalculatorSkipLogTests
     {
         var logger = new CapturingLogger<DiskSpaceCalculator>();
         var calculator = new DiskSpaceCalculator(logger);
-        var progress = new ScanProgress();
 
-        _ = multithreaded
-            ? calculator.CalculateMultithreaded(new(_root), 4, progress, CancellationToken.None)
-            : calculator.Calculate(new(_root), progress, CancellationToken.None);
-
-        var skips = logger.Entries.Where(entry => entry.Level == LogLevel.Warning).ToList();
-
-        using (Assert.EnterMultipleScope())
+        for (var scan = 0; scan < 2; scan++)
         {
-            Assert.That(progress.CreateSnapshot().DirectoriesFailed, Is.EqualTo(LockedCount));
-            Assert.That(skips, Has.Count.EqualTo(LockedCount));
-            Assert.That(skips.Count(entry => entry.Exception is not null), Is.EqualTo(1));
+            var progress = new ScanProgress();
+            var previousEntries = logger.Entries.Count;
+
+            _ = multithreaded
+                ? calculator.CalculateMultithreaded(new(_root), 4, progress, CancellationToken.None)
+                : calculator.Calculate(new(_root), progress, CancellationToken.None);
+
+            var skips = logger.Entries.Skip(previousEntries).Where(entry => entry.Level == LogLevel.Warning).ToList();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(progress.CreateSnapshot().DirectoriesFailed, Is.EqualTo(LockedCount));
+                Assert.That(skips, Has.Count.EqualTo(LockedCount));
+                Assert.That(skips.Count(entry => entry.Exception is not null), Is.EqualTo(1));
+            }
         }
     }
 }

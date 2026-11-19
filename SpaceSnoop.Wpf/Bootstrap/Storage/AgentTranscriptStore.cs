@@ -53,16 +53,12 @@ public sealed class AgentTranscriptStore
         }
     }
 
-    internal static IReadOnlyList<string> Obsolete(IEnumerable<string> files, int keep)
-    {
-        return [.. files.OrderByDescending(Path.GetFileName, StringComparer.OrdinalIgnoreCase).Skip(keep)];
-    }
-
     private void DropObsolete()
     {
         var files = Directory.GetFiles(DirectoryPath, $"{FilePrefix}*{FileExtension}");
+        var obsolete = files.OrderByDescending(Path.GetFileName, StringComparer.OrdinalIgnoreCase).Skip(AppDefaults.AgentTranscriptLimit - 1);
 
-        foreach (var file in Obsolete(files, AppDefaults.AgentTranscriptLimit - 1))
+        foreach (var file in obsolete)
         {
             try
             {

@@ -8,8 +8,6 @@ namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
 
 public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewModelBase
 {
-    internal static readonly TimeSpan ProgressPollInterval = UiProgressPoller.DefaultInterval;
-
     private readonly bool _permanent;
     private readonly PerformanceMonitor _monitor;
     private readonly PerformanceOperations _operations;
@@ -93,7 +91,7 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
         _monitor = monitor;
         _operations = operations;
         _preferences = preferences;
-        _progressPoller = new(uiDispatcher, OnProgressTick, ProgressPollInterval);
+        _progressPoller = new(uiDispatcher, OnProgressTick);
         _logger = logger;
         _unmark = unmark;
         Items = new(items.Select(static item => new DeleteRowViewModel(item)));

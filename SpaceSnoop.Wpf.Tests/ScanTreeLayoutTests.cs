@@ -91,19 +91,17 @@ public class ScanTreeLayoutTests
         node.IsExpanded = true;
         _host.Settle();
         var branch = node.Children.Single();
-        Assert.That(branch.Children.Single().Space, Is.Null);
+        Assert.That(Descendants<TreeViewItem>(_tree).Any(item => item.DataContext is ScanNodeViewModel file && file.Name.StartsWith("sample-", StringComparison.Ordinal)), Is.False);
         branch.IsExpanded = true;
         _host.Settle();
-        Assert.That(
-            branch.Children.Select(child => child.Space),
-            Is.EqualTo(root.SubDirectories.Single().Files.OrderBy(file => file, sort)));
+        Assert.That(branch.Children, Has.Count.EqualTo(count));
+        Assert.That(branch.Children.Select(static child => child.Weight), Is.Ordered.Descending);
 
-        var collection = branch.Children;
         var opened = Descendants<TreeViewItem>(_tree).ToHashSet();
         var containers = new HashSet<TreeViewItem>(opened);
         var scroll = Descendants<ScrollViewer>(_tree).First();
         var row = opened.First(item => ReferenceEquals(item.DataContext, branch.Children[0]));
-        var height = ((FrameworkElement)row.Template.FindName("SelectionBd", row)).ActualHeight;
+        var height = row.ActualHeight;
         Assert.That(height, Is.GreaterThan(0));
         Assert.That(scroll.ViewportHeight, Is.GreaterThan(0).And.LessThan(scroll.ExtentHeight));
         Assert.That(VirtualizingPanel.GetScrollUnit(_tree), Is.EqualTo(ScrollUnit.Pixel));
@@ -123,7 +121,6 @@ public class ScanTreeLayoutTests
         var tail = Descendants<TreeViewItem>(_tree).ToList();
         containers.UnionWith(tail);
         var last = branch.Children[^1];
-        var lastChildren = last.Children;
         var selected = tail.Single(item => ReferenceEquals(item.DataContext, last));
         selected.IsSelected = true;
         last.MarkDeletedCommand.Execute(null);
@@ -137,7 +134,6 @@ public class ScanTreeLayoutTests
             Assert.That(_scan.SelectedNode, Is.SameAs(last));
             Assert.That(last.IsMarkedDeleted, Is.True);
             Assert.That(_scan.Marks.MarkedCount, Is.EqualTo(1));
-            Assert.That(last.Children, Is.Empty.And.SameAs(lastChildren));
         }
 
         scroll.ScrollToTop();
@@ -150,19 +146,15 @@ public class ScanTreeLayoutTests
         _host.Settle();
         branch.IsExpanded = true;
         _host.Settle();
-        Assert.That(branch.Children, Is.SameAs(collection));
-        Assert.That(last.IsMarkedDeleted, Is.True);
+        Assert.That(branch.Children.Single(child => ReferenceEquals(child.Space, last.Space)).IsMarkedDeleted, Is.True);
 
         sort.Field = ScanSortField.Name;
         sort.Invert = false;
         node.Resort();
         _host.Settle();
-        Assert.That(branch.Children, Is.SameAs(collection));
-        Assert.That(
-            branch.Children.Select(child => child.Space),
-            Is.EqualTo(root.SubDirectories.Single().Files.OrderBy(file => file, sort)));
-
-        Assert.That(branch.Children, Does.Contain(last));
+        Assert.That(branch.Children, Has.Count.EqualTo(count));
+        Assert.That(branch.Children.Select(static child => child.Name), Is.Ordered);
+        Assert.That(branch.Children.Single(child => ReferenceEquals(child.Space, last.Space)).IsMarkedDeleted, Is.True);
         TestContext.Out.WriteLine($"Детей {count}, контейнеров при открытии {opened.Count}, за прокрутку {containers.Count}, бюджет {budget}.");
     }
 

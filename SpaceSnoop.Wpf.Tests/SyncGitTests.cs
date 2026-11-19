@@ -52,21 +52,12 @@ public class SyncGitTests
         Assert.That(prompt.Choice, Is.EqualTo(GitFolderPromptChoice.Keep));
     }
 
-    [TestCase(".git", ExpectedResult = true)]
-    [TestCase(".git/config", ExpectedResult = true)]
-    [TestCase(@"sub\.git\HEAD", ExpectedResult = true)]
-    [TestCase(".GIT/objects", ExpectedResult = true)]
-    [TestCase("src/bin/app.dll", ExpectedResult = true)]
-    [TestCase(@"proj\obj\Debug\x.cache", ExpectedResult = true)]
-    [TestCase("src/.gitignore", ExpectedResult = false)]
-    [TestCase("src/binaries/main.cs", ExpectedResult = false)]
-    [TestCase("src/main.cs", ExpectedResult = false)]
-    public bool Группируемый_путь_распознаётся_по_сегменту(string relativePath)
-    {
-        return SyncRowsProjector.IsGroupedPath(relativePath, SyncRowsProjector.ParseGroupFolders(".git,bin,obj"));
-    }
-
+    [TestCase(".git", ExpectedResult = ".git")]
     [TestCase(".git/config", ExpectedResult = ".git")]
+    [TestCase(@"sub\.git\HEAD", ExpectedResult = ".git")]
+    [TestCase(".GIT/objects", ExpectedResult = ".git")]
+    [TestCase("src/.gitignore", ExpectedResult = null)]
+    [TestCase("src/binaries/main.cs", ExpectedResult = null)]
     [TestCase(@"src\bin\app.dll", ExpectedResult = "bin")]
     [TestCase("proj/obj/x.cache", ExpectedResult = "obj")]
     [TestCase(@"bin\.git\HEAD", ExpectedResult = "bin")]

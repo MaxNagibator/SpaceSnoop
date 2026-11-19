@@ -41,18 +41,6 @@ public class DiskSpaceCalculatorTests
         RemoveTree(_tempDir);
     }
 
-    [TestCase(0)]
-    [TestCase(-4)]
-    public void CalculateMultithreaded_ClampsNonPositiveDegree(int degree)
-    {
-        var calculator = new DiskSpaceCalculator();
-        var baseline = calculator.Calculate(new(_tempDir), CancellationToken.None);
-
-        var parallel = calculator.CalculateMultithreaded(new(_tempDir), degree, CancellationToken.None);
-
-        Assert.That(parallel.TotalSize, Is.EqualTo(baseline.TotalSize));
-    }
-
     [TestCase(1)]
     [TestCase(4)]
     public void CalculateMultithreaded_ReportsProgress(int degree)
@@ -74,31 +62,18 @@ public class DiskSpaceCalculatorTests
         }
     }
 
+    [TestCase(null)]
+    [TestCase(-4)]
+    [TestCase(0)]
     [TestCase(1)]
-    [TestCase(2)]
     [TestCase(8)]
-    [TestCase(64)]
-    public void CalculateMultithreaded_WithDegree_MatchesSingleThreaded(int degree)
-    {
-        var calculator = new DiskSpaceCalculator();
-        var baseline = calculator.Calculate(new(_tempDir), CancellationToken.None);
-
-        var parallel = calculator.CalculateMultithreaded(new(_tempDir), degree, CancellationToken.None);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(parallel.TotalSize, Is.EqualTo(baseline.TotalSize));
-            Assert.That(parallel.TotalFileCount, Is.EqualTo(baseline.TotalFileCount));
-            Assert.That(parallel.TotalDirectoryCount, Is.EqualTo(baseline.TotalDirectoryCount));
-        }
-    }
-
-    [Test]
-    public void Calculate_ComputesExpectedTotals()
+    public void Calculate_ComputesExpectedTotals(int? degree)
     {
         var calculator = new DiskSpaceCalculator();
 
-        var result = calculator.Calculate(new(_tempDir), CancellationToken.None);
+        var result = degree is int workers
+            ? calculator.CalculateMultithreaded(new(_tempDir), workers, CancellationToken.None)
+            : calculator.Calculate(new(_tempDir), CancellationToken.None);
 
         using (Assert.EnterMultipleScope())
         {
@@ -501,19 +476,25 @@ public class DiskSpaceCalculatorTests
     [TestCase(@"\\?\Volume{0b1c2d3e-0000-0000-0000-100000000000}\dir")]
     [TestCase(@"\\.\C:\dir")]
     [TestCase(@"\??\C:\dir")]
-    public void FromEnumerationPath_KeepsDevicePaths(string path)
+    public void ScanProgressSnapshot_KeepsDevicePaths(string path)
     {
-        Assert.That(DiskSpaceCalculator.FromEnumerationPath(path), Is.EqualTo(path));
+        var progress = new ScanProgress();
+        progress.EnterDirectory(path);
+
+        Assert.That(progress.CreateSnapshot().CurrentPath, Is.EqualTo(path));
     }
 
-    [TestCase(@"C:\")]
-    [TestCase(@"C:\Windows\servicing\Package~31bf3856ad364e35~amd64")]
-    [TestCase(@"\\server\share\dir")]
-    [TestCase(@"dir\sub")]
-    [TestCase(@"C:/dir/sub")]
-    public void FromEnumerationPath_RestoresPathGivenToEnumeration(string path)
+    [TestCase(@"\\?\C:\", @"C:\")]
+    [TestCase(@"\\?\C:\Windows\System32", @"C:\Windows\System32")]
+    [TestCase(@"\\?\UNC\server\share\dir", @"\\server\share\dir")]
+    [TestCase(@"C:\dir\sub", @"C:\dir\sub")]
+    [TestCase(@"\\server\share\dir", @"\\server\share\dir")]
+    public void ScanProgressSnapshot_StripsExtendedLengthPrefixes(string input, string expected)
     {
-        Assert.That(DiskSpaceCalculator.FromEnumerationPath(DiskSpaceCalculator.ToEnumerationPath(path)), Is.EqualTo(path));
+        var progress = new ScanProgress();
+        progress.EnterDirectory(input);
+
+        Assert.That(progress.CreateSnapshot().CurrentPath, Is.EqualTo(expected));
     }
 
     [Test]
@@ -580,21 +561,6 @@ public class DiskSpaceCalculatorTests
             Assert.That(path.CurrentPath, Is.EqualTo(@"C:\Windows"));
             Assert.That(path.IsStage, Is.False);
         }
-    }
-
-    [TestCase(@"C:\", @"\\?\C:\")]
-    [TestCase(@"C:\Windows\servicing\Package~31bf3856ad364e35~amd64", @"\\?\C:\Windows\servicing\Package~31bf3856ad364e35~amd64")]
-    [TestCase(@"\\server\share\dir", @"\\?\UNC\server\share\dir")]
-    [TestCase(@"\\?\C:\dir", @"\\?\C:\dir")]
-    [TestCase(@"\\?\UNC\server\share\dir", @"\\?\UNC\server\share\dir")]
-    [TestCase(@"\\.\C:\dir", @"\\.\C:\dir")]
-    [TestCase(@"\??\C:\dir", @"\??\C:\dir")]
-    [TestCase(@"dir\sub", @"dir\sub")]
-    [TestCase(@"C:dir", @"C:dir")]
-    [TestCase(@"C:/dir/sub", @"C:/dir/sub")]
-    public void ToEnumerationPath_PrefixesOnlyNormalizedFullPaths(string path, string expected)
-    {
-        Assert.That(DiskSpaceCalculator.ToEnumerationPath(path), Is.EqualTo(expected));
     }
 
     private static void RemoveTree(string path)

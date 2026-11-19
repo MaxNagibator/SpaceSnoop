@@ -9,59 +9,27 @@ namespace SpaceSnoop.Wpf.Tests;
 [Apartment(ApartmentState.STA)]
 public class CompactWrapPanelTests
 {
-    private const CompactSlot N = CompactSlot.None;
-    private const CompactSlot F = CompactSlot.First;
-    private const CompactSlot S = CompactSlot.Second;
-
-    private static readonly double[] Widths = [100, 80, 60, 70];
-    private static readonly bool[] Optional = [false, true, false, true];
-    private static readonly bool[] NoKeep = [false, false, false, false];
-
-    [TestCase(
-        double.PositiveInfinity,
-        new[]
-        {
-            F, F, F, F,
-        })]
-    [TestCase(
-        310,
-        new[]
-        {
-            F, F, F, F,
-        })]
-    [TestCase(
-        309,
-        new[]
-        {
-            F, F, F, N,
-        })]
-    [TestCase(
-        240,
-        new[]
-        {
-            F, F, F, N,
-        })]
-    [TestCase(
-        239,
-        new[]
-        {
-            F, N, F, N,
-        })]
-    [TestCase(
-        159,
-        new[]
-        {
-            F, N, N, N,
-        })]
-    [TestCase(
-        10,
-        new[]
-        {
-            F, N, N, N,
-        })]
-    public void В_одну_строку_первыми_уходят_необязательные_с_конца_потом_остальные_с_конца(double available, CompactSlot[] expected)
+    [TestCase(double.PositiveInfinity, true, true, true)]
+    [TestCase(310, true, true, true)]
+    [TestCase(309, true, true, false)]
+    [TestCase(239, false, true, false)]
+    [TestCase(159, false, false, false)]
+    public void В_одну_строку_первыми_уходят_необязательные_с_конца_потом_остальные_с_конца(
+        double available, bool showsSecond, bool showsThird, bool showsFourth)
     {
-        Assert.That(CompactWrapPanel.Plan(available, Widths, Optional, NoKeep), Is.EqualTo(expected));
+        var panel = CreateSummary(out var first, out var second, out var third, out var fourth);
+        CompactWrapPanel.SetOptional(fourth, true);
+
+        Layout(panel, available);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first.IsEnabled, Is.True);
+            Assert.That(second.IsEnabled, Is.EqualTo(showsSecond));
+            Assert.That(third.IsEnabled, Is.EqualTo(showsThird));
+            Assert.That(fourth.IsEnabled, Is.EqualTo(showsFourth));
+            Assert.That(panel.DesiredSize.Height, Is.EqualTo(20));
+        }
     }
 
     [TestCase(false, 2, true)]
@@ -177,50 +145,70 @@ public class CompactWrapPanelTests
         }
     }
 
-    [TestCase(
-        310,
-        new[]
-        {
-            F, F, F, F,
-        })]
-    [TestCase(
-        229,
-        new[]
-        {
-            F, N, N, F,
-        })]
-    [TestCase(
-        169,
-        new[]
-        {
-            F, N, F, S,
-        })]
-    [TestCase(
-        90,
-        new[]
-        {
-            F, N, N, S,
-        })]
-    public void Предупреждение_не_снимается_а_если_не_влезает_уходит_на_вторую_строку(double available, CompactSlot[] expected)
+    [TestCase(310, true, true, 0)]
+    [TestCase(229, false, false, 0)]
+    [TestCase(169, false, true, 20)]
+    [TestCase(90, false, false, 20)]
+    public void Предупреждение_не_снимается_а_если_не_влезает_уходит_на_вторую_строку(
+        double available, bool showsSecond, bool showsThird, double warningTop)
     {
-        bool[] optional = [false, true, false, false];
-        bool[] keep = [false, false, false, true];
+        var panel = CreateSummary(out var first, out var second, out var third, out var warning);
+        CompactWrapPanel.SetKeep(warning, true);
 
-        Assert.That(CompactWrapPanel.Plan(available, Widths, optional, keep), Is.EqualTo(expected));
+        Layout(panel, available);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first.IsEnabled, Is.True);
+            Assert.That(second.IsEnabled, Is.EqualTo(showsSecond));
+            Assert.That(third.IsEnabled, Is.EqualTo(showsThird));
+            Assert.That(warning.IsEnabled, Is.True);
+            Assert.That(LayoutInformation.GetLayoutSlot(warning).Top, Is.EqualTo(warningTop));
+        }
     }
 
     [Test]
     public void Скрытое_предупреждение_второй_строки_не_заводит()
     {
-        double[] widths = [100, 80, 60, 0];
-        bool[] keep = [false, false, false, true];
+        var panel = CreateSummary(out var first, out var second, out var third, out var warning);
+        CompactWrapPanel.SetKeep(warning, true);
+        warning.Visibility = Visibility.Collapsed;
 
-        Assert.That(
-            CompactWrapPanel.Plan(150, widths, NoKeep, keep),
-            Is.EqualTo(
-                new[]
-                {
-                    F, N, N, F,
-                }));
+        Layout(panel, 150);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(panel.DesiredSize.Height, Is.EqualTo(20));
+            Assert.That(first.IsEnabled, Is.True);
+            Assert.That(second.IsEnabled, Is.False);
+            Assert.That(third.IsEnabled, Is.False);
+        }
+    }
+
+    private static CompactWrapPanel CreateSummary(out Border first, out Border second, out Border third, out Border fourth)
+    {
+        first = new Border { Width = 100, Height = 20 };
+        second = new Border { Width = 80, Height = 20 };
+        third = new Border { Width = 60, Height = 20 };
+        fourth = new Border { Width = 70, Height = 20 };
+        CompactWrapPanel.SetOptional(second, true);
+
+        return new CompactWrapPanel
+        {
+            SingleLine = true,
+            Children =
+            {
+                first,
+                second,
+                third,
+                fourth,
+            },
+        };
+    }
+
+    private static void Layout(CompactWrapPanel panel, double available)
+    {
+        panel.Measure(new(available, double.PositiveInfinity));
+        panel.Arrange(new(panel.DesiredSize));
     }
 }

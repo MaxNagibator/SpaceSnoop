@@ -471,24 +471,6 @@ public class ScanReleaseTests
         }
     }
 
-    [Test]
-    public void Повторный_скан_без_пометок_не_ищет_их_в_прежнем_дереве()
-    {
-        var previous = Tree(Path.Combine(_root, "target"), "branch");
-        _scan.ApplyScanResult(previous, TimeSpan.FromSeconds(1), null, ScanNotes.ForTraversal(1));
-        previous.SubDirectories.Single().Delete();
-        var fresh = Tree(Path.Combine(_root, "target"), "branch");
-
-        var result = ScanTreeEditor.TransferMarks(_scan.Roots, fresh, false);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(result.Transferred, Is.Empty);
-            Assert.That(result.Lost, Is.Zero);
-            Assert.That(fresh.SubDirectories.Single().IsDeleted, Is.False);
-        }
-    }
-
     [TestCase(true, TestName = "Повторный скан переносит пометки на новое дерево и отбрасывает пропавшие пути при включённой настройке")]
     [TestCase(false, TestName = "Повторный скан переносит пометки на новое дерево и отбрасывает пропавшие пути при выключенной настройке")]
     public async Task Повторный_скан_переносит_пометки(bool release)

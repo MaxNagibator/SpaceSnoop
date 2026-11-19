@@ -163,8 +163,6 @@ public static class AgentPrompt
         "cleanup_run",
     ];
 
-    public static string System => Build(false, false);
-
     public static IReadOnlyList<string> Destructive => [.. DestructiveTools];
 
     public static IReadOnlyList<string> AllowedTools(bool mutations, bool duplicates)

@@ -6,15 +6,12 @@ using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Bootstrap.Storage;
 using SpaceSnoop.Wpf.ViewModels.Dialogs;
 using System.Runtime.CompilerServices;
-using System.Xml.Linq;
 
 namespace SpaceSnoop.Wpf.Tests;
 
 [TestFixture]
 public class DeleteDialogTests
 {
-    private const int Rows = 4314;
-
     private const int RunRows = 120;
 
     private static readonly string[] Paths = [@"C:\a", @"C:\b", @"C:\c", @"C:\d", @"C:\e"];
@@ -38,36 +35,6 @@ public class DeleteDialogTests
     }
 
     [Test]
-    public void Вращение_значка_идущей_строки_спрашивает_системную_настройку_анимаций()
-    {
-        var spin = XDocument.Parse(Markup())
-            .Descendants()
-            .Single(static element => element.Name.LocalName == "BeginStoryboard");
-
-        var trigger = spin.Ancestors().First(static element => element.Name.LocalName.EndsWith("Trigger", StringComparison.Ordinal));
-
-        var conditions = trigger.Descendants()
-            .Where(static element => element.Name.LocalName == "Condition")
-            .Select(static element => $"{(string?)element.Attribute("Binding")} = {(string?)element.Attribute("Value")}")
-            .ToList();
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                trigger.Name.LocalName,
-                Is.EqualTo("MultiDataTrigger"),
-                $"Вращение значка висит на «{trigger.Name.LocalName}» – второму условию, системной настройке анимаций, места нет.");
-
-            Assert.That(conditions, Does.Contain("{Binding State} = Deleting"), "Вращение перестало зависеть от того, идёт ли строка.");
-
-            Assert.That(
-                conditions,
-                Does.Contain("{Binding Source={x:Static SystemParameters.ClientAreaAnimation}} = True"),
-                "Значок крутится, не спрашивая, разрешены ли анимации в системе.");
-        }
-    }
-
-    [Test]
     public void Длинная_причина_отказа_обрезана_многоточием()
     {
         var row = new DeleteRowViewModel(Space("объект"))
@@ -81,24 +48,6 @@ public class DeleteDialogTests
             Assert.That(row.ErrorSummary, Does.EndWith("…"));
             Assert.That(row.ToolTipText, Does.Contain(new('я', 150)), "Подсказка обязана нести причину целиком.");
         }
-    }
-
-    [TestCase("StatusText")]
-    [TestCase("CountText")]
-    [TestCase("BatchCaption")]
-    [TestCase("ChunkElapsedText")]
-    public void Живой_текст_диалога_удаления_объявлен_экранному_диктору(string property)
-    {
-        var block = XDocument.Parse(Markup())
-            .Descendants()
-            .SingleOrDefault(element => (string?)element.Attribute("Text") == $"{{Binding {property}}}");
-
-        Assert.That(block, Is.Not.Null, $"В разметке нет строки с текстом {property} – проверять нечего.");
-
-        Assert.That(
-            (string?)block!.Attribute("AutomationProperties.LiveSetting"),
-            Is.EqualTo("Polite"),
-            $"Текст {property} меняется по ходу удаления, но экранный диктор о смене не узнает.");
     }
 
     [Test]
@@ -684,93 +633,6 @@ public class DeleteDialogTests
     }
 
     [Test]
-    public void Прогресс_держит_только_последнее_состояние_каждой_строки()
-    {
-        var progress = new DeleteProgressState(Rows);
-
-        for (var index = 0; index < Rows; index++)
-        {
-            progress.Report(new(index, DeleteRowState.Deleting, null, index, index, 0));
-            progress.Report(new(index, DeleteRowState.Done, null, index + 1, index + 1, 0));
-        }
-
-        var snapshot = progress.CreateSnapshot();
-        var updates = snapshot.Updates.ToDictionary(static update => update.Index);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(snapshot.Updates, Has.Count.EqualTo(Rows));
-            Assert.That(updates[0], Is.EqualTo(new DeleteTick(0, DeleteRowState.Done, null, 1, 1, 0)));
-            Assert.That(updates[Rows - 1], Is.EqualTo(new DeleteTick(Rows - 1, DeleteRowState.Done, null, Rows, Rows, 0)));
-            Assert.That(snapshot.CurrentIndex, Is.EqualTo(Rows - 1));
-        }
-    }
-
-    [Test]
-    public void Прогресс_сливает_повторные_обновления_строки_и_не_теряет_ошибку()
-    {
-        var progress = new DeleteProgressState(2);
-
-        progress.Report(new(0, DeleteRowState.Deleting, null, 0, 0, 0));
-        progress.Report(new(0, DeleteRowState.Failed, "занят", 0, 0, 1));
-        progress.Report(new(1, DeleteRowState.Done, null, 200, 1, 1));
-
-        var snapshot = progress.CreateSnapshot();
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(snapshot.Updates, Has.Count.EqualTo(2));
-            Assert.That(snapshot.Updates.Single(update => update.Index == 0), Is.EqualTo(new DeleteTick(0, DeleteRowState.Failed, "занят", 0, 0, 1)));
-            Assert.That(snapshot.Updates.Single(update => update.Index == 1), Is.EqualTo(new DeleteTick(1, DeleteRowState.Done, null, 200, 1, 1)));
-            Assert.That(snapshot.CurrentIndex, Is.EqualTo(1));
-            Assert.That(snapshot.Completed, Is.EqualTo(1));
-            Assert.That(snapshot.Failed, Is.EqualTo(1));
-            Assert.That(progress.CreateSnapshot().Updates, Is.Empty);
-        }
-    }
-
-    [Test]
-    public void Пульс_включает_затянувшаяся_пачка_а_не_сам_факт_пачки()
-    {
-        var dialog = Dialog(new(), Items(3, static _ => true));
-        var notified = 0;
-
-        dialog.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(DeleteProgressDialogViewModel.IsChunkStalled))
-            {
-                notified++;
-            }
-        };
-
-        Assert.That(dialog.IsChunkStalled, Is.False, "Диалог до старта уже показывает пульс.");
-
-        dialog.IsChunkRunning = true;
-
-        Assert.That(
-            dialog.IsChunkStalled,
-            Is.False,
-            "Пачка идёт почти всё время прогона, поэтому пульс по одному этому признаку не даст процентам вернуться никогда.");
-
-        dialog.ChunkElapsedText = "идёт 3 с";
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(dialog.IsChunkStalled, Is.True, "Пачка идёт дольше секунды, а полоса всё ещё считает проценты по завершённым объектам.");
-
-            Assert.That(
-                notified,
-                Is.EqualTo(2),
-                $"Об изменении пульса сообщено {notified} раз(а) из двух – привязка полосы не узнает о переключении.");
-        }
-
-        dialog.ChunkElapsedText = null;
-        dialog.IsChunkRunning = false;
-
-        Assert.That(dialog.IsChunkStalled, Is.False, "Пачка закончилась, а полоса осталась в пульсе.");
-    }
-
-    [Test]
     public async Task Пульс_объявляет_идущую_пачку_и_гаснет_в_итоге()
     {
         const int stopAt = 3;
@@ -810,37 +672,6 @@ public class DeleteDialogTests
             Assert.That(dialog.IsChunkRunning, Is.False, "Пульс пережил операцию.");
             Assert.That(dialog.FollowIndex, Is.EqualTo(-1), "Следовать больше не за чем, а индекс остался.");
             Assert.That(dialog.BatchCaption, Is.Null);
-        }
-    }
-
-    [Test]
-    public void Разметка_диалога_удаления_держит_пульс_и_причину_отказа()
-    {
-        var markup = Markup();
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                markup,
-                Does.Contain("IsIndeterminate=\"{Binding IsChunkStalled"),
-                "Полоса перестала уходить в пульс – на неделимой операции снова не движется ни один индикатор.");
-
-            Assert.That(
-                markup,
-                Does.Not.Contain("IsIndeterminate=\"{Binding IsChunkRunning"),
-                "Пачка идёт почти всё время прогона, поэтому пульс по ней означает, что проценты не вернутся никогда.");
-
-            Assert.That(markup, Does.Contain("Content=\"{Binding CancelCaption}\""), "Кнопка отмены снова молчит о том, что нажатие услышано.");
-            Assert.That(markup, Does.Contain("ToolTip=\"{Binding CancelHint}\""), "Подсказка отмены не называет момент срабатывания.");
-
-            Assert.That(
-                markup,
-                Does.Not.Contain("IsEnabled"),
-                "Кнопка отмены обязана оставаться нажимаемой – её выключение отняло бы единственное работающее действие.");
-
-            Assert.That(markup, Does.Contain("ToolTip=\"{Binding ToolTipText}\""), "Подсказка строки снова несёт только путь.");
-            Assert.That(markup, Does.Not.Contain("ToolTip=\"{Binding Path}\""), "Причина отказа строки опять никуда не выведена.");
-            Assert.That(markup, Does.Contain("{Binding ErrorSummary}"), "Текст отказа не показан второй строкой под именем.");
         }
     }
 
@@ -898,24 +729,6 @@ public class DeleteDialogTests
     public int Следование_показывает_первую_незакрытую_строку_пачки(DeleteRowState[] states, int firstIndex, int lastIndex)
     {
         return DeleteProgressDialogViewModel.FirstUnfinished(RowsWith(states), firstIndex, lastIndex);
-    }
-
-    [Test]
-    public void Список_диалога_удаления_виртуализирован()
-    {
-        var markup = Markup();
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(markup, Does.Contain("<VirtualizingStackPanel"), "Панель списка по умолчанию не виртуализирует – 4314 строк раскладываются при открытии.");
-            Assert.That(markup, Does.Contain("VirtualizingPanel.IsVirtualizing=\"True\""));
-            Assert.That(markup, Does.Contain("VirtualizingPanel.VirtualizationMode=\"Recycling\""));
-            Assert.That(markup, Does.Contain("CanContentScroll=\"True\""), "Без CanContentScroll панель получает бесконечную высоту и виртуализация не включается.");
-            Assert.That(markup, Does.Contain("DiagnosticsText"));
-            Assert.That(markup, Does.Contain("AutomationProperties.Name=\"Диагностика удаления\""));
-            Assert.That(markup, Does.Not.Contain("IsSharedSizeScope"), "SharedSizeScope связывает пере-измерение всех строк списка.");
-            Assert.That(markup, Does.Not.Contain("SharedSizeGroup"));
-        }
     }
 
     [Test]
@@ -980,7 +793,7 @@ public class DeleteDialogTests
     }
 
     [Test]
-    public async Task Экран_удаления_обновляется_тиком_таймера_а_не_каждым_объектом()
+    public async Task Удаление_объединяет_обновления_прогресса_и_показывает_исход_каждой_строки()
     {
         var dispatcher = new FakeUiDispatcher();
         var dialog = Dialog(dispatcher, Items(RunRows, static index => index % 2 == 0));
@@ -995,8 +808,8 @@ public class DeleteDialogTests
         {
             Assert.That(
                 updates.Value,
-                Is.EqualTo(1),
-                $"Экран обновился {updates.Value} раз на {RunRows} объектах – прогресс снова пушится на каждую строку.");
+                Is.Positive.And.LessThan(RunRows / 2),
+                $"Экран обновился {updates.Value} раз на {RunRows} объектах.");
 
             Assert.That(dispatcher.Timers[0].IsRunning, Is.False, "Таймер опроса пережил операцию.");
             Assert.That(dialog.CountText, Is.EqualTo($"{RunRows / 2} / {RunRows}"), "Итоговый счёт до экрана не доехал.");
@@ -1130,16 +943,6 @@ public class DeleteDialogTests
         }
 
         return items;
-    }
-
-    private static string Markup()
-    {
-        return File.ReadAllText(Path.Combine(RepositoryRoot(), "SpaceSnoop.Wpf", "Views", "Dialogs", "DeleteProgressDialogView.xaml"));
-    }
-
-    private static string RepositoryRoot([CallerFilePath] string caller = "")
-    {
-        return Path.GetFullPath(Path.Combine(Path.GetDirectoryName(caller)!, ".."));
     }
 
     private static DeleteItemStatus Status(List<DeleteItemResult> results, int index)

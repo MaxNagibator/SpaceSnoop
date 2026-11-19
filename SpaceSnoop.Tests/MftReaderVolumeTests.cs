@@ -86,9 +86,13 @@ public class MftReaderVolumeTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(table.Entries[20].Name, Is.EqualTo("огромный.iso"));
+            Assert.That(table.Entries[20].Parent, Is.EqualTo(MftLayout.RootRecord));
+            Assert.That(table.Entries[20].Names, Is.EqualTo(1));
             Assert.That(table.Entries[20].Size, Is.EqualTo(9_000_000_000));
             Assert.That(table.Entries[20].SizeKnown, Is.True);
+            Assert.That(table.Entries[28].Present, Is.False);
             Assert.That(table.Statistics.Extensions, Is.EqualTo(1));
+            Assert.That(table.Statistics.Nameless, Is.Zero);
         }
     }
 
@@ -295,17 +299,13 @@ public class MftReaderVolumeTests
 
         volume.ReadAt(offset, buffer);
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(buffer, Is.EqualTo(image.AsSpan(offset, length).ToArray()));
-            Assert.That(volume.Downgraded, Is.False);
-        }
+        Assert.That(buffer, Is.EqualTo(image.AsSpan(offset, length).ToArray()));
     }
 
-    [TestCase(8, 4, 4, 1, TestName = "Том из файла с кластером 4 КБ читается в один поток как образ в памяти")]
-    [TestCase(8, 4, 4, 4, TestName = "Том из файла с кластером 4 КБ читается в четыре потока как образ в памяти")]
-    [TestCase(1, 33, 31, 4, TestName = "Том из файла с кластером 512 Б читается в четыре потока как образ в памяти")]
-    public void Том_из_файла_читается_как_образ_в_памяти(int sectorsPerCluster, int first, int second, int threads)
+    [TestCase(8, 4, 4, 1, TestName = "Фрагментированный образ с кластером 4 КБ читается в один поток")]
+    [TestCase(8, 4, 4, 4, TestName = "Фрагментированный образ с кластером 4 КБ читается в четыре потока")]
+    [TestCase(1, 33, 31, 4, TestName = "Фрагментированный образ с кластером 512 Б читается в четыре потока")]
+    public void Том_из_файла_сохраняет_записи_разных_экстентов(int sectorsPerCluster, int first, int second, int threads)
     {
         var image = new MftVolumeBuilder(sectorsPerCluster: sectorsPerCluster)
             .Fragment(first)
@@ -315,7 +315,6 @@ public class MftReaderVolumeTests
             .Record(Records - 1, new MftRecordBuilder().FileName(MftLayout.RootRecord, 1, "последняя.bin").ResidentData(64))
             .Build(Records);
 
-        var expected = Read(image);
         using var file = new MftImageFile(image);
         using var volume = MftFileVolume.Open(file.Path, "T:");
 
@@ -323,11 +322,12 @@ public class MftReaderVolumeTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(table.Entries, Is.EqualTo(expected.Entries));
             Assert.That(table.Entries[20].Name, Is.EqualTo("во-втором-экстенте.bin"));
+            Assert.That(table.Entries[20].Size, Is.EqualTo(48));
+            Assert.That(table.Entries[Records - 1].Name, Is.EqualTo("последняя.bin"));
+            Assert.That(table.Entries[Records - 1].Size, Is.EqualTo(64));
             Assert.That(table.Statistics.RecordsScanned, Is.EqualTo(Records));
             Assert.That(table.Statistics.Damaged, Is.Zero);
-            Assert.That(volume.Downgraded, Is.False);
         }
     }
 

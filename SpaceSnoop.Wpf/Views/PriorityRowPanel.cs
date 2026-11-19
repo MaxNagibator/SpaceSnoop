@@ -4,7 +4,7 @@ public sealed class PriorityRowPanel : Panel
 {
     private double _tailNatural;
 
-    public static RowPlan Plan(double available, double fillMin, IReadOnlyList<double> optional, double tailMin, double tailMax)
+    private static RowPlan Plan(double available, double fillMin, IReadOnlyList<double> optional, double tailMin, double tailMax)
     {
         var kept = new bool[optional.Count];
         var used = 0d;
@@ -143,6 +143,6 @@ public sealed class PriorityRowPanel : Panel
 
         return Plan(available, MinOf(children[0]), optional, Math.Max(MinOf(children[^1]), _tailNatural), TailMax(children[^1]));
     }
-}
 
-public sealed record RowPlan(double FillWidth, IReadOnlyList<bool> Kept, double TailWidth);
+    private sealed record RowPlan(double FillWidth, IReadOnlyList<bool> Kept, double TailWidth);
+}

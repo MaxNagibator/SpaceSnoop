@@ -7,6 +7,7 @@ using MahApps.Metro.IconPacks;
 using Microsoft.Extensions.DependencyInjection;
 using SpaceSnoop.Core;
 using SpaceSnoop.Core.Cleanup;
+using SpaceSnoop.Core.Domain;
 using SpaceSnoop.Core.Duplicates;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Bootstrap.Gallery;
@@ -93,6 +94,17 @@ public partial class BindingSmokeTests
         VisualTestHost.Run(() => GalleryHost.ArrangeAsync(_services, _fixture));
 
         _sink = BindingErrorSink.Attach();
+
+        var probe = new TextBlock
+        {
+            DataContext = _shell,
+        };
+
+        probe.SetBinding(TextBlock.TextProperty, new Binding("НетТакогоСвойства"));
+
+        Settle();
+
+        Assert.That(_sink.Errors, Is.Not.Empty, "Сенсор ошибок биндинга молчит – остальные проверки этого набора ничего не значат.");
     }
 
     [OneTimeTearDown]
@@ -147,7 +159,6 @@ public partial class BindingSmokeTests
         Settle();
 
         var rail = Descendant<SettingsRail>(_window) ?? throw new InvalidOperationException("На странице настроек нет рейла разделов.");
-        var sections = _services.GetRequiredService<SettingsViewModel>().Sections;
 
         try
         {
@@ -164,11 +175,9 @@ public partial class BindingSmokeTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(reopened, Is.Not.SameAs(rail), "Страница вернулась тем же рейлом – регрессию проверять не на чем.");
-                Assert.That(reopened.Sections, Is.SameAs(sections), "Разделы у страницы новые – терять фильтр было негде.");
-                Assert.That(reopened.SearchText, Is.EqualTo("шнырь"), "Новый рейл затёр запрос, который держал список разделов.");
+                Assert.That(reopened.SearchText, Is.EqualTo("шнырь"), "После возврата потерян поисковый запрос.");
                 Assert.That(
-                    sections.Items.Where(section => section.IsVisible).Select(section => section.Key),
+                    reopened.Sections?.Items.Where(section => section.IsVisible).Select(section => section.Key),
                     Is.EqualTo(
                         new[]
                         {
@@ -186,73 +195,82 @@ public partial class BindingSmokeTests
     }
 
     [Test]
-    public void Всплывающая_настройка_подсветки_не_теряет_биндинги()
+    public void Ползунок_в_панели_подсветки_меняет_интенсивность()
     {
         Assert.That(_shell.TryNavigate(SectionKey.Scan), Is.True, "Страница «Сканирование» не открылась.");
-
         Settle();
 
-        var toggle = ViewCapture.Find(_window, "HeatToggle") as ToggleButton;
-        Assert.That(toggle, Is.Not.Null, "В разметке сканирования нет кнопки подсветки HeatToggle.");
+        var page = _services.GetRequiredService<ScanViewModel>();
+        var originalIntensity = page.Intensity;
+        var toggle = (ToggleButton)ViewCapture.Find(_window, "HeatToggle")!;
 
-        _sink.Clear();
-        toggle.IsChecked = true;
-        Settle();
-
-        var popup = toggle.FindName("HeatPopup") as Popup;
-        Assert.That(popup?.Child, Is.Not.Null, "Всплывающая панель подсветки не построила содержимое.");
-
-        var content = (FrameworkElement)popup.Child;
-        content.UpdateLayout();
-        Settle();
-
-        var slider = (Slider)toggle.FindName("HeatSlider");
-        var intensity = BindingOperations.GetBindingExpression(slider, RangeBase.ValueProperty);
-
-        toggle.IsChecked = false;
-
-        Assert.Multiple(() =>
+        try
         {
-            Assert.That(content.DataContext, Is.InstanceOf<ScanViewModel>(), "Всплывающая панель не унаследовала контекст страницы.");
-            Assert.That(intensity?.Status, Is.EqualTo(BindingStatus.Active), "Ползунок подсветки не привязался к странице.");
-            Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
-        });
+            page.Intensity = 8;
+            toggle.IsChecked = true;
+            Settle();
+
+            var slider = (Slider)toggle.FindName("HeatSlider");
+            Assert.That(slider.Value, Is.EqualTo(8));
+
+            slider.SetCurrentValue(RangeBase.ValueProperty, 12d);
+            Settle();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(page.Intensity, Is.EqualTo(12));
+                Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
+            }
+        }
+        finally
+        {
+            toggle.IsChecked = false;
+            page.Intensity = originalIntensity;
+            Settle();
+        }
     }
 
     [Test]
-    public void Всплывающая_панель_синхронизации_не_теряет_биндинги()
+    public void Зеркало_в_меню_синхронизации_доступно_при_выбранной_стороне()
     {
         Assert.That(_shell.TryNavigate(SectionKey.Sync), Is.True, "Страница «Синхронизация» не открылась.");
-
         Settle();
 
-        var toggle = ViewCapture.Find(_window, "MoreToggle") as ToggleButton;
-        Assert.That(toggle, Is.Not.Null, "В тулбаре синхронизации нет кнопки «Ещё».");
+        var setup = _services.GetRequiredService<SyncViewModel>().Setup;
+        var (mode, winner, wasMirror) = (setup.SelectedModeIndex, setup.SelectedWinnerIndex, setup.Mirror);
+        var toggle = (ToggleButton)ViewCapture.Find(_window, "MoreToggle")!;
 
-        _sink.Clear();
-        toggle.IsChecked = true;
-        Settle();
-
-        var popup = toggle.FindName("MorePopup") as Popup;
-        Assert.That(popup?.Child, Is.Not.Null, "Всплывающая панель «Ещё» не построила содержимое.");
-
-        var content = (FrameworkElement)popup.Child;
-        content.UpdateLayout();
-        Settle();
-
-        var mirror = (ToggleButton)toggle.FindName("MirrorButton");
-        var checkedBinding = BindingOperations.GetBindingExpression(mirror, ToggleButton.IsCheckedProperty);
-        var enabledBinding = BindingOperations.GetBindingExpression(mirror, UIElement.IsEnabledProperty);
-
-        toggle.IsChecked = false;
-
-        Assert.Multiple(() =>
+        try
         {
-            Assert.That(content.DataContext, Is.InstanceOf<SyncViewModel>(), "Всплывающая панель не унаследовала контекст страницы.");
-            Assert.That(checkedBinding?.Status, Is.EqualTo(BindingStatus.Active), "Тумблер зеркала не привязался к настройке.");
-            Assert.That(enabledBinding?.Status, Is.EqualTo(BindingStatus.Active), "Доступность тумблера зеркала не привязалась к странице.");
-            Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
-        });
+            setup.Mirror = false;
+            setup.SelectedModeIndex = SyncProfile.IndexOfMode(SyncMode.Bidirectional);
+            setup.SelectedWinnerIndex = SyncProfile.IndexOfWinner(SyncWinner.Newest);
+            toggle.IsChecked = true;
+            Settle();
+
+            var mirror = (ToggleButton)toggle.FindName("MirrorButton");
+            Assert.That(mirror.IsEnabled, Is.False);
+
+            setup.SelectedWinnerIndex = SyncProfile.IndexOfWinner(SyncWinner.Left);
+            Settle();
+            Assert.That(mirror.IsEnabled, Is.True);
+            Assert.That(mirror.IsChecked, Is.False);
+
+            mirror.SetCurrentValue(ToggleButton.IsCheckedProperty, true);
+            Settle();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(setup.Mirror, Is.True);
+                Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
+            }
+        }
+        finally
+        {
+            toggle.IsChecked = false;
+            (setup.SelectedModeIndex, setup.SelectedWinnerIndex, setup.Mirror) = (mode, winner, wasMirror);
+            Settle();
+        }
     }
 
     [TestCase(false, TestName = "Выбор плитки тома через UI Automation меняет цель скана")]
@@ -1052,7 +1070,6 @@ public partial class BindingSmokeTests
             menu.IsOpen = true;
             Settle();
             var hide = menu.Items.OfType<MenuItem>().Single(item => ReferenceEquals(item.Command, node.IgnoreCommand));
-            Assert.That(hide.Command, Is.SameAs(node.IgnoreCommand));
             hide.Command.Execute(null);
             menu.IsOpen = false;
             Settle();
@@ -1071,12 +1088,11 @@ public partial class BindingSmokeTests
 
             var restore = (Button)ViewCapture.Find(_window, "ResetIgnoredButton")!;
             Assert.That(restore.IsVisible, Is.True);
-            Assert.That(restore.Command, Is.SameAs(scan.ResetIgnoredCommand));
             var delete = Descendants<Button>(Descendant<ScanToolbar>(_window)!)
                 .Single(button => ReferenceEquals(button.Command, scan.Marks.DeleteMarkedCommand));
 
             Assert.That(delete.IsVisible, Is.True);
-            Assert.That(VisualTreeHelper.GetParent(restore), Is.SameAs(VisualTreeHelper.GetParent(delete)));
+            Assert.That(restore.TranslatePoint(default, _window).Y, Is.EqualTo(delete.TranslatePoint(default, _window).Y).Within(1));
             Assert.That(restore.ActualHeight, Is.EqualTo(delete.ActualHeight).Within(0.1));
             Assert.That(scan.HasIgnoredItems, Is.True);
             Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
@@ -1119,21 +1135,6 @@ public partial class BindingSmokeTests
 
             scan.ViewMode = previousMode;
         }
-    }
-
-    [Test]
-    public void Потерянный_путь_биндинга_виден_тесту()
-    {
-        var probe = new TextBlock
-        {
-            DataContext = _shell,
-        };
-
-        probe.SetBinding(TextBlock.TextProperty, new Binding("НетТакогоСвойства"));
-
-        Settle();
-
-        Assert.That(_sink.Errors, Is.Not.Empty, "Сенсор ошибок биндинга молчит – остальные проверки этого набора ничего не значат.");
     }
 
     [Test]

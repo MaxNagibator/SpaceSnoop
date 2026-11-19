@@ -1,11 +1,12 @@
 ﻿using KeepShell.Services;
 using KeepShell.Services.Modal;
-using KeepShell.Services.Platform;
 using KeepShell.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using SpaceSnoop.Core.Cleanup;
 using SpaceSnoop.Wpf.ViewModels.Cleanup;
 using SpaceSnoop.Wpf.ViewModels.Dialogs;
+using System.Windows.Data;
+using System.Windows.Threading;
 
 namespace SpaceSnoop.Wpf.Tests;
 
@@ -138,17 +139,6 @@ public sealed class DeveloperCleanupViewModelTests
     }
 
     [Test]
-    public async Task Отказ_от_подтверждения_сохраняет_файлы_и_план()
-    {
-        var vm = Create();
-        await vm.RefreshCommand.ExecuteAsync(null);
-        await vm.CleanCommand.ExecuteAsync(null);
-        Assert.That(File.Exists(Path.Combine(_paths[NuGetCacheKind.HttpCache], "cache.dat")), Is.True);
-        Assert.That(vm.CanClean, Is.True);
-        Assert.That(vm.ResultText, Is.Null);
-    }
-
-    [Test]
     public async Task Ошибка_определения_путей_не_оставляет_исполнимый_план()
     {
         var vm = new DeveloperCleanupViewModel(
@@ -191,7 +181,7 @@ public sealed class DeveloperCleanupViewModelTests
     }
 
     [Test]
-    public async Task Подтверждение_содержит_безвозвратность_удаления()
+    public async Task Подтверждение_предупреждает_о_безвозвратности_а_отказ_сохраняет_файлы_и_план()
     {
         ConfirmDialogViewModel? confirmation = null;
         var dialogs = new NoopDialogs(
@@ -212,8 +202,13 @@ public sealed class DeveloperCleanupViewModelTests
 
         await vm.RefreshCommand.ExecuteAsync(null);
         await vm.CleanCommand.ExecuteAsync(null);
-        Assert.That(confirmation, Is.Not.Null);
-        Assert.That(confirmation!.Warning, Does.Contain("безвозвратно"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(confirmation?.Warning, Does.Contain("безвозвратно"));
+            Assert.That(File.Exists(Path.Combine(_paths[NuGetCacheKind.HttpCache], "cache.dat")), Is.True);
+            Assert.That(vm.CanClean, Is.True);
+            Assert.That(vm.ResultText, Is.Null);
+        }
     }
 
     [Test]
@@ -290,9 +285,10 @@ public sealed class DeveloperCleanupViewModelTests
     }
 
     [Test]
-    public async Task Фоновый_вызов_меняет_коллекцию_только_через_диспетчер()
+    [Apartment(ApartmentState.STA)]
+    public void Замер_из_фона_наполняет_привязанный_список_кэшей()
     {
-        var dispatcher = new TrackingDispatcher();
+        var dispatcher = new DispatcherUiDispatcher(Dispatcher.CurrentDispatcher);
         var vm = new DeveloperCleanupViewModel(
             new(_ => Task.FromResult(new NuGetCacheLocations("user", _paths))),
             new NoopDialogs(),
@@ -302,11 +298,11 @@ public sealed class DeveloperCleanupViewModelTests
             CreateWorkloads(),
             CreateDotNetClean());
 
-        var changedOutsideDispatcher = false;
-        vm.Caches.CollectionChanged += (_, _) => changedOutsideDispatcher |= !dispatcher.InsideInvoke;
-        await Task.Run(() => vm.RefreshCommand.ExecuteAsync(null));
-        Assert.That(vm.Caches.Count, Is.EqualTo(4));
-        Assert.That(changedOutsideDispatcher, Is.False);
+        var caches = CollectionViewSource.GetDefaultView(vm.Caches);
+        VisualTestHost.Run(() => Task.Run(() => vm.RefreshCommand.ExecuteAsync(null)));
+        VisualTestHost.Pump();
+
+        Assert.That(caches.Cast<NuGetCacheViewModel>().Select(cache => cache.Kind), Is.EquivalentTo(_paths.Keys));
     }
 
     [Test]
@@ -462,31 +458,6 @@ public sealed class DeveloperCleanupViewModelTests
         }
 
         public void Error(string title, string message)
-        {
-            throw new NotSupportedException();
-        }
-    }
-
-    private sealed class TrackingDispatcher : IUiDispatcher
-    {
-        public bool HasAccess => InsideInvoke;
-        internal bool InsideInvoke { get; private set; }
-
-        public void Invoke(Action action)
-        {
-            var previous = InsideInvoke;
-            InsideInvoke = true;
-            try
-            {
-                action();
-            }
-            finally
-            {
-                InsideInvoke = previous;
-            }
-        }
-
-        public IUiTimer CreateTimer(TimeSpan interval, Action tick)
         {
             throw new NotSupportedException();
         }

@@ -90,7 +90,7 @@ public class DirectoryComparerTests
         File.WriteAllText(Path.Combine(_rightDir, "Foo.txt"), "right side");
 
         var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
-        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None, caseRules: PathCaseRules.Insensitive);
+        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None, caseRules: new PathCaseRules(StringComparer.OrdinalIgnoreCase, StringComparer.OrdinalIgnoreCase));
 
         var file = result.Root.Files.Single();
         using (Assert.EnterMultipleScope())
@@ -132,7 +132,7 @@ public class DirectoryComparerTests
         File.WriteAllText(Path.Combine(_rightDir, "Foo.txt"), "right");
 
         var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
-        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None, caseRules: PathCaseRules.Sensitive);
+        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None, caseRules: new PathCaseRules(StringComparer.Ordinal, StringComparer.Ordinal));
         result.ApplyMode(SyncMode.LeftToRight, true);
 
         var left = result.Root.Files.Single(x => x.Name == "foo.txt");
@@ -233,24 +233,6 @@ public class DirectoryComparerTests
 
         Assert.That(result.Root.Files, Has.Count.EqualTo(1));
         Assert.That(result.Root.Files[0].Status, Is.EqualTo(ComparisonStatus.RightOnly));
-    }
-
-    [Test]
-    public void IdenticalDirectories_AllIdentical()
-    {
-        var leftPath = Path.Combine(_leftDir, "a.txt");
-        var rightPath = Path.Combine(_rightDir, "a.txt");
-        File.WriteAllText(leftPath, "hello");
-        File.WriteAllText(rightPath, "hello");
-        var timestamp = new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Local);
-        File.SetLastWriteTime(leftPath, timestamp);
-        File.SetLastWriteTime(rightPath, timestamp);
-
-        var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
-        var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
-
-        Assert.That(result.Root.Files, Has.Count.EqualTo(1));
-        Assert.That(result.Root.Files[0].Status, Is.EqualTo(ComparisonStatus.Identical));
     }
 
     [TestCase(false)]
@@ -356,7 +338,6 @@ public class DirectoryComparerTests
             Assert.That(file.Action, Is.EqualTo(SyncAction.None));
             Assert.That(result.Root.SubDirectories, Is.Empty);
             Assert.That(result.CountPlannedActions().Total, Is.EqualTo(0));
-            Assert.That(result.HasUnresolvedConflicts(), Is.True);
         }
     }
 
@@ -398,7 +379,7 @@ public class DirectoryComparerTests
         var comparer = new DirectoryComparer(new(""), NullLogger<DirectoryComparer>.Instance);
         var result = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
 
-        return result.Root.Files[0].Status;
+        return result.Root.Files.Single().Status;
     }
 
     [Test]

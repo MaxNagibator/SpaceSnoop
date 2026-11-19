@@ -29,51 +29,77 @@ public class AgentIntegrationTests
     }
 
     [Test]
-    public void Реестр_создаёт_четыре_адаптера_из_общего_пакета()
+    public void Реестр_предлагает_поддерживаемых_агентов_без_создания_рабочих_каталогов()
     {
         using var registry = new AgentBackends(new(new MemorySettings()), _directory);
 
         Assert.Multiple(() =>
         {
-            Assert.That(registry.All.Select(item => item.Kind), Is.EqualTo(AgentBackendChoice.Order));
             Assert.That(registry.All.Select(item => item.Id), Is.EqualTo(new[] { "claude-code", "codex", "opencode", "antigravity" }));
-            Assert.That(registry.All.All(item => item.GetType().Assembly == typeof(AgentRequest).Assembly), Is.True);
             Assert.That(registry.All.All(item => !item.HasBuiltInShell), Is.True);
             Assert.That(Directory.GetFileSystemEntries(_directory), Is.Empty);
         });
     }
 
     [Test]
-    public void Правка_cli_path_заменяет_только_свой_адаптер()
+    public void После_смены_пути_обнаружение_использует_новый_CLI()
     {
-        var preferences = new AgentPreferences(new MemorySettings());
-        using var registry = new AgentBackends(preferences, _directory);
-        var before = registry.All;
-
-        preferences.CliPath = @"C:\другой-cli\claude.exe";
-
-        Assert.Multiple(() =>
+        var first = WriteCli("first", "1.2.3");
+        var second = WriteCli("second", "4.5.6");
+        var preferences = new AgentPreferences(new MemorySettings())
         {
-            Assert.That(registry.Current, Is.Not.SameAs(before[0]));
-            Assert.That(registry.All.Skip(1), Is.EqualTo(before.Skip(1)));
-        });
+            Backend = AgentBackendKind.Antigravity,
+            CliPath = first,
+        };
+        using var registry = new AgentBackends(preferences, _directory);
+
+        using (Assert.EnterMultipleScope())
+        {
+            var detected = registry.Current.Detect();
+            Assert.That(detected?.ExecutablePath, Is.EqualTo(first));
+            Assert.That(detected?.Version, Is.EqualTo("1.2.3"));
+        }
+
+        preferences.CliPath = second;
+
+        using (Assert.EnterMultipleScope())
+        {
+            var detected = registry.Current.Detect();
+            Assert.That(detected?.ExecutablePath, Is.EqualTo(second));
+            Assert.That(detected?.Version, Is.EqualTo("4.5.6"));
+        }
+    }
+
+    private string WriteCli(string name, string version)
+    {
+        var directory = Directory.CreateDirectory(Path.Combine(_directory, name));
+        var path = Path.Combine(directory.FullName, "agy.cmd");
+        File.WriteAllText(path, $"@echo off\r\necho {version}\r\n");
+        return path;
     }
 
     [TestCase(AgentBackendKind.Claude)]
     [TestCase(AgentBackendKind.Codex)]
     [TestCase(AgentBackendKind.OpenCode)]
     [TestCase(AgentBackendKind.Antigravity)]
-    public void Настройки_четырёх_агентов_сохраняются_по_именам_без_переноса_согласия(AgentBackendKind selected)
+    public void Настройки_четырёх_агентов_переживают_перезапуск_раздельно(AgentBackendKind selected)
     {
         var path = Path.Combine(_directory, "settings.toml");
+        var efforts = new Dictionary<AgentBackendKind, string>
+        {
+            [AgentBackendKind.Claude] = "xhigh",
+            [AgentBackendKind.Codex] = "ultra",
+            [AgentBackendKind.OpenCode] = "medium",
+            [AgentBackendKind.Antigravity] = "high",
+        };
         using (var settings = new SettingsStore(path))
         {
             var preferences = new AgentPreferences(settings);
-            foreach (var kind in AgentBackendChoice.Order)
+            foreach (var (kind, effort) in efforts)
             {
                 preferences.Backend = kind;
                 preferences.Model = $"model-{kind}";
-                preferences.Effort = "high";
+                preferences.Effort = effort;
                 preferences.CliPath = $@"C:\cli\{kind}.exe";
                 preferences.Consent = kind == selected;
             }
@@ -88,10 +114,16 @@ public class AgentIntegrationTests
         {
             Assert.That(restored.Backend, Is.EqualTo(selected));
             Assert.That(restored.Model, Is.EqualTo($"model-{selected}"));
-            Assert.That(restored.Effort, Is.EqualTo("high"));
+            Assert.That(restored.Effort, Is.EqualTo(efforts[selected]));
             Assert.That(restored.CliPath, Is.EqualTo($@"C:\cli\{selected}.exe"));
             Assert.That(restored.Consent, Is.True);
-            Assert.That(AgentBackendChoice.Order.Where(kind => kind != selected).All(kind => !restored.ConsentFor(kind)), Is.True);
+            foreach (var (kind, effort) in efforts)
+            {
+                Assert.That(restored.ModelFor(kind), Is.EqualTo($"model-{kind}"));
+                Assert.That(restored.EffortFor(kind), Is.EqualTo(effort));
+                Assert.That(restored.CliPathFor(kind), Is.EqualTo($@"C:\cli\{kind}.exe"));
+                Assert.That(restored.ConsentFor(kind), Is.EqualTo(kind == selected));
+            }
         });
     }
 
