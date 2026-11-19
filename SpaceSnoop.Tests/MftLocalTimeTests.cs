@@ -457,33 +457,44 @@ public class MftLocalTimeTests
     [Test]
     public void Неактивное_правило_с_пустым_переходом_не_мешает_пересчёту_вне_его_диапазона()
     {
+        var offset = TimeSpan.FromHours(3);
         var rule = TimeZoneInfo.AdjustmentRule.CreateAdjustmentRule(
             new(2024, 6, 1),
             new(2024, 6, 30),
             TimeSpan.FromMinutes(30),
             default,
             TimeZoneInfo.TransitionTime.CreateFixedDateRule(new(1, 1, 1, 2, 0, 0), 6, 15));
-        var zone = TimeZoneInfo.CreateCustomTimeZone("InactiveDefault", TimeSpan.Zero, "ID", "ID", "ID", [rule]);
+        var zone = TimeZoneInfo.CreateCustomTimeZone("InactiveDefault", offset, "ID", "ID", "ID", [rule]);
         var exactCalls = 0;
         Func<long, DateTime> exact = x =>
         {
             exactCalls++;
-            return WithLocalKind(TimeZoneInfo.ConvertTimeFromUtc(DateTime.FromFileTimeUtc(x), zone), ambiguous: false);
+            return WithLocalKind(DateTime.FromFileTimeUtc(x) + offset, ambiguous: false);
         };
 
         var clock = new MftLocalTime(zone, exact);
-        var target = new DateTime(2024, 2, 10, 12, 0, 0, DateTimeKind.Utc).ToFileTimeUtc();
+        var outside = new DateTime(2024, 2, 10, 12, 0, 0, DateTimeKind.Utc).ToFileTimeUtc();
+        var inside = new DateTime(2024, 6, 10, 12, 0, 0, DateTimeKind.Utc).ToFileTimeUtc();
 
-        var first = clock.FromFileTime(target);
+        var first = clock.FromFileTime(outside);
         exactCalls = 0;
-        var warm = clock.FromFileTime(target);
-        var expected = WithLocalKind(TimeZoneInfo.ConvertTimeFromUtc(DateTime.FromFileTimeUtc(target), zone), ambiguous: false);
+        var warm = clock.FromFileTime(outside);
+        var outsideWarmCalls = exactCalls;
+        var expected = WithLocalKind(DateTime.FromFileTimeUtc(outside) + offset, ambiguous: false);
+
+        _ = clock.FromFileTime(inside);
+        exactCalls = 0;
+        var insideWarm = clock.FromFileTime(inside);
+        var insideWarmCalls = exactCalls;
+        var insideExpected = WithLocalKind(DateTime.FromFileTimeUtc(inside) + offset, ambiguous: false);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(SameDateTime(first, expected), Is.True);
             Assert.That(SameDateTime(warm, expected), Is.True);
-            Assert.That(exactCalls, Is.Zero);
+            Assert.That(outsideWarmCalls, Is.Zero);
+            Assert.That(SameDateTime(insideWarm, insideExpected), Is.True);
+            Assert.That(insideWarmCalls, Is.EqualTo(1));
         }
     }
 
