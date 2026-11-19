@@ -8,6 +8,7 @@ using SpaceSnoop.Wpf.ViewModels;
 using SpaceSnoop.Wpf.ViewModels.Dialogs;
 using SpaceSnoop.Wpf.ViewModels.Scan;
 using SpaceSnoop.Wpf.ViewModels.Settings;
+using SpaceSnoop.Wpf.ViewModels.Sync;
 
 namespace SpaceSnoop.Wpf.Tests;
 
@@ -366,6 +367,99 @@ public class FirstRunTests
         Assert.That(AdminStartupPrompt.Decide(isElevated, welcomePending, mode, elevationRefused), Is.EqualTo(expected));
     }
 
+    [Test]
+    public void Выбор_стратегии_удаления_в_карточке_синхронизируется_с_настройками_и_игнорирует_сброс_в_null()
+    {
+        var settings = PendingSettings();
+        var operations = new OperationPreferences(settings);
+        var card = Card(settings, true, () => Task.FromResult(false), operations);
+        var changed = new List<string?>();
+        card.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        Assert.That(card.SelectedDeleteModeOption.Value, Is.EqualTo(DeleteMode.RecycleBin));
+
+        card.SelectedDeleteModeOption = card.DeleteModeOptions.First(static option => option.Value == DeleteMode.Permanent);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(operations.DeleteMode, Is.EqualTo(DeleteMode.Permanent));
+            Assert.That(((ISettingsStore)settings).GetEnum(SettingsKeys.DeleteMode, DeleteMode.RecycleBin), Is.EqualTo(DeleteMode.Permanent));
+        }
+
+        changed.Clear();
+        card.SelectedDeleteModeOption = null!;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(operations.DeleteMode, Is.EqualTo(DeleteMode.Permanent));
+            Assert.That(card.SelectedDeleteModeOption.Value, Is.EqualTo(DeleteMode.Permanent));
+            Assert.That(changed, Does.Contain(nameof(FirstRunViewModel.SelectedDeleteModeOption)));
+        }
+
+        changed.Clear();
+        operations.DeleteMode = DeleteMode.RecycleBin;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(card.SelectedDeleteModeOption.Value, Is.EqualTo(DeleteMode.RecycleBin));
+            Assert.That(changed, Does.Contain(nameof(FirstRunViewModel.SelectedDeleteModeOption)));
+        }
+    }
+
+    [Test]
+    public void Пропуск_карточки_возвращает_исходные_настройки_и_снимает_отметку()
+    {
+        var settings = PendingSettings();
+        var operations = new OperationPreferences(settings);
+        var card = Card(settings, true, () => Task.FromResult(false), operations);
+
+        var initialFastScan = card.FastScan;
+        var initialDeleteMode = card.SelectedDeleteModeOption.Value;
+        var initialUpdates = card.CheckUpdates;
+
+        card.FastScan = !initialFastScan;
+        card.SelectedDeleteModeOption = card.DeleteModeOptions.First(static option => option.Value == DeleteMode.Permanent);
+        card.CheckUpdates = !initialUpdates;
+
+        card.SkipCommand.Execute(null);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(card.IsVisible, Is.False);
+            Assert.That(((ISettingsStore)settings).GetBool(SettingsKeys.WelcomePending, true), Is.False);
+            Assert.That(card.FastScan, Is.EqualTo(initialFastScan));
+            Assert.That(card.SelectedDeleteModeOption.Value, Is.EqualTo(initialDeleteMode));
+            Assert.That(operations.DeleteMode, Is.EqualTo(initialDeleteMode));
+            Assert.That(card.CheckUpdates, Is.EqualTo(initialUpdates));
+            Assert.That(((ISettingsStore)settings).GetBool(SettingsKeys.ScanMftEnabled), Is.EqualTo(initialFastScan));
+            Assert.That(((ISettingsStore)settings).GetEnum(SettingsKeys.DeleteMode, DeleteMode.RecycleBin), Is.EqualTo(initialDeleteMode));
+            Assert.That(((ISettingsStore)settings).GetBool(SettingsKeys.UpdateCheckOnStartup, true), Is.EqualTo(initialUpdates));
+        }
+    }
+
+    [Test]
+    public void Готово_в_карточке_сохраняет_выбранные_настройки_и_снимает_отметку()
+    {
+        var settings = PendingSettings();
+        var operations = new OperationPreferences(settings);
+        var card = Card(settings, true, () => Task.FromResult(false), operations);
+
+        card.FastScan = true;
+        card.SelectedDeleteModeOption = card.DeleteModeOptions.First(static option => option.Value == DeleteMode.Permanent);
+        card.CheckUpdates = false;
+
+        card.DismissCommand.Execute(null);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(card.IsVisible, Is.False);
+            Assert.That(((ISettingsStore)settings).GetBool(SettingsKeys.WelcomePending, true), Is.False);
+            Assert.That(((ISettingsStore)settings).GetBool(SettingsKeys.ScanMftEnabled), Is.True);
+            Assert.That(((ISettingsStore)settings).GetEnum(SettingsKeys.DeleteMode, DeleteMode.RecycleBin), Is.EqualTo(DeleteMode.Permanent));
+            Assert.That(((ISettingsStore)settings).GetBool(SettingsKeys.UpdateCheckOnStartup, true), Is.False);
+        }
+    }
+
     private static MemorySettings PendingSettings()
     {
         var settings = new MemorySettings();
@@ -374,8 +468,12 @@ public class FirstRunTests
         return settings;
     }
 
-    private static FirstRunViewModel Card(ISettingsStore settings, bool isElevated, Func<Task<bool>> restart)
+    private static FirstRunViewModel Card(
+        ISettingsStore settings,
+        bool isElevated,
+        Func<Task<bool>> restart,
+        OperationPreferences? operations = null)
     {
-        return new(settings, new(settings), new(settings), new(settings), isElevated, restart);
+        return new(settings, new(settings), operations ?? new(settings), new(settings), new(settings), isElevated, restart);
     }
 }

@@ -179,7 +179,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
         RestartPrompt = new(dialogs, notifier, () => MarkedCount, () => AdminRestart.Run(lifetime));
         Summary = new(AdminElevation.IsElevated, RestartPrompt.RunAsync);
-        FirstRun = new(settings, preferences, theme, updates, AdminElevation.IsElevated, RestartPrompt.RunAsync);
+        FirstRun = new(settings, preferences, operations, theme, updates, AdminElevation.IsElevated, RestartPrompt.RunAsync);
         FirstRun.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(FirstRunViewModel.IsVisible))

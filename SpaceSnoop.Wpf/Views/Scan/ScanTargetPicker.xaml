@@ -120,89 +120,16 @@
                     </Style>
                 </StackPanel.Style>
 
-                <FrameworkElement Width="{Binding ActualWidth, ElementName=PickerActionsRow}"
-                                  HorizontalAlignment="Left"
-                                  Height="0" />
-
                 <local:FirstRunCard DataContext="{Binding FirstRun}"
                                     MaxWidth="652"
-                                    HorizontalAlignment="Left" />
+                                    HorizontalAlignment="Center" />
 
-                <Grid Margin="0,0,0,12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <TextBlock Grid.Column="0"
-                               Text="Что сканируем"
-                               Style="{StaticResource SectionTitle}"
-                               Foreground="{DynamicResource Fg.Secondary}"
-                               VerticalAlignment="Center" />
-
-                    <StackPanel Grid.Column="1"
-                                Orientation="Horizontal">
-                        <Button Style="{StaticResource Button.Ghost}"
-                                Command="{Binding ClosePickerCommand}"
-                                Margin="0,0,6,0"
-                                AutomationProperties.Name="{Binding Summary.ReturnCaption}"
-                                Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
-                            <Button.ToolTip>
-                                <ToolTip>
-                                    <TextBlock
-                                        Text="{Binding Summary.ResultPath, StringFormat='Вернуться к результатам сканирования {0}'}" />
-                                </ToolTip>
-                            </Button.ToolTip>
-                            <StackPanel Orientation="Horizontal">
-                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ArrowLeft}"
-                                                          Width="14"
-                                                          Height="14"
-                                                          VerticalAlignment="Center"
-                                                          Margin="0,0,6,0" />
-                                <TextBlock Text="{Binding Summary.ReturnCaption}"
-                                           MaxWidth="320"
-                                           TextTrimming="CharacterEllipsis"
-                                           VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Button>
-
-                        <Button Style="{StaticResource Button.Icon}"
-                                Command="{Binding RefreshDrivesCommand}"
-                                ToolTip="Обновить список дисков"
-                                AutomationProperties.Name="Обновить список дисков">
-                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.RefreshCw}"
-                                                      Width="15"
-                                                      Height="15" />
-                        </Button>
-                    </StackPanel>
-                </Grid>
-
-                <ItemsControl x:Name="Targets"
-                              Focusable="False"
-                              Margin="0,0,-12,0"
-                              AutomationProperties.Name="Диски">
-                    <ItemsControl.ItemsSource>
-                        <CompositeCollection>
-                            <CollectionContainer Collection="{Binding Source={StaticResource VolumeSource}}" />
-                            <Button Style="{StaticResource TargetTile.Browse}"
-                                    Command="{Binding BrowseCommand}"
-                                    ToolTip="Выбрать другой каталог для анализа"
-                                    AutomationProperties.Name="Другой каталог" />
-                        </CompositeCollection>
-                    </ItemsControl.ItemsSource>
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                </ItemsControl>
-
-                <StackPanel Margin="0,12,0,12">
+                <StackPanel>
                     <StackPanel.Style>
                         <Style TargetType="StackPanel">
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding Drives.RecentDirectories.Count}"
-                                             Value="0">
+                                <DataTrigger Binding="{Binding FirstRun.IsVisible}"
+                                             Value="True">
                                     <Setter Property="Visibility"
                                             Value="Collapsed" />
                                 </DataTrigger>
@@ -210,20 +137,107 @@
                         </Style>
                     </StackPanel.Style>
 
-                    <TextBlock Text="Недавние"
-                               Style="{StaticResource Caption}"
-                               Margin="0,0,0,8" />
+                    <FrameworkElement Width="{Binding ActualWidth, ElementName=PickerActionsRow}"
+                                      HorizontalAlignment="Left"
+                                      Height="0" />
 
-                    <ItemsControl ItemsSource="{Binding Drives.RecentDirectories}"
-                                  ItemTemplate="{StaticResource TargetTile.Recent}"
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   Text="Что сканируем"
+                                   Style="{StaticResource SectionTitle}"
+                                   Foreground="{DynamicResource Fg.Secondary}"
+                                   VerticalAlignment="Center" />
+
+                        <StackPanel Grid.Column="1"
+                                    Orientation="Horizontal">
+                            <Button Style="{StaticResource Button.Ghost}"
+                                    Command="{Binding ClosePickerCommand}"
+                                    Margin="0,0,6,0"
+                                    AutomationProperties.Name="{Binding Summary.ReturnCaption}"
+                                    Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                                <Button.ToolTip>
+                                    <ToolTip>
+                                        <TextBlock
+                                            Text="{Binding Summary.ResultPath, StringFormat='Вернуться к результатам сканирования {0}'}" />
+                                    </ToolTip>
+                                </Button.ToolTip>
+                                <StackPanel Orientation="Horizontal">
+                                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ArrowLeft}"
+                                                              Width="14"
+                                                              Height="14"
+                                                              VerticalAlignment="Center"
+                                                              Margin="0,0,6,0" />
+                                    <TextBlock Text="{Binding Summary.ReturnCaption}"
+                                               MaxWidth="320"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+
+                            <Button Style="{StaticResource Button.Icon}"
+                                    Command="{Binding RefreshDrivesCommand}"
+                                    ToolTip="Обновить список дисков"
+                                    AutomationProperties.Name="Обновить список дисков">
+                                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.RefreshCw}"
+                                                          Width="15"
+                                                          Height="15" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+
+                    <ItemsControl x:Name="Targets"
                                   Focusable="False"
-                                  AutomationProperties.Name="Недавние каталоги">
+                                  Margin="0,0,-12,0"
+                                  AutomationProperties.Name="Диски">
+                        <ItemsControl.ItemsSource>
+                            <CompositeCollection>
+                                <CollectionContainer Collection="{Binding Source={StaticResource VolumeSource}}" />
+                                <Button Style="{StaticResource TargetTile.Browse}"
+                                        Command="{Binding BrowseCommand}"
+                                        ToolTip="Выбрать другой каталог для анализа"
+                                        AutomationProperties.Name="Другой каталог" />
+                            </CompositeCollection>
+                        </ItemsControl.ItemsSource>
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <WrapPanel />
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                     </ItemsControl>
+
+                    <StackPanel Margin="0,12,0,12">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Drives.RecentDirectories.Count}"
+                                                 Value="0">
+                                        <Setter Property="Visibility"
+                                                Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+
+                        <TextBlock Text="Недавние"
+                                   Style="{StaticResource Caption}"
+                                   Margin="0,0,0,8" />
+
+                        <ItemsControl ItemsSource="{Binding Drives.RecentDirectories}"
+                                      ItemTemplate="{StaticResource TargetTile.Recent}"
+                                      Focusable="False"
+                                      AutomationProperties.Name="Недавние каталоги">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </StackPanel>
                 </StackPanel>
             </StackPanel>
         </ScrollViewer>
@@ -239,6 +253,11 @@
                     <Setter Property="BorderBrush"
                             Value="Transparent" />
                     <Style.Triggers>
+                        <DataTrigger Binding="{Binding FirstRun.IsVisible}"
+                                     Value="True">
+                            <Setter Property="Visibility"
+                                    Value="Collapsed" />
+                        </DataTrigger>
                         <DataTrigger Binding="{Binding ComputedVerticalScrollBarVisibility, ElementName=PickerScroll}"
                                      Value="{x:Static Visibility.Visible}">
                             <Setter Property="BorderBrush"
