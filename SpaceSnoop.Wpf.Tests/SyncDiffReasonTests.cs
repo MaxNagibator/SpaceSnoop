@@ -8,6 +8,17 @@ public class SyncDiffReasonTests
 {
     private static readonly DateTime Base = new(2026, 1, 1, 12, 0, 0, DateTimeKind.Local);
 
+    [Test]
+    public void Не_изменённый_файл_без_причины()
+    {
+        var file = new FileComparison("a.txt", "a.txt")
+        {
+            Status = ComparisonStatus.Identical,
+        };
+
+        Assert.That(SyncNodeText.DescribeDiff(file), Is.Empty);
+    }
+
     [TestCase(10, 20, 0, ExpectedResult = "размер")]
     [TestCase(10, 10, 5, ExpectedResult = "время (Δ 5 с)")]
     [TestCase(10, 10, 1, ExpectedResult = "")]
@@ -23,14 +34,6 @@ public class SyncDiffReasonTests
             RightModified = Base.AddSeconds(secondsApart),
         };
 
-        return SyncNodeViewModel.DescribeDiff(file);
-    }
-
-    [Test]
-    public void Не_изменённый_файл_без_причины()
-    {
-        var file = new FileComparison("a.txt", "a.txt") { Status = ComparisonStatus.Identical };
-
-        Assert.That(SyncNodeViewModel.DescribeDiff(file), Is.Empty);
+        return SyncNodeText.DescribeDiff(file);
     }
 }

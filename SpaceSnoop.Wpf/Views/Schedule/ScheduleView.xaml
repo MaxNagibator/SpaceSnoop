@@ -4,6 +4,7 @@
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Schedule"
              xmlns:sync="clr-namespace:SpaceSnoop.Wpf.ViewModels.Sync"
              xmlns:schedule="clr-namespace:SpaceSnoop.Wpf.Views.Schedule"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -15,7 +16,8 @@
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/Views/Settings/SettingsResources.xaml" />
+                <ResourceDictionary
+                    Source="pack://application:,,,/SpaceSnoop.Wpf;component/Views/Settings/SettingsResources.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <Style x:Key="Schedule.HistoryLine"
@@ -34,7 +36,7 @@
                     <DataTrigger Binding="{Binding HasErrors}"
                                  Value="True">
                         <Setter Property="Foreground"
-                                Value="{DynamicResource State.Error}" />
+                                Value="{DynamicResource State.ErrorText}" />
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
@@ -50,31 +52,46 @@
                     Margin="0,0,0,10">
                 <StackPanel>
                     <TextBlock Text="Как это работает"
-                               Style="{StaticResource Setting.SectionTitle}" />
+                               Style="{StaticResource Form.SectionTitle}" />
                     <TextBlock
                         Text="Каждый профиль – отдельная задача Планировщика Windows, запускающая автосинхронизацию в фоне с собственными каталогами, направлением и временем. «Запустить сейчас» прогоняет профиль немедленно, не дожидаясь расписания."
-                        Style="{StaticResource Setting.Hint}" />
+                        Style="{StaticResource Form.Hint}" />
                 </StackPanel>
             </Border>
 
-            <Grid Margin="0,4,0,8">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0"
+            <keepshell:StretchWrapPanel Margin="0,4,0,4"
+                                      ItemWidth="160">
+                <TextBlock keepshell:StretchWrapPanel.Stretch="True"
+                           keepshell:StretchWrapPanel.StretchWidth="160"
                            Text="Профили"
                            VerticalAlignment="Center"
+                           Margin="0,2,12,6"
                            FontWeight="{DynamicResource Font.Weight.SemiBold}"
                            FontSize="{DynamicResource Font.Size.L}"
                            Foreground="{DynamicResource Fg.Primary}" />
-                <StackPanel Grid.Column="1"
-                            Orientation="Horizontal">
+                <WrapPanel Orientation="Horizontal"
+                           VerticalAlignment="Center">
+                    <Button Style="{StaticResource Button.Ghost}"
+                            Command="{Binding Bulk.SelectAllCommand}"
+                            MinHeight="{DynamicResource Control.Height.Default}"
+                            Padding="14,6"
+                            Margin="0,0,8,4"
+                            Visibility="{Binding HasProfiles, Converter={StaticResource BoolToVisibility}}"
+                            ToolTip="Выбрать все профили для пакетного редактирования">
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.CheckCheck}"
+                                                      Width="14"
+                                                      Height="14"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,6,0" />
+                            <TextBlock Text="Выбрать все" />
+                        </StackPanel>
+                    </Button>
                     <Button Style="{StaticResource Button.Ghost}"
                             Command="{Binding CreateBatchCommand}"
                             MinHeight="{DynamicResource Control.Height.Default}"
                             Padding="14,6"
-                            Margin="0,0,8,0">
+                            Margin="0,0,8,4">
                         <StackPanel Orientation="Horizontal">
                             <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.CopyPlus}"
                                                       Width="14"
@@ -87,7 +104,8 @@
                     <Button Style="{StaticResource Button.Primary}"
                             Command="{Binding AddProfileCommand}"
                             MinHeight="{DynamicResource Control.Height.Default}"
-                            Padding="14,6">
+                            Padding="14,6"
+                            Margin="0,0,0,4">
                         <StackPanel Orientation="Horizontal">
                             <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Plus}"
                                                       Width="14"
@@ -97,19 +115,21 @@
                             <TextBlock Text="Добавить профиль" />
                         </StackPanel>
                     </Button>
-                </StackPanel>
-            </Grid>
+                </WrapPanel>
+            </keepshell:StretchWrapPanel>
 
             <Border Style="{StaticResource Card.Inset}"
                     Margin="0,0,0,10"
                     Visibility="{Binding HasProfiles, Converter={StaticResource InverseBoolToVisibility}}">
                 <StackPanel>
                     <TextBlock Text="Профилей пока нет."
-                               Style="{StaticResource Setting.Label}" />
+                               Style="{StaticResource Form.Label}" />
                     <TextBlock Text="Добавьте профиль, чтобы запланировать автосинхронизацию каталогов."
-                               Style="{StaticResource Setting.Hint}" />
+                               Style="{StaticResource Form.Hint}" />
                 </StackPanel>
             </Border>
+
+            <schedule:ScheduleBulkBar DataContext="{Binding Bulk}" />
 
             <ItemsControl ItemsSource="{Binding Profiles}">
                 <ItemsControl.ItemTemplate>
@@ -123,9 +143,9 @@
                     Margin="0,6,0,10">
                 <StackPanel>
                     <TextBlock Text="История прогонов"
-                               Style="{StaticResource Setting.SectionTitle}" />
+                               Style="{StaticResource Form.SectionTitle}" />
                     <TextBlock Text="Последние записи журнала автосинхронизации (sync-log.txt)."
-                               Style="{StaticResource Setting.Hint}" />
+                               Style="{StaticResource Form.Hint}" />
 
                     <TextBlock Text="Прогонов ещё не было."
                                Style="{StaticResource TextBlock.Subtle}"

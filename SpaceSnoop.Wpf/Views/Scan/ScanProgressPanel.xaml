@@ -3,15 +3,32 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Scan"
              xmlns:behaviors="clr-namespace:SpaceSnoop.Wpf.Views.Behaviors"
+             xmlns:views="clr-namespace:SpaceSnoop.Wpf.Views"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
-             d:DataContext="{d:DesignInstance vm:ScanViewModel}"
+             d:DataContext="{d:DesignInstance vm:ScanProgressViewModel}"
              d:DesignWidth="980">
-    <Border Style="{StaticResource Card.Inset}"
-            Padding="15,12"
-            Margin="0,0,0,12"
-            Visibility="{Binding IsScanning, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+    <Border Visibility="{Binding IsScanning, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+        <Border.Style>
+            <Style TargetType="Border"
+                   BasedOn="{StaticResource Card.Inset}">
+                <Setter Property="Padding"
+                        Value="15,12" />
+                <Setter Property="Margin"
+                        Value="0,0,0,12" />
+                <Style.Triggers>
+                    <DataTrigger
+                        Binding="{Binding IsCompact, RelativeSource={RelativeSource AncestorType=views:ScanView}}"
+                        Value="True">
+                        <Setter Property="Padding"
+                                Value="15,8" />
+                        <Setter Property="Margin"
+                                Value="0,0,0,6" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Border.Style>
         <StackPanel>
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -29,24 +46,40 @@
                              VerticalAlignment="Center"
                              Margin="0,0,9,0"
                              Fill="{DynamicResource Accent.Primary}">
-                        <Ellipse.Triggers>
-                            <EventTrigger RoutedEvent="Ellipse.Loaded">
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                         From="1"
-                                                         To="0.25"
-                                                         Duration="0:0:0.75"
-                                                         AutoReverse="True"
-                                                         RepeatBehavior="Forever" />
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </EventTrigger>
-                        </Ellipse.Triggers>
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsScanning}"
+                                                       Value="True" />
+                                            <Condition
+                                                Binding="{Binding Enabled, Source={x:Static behaviors:SystemAnimations.Current}}"
+                                                Value="True" />
+                                        </MultiDataTrigger.Conditions>
+                                        <MultiDataTrigger.EnterActions>
+                                            <BeginStoryboard x:Name="ScanPulseBeat">
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                     From="1"
+                                                                     To="0.25"
+                                                                     Duration="0:0:0.75"
+                                                                     AutoReverse="True"
+                                                                     RepeatBehavior="Forever" />
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </MultiDataTrigger.EnterActions>
+                                        <MultiDataTrigger.ExitActions>
+                                            <StopStoryboard BeginStoryboardName="ScanPulseBeat" />
+                                        </MultiDataTrigger.ExitActions>
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
                     </Ellipse>
-                    <TextBlock Text="СКАНИРОВАНИЕ"
+                    <TextBlock Text="Сканирование"
                                Style="{StaticResource Caption}"
-                               Foreground="{DynamicResource Accent.Primary}" />
+                               Foreground="{DynamicResource Accent.Text}" />
                 </StackPanel>
 
                 <TextBlock Grid.Column="1"
@@ -57,12 +90,32 @@
                            FontFamily="{DynamicResource Font.Mono}"
                            FontSize="{DynamicResource Font.Size.S}"
                            Foreground="{DynamicResource Fg.Secondary}"
-                           ToolTip="{Binding ScanCurrentPath}" />
+                           ToolTip="{Binding ScanCurrentPath}"
+                           Visibility="{Binding ScanShowsStage, Converter={StaticResource InverseBoolToVisibility}}" />
 
-                <TextBlock Grid.Column="2"
-                           Text="{Binding ScanElapsedText}"
-                           Style="{StaticResource StatValue}"
-                           Foreground="{DynamicResource Accent.Primary}" />
+                <TextBlock Grid.Column="1"
+                           Text="{Binding ScanStageText}"
+                           VerticalAlignment="Center"
+                           Margin="14,0,14,0"
+                           TextWrapping="NoWrap"
+                           TextTrimming="CharacterEllipsis"
+                           FontFamily="{DynamicResource Font.Mono}"
+                           FontSize="{DynamicResource Font.Size.S}"
+                           Foreground="{DynamicResource Fg.Secondary}"
+                           Visibility="{Binding ScanShowsStage, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+
+                <StackPanel Grid.Column="2"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <TextBlock Text="Прошло"
+                               Style="{StaticResource Caption}"
+                               VerticalAlignment="Center"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ScanElapsedText}"
+                               Style="{StaticResource StatValue}"
+                               MinWidth="56"
+                               TextAlignment="Right" />
+                </StackPanel>
             </Grid>
 
             <Grid Margin="0,11,0,0">
@@ -83,53 +136,81 @@
                            Margin="10,0,0,0"
                            TextAlignment="Right"
                            VerticalAlignment="Center"
-                           FontFamily="{DynamicResource Font.Mono}"
                            FontSize="{DynamicResource Font.Size.S}"
                            FontWeight="Medium"
-                           Foreground="{DynamicResource Accent.Primary}"
+                           Typography.NumeralAlignment="Tabular"
+                           Foreground="{DynamicResource Fg.Secondary}"
                            Visibility="{Binding ScanHasDeterminateProgress, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
             </Grid>
 
-            <StackPanel Orientation="Horizontal"
-                        Margin="0,11,0,0"
-                        VerticalAlignment="Center">
-                <TextBlock Text="КАТАЛОГОВ"
-                           Style="{StaticResource Caption}"
-                           Margin="0,0,7,0" />
-                <TextBlock Text="{Binding ScanDirCountText}"
-                           Style="{StaticResource StatValue}"
-                           Margin="0,0,18,0" />
+            <views:CompactWrapPanel Margin="0,7,0,0"
+                                    SingleLine="{Binding IsCompact, RelativeSource={RelativeSource AncestorType=views:ScanView}}">
+                <views:CompactWrapPanel.Resources>
+                    <Style x:Key="Metric"
+                           TargetType="StackPanel">
+                        <Setter Property="Orientation"
+                                Value="Horizontal" />
+                        <Setter Property="Margin"
+                                Value="0,4,18,0" />
+                    </Style>
+                </views:CompactWrapPanel.Resources>
 
-                <TextBlock Text="ФАЙЛОВ"
-                           Style="{StaticResource Caption}"
-                           Margin="0,0,7,0" />
-                <TextBlock Text="{Binding ScanFileCountText}"
-                           Style="{StaticResource StatValue}"
-                           Margin="0,0,18,0" />
+                <StackPanel Style="{StaticResource Metric}">
+                    <TextBlock Text="Объём"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ScanBytesText}"
+                               Style="{StaticResource StatValue.Lead}"
+                               ToolTip="Логический объём учтённых файлов" />
+                </StackPanel>
 
-                <TextBlock Text="ОБЪЁМ"
-                           Style="{StaticResource Caption}"
-                           Margin="0,0,7,0" />
-                <TextBlock Text="{Binding ScanBytesText}"
-                           Style="{StaticResource StatValue}"
-                           Foreground="{DynamicResource Accent.Primary}"
-                           Margin="0,0,18,0" />
+                <StackPanel Style="{StaticResource Metric}">
+                    <TextBlock Text="Каталогов"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ScanDirCountText}"
+                               Style="{StaticResource StatValue}" />
+                </StackPanel>
 
-                <TextBlock Text="СКОРОСТЬ"
-                           Style="{StaticResource Caption}"
-                           Margin="0,0,7,0" />
-                <TextBlock Text="{Binding ScanThroughputText}"
-                           Style="{StaticResource StatValue}"
-                           Margin="0,0,18,0" />
+                <StackPanel Style="{StaticResource Metric}">
+                    <TextBlock Text="Файлов"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ScanFileCountText}"
+                               Style="{StaticResource StatValue}" />
+                </StackPanel>
 
-                <TextBlock Text="ВЕТКИ"
-                           Style="{StaticResource Caption}"
-                           Margin="0,0,7,0"
-                           Visibility="{Binding ScanHasBranches, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
-                <TextBlock Text="{Binding ScanTopLevelText}"
-                           Style="{StaticResource StatValue}"
-                           Visibility="{Binding ScanHasBranches, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
-            </StackPanel>
+                <StackPanel Style="{StaticResource Metric}"
+                            views:CompactWrapPanel.Optional="True">
+                    <TextBlock Text="Скорость"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ScanThroughputText}"
+                               Style="{StaticResource StatValue.Aside}"
+                               ToolTip="Скорость обхода: сколько файлов в секунду учитывает скан" />
+                </StackPanel>
+
+                <StackPanel Style="{StaticResource Metric}"
+                            Visibility="{Binding ScanHasRemaining, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                    <TextBlock Text="Осталось"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ScanRemainingText}"
+                               Style="{StaticResource StatValue.Aside}"
+                               ToolTip="Оценка по средней скорости от начала сканирования" />
+                </StackPanel>
+
+                <StackPanel Style="{StaticResource Metric}"
+                            views:CompactWrapPanel.Optional="True"
+                            Visibility="{Binding ScanHasBranches, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                    <TextBlock Text="Пройдено папок"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,7,0" />
+                    <TextBlock Text="{Binding ScanTopLevelText}"
+                               Style="{StaticResource StatValue.Aside}"
+                               ToolTip="Сколько папок, лежащих прямо в сканируемом каталоге, уже пройдено целиком" />
+                </StackPanel>
+            </views:CompactWrapPanel>
         </StackPanel>
     </Border>
 </UserControl>

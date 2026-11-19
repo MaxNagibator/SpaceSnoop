@@ -1,8 +1,8 @@
 ﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Schedule.BatchCreateProfilesDialogView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Schedule"
-             xmlns:views="clr-namespace:SpaceSnoop.Wpf.Views"
              xmlns:behaviors="clr-namespace:SpaceSnoop.Wpf.Views.Behaviors"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -11,7 +11,8 @@
              d:DataContext="{d:DesignInstance vm:BatchCreateProfilesDialogViewModel}"
              d:DesignHeight="560"
              d:DesignWidth="720"
-             Width="720">
+             Width="720"
+             AutomationProperties.Name="{Binding Title}">
 
     <UserControl.Resources>
         <Style x:Key="EndpointChip"
@@ -47,9 +48,9 @@
                                       Height="20"
                                       VerticalAlignment="Center"
                                       Margin="0,0,10,0"
-                                      Foreground="{DynamicResource Accent.Primary}" />
+                                      Foreground="{DynamicResource Accent.Text}" />
             <TextBlock Text="{Binding Title}"
-                       Style="{StaticResource TextBlock.Heading}"
+                       Style="{StaticResource DialogTitle}"
                        VerticalAlignment="Center" />
         </StackPanel>
 
@@ -77,15 +78,15 @@
                             VerticalAlignment="Center"
                             Margin="0,0,8,0">
                     <Border Style="{StaticResource EndpointChip}"
-                            Background="{DynamicResource State.SuccessSoft}"
-                            BorderBrush="{DynamicResource State.Success}"
+                            Background="{DynamicResource Accent.Soft}"
+                            BorderBrush="{DynamicResource Sync.LeftOnly}"
                             ToolTip="Родитель-источник">
                         <TextBlock Text="Л"
                                    FontWeight="Bold"
                                    FontSize="{DynamicResource Font.Size.XS}"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
-                                   Foreground="{DynamicResource State.Success}" />
+                                   Foreground="{DynamicResource Sync.LeftOnly}" />
                     </Border>
 
                     <Button HorizontalAlignment="Center"
@@ -113,7 +114,7 @@
                                                               Height="14"
                                                               HorizontalAlignment="Center"
                                                               VerticalAlignment="Center"
-                                                              Foreground="{DynamicResource Accent.Primary}" />
+                                                              Foreground="{DynamicResource Accent.Text}" />
                                 </Border>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsMouseOver"
@@ -132,14 +133,14 @@
 
                     <Border Style="{StaticResource EndpointChip}"
                             Background="{DynamicResource State.InfoSoft}"
-                            BorderBrush="{DynamicResource State.Info}"
+                            BorderBrush="{DynamicResource Sync.RightOnly}"
                             ToolTip="Родитель-приёмник">
                         <TextBlock Text="П"
                                    FontWeight="Bold"
                                    FontSize="{DynamicResource Font.Size.XS}"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
-                                   Foreground="{DynamicResource State.Info}" />
+                                   Foreground="{DynamicResource Sync.RightOnly}" />
                     </Border>
                 </StackPanel>
 
@@ -149,6 +150,7 @@
                          behaviors:PathSuggest.Enabled="{Binding PathSuggest}"
                          Style="{StaticResource TextBox.Toolbar}"
                          VerticalAlignment="Center"
+                         AutomationProperties.Name="Родитель-источник"
                          ToolTip="Родитель-источник" />
                 <Button Grid.Row="0"
                         Grid.Column="2"
@@ -158,7 +160,8 @@
                         Padding="10,6"
                         Margin="8,0,0,0"
                         VerticalAlignment="Center"
-                        ToolTip="Обзор">
+                        AutomationProperties.Name="Выбрать родителя-источник"
+                        ToolTip="Выбрать каталог">
                     <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderOpen}"
                                               Width="14"
                                               Height="14" />
@@ -171,6 +174,7 @@
                          Style="{StaticResource TextBox.Toolbar}"
                          VerticalAlignment="Center"
                          Margin="0,16,0,0"
+                         AutomationProperties.Name="Родитель-приёмник"
                          ToolTip="Родитель-приёмник" />
                 <Button Grid.Row="1"
                         Grid.Column="2"
@@ -180,7 +184,8 @@
                         Padding="10,6"
                         Margin="8,16,0,0"
                         VerticalAlignment="Center"
-                        ToolTip="Обзор">
+                        AutomationProperties.Name="Выбрать родителя-приёмник"
+                        ToolTip="Выбрать каталог">
                     <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderOpen}"
                                               Width="14"
                                               Height="14" />
@@ -188,16 +193,23 @@
             </Grid>
         </StackPanel>
 
-        <views:StretchWrapPanel Grid.Row="2"
+        <keepshell:StretchWrapPanel Grid.Row="2"
                                 Margin="0,14,0,0"
                                 ItemWidth="240">
-            <ComboBox Style="{StaticResource ComboBox.Form}"
-                      ItemsSource="{Binding Modes}"
-                      SelectedIndex="{Binding SelectedModeIndex}"
-                      MinWidth="170"
-                      VerticalAlignment="Center"
-                      Margin="0,0,16,8"
-                      ToolTip="Направление синхронизации" />
+            <ListBox Style="{StaticResource ListBox.Segmented}"
+                     ItemsSource="{Binding Modes}"
+                     SelectedIndex="{Binding SelectedModeIndex}"
+                     VerticalAlignment="Center"
+                     Margin="0,0,16,8"
+                     AutomationProperties.Name="Направление синхронизации" />
+            <ListBox Style="{StaticResource ListBox.Segmented}"
+                     ItemsSource="{Binding Winners}"
+                     SelectedIndex="{Binding SelectedWinnerIndex}"
+                     VerticalAlignment="Center"
+                     Margin="0,0,16,8"
+                     Visibility="{Binding WinnerApplicable, Converter={StaticResource BoolToVisibility}}"
+                     ToolTip="Победитель (двусторонний): решает изменённые файлы; при зеркале – что удалять на проигравшей стороне."
+                     AutomationProperties.Name="Победитель в двустороннем режиме" />
             <CheckBox Content="Зеркало"
                       IsChecked="{Binding Mirror}"
                       IsEnabled="{Binding MirrorApplicable}"
@@ -208,23 +220,30 @@
                       VerticalAlignment="Center"
                       Margin="0,0,16,8"
                       Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}" />
-            <ComboBox views:StretchWrapPanel.Stretch="True"
-                      views:StretchWrapPanel.StretchWidth="150"
+            <ComboBox keepshell:StretchWrapPanel.Stretch="True"
+                      keepshell:StretchWrapPanel.StretchWidth="150"
                       MinWidth="150"
                       Style="{StaticResource ComboBox.Form}"
                       ItemsSource="{Binding SortOptions}"
                       SelectedIndex="{Binding SelectedSort}"
                       VerticalAlignment="Center"
                       Margin="0,0,16,8"
+                      AutomationProperties.Name="Сортировка пар"
                       ToolTip="Сортировка пар"
                       Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}" />
-            <TextBox views:StretchWrapPanel.Stretch="True"
-                     Text="{Binding Exclusions, UpdateSourceTrigger=PropertyChanged}"
-                     Style="{StaticResource TextBox.Toolbar}"
-                     VerticalAlignment="Center"
-                     Margin="0,0,0,8"
-                     ToolTip="Исключения (через запятую)" />
-        </views:StretchWrapPanel>
+            <StackPanel keepshell:StretchWrapPanel.Stretch="True"
+                        VerticalAlignment="Center"
+                        Margin="0,0,0,8">
+                <TextBlock Text="Исключения (через запятую)"
+                           Style="{StaticResource Caption}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,4" />
+                <TextBox Text="{Binding Exclusions, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource TextBox.Toolbar}"
+                         AutomationProperties.Name="Исключения"
+                         ToolTip="Исключения (через запятую)" />
+            </StackPanel>
+        </keepshell:StretchWrapPanel>
 
         <Border Grid.Row="3"
                 Margin="0,14,0,0"
@@ -239,6 +258,7 @@
                            Visibility="{Binding HasRows, Converter={StaticResource InverseBoolToVisibility}}" />
 
                 <ListBox ItemsSource="{Binding Rows}"
+                         AutomationProperties.Name="Пары профилей"
                          HorizontalContentAlignment="Stretch"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}">
@@ -253,8 +273,10 @@
 
                                 <CheckBox Grid.Column="0"
                                           IsChecked="{Binding Include}"
+                                          IsEnabled="{Binding IsSelectable}"
                                           VerticalAlignment="Center"
-                                          Margin="0,0,10,0" />
+                                          Margin="0,0,10,0"
+                                          AutomationProperties.Name="{Binding Name, StringFormat='Создавать профиль {0}'}" />
 
                                 <StackPanel Grid.Column="1">
                                     <TextBlock Text="{Binding Name}"
@@ -266,13 +288,17 @@
                                         <Run Text="→" />
                                         <Run Text="{Binding Right, Mode=OneWay}" />
                                     </TextBlock>
+                                    <TextBlock Text="{Binding Refusal}"
+                                               Foreground="{DynamicResource State.WarningText}"
+                                               TextWrapping="Wrap"
+                                               Visibility="{Binding IsRefused, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
                                 </StackPanel>
 
                                 <TextBlock Grid.Column="2"
                                            Text="уже есть"
                                            VerticalAlignment="Center"
                                            Margin="10,0,0,0"
-                                           Foreground="{DynamicResource State.Warning}"
+                                           Foreground="{DynamicResource State.WarningText}"
                                            Visibility="{Binding AlreadyExists, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
                             </Grid>
                         </DataTemplate>
@@ -297,7 +323,7 @@
             <StackPanel Grid.Column="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right">
-                <Button Style="{StaticResource Button.Ghost}"
+                <Button Style="{StaticResource Button.Secondary}"
                         Command="{Binding CancelCommand}"
                         Content="Отмена"
                         MinWidth="96"
@@ -307,7 +333,7 @@
                         IsCancel="True" />
                 <Button Style="{StaticResource Button.Primary}"
                         Command="{Binding CreateCommand}"
-                        Content="{Binding SelectedCount, StringFormat='Создать ({0})'}"
+                        Content="{Binding CreateCaption}"
                         MinWidth="120"
                         MinHeight="{DynamicResource Control.Height.Default}"
                         Padding="14,6"

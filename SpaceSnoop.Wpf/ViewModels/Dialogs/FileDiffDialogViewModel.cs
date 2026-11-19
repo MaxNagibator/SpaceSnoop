@@ -24,25 +24,6 @@ public sealed partial class FileDiffDialogViewModel : ObservableObject, IDialogV
     [NotifyPropertyChangedFor(nameof(CollapseAllHint))]
     private bool _collapseUnchanged;
 
-    public FileDiffDialogViewModel(ISettingsStore settings, FileComparison file, string leftPath, string rightPath, IReadOnlyList<DiffLine> lines, int added, int removed, string? unavailable)
-    {
-        _settings = settings;
-        _file = file;
-        _unavailable = unavailable;
-        Name = file.Name;
-        LeftPath = leftPath;
-        RightPath = rightPath;
-        _lines = lines;
-        Added = added;
-        Removed = removed;
-        Summary = BuildSummary(file, unavailable, Added > 0 || Removed > 0);
-
-        _unified = settings.GetBool(SettingsKeys.SyncDiffUnified);
-        _collapseUnchanged = settings.GetBool(SettingsKeys.SyncDiffCollapse, AppDefaults.SyncDiffCollapseDefault);
-
-        RebuildItems();
-    }
-
     public event EventHandler<bool>? RequestClose;
 
     public string Title => "Сравнение содержимого";
@@ -85,6 +66,25 @@ public sealed partial class FileDiffDialogViewModel : ObservableObject, IDialogV
 
     public PackIconLucideKind CollapseAllIconKind => CollapseUnchanged ? PackIconLucideKind.UnfoldVertical : PackIconLucideKind.FoldVertical;
 
+    public FileDiffDialogViewModel(ISettingsStore settings, FileComparison file, string leftPath, string rightPath, IReadOnlyList<DiffLine> lines, int added, int removed, string? unavailable)
+    {
+        _settings = settings;
+        _file = file;
+        _unavailable = unavailable;
+        Name = file.Name;
+        LeftPath = leftPath;
+        RightPath = rightPath;
+        _lines = lines;
+        Added = added;
+        Removed = removed;
+        Summary = BuildSummary(file, unavailable, Added > 0 || Removed > 0);
+
+        _unified = settings.GetBool(SettingsKeys.SyncDiffUnified);
+        _collapseUnchanged = settings.GetBool(SettingsKeys.SyncDiffCollapse, AppDefaults.SyncDiffCollapseDefault);
+
+        RebuildItems();
+    }
+
     public static string DescribeHiddenDifference(FileComparison file)
     {
         var sizeDelta = Math.Abs((file.LeftSize ?? 0) - (file.RightSize ?? 0));
@@ -93,7 +93,7 @@ public sealed partial class FileDiffDialogViewModel : ObservableObject, IDialogV
 
         if (sizeDelta > 0 && timeDiffers)
         {
-            return $"Размер отличается на {SizeFormatter.Format(sizeDelta)}, время – на {SyncNodeViewModel.FormatDelta(timeDelta)}.";
+            return $"Размер отличается на {SizeFormatter.Format(sizeDelta)}, время – на {SyncNodeText.FormatDelta(timeDelta)}.";
         }
 
         if (sizeDelta > 0)
@@ -103,18 +103,35 @@ public sealed partial class FileDiffDialogViewModel : ObservableObject, IDialogV
 
         if (timeDiffers)
         {
-            return $"Размер совпадает, отличается только время изменения (Δ {SyncNodeViewModel.FormatDelta(timeDelta)}) – копирование меняет метку, на содержимое не влияет.";
+            return $"Размер совпадает, отличается только время изменения (Δ {SyncNodeText.FormatDelta(timeDelta)}) – копирование меняет метку, на содержимое не влияет.";
         }
 
         return "Размер и строки совпадают – различие в служебных метаданных файла.";
     }
 
+    public static string DescribeOneSided(FileComparison file)
+    {
+        return file.Status switch
+        {
+            ComparisonStatus.LeftOnly => $"Файл есть только слева, справа его нет – показано всё содержимое левой стороны ({SizeFormatter.Format(file.LeftSize ?? 0)}).",
+            ComparisonStatus.RightOnly => $"Файл есть только справа, слева его нет – показано всё содержимое правой стороны ({SizeFormatter.Format(file.RightSize ?? 0)}).",
+            _ => string.Empty,
+        };
+    }
+
     private static string BuildSummary(FileComparison file, string? unavailable, bool hasChanges)
     {
+        var oneSided = DescribeOneSided(file);
+
         if (unavailable is not null)
         {
-            var reason = DescribeHiddenDifference(file);
+            var reason = oneSided.Length > 0 ? oneSided : DescribeHiddenDifference(file);
             return reason.Length == 0 ? unavailable : $"{unavailable} {reason}";
+        }
+
+        if (oneSided.Length > 0)
+        {
+            return oneSided;
         }
 
         if (!hasChanges && file.Status != ComparisonStatus.Identical)
@@ -177,7 +194,7 @@ public sealed partial class FileDiffDialogViewModel : ObservableObject, IDialogV
             }
             else if (Unified)
             {
-                for (var i = segment.Start; i < segment.Start + segment.Count; i++)
+                for (var i = segment.Start; i < (segment.Start + segment.Count); i++)
                 {
                     Items.Add(_lines[i]);
                 }

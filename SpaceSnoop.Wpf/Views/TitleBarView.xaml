@@ -4,7 +4,6 @@
              xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
              xmlns:keepshell="https://schemas.keepshell.dev/wpf"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
-             xmlns:bs="clr-namespace:SpaceSnoop.Wpf.Bootstrap"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -12,75 +11,6 @@
              d:DataContext="{d:DesignInstance vm:ShellViewModel}"
              d:DesignHeight="36"
              d:DesignWidth="1100">
-
-    <UserControl.Resources>
-        <Style x:Key="Theme.SegmentButton"
-               TargetType="Button">
-            <Setter Property="Background"
-                    Value="Transparent" />
-            <Setter Property="Foreground"
-                    Value="{DynamicResource Fg.Secondary}" />
-            <Setter Property="BorderThickness"
-                    Value="0" />
-            <Setter Property="Padding"
-                    Value="0" />
-            <Setter Property="MinHeight"
-                    Value="32" />
-            <Setter Property="Cursor"
-                    Value="Hand" />
-            <Setter Property="HorizontalContentAlignment"
-                    Value="Center" />
-            <Setter Property="VerticalContentAlignment"
-                    Value="Center" />
-            <Setter Property="FocusVisualStyle"
-                    Value="{x:Null}" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd"
-                                Background="{TemplateBinding Background}"
-                                CornerRadius="{DynamicResource Radius.S}"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver"
-                                     Value="True">
-                                <Setter TargetName="Bd"
-                                        Property="Background"
-                                        Value="{DynamicResource Bg.SurfaceAlt}" />
-                            </Trigger>
-                            <Trigger Property="IsPressed"
-                                     Value="True">
-                                <Setter TargetName="Bd"
-                                        Property="Background"
-                                        Value="{DynamicResource Bg.SurfaceMute}" />
-                            </Trigger>
-                            <Trigger Property="IsKeyboardFocused"
-                                     Value="True">
-                                <Setter TargetName="Bd"
-                                        Property="BorderBrush"
-                                        Value="{DynamicResource Accent.Primary}" />
-                                <Setter TargetName="Bd"
-                                        Property="BorderThickness"
-                                        Value="1" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}"
-                             Value="True">
-                    <Setter Property="Background"
-                            Value="{DynamicResource Accent.Soft}" />
-                    <Setter Property="Foreground"
-                            Value="{DynamicResource Accent.Primary}" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-    </UserControl.Resources>
 
     <Border Background="{DynamicResource Bg.Surface}"
             BorderBrush="{DynamicResource Border.Subtle}"
@@ -92,62 +22,112 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Column="0"
-                        Orientation="Horizontal"
-                        Margin="14,0">
-                <Image Source="pack://application:,,,/icon.ico"
+            <Grid Grid.Column="0"
+                  Margin="14,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Image Grid.Column="0"
+                       Source="pack://application:,,,/SpaceSnoop.Wpf;component/icon.ico"
                        Width="18"
                        Height="18"
                        VerticalAlignment="Center"
                        RenderOptions.BitmapScalingMode="HighQuality" />
-                <TextBlock Text="SpaceSnoop"
+                <TextBlock Grid.Column="1"
+                           Text="SpaceSnoop"
                            Margin="10,0,0,0"
                            VerticalAlignment="Center"
                            FontWeight="SemiBold" />
-                <TextBlock VerticalAlignment="Center"
+                <TextBlock Grid.Column="2"
+                           VerticalAlignment="Center"
                            Margin="10,0,0,0"
                            Style="{StaticResource TextBlock.Subtle}">
                     <Run Text="v" /><Run Text="{Binding AppVersion, Mode=OneTime}" />
                 </TextBlock>
 
-                <Border Margin="14,0,0,0"
-                        Padding="8,2"
-                        CornerRadius="4"
-                        BorderBrush="{DynamicResource Border.Subtle}"
-                        BorderThickness="1"
-                        VerticalAlignment="Center"
-                        ToolTip="Режим запуска приложения">
-                    <StackPanel Orientation="Horizontal"
-                                VerticalAlignment="Center">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ShieldCheck}"
-                                                  Width="13"
-                                                  Height="13"
-                                                  Margin="0,0,6,0"
-                                                  VerticalAlignment="Center"
-                                                  Visibility="{Binding IsElevated, Converter={StaticResource BoolToVisibility}}" />
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Shield}"
-                                                  Width="13"
-                                                  Height="13"
-                                                  Margin="0,0,6,0"
-                                                  VerticalAlignment="Center"
-                                                  Visibility="{Binding IsElevated, Converter={StaticResource InverseBoolToVisibility}}" />
-                        <TextBlock Text="{Binding ElevationCaption}"
-                                   Style="{StaticResource TextBlock.Subtle}"
-                                   VerticalAlignment="Center" />
-                        <Button Content="Перезапустить от админа"
-                                Style="{StaticResource Button.Ghost}"
+                <keepshell:FirstFitPanel x:Name="ElevationSlot"
+                                     Grid.Column="3"
+                                     Margin="14,0,0,0"
+                                     HorizontalAlignment="Left"
+                                     VerticalAlignment="Center">
+                    <Border x:Name="ElevationPill"
+                            Padding="8,2"
+                            CornerRadius="4"
+                            BorderBrush="{DynamicResource Border.Subtle}"
+                            BorderThickness="1"
+                            VerticalAlignment="Center"
+                            ToolTip="Режим запуска приложения">
+                        <StackPanel Orientation="Horizontal"
+                                    VerticalAlignment="Center">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ShieldCheck}"
+                                                      Width="13"
+                                                      Height="13"
+                                                      Margin="0,0,6,0"
+                                                      VerticalAlignment="Center"
+                                                      Visibility="{Binding IsElevated, Converter={StaticResource BoolToVisibility}}" />
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Shield}"
+                                                      Width="13"
+                                                      Height="13"
+                                                      Margin="0,0,6,0"
+                                                      VerticalAlignment="Center"
+                                                      Visibility="{Binding IsElevated, Converter={StaticResource InverseBoolToVisibility}}" />
+                            <TextBlock Text="{Binding ElevationCaption}"
+                                       Style="{StaticResource TextBlock.Subtle}"
+                                       VerticalAlignment="Center" />
+                            <Button Content="Перезапустить от администратора"
+                                    Style="{StaticResource Button.Ghost}"
+                                    Command="{Binding RestartAsAdminCommand}"
+                                    shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                                    Margin="10,0,0,0"
+                                    Padding="6,2"
+                                    MinHeight="22"
+                                    VerticalAlignment="Center"
+                                    ToolTip="Перезапустить приложение с правами администратора"
+                                    AutomationProperties.Name="Перезапустить от имени администратора"
+                                    Visibility="{Binding IsElevated, Converter={StaticResource InverseBoolToVisibility}}" />
+                        </StackPanel>
+                    </Border>
+                    <Grid x:Name="ElevationIcon"
+                          VerticalAlignment="Center">
+                        <Button x:Name="ElevationIconButton"
+                                Style="{StaticResource Theme.SegmentButton}"
                                 Command="{Binding RestartAsAdminCommand}"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True"
-                                Margin="10,0,0,0"
-                                Padding="6,2"
-                                MinHeight="22"
-                                VerticalAlignment="Center"
-                                ToolTip="Перезапустить приложение с правами администратора"
+                                BorderBrush="{DynamicResource Border.Subtle}"
+                                BorderThickness="1"
+                                Width="30"
+                                MinHeight="24"
+                                ToolTip="Обычный режим: часть каталогов не прочитать. Нажмите, чтобы перезапустить от администратора"
                                 AutomationProperties.Name="Перезапустить от имени администратора"
-                                Visibility="{Binding IsElevated, Converter={StaticResource InverseBoolToVisibility}}" />
-                    </StackPanel>
-                </Border>
-            </StackPanel>
+                                Visibility="{Binding IsElevated, Converter={StaticResource InverseBoolToVisibility}}">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Shield}"
+                                                      Width="14"
+                                                      Height="14" />
+                        </Button>
+                        <Border Width="30"
+                                MinHeight="24"
+                                CornerRadius="4"
+                                BorderBrush="{DynamicResource Border.Subtle}"
+                                BorderThickness="1"
+                                Background="Transparent"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                                ToolTip="Запущено от администратора"
+                                AutomationProperties.Name="Запущено от администратора"
+                                Visibility="{Binding IsElevated, Converter={StaticResource BoolToVisibility}}">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ShieldCheck}"
+                                                      Width="14"
+                                                      Height="14"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"
+                                                      Foreground="{DynamicResource Fg.Secondary}" />
+                        </Border>
+                    </Grid>
+                </keepshell:FirstFitPanel>
+            </Grid>
 
             <StackPanel Grid.Column="1"
                         Orientation="Horizontal"
@@ -175,7 +155,7 @@
                                 <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Sparkles}"
                                                           Width="14"
                                                           Height="14"
-                                                          Foreground="{DynamicResource Accent.Primary}"
+                                                          Foreground="{DynamicResource Accent.Text}"
                                                           VerticalAlignment="Center"
                                                           Margin="0,0,6,0" />
                                 <TextBlock Text="{Binding AppUpdate.PillText}"
@@ -200,7 +180,7 @@
                 </Border>
 
                 <Button Style="{StaticResource Theme.SegmentButton}"
-                        Command="{Binding CurrentPageRefresh.RefreshCommand}"
+                        Command="{Binding PageRefreshCommand}"
                         Width="36"
                         VerticalAlignment="Center"
                         Margin="0,0,8,0"
@@ -216,64 +196,27 @@
                         Margin="0,8,8,8"
                         Visibility="{Binding CurrentPageRefresh, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
 
-                <StackPanel Orientation="Horizontal"
-                            VerticalAlignment="Center"
-                            Margin="0,0,8,0">
-                    <Button Style="{StaticResource Theme.SegmentButton}"
-                            Command="{Binding Theme.ApplyCommand}"
-                            CommandParameter="{x:Static bs:AppTheme.Light}"
-                            Tag="{Binding Theme.IsLight}"
-                            Width="36"
-                            ToolTip="Светлая тема"
-                            AutomationProperties.Name="Светлая тема">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Sun}"
-                                                  Width="16"
-                                                  Height="16" />
-                    </Button>
-                    <Button Style="{StaticResource Theme.SegmentButton}"
-                            Command="{Binding Theme.ApplyCommand}"
-                            CommandParameter="{x:Static bs:AppTheme.Dark}"
-                            Tag="{Binding Theme.IsDark}"
-                            Width="36"
-                            Margin="2,0,0,0"
-                            ToolTip="Тёмная тема"
-                            AutomationProperties.Name="Тёмная тема">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Moon}"
-                                                  Width="16"
-                                                  Height="16" />
-                    </Button>
-                    <Button Style="{StaticResource Theme.SegmentButton}"
-                            Command="{Binding Theme.ApplyCommand}"
-                            CommandParameter="{x:Static bs:AppTheme.Tarkov}"
-                            Tag="{Binding Theme.IsTarkov}"
-                            Width="36"
-                            Margin="2,0,0,0"
-                            ToolTip="Tarkov-тема"
-                            AutomationProperties.Name="Tarkov-тема">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Target}"
-                                                  Width="16"
-                                                  Height="16" />
-                    </Button>
-                </StackPanel>
+                <keepshell:ThemeSwitcher DataContext="{Binding Theme}"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0" />
                 <Border Width="1"
                         Background="{DynamicResource Border.Subtle}"
                         Margin="0,8" />
                 <Button Style="{StaticResource Chrome.Button}"
                         keepshell:ChromeAction.Action="Minimize"
-                        ToolTip="Свернуть">
-                    <Path Data="M 0,5 L 10,5"
-                          Style="{StaticResource Chrome.Glyph}" />
+                        ToolTip="Свернуть"
+                        AutomationProperties.Name="Свернуть окно">
+                    <Path Style="{StaticResource Chrome.Glyph.Minimize}" />
                 </Button>
-                <Button Style="{StaticResource Chrome.Button}"
-                        keepshell:ChromeAction.Action="MaxRestore"
-                        ToolTip="Развернуть">
+                <Button Style="{StaticResource Chrome.Button.MaxRestore}"
+                        keepshell:ChromeAction.Action="MaxRestore">
                     <Path Style="{StaticResource Chrome.Glyph.MaxRestore}" />
                 </Button>
                 <Button Style="{StaticResource Chrome.Button.Close}"
                         keepshell:ChromeAction.Action="Close"
-                        ToolTip="Закрыть">
-                    <Path Data="M 0,0 L 10,10 M 10,0 L 0,10"
-                          Style="{StaticResource Chrome.Glyph}" />
+                        ToolTip="Закрыть"
+                        AutomationProperties.Name="Закрыть окно">
+                    <Path Style="{StaticResource Chrome.Glyph.Close}" />
                 </Button>
             </StackPanel>
         </Grid>

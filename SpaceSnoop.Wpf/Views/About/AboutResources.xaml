@@ -17,18 +17,67 @@
         <Setter Property="Height"
                 Value="22" />
         <Setter Property="Foreground"
-                Value="{DynamicResource Accent.Primary}" />
+                Value="{DynamicResource Accent.Text}" />
         <Setter Property="VerticalAlignment"
                 Value="Center" />
     </Style>
 
     <Style x:Key="About.FeatureCard"
-           TargetType="Border"
-           BasedOn="{StaticResource Card.Inset}">
+           TargetType="Button">
         <Setter Property="Margin"
                 Value="0,0,10,10" />
         <Setter Property="Padding"
                 Value="14" />
+        <Setter Property="Cursor"
+                Value="Hand" />
+        <Setter Property="HorizontalAlignment"
+                Value="Stretch" />
+        <Setter Property="VerticalAlignment"
+                Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment"
+                Value="Stretch" />
+        <Setter Property="VerticalContentAlignment"
+                Value="Top" />
+        <Setter Property="Background"
+                Value="{DynamicResource Bg.SurfaceMute}" />
+        <Setter Property="BorderBrush"
+                Value="{DynamicResource Border.Subtle}" />
+        <Setter Property="BorderThickness"
+                Value="1" />
+        <Setter Property="FocusVisualStyle"
+                Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="CardBorder"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{DynamicResource Radius.M}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver"
+                                 Value="True">
+                            <Setter TargetName="CardBorder"
+                                    Property="BorderBrush"
+                                    Value="{DynamicResource Accent.Primary}" />
+                            <Setter TargetName="CardBorder"
+                                    Property="Background"
+                                    Value="{DynamicResource Bg.Surface}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused"
+                                 Value="True">
+                            <Setter TargetName="CardBorder"
+                                    Property="BorderBrush"
+                                    Value="{DynamicResource Accent.Primary}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style x:Key="About.MetaIcon"
@@ -54,8 +103,9 @@
     </Style>
 
     <Style x:Key="About.MetaValue"
-           TargetType="TextBlock"
-           BasedOn="{StaticResource TextBlock.Mono}">
+           TargetType="TextBlock">
+        <Setter Property="Foreground"
+                Value="{DynamicResource Fg.Primary}" />
         <Setter Property="HorizontalAlignment"
                 Value="Right" />
         <Setter Property="TextAlignment"
@@ -64,6 +114,13 @@
                 Value="Center" />
         <Setter Property="TextWrapping"
                 Value="Wrap" />
+    </Style>
+
+    <Style x:Key="About.MetaValueMono"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource About.MetaValue}">
+        <Setter Property="FontFamily"
+                Value="{DynamicResource Font.Mono}" />
     </Style>
 
 </ResourceDictionary>

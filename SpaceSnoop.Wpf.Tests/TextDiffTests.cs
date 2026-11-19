@@ -7,40 +7,49 @@ namespace SpaceSnoop.Wpf.Tests;
 public class TextDiffTests
 {
     [Test]
-    public void Идентичные_файлы_дают_только_контекст()
+    public void Collapse_не_трогает_короткий_неизменный_блок()
     {
-        string[] lines = ["a", "b", "c"];
+        var lines = TextDiff.Compute(["A", "b", "c", "D"], ["A2", "b", "c", "D2"]);
 
-        var diff = TextDiff.Compute(lines, lines);
+        var segments = TextDiff.Collapse(lines, 3, new HashSet<int>());
+
+        Assert.That(segments.Any(static s => s.IsGap), Is.False);
+    }
+
+    [Test]
+    public void Collapse_разворачивает_сегмент_по_ключу()
+    {
+        var lines = SingleChangeDiff();
+        var gap = TextDiff.Collapse(lines, 3, new HashSet<int>()).First(static s => s.IsGap);
+
+        var expanded = TextDiff.Collapse(
+            lines,
+            3,
+            new HashSet<int>
+            {
+                gap.Start,
+            });
+
+        Assert.That(expanded.Any(static s => s.IsGap), Is.False);
+    }
+
+    [Test]
+    public void Collapse_сворачивает_длинный_неизменный_блок_сохраняя_контекст()
+    {
+        var lines = SingleChangeDiff();
+
+        var segments = TextDiff.Collapse(lines, 3, new HashSet<int>());
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(diff.All(static l => l.Kind == DiffLineKind.Context));
-            Assert.That(diff, Has.Count.EqualTo(3));
+            Assert.That(segments.Any(static s => s.IsGap), "длинный неизменный хвост должен схлопнуться");
+            Assert.That(
+                segments.Where(static s => !s.IsGap).Where(s => lines[s.Start].Kind == DiffLineKind.Context).Sum(static s => s.Count),
+                Is.EqualTo(3),
+                "вокруг изменения остаётся ровно context строк");
+
+            Assert.That(segments.Sum(static s => s.Count), Is.EqualTo(lines.Count), "сегменты покрывают все строки без потерь");
         }
-    }
-
-    private static IEnumerable<TestCaseData> ChangeCases()
-    {
-        yield return new TestCaseData(new[] { "a", "c" },
-            new[] { "a", "b", "c" },
-            0, 1).SetName("Вставка_строки_даёт_одно_добавление");
-
-        yield return new TestCaseData(new[] { "a", "b", "c" },
-            new[] { "a", "c" },
-            1, 0).SetName("Удаление_строки_даёт_одно_удаление");
-
-        yield return new TestCaseData(new[] { "a", "b", "c" },
-            new[] { "a", "B", "c" },
-            1, 1).SetName("Модификация_строки_даёт_удаление_и_добавление");
-
-        yield return new TestCaseData(Array.Empty<string>(),
-            new[] { "a", "b" },
-            0, 2).SetName("Пустой_левый_файл_всё_добавлено");
-
-        yield return new TestCaseData(new[] { "x", "y" },
-            new[] { "p", "q" },
-            2, 2).SetName("Полностью_разные_файлы");
     }
 
     [TestCaseSource(nameof(ChangeCases))]
@@ -52,6 +61,84 @@ public class TextDiffTests
         {
             Assert.That(diff.Count(static l => l.Kind == DiffLineKind.Removed), Is.EqualTo(expectedRemoved));
             Assert.That(diff.Count(static l => l.Kind == DiffLineKind.Added), Is.EqualTo(expectedAdded));
+        }
+    }
+
+    [Test]
+    public void HighlightInline_делает_видимым_хвостовой_пробел()
+    {
+        var row = new DiffRow(DiffLineKind.Removed, "1", "foo ", DiffLineKind.Added, "1", "foo");
+
+        var (left, right) = TextDiff.HighlightInline(row);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(left.Any(static s => s is { Changed: true, Text: " " }), "хвостовой пробел слева помечен изменённым");
+            Assert.That(right.Any(static s => s.Changed), Is.False, "справа добавлять нечего");
+        }
+    }
+
+    [Test]
+    public void HighlightInline_не_трогает_неизменную_строку()
+    {
+        var row = new DiffRow(DiffLineKind.Context, "1", "same", DiffLineKind.Context, "1", "same");
+
+        var (left, _) = TextDiff.HighlightInline(row);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(left, Has.Count.EqualTo(1));
+            Assert.That(left[0].Changed, Is.False);
+        }
+    }
+
+    [Test]
+    public void HighlightInline_подсвечивает_только_изменённую_середину()
+    {
+        var row = new DiffRow(DiffLineKind.Removed, "1", "abXcd", DiffLineKind.Added, "1", "abYcd");
+
+        var (left, right) = TextDiff.HighlightInline(row);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(left.Single(static s => s.Changed).Text, Is.EqualTo("X"));
+            Assert.That(right.Single(static s => s.Changed).Text, Is.EqualTo("Y"));
+            Assert.That(string.Concat(left.Select(static s => s.Text)), Is.EqualTo("abXcd"), "сегменты склеиваются в исходную строку");
+        }
+    }
+
+    [Test]
+    public void Myers_разреженные_правки_в_большом_файле_не_деградируют_в_блочную_замену()
+    {
+        var left = Enumerable.Range(0, 3000).Select(static i => i.ToString(CultureInfo.InvariantCulture)).ToArray();
+        var right = (string[])left.Clone();
+        var changes = 0;
+
+        for (var i = 100; i <= 2900; i += 50)
+        {
+            right[i] = "X" + i.ToString(CultureInfo.InvariantCulture);
+            changes++;
+        }
+
+        var diff = TextDiff.Compute(left, right);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diff.Count(static l => l.Kind == DiffLineKind.Removed), Is.EqualTo(changes), "правок мало – блочная замена дала бы тысячи удалений");
+            Assert.That(diff.Count(static l => l.Kind == DiffLineKind.Added), Is.EqualTo(changes));
+        }
+    }
+
+    [Test]
+    public void Myers_сохраняет_внутренний_общий_фрагмент()
+    {
+        var diff = TextDiff.Compute(["1", "2", "3", "4"], ["1", "9", "3", "8"]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diff.Any(static l => l.Kind == DiffLineKind.Context && l.Text == "3"), "общая строка «3» в середине должна остаться контекстом");
+            Assert.That(diff.Count(static l => l.Kind == DiffLineKind.Removed), Is.EqualTo(2));
+            Assert.That(diff.Count(static l => l.Kind == DiffLineKind.Added), Is.EqualTo(2));
         }
     }
 
@@ -90,38 +177,77 @@ public class TextDiffTests
     }
 
     [Test]
-    public void Myers_сохраняет_внутренний_общий_фрагмент()
+    public void Идентичные_файлы_дают_только_контекст()
     {
-        var diff = TextDiff.Compute(["1", "2", "3", "4"], ["1", "9", "3", "8"]);
+        string[] lines = ["a", "b", "c"];
+
+        var diff = TextDiff.Compute(lines, lines);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(diff.Any(static l => l.Kind == DiffLineKind.Context && l.Text == "3"), "общая строка «3» в середине должна остаться контекстом");
-            Assert.That(diff.Count(static l => l.Kind == DiffLineKind.Removed), Is.EqualTo(2));
-            Assert.That(diff.Count(static l => l.Kind == DiffLineKind.Added), Is.EqualTo(2));
+            Assert.That(diff.All(static l => l.Kind == DiffLineKind.Context));
+            Assert.That(diff, Has.Count.EqualTo(3));
         }
     }
 
-    [Test]
-    public void Myers_разреженные_правки_в_большом_файле_не_деградируют_в_блочную_замену()
+    private static IEnumerable<TestCaseData> ChangeCases()
     {
-        var left = Enumerable.Range(0, 3000).Select(static i => i.ToString(CultureInfo.InvariantCulture)).ToArray();
-        var right = (string[])left.Clone();
-        var changes = 0;
+        yield return new TestCaseData(
+            new[]
+            {
+                "a", "c",
+            },
+            new[]
+            {
+                "a", "b", "c",
+            },
+            0,
+            1).SetName("Вставка_строки_даёт_одно_добавление");
 
-        for (var i = 100; i <= 2900; i += 50)
-        {
-            right[i] = "X" + i.ToString(CultureInfo.InvariantCulture);
-            changes++;
-        }
+        yield return new TestCaseData(
+            new[]
+            {
+                "a", "b", "c",
+            },
+            new[]
+            {
+                "a", "c",
+            },
+            1,
+            0).SetName("Удаление_строки_даёт_одно_удаление");
 
-        var diff = TextDiff.Compute(left, right);
+        yield return new TestCaseData(
+            new[]
+            {
+                "a", "b", "c",
+            },
+            new[]
+            {
+                "a", "B", "c",
+            },
+            1,
+            1).SetName("Модификация_строки_даёт_удаление_и_добавление");
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(diff.Count(static l => l.Kind == DiffLineKind.Removed), Is.EqualTo(changes), "правок мало – блочная замена дала бы тысячи удалений");
-            Assert.That(diff.Count(static l => l.Kind == DiffLineKind.Added), Is.EqualTo(changes));
-        }
+        yield return new TestCaseData(
+            Array.Empty<string>(),
+            new[]
+            {
+                "a", "b",
+            },
+            0,
+            2).SetName("Пустой_левый_файл_всё_добавлено");
+
+        yield return new TestCaseData(
+            new[]
+            {
+                "x", "y",
+            },
+            new[]
+            {
+                "p", "q",
+            },
+            2,
+            2).SetName("Полностью_разные_файлы");
     }
 
     private static IReadOnlyList<DiffLine> SingleChangeDiff()
@@ -130,84 +256,5 @@ public class TextDiffTests
         var right = (string[])left.Clone();
         right[0] = "X";
         return TextDiff.Compute(left, right);
-    }
-
-    [Test]
-    public void Collapse_сворачивает_длинный_неизменный_блок_сохраняя_контекст()
-    {
-        var lines = SingleChangeDiff();
-
-        var segments = TextDiff.Collapse(lines, 3, new HashSet<int>());
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(segments.Any(static s => s.IsGap), "длинный неизменный хвост должен схлопнуться");
-            Assert.That(segments.Where(static s => !s.IsGap).Where(s => lines[s.Start].Kind == DiffLineKind.Context).Sum(static s => s.Count), Is.EqualTo(3), "вокруг изменения остаётся ровно context строк");
-            Assert.That(segments.Sum(static s => s.Count), Is.EqualTo(lines.Count), "сегменты покрывают все строки без потерь");
-        }
-    }
-
-    [Test]
-    public void Collapse_не_трогает_короткий_неизменный_блок()
-    {
-        var lines = TextDiff.Compute(["A", "b", "c", "D"], ["A2", "b", "c", "D2"]);
-
-        var segments = TextDiff.Collapse(lines, 3, new HashSet<int>());
-
-        Assert.That(segments.Any(static s => s.IsGap), Is.False);
-    }
-
-    [Test]
-    public void Collapse_разворачивает_сегмент_по_ключу()
-    {
-        var lines = SingleChangeDiff();
-        var gap = TextDiff.Collapse(lines, 3, new HashSet<int>()).First(static s => s.IsGap);
-
-        var expanded = TextDiff.Collapse(lines, 3, new HashSet<int> { gap.Start });
-
-        Assert.That(expanded.Any(static s => s.IsGap), Is.False);
-    }
-
-    [Test]
-    public void HighlightInline_подсвечивает_только_изменённую_середину()
-    {
-        var row = new DiffRow(DiffLineKind.Removed, "1", "abXcd", DiffLineKind.Added, "1", "abYcd");
-
-        var (left, right) = TextDiff.HighlightInline(row);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(left.Single(static s => s.Changed).Text, Is.EqualTo("X"));
-            Assert.That(right.Single(static s => s.Changed).Text, Is.EqualTo("Y"));
-            Assert.That(string.Concat(left.Select(static s => s.Text)), Is.EqualTo("abXcd"), "сегменты склеиваются в исходную строку");
-        }
-    }
-
-    [Test]
-    public void HighlightInline_делает_видимым_хвостовой_пробел()
-    {
-        var row = new DiffRow(DiffLineKind.Removed, "1", "foo ", DiffLineKind.Added, "1", "foo");
-
-        var (left, right) = TextDiff.HighlightInline(row);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(left.Any(static s => s is { Changed: true, Text: " " }), "хвостовой пробел слева помечен изменённым");
-            Assert.That(right.Any(static s => s.Changed), Is.False, "справа добавлять нечего");
-        }
-    }
-
-    [Test]
-    public void HighlightInline_не_трогает_неизменную_строку()
-    {
-        var row = new DiffRow(DiffLineKind.Context, "1", "same", DiffLineKind.Context, "1", "same");
-
-        var (left, _) = TextDiff.HighlightInline(row);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(left, Has.Count.EqualTo(1));
-            Assert.That(left[0].Changed, Is.False);
-        }
     }
 }

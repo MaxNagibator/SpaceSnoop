@@ -7,6 +7,13 @@ public partial class MainWindow : Window
     private readonly ShellViewModel _viewModel;
     private readonly ISettingsStore _settings;
 
+    private static WindowPlacementKeys WindowKeys => new(
+        SettingsKeys.WindowLeft,
+        SettingsKeys.WindowTop,
+        SettingsKeys.WindowWidth,
+        SettingsKeys.WindowHeight,
+        SettingsKeys.WindowMaximized);
+
     public MainWindow(ShellViewModel viewModel, ISettingsStore settings)
     {
         InitializeComponent();
@@ -18,12 +25,6 @@ public partial class MainWindow : Window
 
         WindowPlacement.Restore(this, _settings, WindowKeys);
     }
-
-    private static WindowPlacementKeys WindowKeys => new(SettingsKeys.WindowLeft,
-        SettingsKeys.WindowTop,
-        SettingsKeys.WindowWidth,
-        SettingsKeys.WindowHeight,
-        SettingsKeys.WindowMaximized);
 
     protected override void OnClosing(CancelEventArgs e)
     {

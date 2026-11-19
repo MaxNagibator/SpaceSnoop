@@ -14,23 +14,22 @@ public class TreemapLayoutTests
         [7, 7, 7, 7, 7, 7, 7],
     ];
 
-    private static IEnumerable<TestCaseData> Cases()
+    [Test]
+    public void Все_нулевые_веса_дают_пустые_прямоугольники()
     {
-        foreach (var weights in WeightSets)
-        {
-            yield return new(weights, 320d, 200d);
-            yield return new(weights, 100d, 400d);
-        }
+        var rects = TreemapLayout.Squarify([0, 0, 0], 100, 100);
+
+        Assert.That(rects, Has.All.EqualTo(default(LayoutRect)));
     }
 
-    [TestCaseSource(nameof(Cases))]
-    public void Плитки_покрывают_всю_площадь(double[] weights, double width, double height)
+    [TestCase(0, 0)]
+    [TestCase(100, 0)]
+    [TestCase(0, 100)]
+    public void Неположительные_границы_дают_пустые_прямоугольники(double width, double height)
     {
-        var rects = TreemapLayout.Squarify(weights, width, height);
+        var rects = TreemapLayout.Squarify([3, 2, 1], width, height);
 
-        var covered = rects.Sum(static r => r.Width * r.Height);
-
-        Assert.That(covered, Is.EqualTo(width * height).Within(0.5));
+        Assert.That(rects, Has.All.EqualTo(default(LayoutRect)));
     }
 
     [TestCaseSource(nameof(Cases))]
@@ -52,6 +51,16 @@ public class TreemapLayoutTests
         }
     }
 
+    [TestCaseSource(nameof(Cases))]
+    public void Плитки_покрывают_всю_площадь(double[] weights, double width, double height)
+    {
+        var rects = TreemapLayout.Squarify(weights, width, height);
+
+        var covered = rects.Sum(static r => r.Width * r.Height);
+
+        Assert.That(covered, Is.EqualTo(width * height).Within(0.5));
+    }
+
     [Test]
     public void Площадь_плитки_пропорциональна_весу()
     {
@@ -71,27 +80,18 @@ public class TreemapLayoutTests
         }
     }
 
-    [TestCase(0, 0)]
-    [TestCase(100, 0)]
-    [TestCase(0, 100)]
-    public void Неположительные_границы_дают_пустые_прямоугольники(double width, double height)
-    {
-        var rects = TreemapLayout.Squarify([3, 2, 1], width, height);
-
-        Assert.That(rects, Has.All.EqualTo(default(LayoutRect)));
-    }
-
     [Test]
     public void Пустой_список_весов_даёт_пустой_результат()
     {
         Assert.That(TreemapLayout.Squarify([], 100, 100), Is.Empty);
     }
 
-    [Test]
-    public void Все_нулевые_веса_дают_пустые_прямоугольники()
+    private static IEnumerable<TestCaseData> Cases()
     {
-        var rects = TreemapLayout.Squarify([0, 0, 0], 100, 100);
-
-        Assert.That(rects, Has.All.EqualTo(default(LayoutRect)));
+        foreach (var weights in WeightSets)
+        {
+            yield return new(weights, 320d, 200d);
+            yield return new(weights, 100d, 400d);
+        }
     }
 }

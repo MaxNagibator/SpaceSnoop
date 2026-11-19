@@ -31,6 +31,29 @@ public class SyncFreshnessTests
     }
 
     [Test]
+    public void Перевес_свежести_измеряется_в_секундах_и_бесконечен_для_односторонних()
+    {
+        var both = SyncFreshness.Compute(Dir("", Modified("a.txt", New, New.AddMinutes(-5))));
+        var oneSided = SyncFreshness.Compute(
+            Dir(
+                "",
+                new FileComparison("l.txt", "l.txt")
+                {
+                    Status = ComparisonStatus.LeftOnly,
+                    LeftModified = Old,
+                }));
+
+        var nothing = SyncFreshness.Compute(Dir("", Modified("a.txt", New, New)));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(both.LeadSeconds, Is.EqualTo(300));
+            Assert.That(oneSided.LeadSeconds, Is.EqualTo(double.MaxValue));
+            Assert.That(nothing.LeadSeconds, Is.Zero);
+        }
+    }
+
+    [Test]
     public void Разница_в_пределах_FAT_допуска_даёт_ничью()
     {
         var withinTolerance = Modified("a.txt", New, New.AddSeconds(1));
@@ -47,50 +70,6 @@ public class SyncFreshnessTests
     }
 
     [Test]
-    public void Симметричные_изменения_дают_ничью()
-    {
-        var root = Dir("", Modified("a.txt", New, Old), Modified("b.txt", Old, New));
-
-        Assert.That(SyncFreshness.Compute(root).Verdict, Is.EqualTo(NewerSide.Tie));
-    }
-
-    [Test]
-    public void Сторона_с_единственными_изменениями_свежее()
-    {
-        var leftOnly = new FileComparison("l.txt", "l.txt") { Status = ComparisonStatus.LeftOnly, LeftModified = Old };
-        var root = Dir("", leftOnly);
-
-        var summary = SyncFreshness.Compute(root);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(summary.RightChangedMax, Is.Null);
-            Assert.That(summary.Verdict, Is.EqualTo(NewerSide.Left));
-        }
-    }
-
-    [Test]
-    public void Сводка_считает_максимум_и_уникальные_рекурсивно()
-    {
-        var leftOnly = new FileComparison("l.txt", "l.txt") { Status = ComparisonStatus.LeftOnly, LeftModified = Old };
-        var rightOnly = new FileComparison("r.txt", "sub/r.txt") { Status = ComparisonStatus.RightOnly, RightModified = New };
-        var root = Dir("", leftOnly);
-        root.SubDirectories.Add(Dir("sub", rightOnly));
-
-        var summary = SyncFreshness.Compute(root);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(summary.LeftOnly, Is.EqualTo(1));
-            Assert.That(summary.RightOnly, Is.EqualTo(1));
-            Assert.That(summary.LeftMax, Is.EqualTo(Old));
-            Assert.That(summary.RightMax, Is.EqualTo(New));
-            Assert.That(summary.LeftChangedMax, Is.EqualTo(Old));
-            Assert.That(summary.RightChangedMax, Is.EqualTo(New));
-        }
-    }
-
-    [Test]
     public void Свежесть_удаляемого_берёт_сторону_по_действию_и_не_входит_в_удаляемый_каталог()
     {
         var deletedRight = new FileComparison("x.txt", "x.txt")
@@ -99,7 +78,12 @@ public class SyncFreshnessTests
             RightModified = New,
         };
 
-        var kept = new FileComparison("y.txt", "y.txt") { Action = SyncAction.CopyToRight, RightModified = New.AddYears(1) };
+        var kept = new FileComparison("y.txt", "y.txt")
+        {
+            Action = SyncAction.CopyToRight,
+            RightModified = New.AddYears(1),
+        };
+
         var insideDeletedDir = new FileComparison("z.txt", "gone/z.txt")
         {
             Action = SyncAction.DeleteRight,
@@ -118,6 +102,65 @@ public class SyncFreshnessTests
         {
             Assert.That(count, Is.EqualTo(2));
             Assert.That(newest, Is.EqualTo(New));
+        }
+    }
+
+    [Test]
+    public void Сводка_считает_максимум_и_уникальные_рекурсивно()
+    {
+        var leftOnly = new FileComparison("l.txt", "l.txt")
+        {
+            Status = ComparisonStatus.LeftOnly,
+            LeftModified = Old,
+        };
+
+        var rightOnly = new FileComparison("r.txt", "sub/r.txt")
+        {
+            Status = ComparisonStatus.RightOnly,
+            RightModified = New,
+        };
+
+        var root = Dir("", leftOnly);
+        root.SubDirectories.Add(Dir("sub", rightOnly));
+
+        var summary = SyncFreshness.Compute(root);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(summary.LeftOnly, Is.EqualTo(1));
+            Assert.That(summary.RightOnly, Is.EqualTo(1));
+            Assert.That(summary.LeftMax, Is.EqualTo(Old));
+            Assert.That(summary.RightMax, Is.EqualTo(New));
+            Assert.That(summary.LeftChangedMax, Is.EqualTo(Old));
+            Assert.That(summary.RightChangedMax, Is.EqualTo(New));
+        }
+    }
+
+    [Test]
+    public void Симметричные_изменения_дают_ничью()
+    {
+        var root = Dir("", Modified("a.txt", New, Old), Modified("b.txt", Old, New));
+
+        Assert.That(SyncFreshness.Compute(root).Verdict, Is.EqualTo(NewerSide.Tie));
+    }
+
+    [Test]
+    public void Сторона_с_единственными_изменениями_свежее()
+    {
+        var leftOnly = new FileComparison("l.txt", "l.txt")
+        {
+            Status = ComparisonStatus.LeftOnly,
+            LeftModified = Old,
+        };
+
+        var root = Dir("", leftOnly);
+
+        var summary = SyncFreshness.Compute(root);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(summary.RightChangedMax, Is.Null);
+            Assert.That(summary.Verdict, Is.EqualTo(NewerSide.Left));
         }
     }
 

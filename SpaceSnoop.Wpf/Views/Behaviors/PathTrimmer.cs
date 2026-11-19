@@ -8,7 +8,10 @@ public static class PathTrimmer
 {
     private const string Ellipsis = "…";
 
-    public static readonly DependencyProperty FullPathProperty = DependencyProperty.RegisterAttached("FullPath",
+    private static readonly char[] PathSeparators = [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar];
+
+    public static readonly DependencyProperty FullPathProperty = DependencyProperty.RegisterAttached(
+        "FullPath",
         typeof(string),
         typeof(PathTrimmer),
         new(string.Empty, OnFullPathChanged));
@@ -62,7 +65,7 @@ public static class PathTrimmer
 
     private static string Shorten(TextBlock textBlock, string path, double available)
     {
-        var parts = path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var parts = path.Split(PathSeparators);
 
         if (parts.Length <= 2)
         {
@@ -131,7 +134,8 @@ public static class PathTrimmer
         var typeface = new Typeface(textBlock.FontFamily, textBlock.FontStyle, textBlock.FontWeight, textBlock.FontStretch);
         var pixelsPerDip = VisualTreeHelper.GetDpi(textBlock).PixelsPerDip;
 
-        var formatted = new FormattedText(text,
+        var formatted = new FormattedText(
+            text,
             CultureInfo.CurrentUICulture,
             textBlock.FlowDirection,
             typeface,

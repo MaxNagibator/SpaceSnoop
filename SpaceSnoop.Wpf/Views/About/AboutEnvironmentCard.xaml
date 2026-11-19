@@ -12,7 +12,8 @@
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/Views/About/AboutResources.xaml" />
+                <ResourceDictionary
+                    Source="pack://application:,,,/SpaceSnoop.Wpf;component/Views/About/AboutResources.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </UserControl.Resources>
@@ -58,15 +59,16 @@
                             Grid.Column="0"
                             Orientation="Horizontal"
                             Margin="0,0,0,10">
-                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Tag}"
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Hammer}"
                                               Style="{StaticResource About.MetaIcon}" />
-                    <TextBlock Text="Версия"
+                    <TextBlock Text="Сборка"
                                Style="{StaticResource About.MetaLabel}" />
                 </StackPanel>
                 <TextBlock Grid.Row="0"
                            Grid.Column="1"
-                           Text="{Binding Version}"
-                           Style="{StaticResource About.MetaValue}"
+                           Text="{Binding BuildInfo}"
+                           ToolTip="{Binding BuildInfoTooltip}"
+                           Style="{StaticResource About.MetaValueMono}"
                            Margin="20,0,0,10" />
 
                 <StackPanel Grid.Row="1"
@@ -120,32 +122,39 @@
                     Background="{DynamicResource Bg.SurfaceMute}"
                     BorderBrush="{DynamicResource Border.Subtle}"
                     BorderThickness="1">
-                <StackPanel Orientation="Horizontal">
-                    <iconPacks:PackIconLucide Width="16"
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <iconPacks:PackIconLucide Grid.Column="0"
+                                              Width="16"
                                               Height="16"
                                               VerticalAlignment="Center"
                                               Margin="0,0,10,0">
                         <iconPacks:PackIconLucide.Style>
                             <Style TargetType="iconPacks:PackIconLucide">
                                 <Setter Property="Kind"
-                                        Value="Shield" />
+                                        Value="{x:Static iconPacks:PackIconLucideKind.Shield}" />
                                 <Setter Property="Foreground"
-                                        Value="{DynamicResource State.Warning}" />
+                                        Value="{DynamicResource State.WarningText}" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsElevated}"
                                                  Value="True">
                                         <Setter Property="Kind"
-                                                Value="ShieldCheck" />
+                                                Value="{x:Static iconPacks:PackIconLucideKind.ShieldCheck}" />
                                         <Setter Property="Foreground"
-                                                Value="{DynamicResource State.Success}" />
+                                                Value="{DynamicResource State.SuccessText}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </iconPacks:PackIconLucide.Style>
                     </iconPacks:PackIconLucide>
-                    <TextBlock Text="{Binding ElevationCaption}"
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding ElevationCaption}"
+                               TextWrapping="Wrap"
                                Style="{StaticResource About.MetaLabel}" />
-                </StackPanel>
+                </Grid>
             </Border>
         </StackPanel>
     </Border>

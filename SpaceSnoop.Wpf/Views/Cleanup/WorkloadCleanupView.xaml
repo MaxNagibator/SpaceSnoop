@@ -1,0 +1,99 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Cleanup.WorkloadCleanupView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Cleanup"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:WorkloadCleanupViewModel}">
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  Padding="0,0,12,0">
+        <StackPanel>
+            <Border Style="{StaticResource Card}"
+                    Margin="0,0,0,10"
+                    Padding="18">
+                <StackPanel>
+                    <TextBlock Text=".NET workloads"
+                               Style="{StaticResource SectionTitle}" />
+                    <TextBlock
+                        Text="Команда workload clean обслуживает только установленное SDK workload-хранилище. Точного предварительного просмотра нет, объём освобождённого места не измеряется."
+                        TextWrapping="Wrap"
+                        Style="{StaticResource TextBlock.Subtle}"
+                        Margin="0,6,0,12" />
+                    <WrapPanel>
+                        <Button Content="Проверить SDK и workloads"
+                                Style="{StaticResource Button.Secondary}"
+                                Command="{Binding InspectCommand}"
+                                Padding="12,6"
+                                Margin="0,0,8,8" />
+                        <Button Content="Выполнить dotnet workload clean"
+                                Style="{StaticResource Button.Base}"
+                                Command="{Binding CleanCommand}"
+                                Padding="12,6"
+                                Margin="0,0,8,8" />
+                        <Button Content="Открыть журнал"
+                                Style="{StaticResource Button.Ghost}"
+                                Command="{Binding OpenLogCommand}"
+                                Padding="12,6"
+                                Margin="0,0,8,8" />
+                        <Button Content="Остановить"
+                                Style="{StaticResource Button.Ghost}"
+                                Command="{Binding CancelCommand}"
+                                AutomationProperties.Name="Остановить операцию"
+                                Padding="12,6"
+                                Margin="0,0,8,8"
+                                Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+                    </WrapPanel>
+                    <TextBlock Text="{Binding StatusText}"
+                               TextWrapping="Wrap"
+                               Style="{StaticResource TextBlock.Subtle}"
+                               Margin="0,4,0,8" />
+                    <Border Style="{StaticResource Card}"
+                            Padding="12"
+                            Visibility="{Binding HasPlan, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel>
+                            <TextBlock Text="План проверки"
+                                       FontWeight="Medium" />
+                            <TextBlock Text="{Binding DisplayPlan.Executable}"
+                                       TextWrapping="Wrap"
+                                       Style="{StaticResource TextBlock.Mono}"
+                                       Margin="0,6,0,0" />
+                            <TextBlock Text="{Binding DisplayPlan.WorkingDirectory, StringFormat=Рабочий каталог: {0}}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,4,0,0" />
+                            <TextBlock Text="{Binding DisplayPlan.SdkVersion, StringFormat=Активный SDK: {0}}"
+                                       Margin="0,4,0,0" />
+                            <Expander Style="{StaticResource Expander.Section}"
+                                      Header="Вывод CLI об установленных workloads"
+                                      Margin="-6,4,0,0">
+                                <TextBox Text="{Binding DisplayPlan.InstalledWorkloads, Mode=OneWay}"
+                                         IsReadOnly="True"
+                                         TextWrapping="Wrap"
+                                         AcceptsReturn="True"
+                                         MinHeight="70"
+                                         MaxHeight="180"
+                                         VerticalScrollBarVisibility="Auto" />
+                            </Expander>
+                            <TextBlock Text="{Binding DisplayPlan.Command, StringFormat=Команда: {0}}"
+                                       Style="{StaticResource TextBlock.Mono}"
+                                       Margin="0,8,0,0" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Card}"
+                            Padding="12"
+                            Margin="0,8,0,0"
+                            Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}}">
+                        <TextBox Text="{Binding ResultText, Mode=OneWay}"
+                                 IsReadOnly="True"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 MinHeight="100"
+                                 MaxHeight="240"
+                                 VerticalScrollBarVisibility="Auto" />
+                    </Border>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

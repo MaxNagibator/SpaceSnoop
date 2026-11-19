@@ -5,13 +5,12 @@
         xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels"
         xmlns:views="clr-namespace:SpaceSnoop.Wpf.Views"
         xmlns:keepshell="https://schemas.keepshell.dev/wpf"
-        xmlns:tarkov="https://schemas.keepshell.dev/wpf/tarkov"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance vm:ShellViewModel}"
         Title="SpaceSnoop"
-        Icon="pack://application:,,,/icon.ico"
+        Icon="pack://application:,,,/SpaceSnoop.Wpf;component/icon.ico"
         Height="720"
         Width="1100"
         MinHeight="520"
@@ -32,14 +31,26 @@
                             CornerRadius="0" />
     </shell:WindowChrome.WindowChrome>
 
+    <Window.Resources>
+        <Style TargetType="keepshell:NavigationRailView">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsNavigationLocked}"
+                             Value="True">
+                    <Setter Property="IsEnabled"
+                            Value="False" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
     <Window.InputBindings>
         <KeyBinding Key="F5"
-                    Command="{Binding CurrentPageRefresh.RefreshCommand}" />
+                    Command="{Binding PageRefreshCommand}" />
         <KeyBinding Key="Escape"
                     Command="{Binding CurrentPageStatus.CancelCommand}" />
     </Window.InputBindings>
 
-    <keepshell:ShellLayout>
+    <keepshell:ShellLayout ModalCoversShell="True">
         <keepshell:ShellLayout.TitleBar>
             <views:TitleBarView />
         </keepshell:ShellLayout.TitleBar>
@@ -49,8 +60,5 @@
         <keepshell:ShellLayout.ContentOverlay>
             <keepshell:ToastHost DataContext="{Binding Toasts}" />
         </keepshell:ShellLayout.ContentOverlay>
-        <keepshell:ShellLayout.WindowOverlay>
-            <tarkov:TarkovBootOverlay IsActive="{Binding IsTarkovBootPlaying, Mode=TwoWay}" />
-        </keepshell:ShellLayout.WindowOverlay>
     </keepshell:ShellLayout>
 </Window>

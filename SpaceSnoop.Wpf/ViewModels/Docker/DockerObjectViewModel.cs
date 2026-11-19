@@ -11,11 +11,16 @@ public sealed partial class DockerObjectViewModel(DockerObject model) : Observab
 
     public string Name => model.Name;
 
-    public string Size => model.Size;
+    public string Size => SizeFormatter.Format(model.SizeBytes);
 
     public string Detail => model.Detail;
 
     public bool InUse => model.InUse;
+    public bool CanRemove => !InUse;
+
+    public string DeleteTooltip => InUse
+        ? "Объект используется. Остановите контейнер и освободите связанные образы или тома перед удалением."
+        : "Удалить безвозвратно";
 
     public PackIconLucideKind IconKind => IconFor(model.Kind);
 
@@ -30,7 +35,7 @@ public sealed partial class DockerObjectViewModel(DockerObject model) : Observab
         };
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRemove))]
     private void ArmDelete()
     {
         ConfirmingDelete = true;

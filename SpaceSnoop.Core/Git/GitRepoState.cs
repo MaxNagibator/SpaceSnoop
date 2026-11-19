@@ -78,8 +78,17 @@ public sealed record GitRepoState(
             hasCommits = false;
         }
 
-        return new(branch, detached, hasCommits, hash, oid, subject, committedAt, dirty,
-            ahead, behind);
+        return new(
+            branch,
+            detached,
+            hasCommits,
+            hash,
+            oid,
+            subject,
+            committedAt,
+            dirty,
+            ahead,
+            behind);
     }
 
     private static (int? Ahead, int? Behind) ParseAheadBehind(string text)
@@ -120,9 +129,9 @@ public sealed record GitRepoState(
         var hash = parts.Length > 0 ? parts[0].Trim() : string.Empty;
 
         DateTimeOffset? when = parts.Length > 1
-                               && DateTimeOffset.TryParse(parts[1], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsed)
-            ? parsed
-            : null;
+            && DateTimeOffset.TryParse(parts[1], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsed)
+                ? parsed
+                : null;
 
         var subject = parts.Length > 2 ? parts[2] : string.Empty;
 

@@ -1,0 +1,106 @@
+﻿name: Build and test
+
+on:
+  workflow_call:
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: |
+            **/packages.lock.json
+            **/*.csproj
+            packages/**/*.nupkg
+
+      - name: Restore
+        run: dotnet restore SpaceSnoop.sln --locked-mode
+
+      - name: Format check
+        run: dotnet format whitespace SpaceSnoop.sln --verify-no-changes --no-restore
+
+      - name: Build
+        run: dotnet build SpaceSnoop.sln --configuration Release --no-restore
+
+      - name: Test
+        run: >
+          dotnet test SpaceSnoop.sln
+          --configuration Release
+          --no-build
+          --logger trx
+          --results-directory TestResults
+          --collect "Code Coverage;Format=xml"
+          --blame-hang
+          --blame-hang-timeout 60s
+
+      - name: Verify coverage assemblies
+        run: |
+          $reports = @(Get-ChildItem -Path TestResults -Recurse -Filter *.xml)
+          if ($reports.Count -eq 0) {
+            throw "Coverage XML reports were not generated in TestResults."
+          }
+
+          $modules = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+          foreach ($report in $reports) {
+            [xml]$xml = Get-Content -LiteralPath $report.FullName
+            foreach ($module in $xml.SelectNodes('//module[@name]')) {
+              [void]$modules.Add($module.GetAttribute('name'))
+            }
+          }
+
+          foreach ($required in @('SpaceSnoop.Core.dll', 'SpaceSnoop.Wpf.dll')) {
+            if (-not $modules.Contains($required)) {
+              throw "Coverage report is missing required assembly: $required"
+            }
+          }
+
+      - name: Publish smoke
+        run: >
+          dotnet publish SpaceSnoop.Wpf/SpaceSnoop.Wpf.csproj
+          --configuration Release
+          --runtime win-x64
+          --no-self-contained
+          --output publish-smoke
+          -p:PublishSingleFile=true
+          -p:PublishReadyToRun=true
+
+      - name: Test (.NET 11)
+        run: >
+          dotnet test SpaceSnoop.sln
+          --configuration Release
+          -p:UseNet11=true
+          --logger "trx;LogFilePrefix=net11"
+          --results-directory TestResults
+          --blame-hang
+          --blame-hang-timeout 60s
+
+      - name: Publish smoke (.NET 11)
+        run: >
+          dotnet publish SpaceSnoop.Wpf/SpaceSnoop.Wpf.csproj
+          --configuration Release
+          --runtime win-x64
+          --no-self-contained
+          --output publish-smoke-net11
+          -p:UseNet11=true
+          -p:PublishSingleFile=true
+          -p:PublishReadyToRun=true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-results
+          path: TestResults/**
+          retention-days: 5

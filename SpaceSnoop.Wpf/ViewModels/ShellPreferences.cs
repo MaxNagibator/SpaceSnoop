@@ -9,7 +9,16 @@ public sealed partial class ShellPreferences : ShellPreferencesBase
     private bool _navCollapsed;
 
     [ObservableProperty]
-    private bool _warnIfNotAdministrator = AppDefaults.WarnIfNotAdminDefault;
+    private StartupAdminMode _startupAdmin = AppDefaults.StartupAdminDefault;
+
+    [ObservableProperty]
+    private bool _showPerformanceHud = AppDefaults.PerformanceHudDefault;
+
+    public string? LastPage
+    {
+        get => Settings.GetStringValue(SettingsKeys.LastPage);
+        set => Settings.SetValue(SettingsKeys.LastPage, value ?? string.Empty);
+    }
 
     public ShellPreferences(ISettingsStore settings)
         : base(settings, new(SettingsKeys.ShowPageHeader, SettingsKeys.EnableToastNotifications, SettingsKeys.FontScale))
@@ -17,14 +26,38 @@ public sealed partial class ShellPreferences : ShellPreferencesBase
         SuppressPersist = true;
         StartupPage = Settings.GetEnum(SettingsKeys.StartupPage, AppDefaults.StartupPageDefault);
         NavCollapsed = Settings.GetBool(SettingsKeys.NavCollapsed);
-        WarnIfNotAdministrator = Settings.GetBool(SettingsKeys.WarnIfNotAdmin, AppDefaults.WarnIfNotAdminDefault);
+        StartupAdmin = MigrateStartupAdmin(Settings);
+        ShowPerformanceHud = Settings.GetBool(SettingsKeys.PerformanceHud);
         SuppressPersist = false;
     }
 
-    public string? LastPage
+    public static StartupAdminMode MigrateStartupAdmin(ISettingsStore settings)
     {
-        get => Settings.GetStringValue(SettingsKeys.LastPage);
-        set => Settings.SetValue(SettingsKeys.LastPage, value ?? string.Empty);
+        ArgumentNullException.ThrowIfNull(settings);
+
+        var legacy = settings.GetStringValue(SettingsKeys.WarnIfNotAdmin);
+
+        if (!string.IsNullOrWhiteSpace(legacy))
+        {
+            var migrated = settings.GetBool(SettingsKeys.WarnIfNotAdmin, true)
+                ? StartupAdminMode.Ask
+                : StartupAdminMode.WithoutAdmin;
+
+            if (string.IsNullOrWhiteSpace(settings.GetStringValue(SettingsKeys.StartupAdmin)))
+            {
+                settings.SetEnum(SettingsKeys.StartupAdmin, migrated);
+            }
+
+            settings.SetValue(SettingsKeys.WarnIfNotAdmin, string.Empty);
+        }
+
+        var mode = settings.GetEnum(SettingsKeys.StartupAdmin, AppDefaults.StartupAdminDefault);
+        return mode == StartupAdminMode.None ? AppDefaults.StartupAdminDefault : mode;
+    }
+
+    internal void Flush()
+    {
+        Settings.Flush();
     }
 
     partial void OnStartupPageChanged(StartupPage value)
@@ -40,8 +73,16 @@ public sealed partial class ShellPreferences : ShellPreferencesBase
         PersistBool(SettingsKeys.NavCollapsed, value);
     }
 
-    partial void OnWarnIfNotAdministratorChanged(bool value)
+    partial void OnStartupAdminChanged(StartupAdminMode value)
     {
-        PersistBool(SettingsKeys.WarnIfNotAdmin, value);
+        if (!SuppressPersist)
+        {
+            Settings.SetEnum(SettingsKeys.StartupAdmin, value);
+        }
+    }
+
+    partial void OnShowPerformanceHudChanged(bool value)
+    {
+        PersistBool(SettingsKeys.PerformanceHud, value);
     }
 }

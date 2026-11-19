@@ -1,0 +1,12 @@
+﻿<Project>
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net11.0-windows'">
+    <Features>$(Features);runtime-async=on</Features>
+    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
+    <NuGetLockFilePath>$(BaseIntermediateOutputPath)packages.net11.lock.json</NuGetLockFilePath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(IncludeExtraThemes)' == 'false' And '$(TargetFramework)' != 'net11.0-windows'">
+    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
+    <NuGetLockFilePath>$(BaseIntermediateOutputPath)packages.base-themes.lock.json</NuGetLockFilePath>
+  </PropertyGroup>
+</Project>

@@ -1,15 +1,14 @@
-﻿using Microsoft.Extensions.Logging.Abstractions;
-using System.Diagnostics;
-
-namespace SpaceSnoop.Wpf.ViewModels.Scan;
+﻿namespace SpaceSnoop.Wpf.ViewModels.Scan;
 
 public sealed partial class ScanNodeViewModel : ObservableObject
 {
     private static readonly ScanNodeViewModel Dummy = new();
+    private static readonly System.ComponentModel.PropertyChangedEventArgs AllPropertiesChanged = new(string.Empty);
 
     private readonly ScanSortState? _sort;
-    private readonly ILogger _logger;
     private readonly ScanNodeFactory? _factory;
+    private RangeObservableCollection<ScanNodeViewModel>? _children;
+    private IReadOnlyList<ScanNodeViewModel>? _previewTiles;
     private bool _loaded;
 
     [ObservableProperty]
@@ -21,74 +20,114 @@ public sealed partial class ScanNodeViewModel : ObservableObject
     [ObservableProperty]
     private bool _isSelected;
 
-    internal ScanNodeViewModel(SpaceBase space, double siblingMax, double parentTotal, ScanSortState sort, ILogger logger, ScanNodeFactory factory)
-    {
-        Space = space;
-        Fraction = siblingMax;
-        Share = parentTotal;
-        _sort = sort;
-        _logger = logger;
-        _factory = factory;
-        _isMarkedDeleted = space.IsDeleted;
+    [ObservableProperty]
+    private bool _isPrimarySelected;
 
-        if (HasChildren)
-        {
-            Children.Add(Dummy);
-        }
-    }
-
-    private ScanNodeViewModel()
-    {
-        _logger = NullLogger.Instance;
-    }
-
-    public RangeObservableCollection<ScanNodeViewModel> Children { get; } = [];
+    public RangeObservableCollection<ScanNodeViewModel> Children => _children ??= [];
 
     public bool IsDirectory => Space is DirectorySpace;
 
-    public bool HasChildren => Space is DirectorySpace dir && dir.SubDirectories.Count + dir.Files.Count > 0;
+    public bool HasChildren => Space is DirectorySpace dir && (dir.SubDirectories.Count + dir.Files.Count) > 0;
 
     public string Name => Space?.Name ?? string.Empty;
 
-    public string SizeText => Space is DirectorySpace dir ? dir.TotalSizeText : Space?.SizeText ?? string.Empty;
+    public string SizeText => Space is null ? string.Empty : SizeFormatter.Format(IsIgnored ? Space.TotalSize : (long)Weight);
 
     public double Fraction
     {
         get
         {
-            if (Space is null)
+            if (Space is null || IsIgnored)
             {
                 return 0;
             }
 
+            if (ShowsDriveShare)
+            {
+                return DriveShare;
+            }
+
             if (field > 0)
             {
-                return Math.Clamp(Space.TotalSize / field, 0, 1);
+                return Math.Clamp(Weight / field, 0, 1);
             }
 
             return 1;
         }
+        private set;
     }
 
-    public double Share => Space is null || field <= 0
+    public double Share
+    {
+        get => Space is null || IsIgnored || field <= 0 ? 0 : Math.Clamp(Weight / field, 0, 1);
+        private set;
+    }
+
+    public SpaceBase? Root { get; }
+
+    public bool IsRoot => Space is not null && ReferenceEquals(Space, Root);
+
+    public double ShareOfRoot => Space is null || Root is null || VisibleSize(Root) <= 0
         ? 0
-        : Math.Clamp(Space.TotalSize / field, 0, 1);
+        : Math.Clamp(Weight / VisibleSize(Root), 0, 1);
 
-    public double Weight => Space?.TotalSize ?? 0;
+    public DriveCapacity? Drive { get; }
 
-    public string ShareText => $"{Share * 100:0}%";
+    public bool ShowsDriveShare => IsRoot && Drive is { TotalBytes: > 0 };
 
-    public string FileCountText => Space is DirectorySpace dir ? dir.TotalFileCount.ToString("N0") : string.Empty;
+    public double DriveShare => ShowsDriveShare && Space is not null
+        ? Math.Clamp((double)Space.TotalSize / Drive!.Value.TotalBytes, 0, 1)
+        : 0;
+
+    public string DriveHint => ShowsDriveShare
+        ? $"Диск {Drive!.Value.Name} – занято {SizeFormatter.Format(Drive.Value.UsedBytes)} из {SizeFormatter.Format(Drive.Value.TotalBytes)}"
+        : string.Empty;
+
+    public double Weight => Space is null || IsIgnored ? 0 : VisibleSize(Space);
+
+    public string ShareText => IsIgnored ? "–" : ShareFormatter.Format(ShowsDriveShare ? DriveShare : Share);
+
+    public string FileCountText => Space is DirectorySpace dir
+        ? (IsIgnored ? dir.TotalFileCount : VisibleFileCount(dir)).ToString("N0")
+        : string.Empty;
 
     public string AbsolutePath => Space?.AbsolutePath ?? string.Empty;
 
-    public string Tooltip => Space?.GetTooltipText() ?? string.Empty;
+    public string Tooltip
+    {
+        get
+        {
+            if (IsIgnored)
+            {
+                return $"{Space?.GetTooltipText()}{Environment.NewLine}{IgnoreHint}";
+            }
+
+            if (_factory?.Visibility.Count > 0)
+            {
+                return $"{Name}{Environment.NewLine}{AbsolutePath}{Environment.NewLine}Размер в отображении: {SizeText}";
+            }
+
+            return ShowsDriveShare
+                ? $"{Space!.GetTooltipText()}{Environment.NewLine}Доля диска: {ShareFormatter.Format(DriveShare)} – {DriveHint}"
+                : Space?.GetTooltipText() ?? string.Empty;
+        }
+    }
+
+    public string ShareHint => ShowsDriveShare
+        ? $"Доля диска: {ShareText} ({DriveHint})"
+        : $"Доля от родителя: {ShareText}";
+
+    public string FileCountHint => $"Файлов: {FileCountText} – вместе с вложенными папками";
+
+    public string SizeHint => IsDirectory
+        ? $"Размер: {SizeText} – вместе с вложенными папками"
+        : $"Размер: {SizeText}";
 
     public string KindText => IsDirectory ? "Каталог" : "Файл";
 
-    public bool HasOwnSize => Space is DirectorySpace { Size: > 0 };
+    public bool HasOwnSize => OwnSize > 0;
 
-    public string OwnSizeText => Space is DirectorySpace dir ? dir.SizeText : string.Empty;
+    public string OwnSizeText => Space is DirectorySpace ? SizeFormatter.Format(OwnSize) : string.Empty;
 
     public string CreationDateText => Space?.CreationDate.ToString("g") ?? string.Empty;
 
@@ -98,25 +137,53 @@ public sealed partial class ScanNodeViewModel : ObservableObject
 
     public bool HasPreviewTiles => IsDirectory && PreviewTiles.Count > 0;
 
-    public bool CanMarkContentsDeleted => IsDirectory && !HasMarkedContents;
+    public bool CanAskAgent => Space is not null && _factory?.ChatEnabled == true;
+
+    public bool CanMarkContentsDeleted => Space is DirectorySpace dir
+        && EnumerateChildren(dir).Any(static child => child.State == SpaceState.Added);
 
     public bool CanUnmarkContents => IsDirectory && HasMarkedContents;
 
-    public IReadOnlyList<ScanNodeViewModel> PreviewTiles
-    {
-        get
-        {
-            EnsureLoaded();
+    public IReadOnlyList<ScanNodeViewModel> PreviewTiles => _previewTiles ??= BuildPreviewTiles();
 
-            return Children
-                .Where(static c => c.Weight > 0)
-                .OrderByDescending(static c => c.Weight)
-                .Take(AppDefaults.TreemapPreviewLimit)
-                .ToList();
+    private long OwnSize => Space is DirectorySpace dir
+        ? IsIgnored ? dir.Size : _factory?.Visibility.OwnSizeOf(dir) ?? dir.Size
+        : 0;
+
+    private bool HasMarkedContents => _factory?.MarksPresent == true
+        && Space is DirectorySpace dir
+        && EnumerateChildren(dir).Any(HasDeletedRecursive);
+
+    internal ScanNodeViewModel(
+        SpaceBase space,
+        double siblingMax,
+        double parentTotal,
+        SpaceBase root,
+        DriveCapacity? drive,
+        ScanSortState sort,
+        ScanNodeFactory factory,
+        ScanNodeViewModel? parent = null)
+    {
+        Space = space;
+        Fraction = siblingMax;
+        Share = parentTotal;
+        Root = root;
+        Drive = drive;
+        _sort = sort;
+        _factory = factory;
+        ParentNode = parent;
+        _isMarkedDeleted = space.IsDeleted;
+        _isIgnored = factory.Visibility.IsIgnored(space);
+
+        if (HasChildren)
+        {
+            Children.Add(Dummy);
         }
     }
 
-    private bool HasMarkedContents => Space is DirectorySpace dir && EnumerateChildren(dir).Any(HasDeletedRecursive);
+    private ScanNodeViewModel()
+    {
+    }
 
     public void EnsureLoaded()
     {
@@ -140,18 +207,32 @@ public sealed partial class ScanNodeViewModel : ObservableObject
 
         var items = EnumerateChildren(dir).ToList();
 
-        var localMax = items.Count > 0 ? items.Max(static x => x.TotalSize) : 0;
+        var localMax = items.Where(IsVisible).Select(VisibleSize).DefaultIfEmpty().Max();
+
+        var existing = Children.Where(static child => child.Space is not null).ToDictionary(static child => child.Space!);
 
         var ordered = items
             .OrderBy(static x => x, _sort)
-            .Select(item => _factory!.Create(item, localMax, dir.TotalSize, _sort));
+            .Select(item =>
+            {
+                var child = existing.GetValueOrDefault(item) ?? _factory!.Create(item, localMax, Weight, Root!, _sort, this);
+                child.Fraction = localMax;
+                child.Share = Weight;
+                return child;
+            });
 
         Children.ReplaceAll(ordered);
+        _previewTiles = null;
+    }
+
+    public void RefreshMarks()
+    {
+        RefreshMarkRecursive();
     }
 
     public void NotifyPropertiesChanged()
     {
-        OnPropertyChanged(string.Empty);
+        OnPropertyChanged(AllPropertiesChanged);
     }
 
     public void Resort()
@@ -163,6 +244,7 @@ public sealed partial class ScanNodeViewModel : ObservableObject
 
         var ordered = Children.OrderBy(static child => child.Space!, _sort).ToList();
         Children.ReplaceAll(ordered);
+        _previewTiles = null;
 
         foreach (var child in Children)
         {
@@ -170,12 +252,54 @@ public sealed partial class ScanNodeViewModel : ObservableObject
         }
     }
 
-    private static IEnumerable<SpaceBase> EnumerateChildren(DirectorySpace dir)
+    internal long VisibleSize(SpaceBase space)
     {
-        return dir.SubDirectories.Cast<SpaceBase>().Concat(dir.Files);
+        return _factory?.Visibility.SizeOf(space) ?? space.TotalSize;
     }
 
-    private static void RestoreRecursive(SpaceBase space)
+    internal bool IsVisible(SpaceBase space)
+    {
+        return _factory?.Visibility.IsIgnored(space) != true;
+    }
+
+    internal int VisibleFileCount(DirectorySpace dir)
+    {
+        return _factory?.Visibility.FileCountOf(dir) ?? dir.TotalFileCount;
+    }
+
+    internal int VisibleDirectoryCount(DirectorySpace dir)
+    {
+        return IsIgnored
+            ? dir.TotalDirectoryCount
+            : _factory?.Visibility.DirectoryCountOf(dir) ?? dir.TotalDirectoryCount;
+    }
+
+    internal void RefreshVisibility(IReadOnlySet<SpaceBase> affected, bool inheritedChange = false)
+    {
+        if (Space is null || (!inheritedChange && !affected.Contains(Space)))
+        {
+            return;
+        }
+
+        var changed = IsIgnored != (_factory?.Visibility.IsIgnored(Space) == true);
+        IsIgnored = _factory?.Visibility.IsIgnored(Space) == true;
+
+        if (IsRoot)
+        {
+            Fraction = Weight;
+            Share = Weight;
+        }
+
+        if (_loaded && _children is { Count: > 0 } children)
+        {
+            RefreshLoadedChildrenVisibility(children, affected, changed || inheritedChange);
+        }
+
+        _previewTiles = null;
+        NotifyPropertiesChanged();
+    }
+
+    internal static void RestoreRecursive(SpaceBase space)
     {
         if (space.IsDeleted)
         {
@@ -199,6 +323,69 @@ public sealed partial class ScanNodeViewModel : ObservableObject
                 file.Restore();
             }
         }
+    }
+
+    private void RefreshLoadedChildrenVisibility(
+        RangeObservableCollection<ScanNodeViewModel> children,
+        IReadOnlySet<SpaceBase> affected,
+        bool propagateChange)
+    {
+        var count = children.Count;
+        var updateShares = !IsIgnored;
+        var localMax = updateShares ? ComputeVisibleChildMax(children) : 0;
+        var parentWeight = updateShares ? Weight : 0;
+
+        for (var i = 0; i < count; i++)
+        {
+            var child = children[i];
+
+            if (updateShares)
+            {
+                child.Fraction = localMax;
+                child.Share = parentWeight;
+            }
+
+            if (propagateChange || (child.Space is { } space && affected.Contains(space)))
+            {
+                child.RefreshVisibility(affected, propagateChange);
+            }
+            else
+            {
+                child.NotifyPropertiesChanged();
+            }
+        }
+    }
+
+    private long ComputeVisibleChildMax(RangeObservableCollection<ScanNodeViewModel> children)
+    {
+        var count = children.Count;
+        long max = 0;
+
+        for (var i = 0; i < count; i++)
+        {
+            if (children[i].Space is { } space && IsVisible(space))
+            {
+                var size = VisibleSize(space);
+
+                if (size > max)
+                {
+                    max = size;
+                }
+            }
+        }
+
+        return max;
+    }
+
+    private static IEnumerable<SpaceBase> EnumerateChildren(DirectorySpace dir)
+    {
+        return dir.SubDirectories.Cast<SpaceBase>().Concat(dir.Files);
+    }
+
+    private IReadOnlyList<ScanNodeViewModel> BuildPreviewTiles()
+    {
+        EnsureLoaded();
+        return ScanTopSelector.SelectTopWeightedNodes(Children, AppDefaults.TreemapPreviewLimit, out _);
     }
 
     private static bool HasDeletedRecursive(SpaceBase space)
@@ -227,20 +414,13 @@ public sealed partial class ScanNodeViewModel : ObservableObject
             return;
         }
 
-        try
+        if (Space is DirectorySpace || _factory?.RevealFiles == false)
         {
-            if (Space is DirectorySpace || _factory?.RevealFiles == false)
-            {
-                Process.Start(new ProcessStartInfo(Space.AbsolutePath) { UseShellExecute = true });
-            }
-            else
-            {
-                Process.Start(SystemExecutable.Explorer, $"/select,\"{Space.AbsolutePath}\"");
-            }
+            _factory?.Shell.Open(Space.AbsolutePath);
         }
-        catch (Exception ex)
+        else
         {
-            _logger.OpenExplorerFailed(ex, Space.AbsolutePath);
+            _factory?.Shell.Reveal(Space.AbsolutePath);
         }
     }
 
@@ -254,82 +434,20 @@ public sealed partial class ScanNodeViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void MarkDeleted()
-    {
-        if (Space is null || Space.IsDeleted)
-        {
-            return;
-        }
-
-        Space.Delete();
-        ApplyMarkChange();
-    }
-
-    [RelayCommand]
-    private void UnmarkDeleted()
-    {
-        if (Space is null)
-        {
-            return;
-        }
-
-        RestoreRecursive(Space);
-        ApplyMarkChange();
-    }
-
-    [RelayCommand]
-    private void MarkContentsDeleted()
-    {
-        if (Space is not DirectorySpace dir)
-        {
-            return;
-        }
-
-        foreach (var child in EnumerateChildren(dir))
-        {
-            child.Delete();
-        }
-
-        ApplyMarkChange();
-    }
-
-    [RelayCommand]
-    private void UnmarkContents()
-    {
-        if (Space is not DirectorySpace dir)
-        {
-            return;
-        }
-
-        foreach (var child in EnumerateChildren(dir))
-        {
-            RestoreRecursive(child);
-        }
-
-        ApplyMarkChange();
-    }
-
-    private void ApplyMarkChange()
-    {
-        RefreshMarkRecursive();
-        _factory?.RaiseMarksChanged();
-    }
-
-    private void RefreshMarkRecursive()
+    private void AskAgent()
     {
         if (Space is not null)
         {
-            IsMarkedDeleted = Space.IsDeleted;
-            OnPropertyChanged(nameof(CanMarkContentsDeleted));
-            OnPropertyChanged(nameof(CanUnmarkContents));
+            _factory?.RequestAskAgent(this);
         }
+    }
 
-        foreach (var child in Children)
+    [RelayCommand]
+    private void CopyPath()
+    {
+        if (Space is not null)
         {
-            if (!ReferenceEquals(child, Dummy))
-            {
-                child.RefreshMarkRecursive();
-            }
+            _factory?.RequestCopyPath(this);
         }
     }
 }

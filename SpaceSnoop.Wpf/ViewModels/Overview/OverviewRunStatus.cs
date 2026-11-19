@@ -10,4 +10,5 @@ public enum OverviewRunStatus
     Error = 5,
     Syncing = 6,
     Synced = 7,
+    Skipped = 8,
 }

@@ -1,6 +1,5 @@
 ﻿using MahApps.Metro.IconPacks;
-using Microsoft.Win32;
-using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 
 namespace SpaceSnoop.Wpf.ViewModels.Sync;
@@ -10,6 +9,8 @@ public sealed partial class SyncProfileViewModel : ObservableObject
     private readonly ScheduleViewModel _parent;
 
     private bool _suppress;
+    private int _editSession;
+    private bool _confirmedEnabled;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(DisplayName))]
@@ -30,7 +31,13 @@ public sealed partial class SyncProfileViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(Summary))]
     [NotifyPropertyChangedFor(nameof(MirrorApplicable))]
     [NotifyPropertyChangedFor(nameof(MirrorWarning))]
+    [NotifyPropertyChangedFor(nameof(WinnerApplicable))]
     private int _selectedModeIndex;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MirrorApplicable))]
+    [NotifyPropertyChangedFor(nameof(MirrorWarning))]
+    private int _selectedWinnerIndex;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(MirrorWarning))]
@@ -51,6 +58,9 @@ public sealed partial class SyncProfileViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isEditing;
+
+    [ObservableProperty]
+    private bool _isSelected;
 
     [ObservableProperty]
     private bool _confirmingDelete;
@@ -78,33 +88,11 @@ public sealed partial class SyncProfileViewModel : ObservableObject
     [ObservableProperty]
     private bool _isStale;
 
-    public SyncProfileViewModel(ScheduleViewModel parent, SyncProfile model)
-    {
-        _parent = parent;
-        Id = model.Id;
-
-        _suppress = true;
-        _name = model.Name;
-        _leftPath = model.Left;
-        _rightPath = model.Right;
-        _exclusions = model.Exclusions;
-        _selectedModeIndex = Math.Clamp(model.Mode, 0, 2);
-        _mirror = model.Mirror;
-        _selectedIntervalIndex = model.Interval switch
-        {
-            ScheduleInterval.Hourly => 1,
-            ScheduleInterval.OnLogon => 2,
-            _ => 0,
-        };
-
-        _time = model.Time;
-        _enabled = model.Enabled;
-        _suppress = false;
-    }
-
     public string Id { get; }
 
-    public IReadOnlyList<string> Modes => _parent.Modes;
+    public IReadOnlyList<SegmentOption> Modes => _parent.Modes;
+
+    public IReadOnlyList<SegmentOption> Winners => _parent.Winners;
 
     public IReadOnlyList<string> Intervals => _parent.Intervals;
 
@@ -112,9 +100,11 @@ public sealed partial class SyncProfileViewModel : ObservableObject
 
     public bool TimeApplicable => SelectedIntervalIndex != 2;
 
-    public bool MirrorApplicable => SelectedModeIndex != 2;
+    public bool WinnerApplicable => SelectedModeIndex == 2;
 
-    public bool MirrorWarning => Mirror && SelectedModeIndex != 2;
+    public bool MirrorApplicable => SelectedModeIndex != 2 || SelectedWinnerIndex is 1 or 2;
+
+    public bool MirrorWarning => Mirror && MirrorApplicable;
 
     public PackIconLucideKind StatusIconKind =>
         Enabled && IsScheduled && OsEnabled ? PackIconLucideKind.CalendarCheck : PackIconLucideKind.CalendarOff;
@@ -146,6 +136,36 @@ public sealed partial class SyncProfileViewModel : ObservableObject
         _ => $"Ежедневно в {Time}",
     };
 
+    internal int EnableAttempt { get; private set; }
+
+    internal string TaskName => SyncScheduler.TaskNameFor(Id);
+
+    public SyncProfileViewModel(ScheduleViewModel parent, SyncProfile model)
+    {
+        _parent = parent;
+        Id = model.Id;
+
+        _suppress = true;
+        _name = model.Name;
+        _leftPath = model.Left;
+        _rightPath = model.Right;
+        _exclusions = model.Exclusions;
+        _selectedModeIndex = Math.Clamp(model.Mode, 0, 2);
+        _selectedWinnerIndex = SyncProfile.IndexOfWinner(model.Winner);
+        _mirror = model.Mirror;
+        _selectedIntervalIndex = model.Interval switch
+        {
+            ScheduleInterval.Hourly => 1,
+            ScheduleInterval.OnLogon => 2,
+            _ => 0,
+        };
+
+        _time = model.Time;
+        _enabled = model.Enabled;
+        _confirmedEnabled = model.Enabled;
+        _suppress = false;
+    }
+
     public SyncProfile ToModel()
     {
         return new()
@@ -155,6 +175,7 @@ public sealed partial class SyncProfileViewModel : ObservableObject
             Left = LeftPath.Trim(),
             Right = RightPath.Trim(),
             Mode = SelectedModeIndex,
+            Winner = SyncProfile.WinnerFromIndex(SelectedWinnerIndex),
             Mirror = Mirror,
             Exclusions = Exclusions.Trim(),
             Interval = SelectedIntervalIndex switch
@@ -164,13 +185,8 @@ public sealed partial class SyncProfileViewModel : ObservableObject
                 _ => ScheduleInterval.Daily,
             },
             Time = Time.Trim(),
-            Enabled = Enabled,
+            Enabled = _confirmedEnabled,
         };
-    }
-
-    public void RefreshStatus()
-    {
-        ApplyStatus(SyncScheduler.Query(TaskName));
     }
 
     public void ApplyStatus(ScheduleStatus status)
@@ -183,14 +199,67 @@ public sealed partial class SyncProfileViewModel : ObservableObject
         IsStale = status.Exists && SyncScheduler.IsStale(status.Action, Environment.ProcessPath ?? string.Empty);
     }
 
-    private static void Browse(Action<string> assign)
+    internal async Task<bool> ValidateEnableAsync(bool value)
     {
-        var dialog = new OpenFolderDialog { Title = "Выберите каталог" };
-
-        if (dialog.ShowDialog() == true)
+        if (!value || await RefuseSchedulingAsync() is not { } reason)
         {
-            assign(dialog.FolderName);
+            return true;
         }
+
+        Message = reason;
+        CommitEnabled(false);
+
+        return false;
+    }
+
+    internal void CommitEnabled(bool value)
+    {
+        _suppress = true;
+        Enabled = value;
+        _confirmedEnabled = value;
+        _suppress = false;
+    }
+
+    internal void ApplySchedule()
+    {
+        ApplyScheduleOutcome(_parent.Scheduler.Apply(BuildScheduleRequest()));
+    }
+
+    internal ScheduleRequest BuildScheduleRequest(bool? enabled = null)
+    {
+        TimeSpan.TryParse(Time, CultureInfo.InvariantCulture, out var time);
+
+        return new(enabled ?? Enabled, TaskName, ToModel().Interval, time, $"{AppInfo.SyncArgument} {Id}");
+    }
+
+    internal void ApplyScheduleOutcome(ScheduleOutcome outcome)
+    {
+        if (!outcome.Ok)
+        {
+            Message = $"Не удалось применить расписание: {outcome.Error}";
+            _parent.LogTaskFailed(DisplayName, outcome.Error);
+            return;
+        }
+
+        Message = Enabled
+            ? "Расписание сохранено."
+            : "Профиль сохранён, автозапуск выключен.";
+
+        _parent.LogSaved(DisplayName, Enabled);
+        ApplyStatus(outcome.Status);
+    }
+
+    private void Browse(Action<string> assign)
+    {
+        if (_parent.FilePicker.PickFolder("Выберите каталог") is { } path)
+        {
+            assign(path);
+        }
+    }
+
+    partial void OnIsSelectedChanged(bool value)
+    {
+        _parent.Bulk.NotifySelectionChanged();
     }
 
     partial void OnEnabledChanged(bool value)
@@ -200,16 +269,40 @@ public sealed partial class SyncProfileViewModel : ObservableObject
             return;
         }
 
-        if (value && !ValidateForScheduling(out var reason))
-        {
-            Message = reason;
-            _suppress = true;
-            Enabled = false;
-            _suppress = false;
-            return;
-        }
+        _ = ApplyEnabledAsync(value);
+    }
 
-        Apply();
+    private async Task ApplyEnabledAsync(bool value)
+    {
+        var attempt = ++EnableAttempt;
+
+        try
+        {
+            var reason = value ? await RefuseSchedulingAsync() : null;
+
+            if (attempt != EnableAttempt || Enabled != value || !_parent.Profiles.Contains(this))
+            {
+                return;
+            }
+
+            if (reason is null)
+            {
+                _confirmedEnabled = value;
+                ApplySchedule();
+            }
+            else
+            {
+                Message = reason;
+                CommitEnabled(false);
+            }
+
+            _parent.Persist();
+        }
+        catch (Exception exception)
+        {
+            Message = $"Не удалось применить расписание: {exception.Message}";
+            _parent.LogTaskFailed(DisplayName, exception.Message);
+        }
     }
 
     [RelayCommand]
@@ -227,14 +320,18 @@ public sealed partial class SyncProfileViewModel : ObservableObject
     [RelayCommand]
     private void Edit()
     {
+        _editSession++;
         Message = string.Empty;
         ConfirmingDelete = false;
+        IsSelected = false;
         IsEditing = true;
     }
 
     [RelayCommand]
     private void Cancel()
     {
+        EnableAttempt++;
+        _editSession++;
         var model = SyncProfileStore.Find(_parent.Settings, Id);
 
         if (model is not null)
@@ -245,6 +342,7 @@ public sealed partial class SyncProfileViewModel : ObservableObject
             RightPath = model.Right;
             Exclusions = model.Exclusions;
             SelectedModeIndex = Math.Clamp(model.Mode, 0, 2);
+            SelectedWinnerIndex = SyncProfile.IndexOfWinner(model.Winner);
             Mirror = model.Mirror;
             SelectedIntervalIndex = model.Interval switch
             {
@@ -255,6 +353,7 @@ public sealed partial class SyncProfileViewModel : ObservableObject
 
             Time = model.Time;
             Enabled = model.Enabled;
+            _confirmedEnabled = model.Enabled;
             _suppress = false;
         }
 
@@ -263,14 +362,23 @@ public sealed partial class SyncProfileViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void Save()
+    private async Task Save()
     {
-        if (Enabled && !ValidateForScheduling(out var reason))
+        var session = _editSession;
+        var reason = Enabled ? await RefuseSchedulingAsync() : null;
+
+        if (session != _editSession || !_parent.Profiles.Contains(this))
+        {
+            return;
+        }
+
+        if (Enabled && reason is not null)
         {
             Message = reason;
             return;
         }
 
+        _confirmedEnabled = Enabled;
         Apply();
         IsEditing = false;
     }
@@ -308,85 +416,61 @@ public sealed partial class SyncProfileViewModel : ObservableObject
             return;
         }
 
-        try
+        if (_parent.Shell.Start(exe, AppInfo.SyncArgument, Id))
         {
-            var info = new ProcessStartInfo(exe) { UseShellExecute = false };
-            info.ArgumentList.Add(AppInfo.SyncArgument);
-            info.ArgumentList.Add(Id);
-            Process.Start(info);
-
             _parent.LogRunNow(DisplayName);
             Message = "Запущено в фоне – результат появится в истории.";
         }
-        catch (Exception exception)
+        else
         {
-            Message = $"Не удалось запустить: {exception.Message}";
+            Message = "Не удалось запустить";
         }
     }
 
     private void Apply()
     {
         _parent.Persist();
-
-        if (Enabled)
-        {
-            TimeSpan.TryParse(Time, out var time);
-
-            if (!SyncScheduler.Create(TaskName, ToModel().Interval, time, $"{AppInfo.SyncArgument} {Id}", out var error))
-            {
-                Message = $"Не удалось создать задачу: {error}";
-                _parent.LogTaskFailed(DisplayName, error);
-                return;
-            }
-
-            Message = "Расписание сохранено.";
-        }
-        else
-        {
-            if (SyncScheduler.Exists(TaskName))
-            {
-                SyncScheduler.Disable(TaskName, out _);
-            }
-
-            Message = "Профиль сохранён, автозапуск выключен.";
-        }
-
-        _parent.LogSaved(DisplayName, Enabled);
-        RefreshStatus();
+        ApplySchedule();
     }
 
-    private bool ValidateForScheduling(out string reason)
+    private async Task<string?> RefuseSchedulingAsync()
     {
-        var left = LeftPath.Trim();
-        var right = RightPath.Trim();
-
-        if (left.Length == 0 || right.Length == 0)
+        while (true)
         {
-            reason = "Укажите оба каталога перед включением.";
-            return false;
-        }
+            var input = CaptureSchedulingInput();
+            var reason = await Task.Run(() => RefuseScheduling(input));
 
-        if (!Directory.Exists(left) || !Directory.Exists(right))
-        {
-            reason = "Один из каталогов не существует.";
-            return false;
+            if (input == CaptureSchedulingInput())
+            {
+                return reason;
+            }
         }
-
-        if (SyncProfile.PathsOverlap(left, right))
-        {
-            reason = "Каталоги не должны совпадать или быть вложены друг в друга.";
-            return false;
-        }
-
-        if (TimeApplicable && (!TimeSpan.TryParse(Time, out var time) || time < TimeSpan.Zero || time.TotalHours >= 24))
-        {
-            reason = "Время укажите в формате ЧЧ:ММ, например 03:00.";
-            return false;
-        }
-
-        reason = string.Empty;
-        return true;
     }
 
-    internal string TaskName => SyncScheduler.TaskNameFor(Id);
+    private SchedulingInput CaptureSchedulingInput()
+    {
+        return new(LeftPath.Trim(), RightPath.Trim(), TimeApplicable && !SyncProfile.IsValidTime(Time));
+    }
+
+    private static string? RefuseScheduling(SchedulingInput input)
+    {
+        if (input.Left.Length == 0 || input.Right.Length == 0)
+        {
+            return "Укажите оба каталога перед включением.";
+        }
+
+        if (!Directory.Exists(input.Left) || !Directory.Exists(input.Right))
+        {
+            return "Один из каталогов не существует.";
+        }
+
+        if (SyncRootsCheck.Refusal(input.Left, input.Right) is { } refusal)
+        {
+            return refusal;
+        }
+
+        return input.TimeInvalid ? "Время укажите в формате ЧЧ:ММ, например 03:00." : null;
+    }
+
+    private readonly record struct SchedulingInput(string Left, string Right, bool TimeInvalid);
 }

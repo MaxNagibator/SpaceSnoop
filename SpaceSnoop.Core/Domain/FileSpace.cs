@@ -26,8 +26,13 @@ public class FileSpace : SpaceBase
     public override string GetTooltipText()
     {
         return $"""
-                {base.GetTooltipText()}
-                Размер файла: {SizeText}
-                """;
+            {base.GetTooltipText()}
+            Размер файла: {SizeText}
+            """;
+    }
+
+    internal static FileSpace Create(in ScanEntry entry, SpaceBase? parent)
+    {
+        return new(entry.Name, parent, entry.CreationTime, entry.LastAccessTime, entry.Length);
     }
 }

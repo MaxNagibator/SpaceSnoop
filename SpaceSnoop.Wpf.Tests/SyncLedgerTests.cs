@@ -24,7 +24,7 @@ public class SyncLedgerTests
         var result = new ComparisonResult(@"C:\left", @"C:\right", root);
         var outcomes = SyncOutcomes.Build(result, [], [new("drift.txt", SyncAction.CopyToRight, "содержимое расходится")]);
 
-        var (files, dirs) = SyncViewModel.CountRemaining(root, outcomes);
+        var (files, dirs) = SyncPlanNarrative.CountRemaining(root, outcomes);
 
         using (Assert.EnterMultipleScope())
         {
@@ -40,12 +40,21 @@ public class SyncLedgerTests
     private static FileComparison File(string relativePath, ComparisonStatus status, SyncAction action)
     {
         var name = relativePath.Split('/')[^1];
-        return new(name, relativePath) { Status = status, Action = action };
+        return new(name, relativePath)
+        {
+            Status = status,
+            Action = action,
+        };
     }
 
     private static DirectoryComparison Dir(string name, ComparisonStatus status, SyncAction action, params FileComparison[] files)
     {
-        var dir = new DirectoryComparison(name, name) { Status = status, Action = action };
+        var dir = new DirectoryComparison(name, name)
+        {
+            Status = status,
+            Action = action,
+        };
+
         dir.Files.AddRange(files);
         return dir;
     }

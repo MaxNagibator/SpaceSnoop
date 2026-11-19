@@ -19,6 +19,26 @@ public class DockerInventoryTests
           {"ID":"v0k7c6ebkqir","Size":"0B"}]}
         """;
 
+    [TestCase("", 0L)]
+    [TestCase("0B", 0L)]
+    [TestCase("512MB", 512_000_000L)]
+    [TestCase("1.57GB", 1_570_000_000L)]
+    [TestCase("169.6MB", 169_600_000L)]
+    [TestCase("1.401kB", 1401L)]
+    [TestCase("2TB", 2_000_000_000_000L)]
+    public void DockerSize_ToBytes_ParsesHumanUnits(string human, long expected)
+    {
+        Assert.That(DockerSize.ToBytes(human), Is.EqualTo(expected));
+    }
+
+    [TestCase("")]
+    [TestCase("   ")]
+    [TestCase("not json")]
+    public void Parse_BadInput_ReturnsEmpty(string input)
+    {
+        Assert.That(DockerInventory.Parse(input), Is.Empty);
+    }
+
     [Test]
     public void Parse_FlattensImagesContainersVolumes_SkippingBuildCache()
     {
@@ -30,6 +50,21 @@ public class DockerInventoryTests
             Assert.That(objects.Count(o => o.Kind == DockerObjectKind.Image), Is.EqualTo(2));
             Assert.That(objects.Count(o => o.Kind == DockerObjectKind.Container), Is.EqualTo(1));
             Assert.That(objects.Count(o => o.Kind == DockerObjectKind.Volume), Is.EqualTo(2));
+        }
+    }
+
+    [Test]
+    public void Parse_LocalizesAgeAndStatus()
+    {
+        var objects = DockerInventory.Parse(Sample);
+
+        var image = objects.First(o => o.Kind == DockerObjectKind.Image && o.InUse);
+        var container = objects.First(o => o.Kind == DockerObjectKind.Container);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(image.Detail, Is.EqualTo("2 часа назад"));
+            Assert.That(container.Detail, Is.EqualTo("Остановлен (137), 2 дня назад"));
         }
     }
 
@@ -50,25 +85,5 @@ public class DockerInventoryTests
             Assert.That(volume.InUse, Is.True);
             Assert.That(volume.Id, Is.EqualTo("data-vol"));
         }
-    }
-
-    [TestCase("", 0L)]
-    [TestCase("0B", 0L)]
-    [TestCase("512MB", 512_000_000L)]
-    [TestCase("1.57GB", 1_570_000_000L)]
-    [TestCase("169.6MB", 169_600_000L)]
-    [TestCase("1.401kB", 1401L)]
-    [TestCase("2TB", 2_000_000_000_000L)]
-    public void DockerSize_ToBytes_ParsesHumanUnits(string human, long expected)
-    {
-        Assert.That(DockerSize.ToBytes(human), Is.EqualTo(expected));
-    }
-
-    [TestCase("")]
-    [TestCase("   ")]
-    [TestCase("not json")]
-    public void Parse_BadInput_ReturnsEmpty(string input)
-    {
-        Assert.That(DockerInventory.Parse(input), Is.Empty);
     }
 }

@@ -59,21 +59,6 @@ public class GitRepoStateTests
     }
 
     [Test]
-    public void Parse_DirtyAhead_CountsChangesAndAheadBehind()
-    {
-        var state = GitRepoState.Parse(DirtyAheadStatus, Log);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(state.Branch, Is.EqualTo("feature"));
-            Assert.That(state.DirtyCount, Is.EqualTo(2));
-            Assert.That(state.IsDirty, Is.True);
-            Assert.That(state.Ahead, Is.EqualTo(2));
-            Assert.That(state.Behind, Is.EqualTo(1));
-        }
-    }
-
-    [Test]
     public void Parse_DetachedNoUpstream_FlagsDetachedAndNoUpstream()
     {
         var state = GitRepoState.Parse(DetachedNoUpstreamStatus, Log);
@@ -85,6 +70,21 @@ public class GitRepoStateTests
             Assert.That(state.Ahead, Is.Null);
             Assert.That(state.Behind, Is.Null);
             Assert.That(state.HasCommits, Is.True);
+        }
+    }
+
+    [Test]
+    public void Parse_DirtyAhead_CountsChangesAndAheadBehind()
+    {
+        var state = GitRepoState.Parse(DirtyAheadStatus, Log);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(state.Branch, Is.EqualTo("feature"));
+            Assert.That(state.DirtyCount, Is.EqualTo(2));
+            Assert.That(state.IsDirty, Is.True);
+            Assert.That(state.Ahead, Is.EqualTo(2));
+            Assert.That(state.Behind, Is.EqualTo(1));
         }
     }
 

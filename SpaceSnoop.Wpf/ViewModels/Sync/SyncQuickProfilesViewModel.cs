@@ -9,7 +9,8 @@ public sealed partial class SyncQuickProfilesViewModel(
     Func<string, string, SyncProfile?, SyncProfile> capture,
     Action<SyncProfile> apply,
     Func<bool> canSave,
-    Action<string> setStatus)
+    Action<string> setStatus,
+    IUiDispatcher uiDispatcher)
     : ObservableObject
 {
     public const string CurrentProfileId = "__current";
@@ -28,7 +29,8 @@ public sealed partial class SyncQuickProfilesViewModel(
 
         var profiles = SyncProfileStore.Load(settings)
             .OrderBy(profile => profile.Name, StringComparer.CurrentCultureIgnoreCase)
-            .Select(profile => new SyncQuickProfileItem(profile,
+            .Select(profile => new SyncQuickProfileItem(
+                profile,
                 false,
                 RequestDeleteProfile,
                 ConfirmDeleteProfile,
@@ -41,8 +43,10 @@ public sealed partial class SyncQuickProfilesViewModel(
                 CancelRenameProfile))
             .ToList();
 
-        profiles.Insert(0,
-            new(capture(CurrentProfileId, "Текущие поля", null),
+        profiles.Insert(
+            0,
+            new(
+                capture(CurrentProfileId, "Текущие пути", null),
                 true,
                 RequestDeleteProfile,
                 ConfirmDeleteProfile,
@@ -57,7 +61,7 @@ public sealed partial class SyncQuickProfilesViewModel(
         _loading = true;
         Items.ReplaceAll(profiles);
         SelectedProfile = Items.FirstOrDefault(profile => string.Equals(profile.Id, selectedId, StringComparison.Ordinal))
-                          ?? Items.FirstOrDefault();
+            ?? Items.FirstOrDefault();
 
         _loading = false;
     }
@@ -69,12 +73,13 @@ public sealed partial class SyncQuickProfilesViewModel(
             return;
         }
 
-        var current = capture(CurrentProfileId, "Текущие поля", null);
+        var current = capture(CurrentProfileId, "Текущие пути", null);
         var model = Items[0].Model;
         model.Left = current.Left;
         model.Right = current.Right;
         model.Mode = current.Mode;
         model.Mirror = current.Mirror;
+        model.Winner = current.Winner;
         model.Exclusions = current.Exclusions;
         SelectedProfile = Items[0];
     }
@@ -134,18 +139,21 @@ public sealed partial class SyncQuickProfilesViewModel(
     }
 
     [RelayCommand(CanExecute = nameof(CanSaveProfile))]
-    private void SaveProfile()
+    private async Task SaveProfile()
     {
-        if (!TryBuildProfile(null, string.Empty, out var profile))
+        if (await TryBuildProfileAsync(null, string.Empty) is not { } profile)
         {
             return;
         }
 
-        var profiles = SyncProfileStore.Load(settings);
-        profiles.Add(profile);
-        SyncProfileStore.Save(settings, profiles);
-        Load(profile.Id);
-        setStatus($"Профиль сохранён: {profile.Name}.");
+        uiDispatcher.Invoke(() =>
+        {
+            var profiles = SyncProfileStore.Load(settings);
+            profiles.Add(profile);
+            SyncProfileStore.Save(settings, profiles);
+            Load(profile.Id);
+            setStatus($"Профиль сохранён: {profile.Name}.");
+        });
     }
 
     private bool CanSaveProfile()
@@ -167,28 +175,31 @@ public sealed partial class SyncQuickProfilesViewModel(
     }
 
     [RelayCommand]
-    private void ConfirmUpdateProfile(SyncQuickProfileItem profile)
+    private async Task ConfirmUpdateProfile(SyncQuickProfileItem profile)
     {
-        if (!TryBuildProfile(profile.Model, profile.Model.Name, out var updated))
+        if (await TryBuildProfileAsync(profile.Model, profile.Model.Name) is not { } updated || !profile.IsUpdateConfirming)
         {
             return;
         }
 
-        var profiles = SyncProfileStore.Load(settings);
-        var index = profiles.FindIndex(model => string.Equals(model.Id, profile.Id, StringComparison.Ordinal));
-
-        if (index < 0)
+        uiDispatcher.Invoke(() =>
         {
-            profiles.Add(updated);
-        }
-        else
-        {
-            profiles[index] = updated;
-        }
+            var profiles = SyncProfileStore.Load(settings);
+            var index = profiles.FindIndex(model => string.Equals(model.Id, profile.Id, StringComparison.Ordinal));
 
-        SyncProfileStore.Save(settings, profiles);
-        Load(updated.Id);
-        setStatus($"Профиль обновлён: {updated.Name}.");
+            if (index < 0)
+            {
+                profiles.Add(updated);
+            }
+            else
+            {
+                profiles[index] = updated;
+            }
+
+            SyncProfileStore.Save(settings, profiles);
+            Load(updated.Id);
+            setStatus($"Профиль обновлён: {updated.Name}.");
+        });
     }
 
     [RelayCommand]
@@ -253,35 +264,43 @@ public sealed partial class SyncQuickProfilesViewModel(
         setStatus($"Профиль удалён: {profile.Name}.");
     }
 
-    private bool TryBuildProfile(SyncProfile? existing, string name, out SyncProfile profile)
+    private async Task<SyncProfile?> TryBuildProfileAsync(SyncProfile? existing, string name)
     {
-        var candidate = capture(existing?.Id ?? Guid.NewGuid().ToString("N")[..8],
-            name.Length > 0 ? name : string.Empty,
-            existing);
+        var id = existing?.Id ?? Guid.NewGuid().ToString("N")[..8];
+        var candidate = capture(id, name, existing);
 
-        var left = candidate.Left;
-        var right = candidate.Right;
-
-        if (left.Length == 0 || right.Length == 0)
+        while (true)
         {
-            dialogs.Warning("Профиль синхронизации", "Укажите оба каталога.");
-            profile = new();
-            return false;
-        }
+            var left = candidate.Left;
+            var right = candidate.Right;
 
-        if (SyncProfile.PathsOverlap(left, right))
-        {
-            dialogs.Warning("Профиль синхронизации", "Каталоги совпадают или вложены друг в друга – такой профиль опасен.");
-            profile = new();
-            return false;
-        }
+            if (left.Length == 0 || right.Length == 0)
+            {
+                uiDispatcher.Invoke(() => dialogs.Warning("Профиль синхронизации", "Укажите оба каталога."));
+                return null;
+            }
 
-        if (string.IsNullOrWhiteSpace(candidate.Name))
-        {
-            candidate.Name = BuildProfileName(left, right);
-        }
+            var refusal = await Task.Run(() => SyncRootsCheck.Refusal(left, right));
+            var current = capture(id, name, existing);
 
-        profile = candidate;
-        return true;
+            if (current.Left != left || current.Right != right)
+            {
+                candidate = current;
+                continue;
+            }
+
+            if (refusal is not null)
+            {
+                uiDispatcher.Invoke(() => dialogs.Warning("Профиль синхронизации", refusal));
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(current.Name))
+            {
+                current.Name = BuildProfileName(left, right);
+            }
+
+            return current;
+        }
     }
 }

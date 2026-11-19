@@ -11,73 +11,197 @@
              d:DesignHeight="640"
              d:DesignWidth="980">
 
+    <UserControl.InputBindings>
+        <KeyBinding Key="Escape"
+                    Command="{Binding CancelFullScanExportCommand}" />
+    </UserControl.InputBindings>
+
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+        <Grid>
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Setter Property="IsEnabled"
+                            Value="True" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsExporting}"
+                                     Value="True">
+                            <Setter Property="IsEnabled"
+                                    Value="False" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
-        <controls:ScanToolbar Grid.Row="0"
-                              Margin="0,0,0,12" />
+            <controls:ScanToolbar Grid.Row="0"
+                                  Visibility="{Binding ShowScanResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Visible}" />
 
-        <controls:ScanProgressPanel Grid.Row="1" />
+            <controls:ScanProgressPanel Grid.Row="1"
+                                        DataContext="{Binding Progress}" />
 
-        <!--  Плашка отмены: появляется когда сканирование прервано пользователем  -->
-        <Border Grid.Row="2"
-                Style="{StaticResource Card.Inset}"
-                Padding="14,10"
-                Margin="0,0,0,12"
-                BorderBrush="{DynamicResource State.Warning}"
-                BorderThickness="0,0,0,2"
-                Visibility="{Binding ScanWasCancelled, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
-            <StackPanel Orientation="Horizontal"
-                        VerticalAlignment="Center">
-                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.OctagonAlert}"
-                                          Width="15"
-                                          Height="15"
-                                          VerticalAlignment="Center"
-                                          Margin="0,0,9,0"
-                                          Foreground="{DynamicResource State.Warning}" />
-                <TextBlock Text="Сканирование отменено – результаты не построены"
-                           VerticalAlignment="Center"
-                           FontSize="{DynamicResource Font.Size.S}"
-                           Foreground="{DynamicResource Fg.Secondary}" />
-            </StackPanel>
-        </Border>
+            <Border Grid.Row="2"
+                    x:Name="CancelledNotice"
+                    Style="{StaticResource Card.Inset}"
+                    Padding="0"
+                    Margin="0,0,0,12"
+                    Visibility="{Binding ScanWasCancelled, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="4" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
 
-        <controls:ScanSummaryStrip Grid.Row="3" />
+                    <Border Grid.Column="0"
+                            Background="{DynamicResource State.Warning}"
+                            CornerRadius="10,0,0,10" />
 
-        <Grid Grid.Row="4">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"
-                                  MinWidth="340" />
-                <ColumnDefinition x:Name="SplitterColumn"
-                                  Width="6" />
-                <ColumnDefinition x:Name="InspectorColumn"
-                                  Width="380"
-                                  MinWidth="280" />
-            </Grid.ColumnDefinitions>
+                    <Grid Grid.Column="1"
+                          Margin="14,10,10,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
 
-            <controls:ScanStructurePanel Grid.Column="0" />
+                        <iconPacks:PackIconLucide Grid.Column="0"
+                                                  Kind="{x:Static iconPacks:PackIconLucideKind.OctagonAlert}"
+                                                  Width="16"
+                                                  Height="16"
+                                                  VerticalAlignment="Top"
+                                                  Margin="0,2,10,0"
+                                                  Foreground="{DynamicResource State.WarningText}" />
 
-            <GridSplitter Grid.Column="1"
-                          x:Name="InspectorSplitter"
-                          Width="6"
-                          HorizontalAlignment="Stretch"
-                          VerticalAlignment="Stretch"
-                          ResizeBehavior="PreviousAndNext"
-                          ResizeDirection="Columns"
-                          Background="{DynamicResource Border.Subtle}"
-                          ShowsPreview="False"
-                          DragCompleted="OnInspectorSplitterDragCompleted"
-                          ToolTip="Перетащите, чтобы изменить ширину панели"
-                          Visibility="{Binding Inspector.IsInspectorCollapsed, Converter={StaticResource InverseBoolToVisibility}}" />
+                        <StackPanel Grid.Column="1"
+                                    VerticalAlignment="Center">
+                            <TextBlock Text="{Binding CancelledCaption}"
+                                       ToolTip="{Binding CancelledPath}"
+                                       TextTrimming="CharacterEllipsis"
+                                       FontWeight="{DynamicResource Font.Weight.SemiBold}"
+                                       Foreground="{DynamicResource Fg.Primary}" />
+                            <TextBlock
+                                Text="Прежний результат этой папки убран в начале скана, чтобы освободить память. Чтобы увидеть её снова, просканируйте папку ещё раз."
+                                Style="{StaticResource TextBlock.Subtle}"
+                                TextWrapping="Wrap"
+                                Margin="0,2,0,0"
+                                Visibility="{Binding CancelledReleasedPrevious, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+                        </StackPanel>
 
-            <controls:ScanInspectorPanel Grid.Column="2"
-                                         DataContext="{Binding Inspector}" />
+                        <StackPanel Grid.Column="2"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center"
+                                    Margin="12,0,0,0">
+                            <Button Style="{StaticResource Button.Primary}"
+                                    Command="{Binding RescanCancelledCommand}"
+                                    Margin="0,0,6,0"
+                                    AutomationProperties.Name="Сканировать снова">
+                                <Button.ToolTip>
+                                    <ToolTip>
+                                        <TextBlock
+                                            Text="{Binding CancelledPath, StringFormat='Сканировать {0} заново'}" />
+                                    </ToolTip>
+                                </Button.ToolTip>
+                                <StackPanel Orientation="Horizontal">
+                                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.RotateCw}"
+                                                              Width="14"
+                                                              Height="14"
+                                                              VerticalAlignment="Center"
+                                                              Margin="0,0,6,0" />
+                                    <TextBlock Text="Сканировать снова"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource Button.Ghost}"
+                                    Command="{Binding DismissCancelledCommand}"
+                                    Content="Скрыть"
+                                    ToolTip="Убрать это сообщение"
+                                    AutomationProperties.Name="Скрыть сообщение об остановке" />
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="3"
+                  Visibility="{Binding ShowSummary, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                <controls:ScanSummaryStrip DataContext="{Binding Summary}" />
+            </Grid>
+
+            <Grid Grid.Row="4"
+                  Visibility="{Binding ShowScanResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                <controls:ScanTipCard DataContext="{Binding Tips}" />
+            </Grid>
+
+            <controls:ScanTargetPicker Grid.Row="5"
+                                       Visibility="{Binding ShowTargetPicker, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+
+            <Grid Grid.Row="5"
+                  x:Name="ContentArea"
+                  SizeChanged="OnContentAreaSizeChanged"
+                  Visibility="{Binding ShowScanResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Visible}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition x:Name="StructureColumn"
+                                      Width="*"
+                                      MinWidth="260" />
+                    <ColumnDefinition x:Name="SplitterColumn"
+                                      Width="Auto" />
+                    <ColumnDefinition x:Name="InspectorColumn"
+                                      Width="380"
+                                      MinWidth="280" />
+                </Grid.ColumnDefinitions>
+
+                <controls:ScanStructurePanel Grid.Column="0"
+                                             x:Name="Structure" />
+
+                <GridSplitter Grid.Column="1"
+                              x:Name="InspectorSplitter"
+                              ResizeBehavior="PreviousAndNext"
+                              ResizeDirection="Columns"
+                              ShowsPreview="False"
+                              AutomationProperties.Name="Ширина панели деталей"
+                              DragCompleted="OnInspectorSplitterDragCompleted"
+                              ToolTip="Перетащите, чтобы изменить ширину панели"
+                              Visibility="{Binding Inspector.IsInspectorCollapsed, Converter={StaticResource InverseBoolToVisibility}}" />
+
+                <controls:ScanInspectorPanel Grid.Column="2"
+                                             DataContext="{Binding Inspector}" />
+            </Grid>
         </Grid>
+
+        <Border Panel.ZIndex="10"
+                Background="{DynamicResource Bg.Surface}"
+                Opacity="0.94"
+                Visibility="{Binding IsExporting, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+            <Border HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    MaxWidth="440"
+                    Padding="20"
+                    Style="{StaticResource Card.Inset}">
+                <StackPanel>
+                    <TextBlock Text="Сохранение полного скана"
+                               FontSize="16"
+                               FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding ExportProgressText}"
+                               Style="{StaticResource TextBlock.Subtle}"
+                               Margin="0,8,0,0" />
+                    <ProgressBar Minimum="0"
+                                 Maximum="100"
+                                 Value="{Binding ExportProgressPercent, Mode=OneWay}"
+                                 Height="6"
+                                 Margin="0,14,0,16"
+                                 AutomationProperties.Name="Ход сохранения скана" />
+                    <Button Style="{StaticResource Button.Secondary}"
+                            Command="{Binding CancelFullScanExportCommand}"
+                            HorizontalAlignment="Right"
+                            Content="Отменить экспорт"
+                            AutomationProperties.Name="Отменить экспорт скана" />
+                </StackPanel>
+            </Border>
+        </Border>
     </Grid>
 </UserControl>

@@ -6,33 +6,35 @@ public partial class OverviewView : UserControl, IView<OverviewViewModel>
 {
     private bool _restored;
 
+    private OverviewViewModel? ViewModel => DataContext as OverviewViewModel;
+
     public OverviewView()
     {
         InitializeComponent();
     }
 
-    private OverviewViewModel? ViewModel => DataContext as OverviewViewModel;
-
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         _restored = false;
 
-        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
-        {
-            if (ViewModel is { } vm)
+        Dispatcher.BeginInvoke(
+            DispatcherPriority.Loaded,
+            () =>
             {
-                Scroller.ScrollToVerticalOffset(vm.ScrollOffset);
-            }
+                if (ViewModel is { } vm)
+                {
+                    Scroller.ScrollToVerticalOffset(vm.Rows.ScrollOffset);
+                }
 
-            _restored = true;
-        });
+                _restored = true;
+            });
     }
 
     private void OnScrollChanged(object sender, ScrollChangedEventArgs e)
     {
         if (_restored && ViewModel is { } vm)
         {
-            vm.ScrollOffset = Scroller.VerticalOffset;
+            vm.Rows.ScrollOffset = Scroller.VerticalOffset;
         }
     }
 }

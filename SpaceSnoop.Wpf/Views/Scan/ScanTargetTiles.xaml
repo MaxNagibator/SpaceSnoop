@@ -1,0 +1,442 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Scan"
+                    xmlns:views="clr-namespace:SpaceSnoop.Wpf.Views"
+                    xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks">
+
+    <Style x:Key="TargetTile.Surface"
+           TargetType="Border"
+           BasedOn="{StaticResource Card.Inset}">
+        <Setter Property="BorderThickness"
+                Value="2" />
+        <Setter Property="Padding"
+                Value="12,10" />
+    </Style>
+
+    <Style x:Key="TargetTile"
+           TargetType="RadioButton">
+        <Setter Property="Width"
+                Value="320" />
+        <Setter Property="MinHeight"
+                Value="76" />
+        <Setter Property="Margin"
+                Value="0,0,12,12" />
+        <Setter Property="Cursor"
+                Value="Hand" />
+        <Setter Property="FocusVisualStyle"
+                Value="{x:Null}" />
+        <Setter Property="ToolTip"
+                Value="{Binding Path}" />
+        <Setter Property="AutomationProperties.Name"
+                Value="{Binding AutomationName}" />
+        <Setter Property="IsChecked"
+                Value="{Binding IsSelected, Mode=OneWay}" />
+        <Setter Property="Command"
+                Value="{Binding DataContext.SelectTargetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+        <Setter Property="CommandParameter"
+                Value="{Binding Path}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="Tile"
+                            Style="{StaticResource TargetTile.Surface}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter VerticalAlignment="Top" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver"
+                                 Value="True">
+                            <Setter TargetName="Tile"
+                                    Property="Background"
+                                    Value="{DynamicResource Bg.Surface}" />
+                            <Setter TargetName="Tile"
+                                    Property="BorderBrush"
+                                    Value="{DynamicResource Border.Default}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked"
+                                 Value="True">
+                            <Setter TargetName="Tile"
+                                    Property="Background"
+                                    Value="{DynamicResource Accent.Soft}" />
+                            <Setter TargetName="Tile"
+                                    Property="BorderBrush"
+                                    Value="{DynamicResource Accent.Primary}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused"
+                                 Value="True">
+                            <Setter TargetName="Tile"
+                                    Property="BorderBrush"
+                                    Value="{DynamicResource Accent.Focus}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled"
+                                 Value="False">
+                            <Setter TargetName="Tile"
+                                    Property="Opacity"
+                                    Value="{DynamicResource Opacity.Disabled}" />
+                            <Setter Property="Cursor"
+                                    Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsMissingMedia}"
+                         Value="True">
+                <Setter Property="IsEnabled"
+                        Value="False" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="TargetTile.Browse"
+           TargetType="Button">
+        <Setter Property="Width"
+                Value="320" />
+        <Setter Property="MinHeight"
+                Value="76" />
+        <Setter Property="Margin"
+                Value="0,0,12,12" />
+        <Setter Property="Cursor"
+                Value="Hand" />
+        <Setter Property="FocusVisualStyle"
+                Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid>
+                        <Rectangle x:Name="Dash"
+                                   RadiusX="10"
+                                   RadiusY="10"
+                                   StrokeThickness="2"
+                                   StrokeDashArray="4 3"
+                                   Stroke="{DynamicResource Border.Default}"
+                                   Fill="Transparent"
+                                   SnapsToDevicePixels="True" />
+                        <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderOpen}"
+                                                      Width="15"
+                                                      Height="15"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,8,0"
+                                                      Foreground="{DynamicResource Fg.Secondary}" />
+                            <TextBlock x:Name="Caption"
+                                       Text="Другой каталог…"
+                                       VerticalAlignment="Center"
+                                       FontFamily="{DynamicResource Font.Sans}"
+                                       FontSize="{DynamicResource Font.Size.S}"
+                                       Foreground="{DynamicResource Fg.Secondary}" />
+                        </StackPanel>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver"
+                                 Value="True">
+                            <Setter TargetName="Dash"
+                                    Property="Stroke"
+                                    Value="{DynamicResource Accent.Primary}" />
+                            <Setter TargetName="Caption"
+                                    Property="Foreground"
+                                    Value="{DynamicResource Fg.Primary}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused"
+                                 Value="True">
+                            <Setter TargetName="Dash"
+                                    Property="Stroke"
+                                    Value="{DynamicResource Accent.Focus}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled"
+                                 Value="False">
+                            <Setter Property="Opacity"
+                                    Value="{DynamicResource Opacity.Disabled}" />
+                            <Setter Property="Cursor"
+                                    Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="TargetTile.Bar"
+           TargetType="ProgressBar"
+           BasedOn="{StaticResource {x:Type ProgressBar}}">
+        <Setter Property="MinHeight"
+                Value="0" />
+        <Setter Property="Foreground"
+                Value="{DynamicResource Fg.Secondary}" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding UsageLevel}"
+                         Value="{x:Static vm:DriveUsageLevel.Warning}">
+                <Setter Property="Foreground"
+                        Value="{DynamicResource State.Warning}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding UsageLevel}"
+                         Value="{x:Static vm:DriveUsageLevel.Critical}">
+                <Setter Property="Foreground"
+                        Value="{DynamicResource State.Error}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="TargetTile.Ratio"
+           TargetType="TextBlock">
+        <Setter Property="FontFamily"
+                Value="{DynamicResource Font.Sans}" />
+        <Setter Property="FontSize"
+                Value="{DynamicResource Font.Size.M}" />
+        <Setter Property="FontWeight"
+                Value="{DynamicResource Font.Weight.SemiBold}" />
+        <Setter Property="Foreground"
+                Value="{DynamicResource Fg.Primary}" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding UsageLevel}"
+                         Value="{x:Static vm:DriveUsageLevel.Warning}">
+                <Setter Property="Foreground"
+                        Value="{DynamicResource State.WarningText}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding UsageLevel}"
+                         Value="{x:Static vm:DriveUsageLevel.Critical}">
+                <Setter Property="Foreground"
+                        Value="{DynamicResource State.ErrorText}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="TargetTile.CriticalMark"
+           TargetType="iconPacks:PackIconLucide">
+        <Setter Property="Visibility"
+                Value="Collapsed" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding UsageLevel}"
+                         Value="{x:Static vm:DriveUsageLevel.Critical}">
+                <Setter Property="Visibility"
+                        Value="Visible" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <DataTemplate DataType="{x:Type vm:DriveItem}">
+        <views:CommandRadioButton Style="{StaticResource TargetTile}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <iconPacks:PackIconLucide Grid.Column="0"
+                                              Kind="{Binding IconKind}"
+                                              Width="15"
+                                              Height="15"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,7,0"
+                                              Foreground="{DynamicResource Fg.Secondary}" />
+
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding Title}"
+                               VerticalAlignment="Center"
+                               FontFamily="{DynamicResource Font.Sans}"
+                               FontSize="{DynamicResource Font.Size.M}"
+                               FontWeight="{DynamicResource Font.Weight.SemiBold}"
+                               Foreground="{DynamicResource Fg.Primary}" />
+
+                    <TextBlock Grid.Column="2"
+                               Text="{Binding VolumeLabel}"
+                               VerticalAlignment="Center"
+                               Margin="7,0,0,0"
+                               TextTrimming="CharacterEllipsis"
+                               FontFamily="{DynamicResource Font.Sans}"
+                               FontSize="{DynamicResource Font.Size.S}"
+                               Foreground="{DynamicResource Fg.Secondary}" />
+
+                    <TextBlock Grid.Column="3"
+                               Text="{Binding TypeHint}"
+                               VerticalAlignment="Center"
+                               Margin="7,0,0,0"
+                               FontFamily="{DynamicResource Font.Sans}"
+                               FontSize="{DynamicResource Font.Size.XS}"
+                               Foreground="{DynamicResource Fg.Muted}" />
+                </Grid>
+
+                <Grid Grid.Row="1"
+                      Margin="0,10,0,6"
+                      Visibility="{Binding HasUsage, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <ProgressBar Grid.Column="0"
+                                 Style="{StaticResource TargetTile.Bar}"
+                                 Height="6"
+                                 VerticalAlignment="Center"
+                                 Minimum="0"
+                                 Maximum="1"
+                                 Value="{Binding UsedRatio, Mode=OneWay}" />
+
+                    <iconPacks:PackIconLucide Grid.Column="1"
+                                              Style="{StaticResource TargetTile.CriticalMark}"
+                                              Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
+                                              Width="13"
+                                              Height="13"
+                                              VerticalAlignment="Center"
+                                              Margin="10,0,0,0"
+                                              Foreground="{DynamicResource State.ErrorText}" />
+
+                    <TextBlock Grid.Column="2"
+                               Style="{StaticResource TargetTile.Ratio}"
+                               Text="{Binding RatioCaption}"
+                               VerticalAlignment="Center"
+                               Margin="6,0,0,0" />
+                </Grid>
+
+                <TextBlock Grid.Row="2"
+                           Text="{Binding Caption}"
+                           Style="{StaticResource Caption}"
+                           TextTrimming="CharacterEllipsis" />
+            </Grid>
+        </views:CommandRadioButton>
+    </DataTemplate>
+
+    <Style x:Key="RecentChip"
+           TargetType="Border">
+        <Setter Property="Background"
+                Value="{DynamicResource Bg.SurfaceAlt}" />
+        <Setter Property="BorderBrush"
+                Value="{DynamicResource Border.Subtle}" />
+        <Setter Property="BorderThickness"
+                Value="1" />
+        <Setter Property="Padding"
+                Value="1" />
+        <Setter Property="CornerRadius"
+                Value="{DynamicResource Radius.Pill}" />
+        <Setter Property="Margin"
+                Value="0,0,8,8" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsSelected}"
+                         Value="True">
+                <Setter Property="Background"
+                        Value="{DynamicResource Accent.Soft}" />
+                <Setter Property="BorderBrush"
+                        Value="{DynamicResource Accent.Primary}" />
+                <Setter Property="BorderThickness"
+                        Value="2" />
+                <Setter Property="Padding"
+                        Value="0" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="RecentChip.Select"
+           TargetType="RadioButton">
+        <Setter Property="Foreground"
+                Value="{DynamicResource Fg.Primary}" />
+        <Setter Property="Padding"
+                Value="10,4" />
+        <Setter Property="Cursor"
+                Value="Hand" />
+        <Setter Property="FocusVisualStyle"
+                Value="{x:Null}" />
+        <Setter Property="ToolTip"
+                Value="{Binding Path}" />
+        <Setter Property="AutomationProperties.Name"
+                Value="{Binding AutomationName}" />
+        <Setter Property="IsChecked"
+                Value="{Binding IsSelected, Mode=OneWay}" />
+        <Setter Property="Command"
+                Value="{Binding DataContext.SelectTargetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+        <Setter Property="CommandParameter"
+                Value="{Binding Path}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="Bd"
+                            Background="Transparent"
+                            BorderBrush="Transparent"
+                            BorderThickness="1"
+                            CornerRadius="{DynamicResource Radius.Pill}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver"
+                                 Value="True">
+                            <Setter TargetName="Bd"
+                                    Property="Background"
+                                    Value="{DynamicResource Bg.Surface}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked"
+                                 Value="True">
+                            <Setter TargetName="Bd"
+                                    Property="Background"
+                                    Value="Transparent" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused"
+                                 Value="True">
+                            <Setter TargetName="Bd"
+                                    Property="BorderBrush"
+                                    Value="{DynamicResource Accent.Focus}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="RecentChip.Remove"
+           TargetType="Button"
+           BasedOn="{StaticResource Button.Ghost}">
+        <Setter Property="Padding"
+                Value="6,4" />
+        <Setter Property="MinHeight"
+                Value="0" />
+        <Setter Property="Foreground"
+                Value="{DynamicResource Fg.Muted}" />
+    </Style>
+
+    <DataTemplate x:Key="TargetTile.Recent"
+                  DataType="{x:Type vm:DriveItem}">
+        <Border Style="{StaticResource RecentChip}">
+            <StackPanel Orientation="Horizontal">
+                <views:CommandRadioButton Style="{StaticResource RecentChip.Select}">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Folder}"
+                                                  Width="13"
+                                                  Height="13"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,7,0"
+                                                  Foreground="{DynamicResource Fg.Secondary}" />
+                        <TextBlock Text="{Binding Title}"
+                                   VerticalAlignment="Center"
+                                   MaxWidth="260"
+                                   TextTrimming="CharacterEllipsis"
+                                   FontFamily="{DynamicResource Font.Sans}"
+                                   FontSize="{DynamicResource Font.Size.S}" />
+                    </StackPanel>
+                </views:CommandRadioButton>
+
+                <Button Style="{StaticResource RecentChip.Remove}"
+                        Command="{Binding DataContext.ForgetTargetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        CommandParameter="{Binding Path}"
+                        ToolTip="Убрать из недавних"
+                        AutomationProperties.Name="{Binding Title, StringFormat='Убрать {0} из недавних'}">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.X}"
+                                              Width="11"
+                                              Height="11"
+                                              VerticalAlignment="Center" />
+                </Button>
+            </StackPanel>
+        </Border>
+    </DataTemplate>
+</ResourceDictionary>

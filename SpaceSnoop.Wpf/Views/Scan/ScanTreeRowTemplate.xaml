@@ -1,0 +1,164 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:bootstrap="clr-namespace:SpaceSnoop.Wpf.Bootstrap"
+                    xmlns:behaviors="clr-namespace:SpaceSnoop.Wpf.Views.Behaviors"
+                    xmlns:views="clr-namespace:SpaceSnoop.Wpf.Views"
+                    xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks">
+
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="pack://application:,,,/SpaceSnoop.Wpf;component/Views/Scan/ScanResources.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+
+    <HierarchicalDataTemplate x:Key="ScanTreeRow"
+                              ItemsSource="{Binding Children}">
+        <views:PriorityRowPanel ToolTip="{Binding Tooltip}"
+                                Background="Transparent">
+            <Grid MinWidth="96"
+                  VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <iconPacks:PackIconLucide Grid.Column="0"
+                                          Style="{StaticResource NodeIcon}" />
+                <iconPacks:PackIconLucide Grid.Column="1"
+                                          Kind="{x:Static iconPacks:PackIconLucideKind.EyeOff}"
+                                          Width="13"
+                                          Height="13"
+                                          Margin="0,0,6,0"
+                                          VerticalAlignment="Center"
+                                          Foreground="{DynamicResource Fg.Muted}"
+                                          ToolTip="{Binding IgnoreHint}"
+                                          Visibility="{Binding IsIgnored, Converter={StaticResource BoolToVisibility}}" />
+                <TextBlock Grid.Column="2"
+                           behaviors:PathTrimmer.FullPath="{Binding Name}"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsIgnored}"
+                                             Value="True">
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource Fg.Muted}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsMarkedDeleted}"
+                                             Value="True">
+                                    <Setter Property="TextDecorations"
+                                            Value="Strikethrough" />
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource State.ErrorText}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+
+            <StackPanel Orientation="Horizontal"
+                        MinWidth="58"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Margin="0,0,14,0"
+                        Background="Transparent"
+                        ToolTip="{Binding FileCountHint}"
+                        Visibility="{Binding IsDirectory, Converter={StaticResource BoolToVisibility}}">
+                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Files}"
+                                          Width="11"
+                                          Height="11"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,4,0"
+                                          Foreground="{DynamicResource Fg.Muted}" />
+                <TextBlock Text="{Binding FileCountText}"
+                           VerticalAlignment="Center"
+                           FontFamily="{DynamicResource Font.Mono}"
+                           FontSize="{DynamicResource Font.Size.Caption}"
+                           Foreground="{DynamicResource Fg.Muted}" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Margin="0,0,12,0"
+                        Background="Transparent"
+                        ToolTip="{Binding ShareHint}">
+                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.HardDrive}"
+                                          Width="11"
+                                          Height="11"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,4,0"
+                                          Foreground="{DynamicResource Fg.Muted}">
+                    <iconPacks:PackIconLucide.Style>
+                        <Style TargetType="iconPacks:PackIconLucide">
+                            <Setter Property="Visibility"
+                                    Value="Hidden" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ShowsDriveShare}"
+                                             Value="True">
+                                    <Setter Property="Visibility"
+                                            Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </iconPacks:PackIconLucide.Style>
+                </iconPacks:PackIconLucide>
+                <Grid VerticalAlignment="Center">
+                    <TextBlock Text="{x:Static bootstrap:ShareFormatter.WidestSample}"
+                               Visibility="Hidden"
+                               FontFamily="{DynamicResource Font.Mono}"
+                               FontSize="{DynamicResource Font.Size.Caption}" />
+                    <TextBlock Text="{Binding ShareText}"
+                               HorizontalAlignment="Right"
+                               FontFamily="{DynamicResource Font.Mono}"
+                               FontSize="{DynamicResource Font.Size.Caption}"
+                               Foreground="{DynamicResource Fg.Muted}" />
+                </Grid>
+            </StackPanel>
+
+            <Border x:Name="ScanBarTrack"
+                    MinWidth="96"
+                    MaxWidth="172"
+                    Height="17"
+                    Background="{DynamicResource Bg.SurfaceMute}"
+                    CornerRadius="{DynamicResource Radius.S}"
+                    ToolTip="{Binding SizeHint}"
+                    VerticalAlignment="Center">
+                <Grid>
+                    <Canvas Height="17">
+                        <Rectangle Height="17"
+                                   RadiusX="5"
+                                   RadiusY="5">
+                            <Rectangle.Width>
+                                <MultiBinding Converter="{StaticResource FractionToWidth}">
+                                    <Binding Path="Fraction" />
+                                    <Binding Path="ActualWidth"
+                                             ElementName="ScanBarTrack" />
+                                </MultiBinding>
+                            </Rectangle.Width>
+                            <Rectangle.Fill>
+                                <MultiBinding Converter="{StaticResource HeatBrush}">
+                                    <Binding Path="Fraction" />
+                                    <Binding Path="DataContext.Intensity"
+                                             RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                                </MultiBinding>
+                            </Rectangle.Fill>
+                        </Rectangle>
+                    </Canvas>
+                    <Border HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Margin="0,0,5,0"
+                            Padding="3,0"
+                            Background="{DynamicResource Bg.Surface}"
+                            Opacity="0.75"
+                            CornerRadius="{DynamicResource Radius.S}">
+                        <TextBlock Text="{Binding SizeText}"
+                                   FontFamily="{DynamicResource Font.Mono}"
+                                   FontSize="{DynamicResource Font.Size.Caption}"
+                                   Foreground="{DynamicResource Fg.Primary}" />
+                    </Border>
+                </Grid>
+            </Border>
+        </views:PriorityRowPanel>
+    </HierarchicalDataTemplate>
+</ResourceDictionary>

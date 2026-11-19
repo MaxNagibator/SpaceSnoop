@@ -12,31 +12,8 @@ public sealed partial class DockerGroupViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(ToggleIconKind))]
     private bool _isExpanded;
 
-    public DockerGroupViewModel(DockerObjectKind kind, IReadOnlyList<DockerObject> items)
-    {
-        Title = kind switch
-        {
-            DockerObjectKind.Image => "Образы",
-            DockerObjectKind.Container => "Контейнеры",
-            DockerObjectKind.Volume => "Тома",
-            _ => "Объекты",
-        };
-
-        IconKind = DockerObjectViewModel.IconFor(kind);
-
-        TotalBytes = items.Sum(i => i.SizeBytes);
-        TotalSize = SizeFormatter.Format(TotalBytes);
-
-        var ordered = items
-            .OrderByDescending(i => i.SizeBytes)
-            .Select(i => new DockerObjectViewModel(i))
-            .ToList();
-
-        Preview = new(ordered.Take(PreviewCount));
-        Rest = new(ordered.Skip(PreviewCount));
-    }
-
     public string Title { get; }
+    public string? SizeExplanation { get; }
 
     public PackIconLucideKind IconKind { get; }
 
@@ -55,6 +32,34 @@ public sealed partial class DockerGroupViewModel : ObservableObject
     public string ToggleLabel => IsExpanded ? "Свернуть" : $"Показать ещё {Rest.Count}";
 
     public PackIconLucideKind ToggleIconKind => IsExpanded ? PackIconLucideKind.ChevronUp : PackIconLucideKind.ChevronDown;
+
+    public DockerGroupViewModel(DockerObjectKind kind, IReadOnlyList<DockerObject> items)
+    {
+        Title = kind switch
+        {
+            DockerObjectKind.Image => "Образы",
+            DockerObjectKind.Container => "Контейнеры",
+            DockerObjectKind.Volume => "Тома",
+            _ => "Объекты",
+        };
+
+        SizeExplanation = kind == DockerObjectKind.Image
+            ? "Сумма размеров образов: общие слои учитываются в каждом образе. В таблице выше они учтены один раз."
+            : null;
+
+        IconKind = DockerObjectViewModel.IconFor(kind);
+
+        TotalBytes = items.Sum(i => i.SizeBytes);
+        TotalSize = SizeFormatter.Format(TotalBytes);
+
+        var ordered = items
+            .OrderByDescending(i => i.SizeBytes)
+            .Select(i => new DockerObjectViewModel(i))
+            .ToList();
+
+        Preview = new(ordered.Take(PreviewCount));
+        Rest = new(ordered.Skip(PreviewCount));
+    }
 
     public bool Remove(DockerObjectViewModel row)
     {

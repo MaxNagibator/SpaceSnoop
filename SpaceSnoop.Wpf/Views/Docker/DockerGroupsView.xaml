@@ -17,6 +17,20 @@
                     Value="{DynamicResource Fg.Primary}" />
         </Style>
 
+        <Style x:Key="Docker.DeleteButton"
+               TargetType="Button"
+               BasedOn="{StaticResource Button.Icon}">
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Muted}" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver"
+                         Value="True">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.ErrorText}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <DataTemplate x:Key="Docker.ObjectRow"
                       DataType="{x:Type vm:DockerObjectViewModel}">
             <Border Padding="0,7"
@@ -56,18 +70,18 @@
                                VerticalAlignment="Center" />
                     <Grid Grid.Column="3"
                           Margin="10,0,0,0">
-                        <Button Style="{StaticResource Button.Icon}"
+                        <Button Style="{StaticResource Docker.DeleteButton}"
                                 Command="{Binding ArmDeleteCommand}"
                                 IsEnabled="{Binding DataContext.CanRun, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                 Visibility="{Binding ConfirmingDelete, Converter={StaticResource InverseBoolToVisibility}}"
                                 AutomationProperties.Name="Удалить объект"
-                                ToolTip="Удалить безвозвратно">
+                                ToolTip="{Binding DeleteTooltip}"
+                                ToolTipService.ShowOnDisabled="True">
                             <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
                                                       Width="15"
                                                       Height="15"
                                                       HorizontalAlignment="Center"
-                                                      VerticalAlignment="Center"
-                                                      Foreground="{DynamicResource State.Error}" />
+                                                      VerticalAlignment="Center" />
                         </Button>
                         <StackPanel Orientation="Horizontal"
                                     Visibility="{Binding ConfirmingDelete, Converter={StaticResource BoolToVisibility}}">
@@ -82,7 +96,7 @@
                                                           Height="15"
                                                           HorizontalAlignment="Center"
                                                           VerticalAlignment="Center"
-                                                          Foreground="{DynamicResource State.Success}" />
+                                                          Foreground="{DynamicResource State.SuccessText}" />
                             </Button>
                             <Button Style="{StaticResource Button.Icon}"
                                     Command="{Binding CancelDeleteCommand}"
@@ -93,7 +107,7 @@
                                                           Height="15"
                                                           HorizontalAlignment="Center"
                                                           VerticalAlignment="Center"
-                                                          Foreground="{DynamicResource State.Error}" />
+                                                          Foreground="{DynamicResource State.ErrorText}" />
                             </Button>
                         </StackPanel>
                     </Grid>
@@ -108,7 +122,7 @@
             <TextBlock Text="Крупнейшие объекты"
                        Style="{StaticResource Docker.SectionTitle}" />
             <TextBlock
-                Text="Образы, контейнеры и тома по типам. В каждой группе видны 3 крупнейших, остальное разворачивается. Удаление безвозвратно."
+                Text="В каждой группе видны 3 крупнейших объекта. Полный список раскрывается с отдельной прокруткой."
                 Style="{StaticResource TextBlock.Subtle}"
                 Foreground="{DynamicResource Fg.Muted}"
                 TextWrapping="Wrap"
@@ -131,7 +145,7 @@
                                                           Height="16"
                                                           VerticalAlignment="Center"
                                                           Margin="0,0,8,0"
-                                                          Foreground="{DynamicResource Accent.Primary}" />
+                                                          Foreground="{DynamicResource Fg.Secondary}" />
                                 <TextBlock Grid.Column="1"
                                            VerticalAlignment="Center"
                                            Style="{StaticResource Docker.SectionTitle}">
@@ -141,17 +155,28 @@
                                 </TextBlock>
                                 <TextBlock Grid.Column="2"
                                            Text="{Binding TotalSize}"
+                                           ToolTip="{Binding SizeExplanation}"
                                            Style="{StaticResource TextBlock.Mono}"
-                                           Foreground="{DynamicResource Accent.Primary}"
+                                           Foreground="{DynamicResource Fg.Primary}"
                                            VerticalAlignment="Center" />
                             </Grid>
 
+                            <TextBlock Text="{Binding SizeExplanation}"
+                                       Style="{StaticResource Caption}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,2,0,6"
+                                       Visibility="{Binding SizeExplanation, Converter={StaticResource NullToVisibility}}" />
                             <ItemsControl ItemsSource="{Binding Preview}"
                                           ItemTemplate="{StaticResource Docker.ObjectRow}" />
 
-                            <ItemsControl ItemsSource="{Binding Rest}"
-                                          ItemTemplate="{StaticResource Docker.ObjectRow}"
-                                          Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisibility}}" />
+                            <ScrollViewer MaxHeight="360"
+                                          VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisibility}}">
+                                <ItemsControl ItemsSource="{Binding Rest}"
+                                              ItemTemplate="{StaticResource Docker.ObjectRow}"
+                                              Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisibility}}" />
+                            </ScrollViewer>
 
                             <Button Style="{StaticResource Button.Ghost}"
                                     HorizontalAlignment="Left"

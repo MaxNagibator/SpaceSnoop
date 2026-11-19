@@ -142,6 +142,12 @@
                                     Property="Background"
                                     Value="{DynamicResource Accent.Soft}" />
                         </Trigger>
+                        <DataTrigger Binding="{Binding IsSelected}"
+                                     Value="True">
+                            <Setter TargetName="SelectionBd"
+                                    Property="Background"
+                                    Value="{DynamicResource Accent.Soft}" />
+                        </DataTrigger>
                         <Trigger Property="IsEnabled"
                                  Value="False">
                             <Setter Property="Opacity"

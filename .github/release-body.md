@@ -1,12 +1,15 @@
 ﻿## Скачать
 
-| Редакция                          | EXE¹                                                                                                                           | ZIP¹                                                                                                                           | Portable²                                                                                                                                         |
-|-----------------------------------|--------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
-| **SpaceSnoop** (WPF)              | [![EXE](https://img.shields.io/badge/EXE-2ea44f)](__REPO__/releases/download/v__VERSION__/SpaceSnoop-v__VERSION__.exe)         | [![ZIP](https://img.shields.io/badge/ZIP-1f6feb)](__REPO__/releases/download/v__VERSION__/SpaceSnoop-v__VERSION__.zip)         | [![Portable](https://img.shields.io/badge/Portable-8957e5)](__REPO__/releases/download/v__VERSION__/SpaceSnoop-v__VERSION__-portable.zip)         |
-| **SpaceSnoop Classic** (WinForms) | [![EXE](https://img.shields.io/badge/EXE-2ea44f)](__REPO__/releases/download/v__VERSION__/SpaceSnoop-Classic-v__VERSION__.exe) | [![ZIP](https://img.shields.io/badge/ZIP-1f6feb)](__REPO__/releases/download/v__VERSION__/SpaceSnoop-Classic-v__VERSION__.zip) | [![Portable](https://img.shields.io/badge/Portable-8957e5)](__REPO__/releases/download/v__VERSION__/SpaceSnoop-Classic-v__VERSION__-portable.zip) |
+| Редакция                            | EXE                                                                                                                          | ZIP                                                                                                                          | Portable³                                                                                                                                       |
+|-------------------------------------|------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|
+| **SpaceSnoop** (.NET 10 LTS)        | [![EXE¹](https://img.shields.io/badge/EXE¹-2ea44f)](__REPO__/releases/download/v__VERSION__/SpaceSnoop-v__VERSION__.exe)       | [![ZIP¹](https://img.shields.io/badge/ZIP¹-1f6feb)](__REPO__/releases/download/v__VERSION__/SpaceSnoop-v__VERSION__.zip)       | [![Portable](https://img.shields.io/badge/Portable-8957e5)](__REPO__/releases/download/v__VERSION__/SpaceSnoop-v__VERSION__-portable.zip)       |
+| **SpaceSnoop** (.NET 11 · Async 2)  | [![EXE²](https://img.shields.io/badge/EXE²-2ea44f)](__REPO__/releases/download/v__VERSION__/SpaceSnoop-Net11-v__VERSION__.exe) | [![ZIP²](https://img.shields.io/badge/ZIP²-1f6feb)](__REPO__/releases/download/v__VERSION__/SpaceSnoop-Net11-v__VERSION__.zip) | [![Portable](https://img.shields.io/badge/Portable-8957e5)](__REPO__/releases/download/v__VERSION__/SpaceSnoop-Net11-v__VERSION__-portable.zip) |
 
 ¹ Нужен [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0).
-² Self-contained – рантайм не нужен, файл крупнее.
+² Нужен [.NET 11 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/11.0) (процессоры с `x86-64-v2`).
+³ Self-contained – рантайм не нужен, файл крупнее.
+
+Классическая WinForms-версия вынесена в архив – финальный выпуск: [SpaceSnoop Classic v2.8.81](__REPO__/releases/tag/classic-v2.8.81).
 
 Контрольные суммы – `SHA256SUMS.txt` в ассетах релиза (`sha256sum -c SHA256SUMS.txt`).
 

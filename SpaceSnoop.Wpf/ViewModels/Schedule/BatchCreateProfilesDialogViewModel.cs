@@ -1,15 +1,23 @@
 ﻿using KeepShell.Services.Modal;
 using MahApps.Metro.IconPacks;
-using Microsoft.Win32;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 
 namespace SpaceSnoop.Wpf.ViewModels.Schedule;
 
-public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObject, IDialogViewModel
+public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObject, IDialogViewModel, IDisposable
 {
     private readonly IReadOnlyList<SyncProfile> _existing;
     private readonly ISettingsStore _settings;
+    private readonly IFilePicker _filePicker;
+    private readonly IUiDispatcher _uiDispatcher;
+    private readonly ILogger? _logger;
+    private readonly Lock _rebuildGate = new();
+
+    private CancellationTokenSource? _rebuildCts;
+    private int _rebuildGeneration;
+    private bool _isRebuilding;
+    private bool _closed;
 
     [ObservableProperty]
     private string _sourceParent = string.Empty;
@@ -21,6 +29,9 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
     private int _selectedModeIndex;
 
     [ObservableProperty]
+    private int _selectedWinnerIndex;
+
+    [ObservableProperty]
     private bool _mirror;
 
     [ObservableProperty]
@@ -29,29 +40,15 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
     [ObservableProperty]
     private int _selectedSort;
 
-    public BatchCreateProfilesDialogViewModel(ISettingsStore settings)
-    {
-        _settings = settings;
-        _existing = SyncProfileStore.Load(settings);
-        PathSuggest = settings.GetBool(SettingsKeys.SyncPathSuggest, AppDefaults.SyncPathSuggestDefault);
-
-        _sourceParent = settings.GetStringValue(SettingsKeys.BatchSource) ?? string.Empty;
-        _destParent = settings.GetStringValue(SettingsKeys.BatchDest) ?? string.Empty;
-        _selectedModeIndex = Math.Clamp(settings.GetInt(SettingsKeys.BatchMode, settings.GetInt(SettingsKeys.SyncMode)), 0, Modes.Count - 1);
-        _mirror = settings.GetBool(SettingsKeys.BatchMirror, settings.GetBool(SettingsKeys.SyncMirror));
-        _selectedSort = Math.Clamp(settings.GetInt(SettingsKeys.BatchSort), 0, SortOptions.Count - 1);
-        _exclusions = settings.GetStringValue(SettingsKeys.BatchExclusions) ?? FallbackExclusions(settings);
-
-        Rebuild();
-    }
-
     public event EventHandler<bool>? RequestClose;
 
     public string Title => "Создать пачку профилей";
 
     public bool PathSuggest { get; }
 
-    public IReadOnlyList<string> Modes { get; } = ["Слева направо", "Справа налево", "Двусторонний"];
+    public IReadOnlyList<SegmentOption> Modes => SyncOptions.Modes;
+
+    public IReadOnlyList<SegmentOption> Winners => SyncOptions.Winners;
 
     public IReadOnlyList<string> SortOptions { get; } = ["Имя (А–Я)", "Имя (Я–А)", "Сначала новые"];
 
@@ -73,22 +70,28 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
 
     public IReadOnlyList<SyncProfile> CreatedProfiles { get; private set; } = [];
 
-    public int SelectedCount => Rows.Count(row => row.Include);
+    public int SelectedCount => Rows.Count(row => row.Include && row.IsSelectable);
 
     public bool HasRows => Rows.Count > 0;
 
-    public string SelectionSummary => $"Отмечено: {SelectedCount} из {Rows.Count}";
+    public int SelectableCount => Rows.Count(row => row.IsSelectable);
+
+    public string SelectionSummary => $"Отмечено: {SelectedCount} из {SelectableCount}";
+
+    public string CreateCaption => SelectedCount > 0
+        ? $"Создать {Plural.Format(SelectedCount, "профиль", "профиля", "профилей")}"
+        : "Создать профили";
 
     public bool? AllSelected
     {
         get
         {
-            if (Rows.Count == 0 || SelectedCount == 0)
+            if (SelectableCount == 0 || SelectedCount == 0)
             {
                 return false;
             }
 
-            return SelectedCount == Rows.Count ? true : null;
+            return SelectedCount == SelectableCount ? true : null;
         }
         set
         {
@@ -97,14 +100,44 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
                 return;
             }
 
-            foreach (var row in Rows)
+            foreach (var row in Rows.Where(static row => row.IsSelectable))
             {
                 row.Include = target;
             }
         }
     }
 
-    public bool MirrorApplicable => SelectedModeIndex != 2;
+    public bool WinnerApplicable => SelectedModeIndex == 2;
+
+    public bool MirrorApplicable => SelectedModeIndex != 2 || SelectedWinnerIndex is 1 or 2;
+
+    internal static Func<string, string, IReadOnlyList<SyncProfile>, CancellationToken, IReadOnlyList<BatchPairRow>> PairBuilder { get; set; } = ProfileBatch.BuildPairs;
+
+    internal Task PendingRebuild { get; private set; } = Task.CompletedTask;
+
+    public BatchCreateProfilesDialogViewModel(
+        ISettingsStore settings,
+        IFilePicker filePicker,
+        IUiDispatcher uiDispatcher,
+        ILogger? logger = null)
+    {
+        _settings = settings;
+        _filePicker = filePicker;
+        _uiDispatcher = uiDispatcher;
+        _logger = logger;
+        _existing = SyncProfileStore.Load(settings);
+        PathSuggest = settings.GetBool(SettingsKeys.SyncPathSuggest, AppDefaults.SyncPathSuggestDefault);
+
+        _sourceParent = settings.GetStringValue(SettingsKeys.BatchSource) ?? string.Empty;
+        _destParent = settings.GetStringValue(SettingsKeys.BatchDest) ?? string.Empty;
+        _selectedModeIndex = Math.Clamp(settings.GetInt(SettingsKeys.BatchMode, settings.GetInt(SettingsKeys.SyncMode)), 0, Modes.Count - 1);
+        _selectedWinnerIndex = Math.Clamp(settings.GetInt(SettingsKeys.BatchWinner, settings.GetInt(SettingsKeys.SyncWinner)), 0, Winners.Count - 1);
+        _mirror = settings.GetBool(SettingsKeys.BatchMirror, settings.GetBool(SettingsKeys.SyncMirror));
+        _selectedSort = Math.Clamp(settings.GetInt(SettingsKeys.BatchSort), 0, SortOptions.Count - 1);
+        _exclusions = settings.GetStringValue(SettingsKeys.BatchExclusions) ?? FallbackExclusions(settings);
+
+        Rebuild();
+    }
 
     private void OnRowChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -128,13 +161,11 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
         return exclusions;
     }
 
-    private static void Browse(Action<string> assign)
+    private void Browse(Action<string> assign)
     {
-        var dialog = new OpenFolderDialog { Title = "Выберите каталог" };
-
-        if (dialog.ShowDialog() == true)
+        if (_filePicker.PickFolder("Выберите каталог") is { } path)
         {
-            assign(dialog.FolderName);
+            assign(path);
         }
     }
 
@@ -142,6 +173,7 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
     {
         OnPropertyChanged(nameof(SelectedCount));
         OnPropertyChanged(nameof(SelectionSummary));
+        OnPropertyChanged(nameof(CreateCaption));
         OnPropertyChanged(nameof(AllSelected));
         CreateCommand.NotifyCanExecuteChanged();
     }
@@ -161,8 +193,10 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
     [RelayCommand(CanExecute = nameof(CanCreate))]
     private void Create()
     {
+        CancelPendingRebuild();
+
         CreatedProfiles = Rows
-            .Where(row => row.Include)
+            .Where(row => row.Include && row.IsSelectable)
             .Select(row => new SyncProfile
             {
                 Id = Guid.NewGuid().ToString("N")[..8],
@@ -170,6 +204,7 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
                 Left = row.Left,
                 Right = row.Right,
                 Mode = SelectedModeIndex,
+                Winner = SyncProfile.WinnerFromIndex(SelectedWinnerIndex),
                 Mirror = Mirror,
                 Exclusions = Exclusions.Trim(),
             })
@@ -181,7 +216,13 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
     [RelayCommand]
     private void Cancel()
     {
+        CancelPendingRebuild();
         RequestClose?.Invoke(this, false);
+    }
+
+    public void Dispose()
+    {
+        CancelPendingRebuild();
     }
 
     [RelayCommand]
@@ -211,9 +252,16 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
     partial void OnSelectedModeIndexChanged(int value)
     {
         _settings.SetInt(SettingsKeys.BatchMode, value);
+        OnPropertyChanged(nameof(WinnerApplicable));
         OnPropertyChanged(nameof(MirrorApplicable));
         OnPropertyChanged(nameof(DirectionIconKind));
         OnPropertyChanged(nameof(DirectionHint));
+    }
+
+    partial void OnSelectedWinnerIndexChanged(int value)
+    {
+        _settings.SetInt(SettingsKeys.BatchWinner, value);
+        OnPropertyChanged(nameof(MirrorApplicable));
     }
 
     partial void OnMirrorChanged(bool value)
@@ -228,14 +276,100 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
 
     private void Rebuild()
     {
+        CancellationTokenSource? current = null;
+        int generation;
+        var source = SourceParent;
+        var dest = DestParent;
+        bool empty;
+
+        lock (_rebuildGate)
+        {
+            var previous = _rebuildCts;
+            generation = ++_rebuildGeneration;
+            empty = _closed || string.IsNullOrWhiteSpace(source) || string.IsNullOrWhiteSpace(dest);
+
+            if (empty)
+            {
+                _rebuildCts = null;
+            }
+            else
+            {
+                current = new();
+                _rebuildCts = current;
+            }
+
+            previous?.Cancel();
+        }
+
+        if (empty)
+        {
+            _isRebuilding = false;
+            ApplyRows([]);
+            PendingRebuild = Task.CompletedTask;
+            return;
+        }
+
+        _isRebuilding = true;
+        CreateCommand.NotifyCanExecuteChanged();
+        PendingRebuild = RebuildCoreAsync(source, dest, generation, current!);
+    }
+
+    private async Task RebuildCoreAsync(string source, string dest, int generation, CancellationTokenSource cts)
+    {
+        var token = cts.Token;
+        IReadOnlyList<BatchPairRow> pairs = [];
+
+        try
+        {
+            var builder = PairBuilder;
+            pairs = await Task.Run(() => builder(source, dest, _existing, token), token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            _logger?.ScheduleBatchBuildFailed(exception, source);
+        }
+        finally
+        {
+            lock (_rebuildGate)
+            {
+                if (ReferenceEquals(_rebuildCts, cts))
+                {
+                    _rebuildCts = null;
+                }
+
+                cts.Dispose();
+            }
+        }
+
+        if (token.IsCancellationRequested || IsStale(generation))
+        {
+            return;
+        }
+
+        _uiDispatcher.Invoke(() =>
+        {
+            if (IsStale(generation))
+            {
+                return;
+            }
+
+            _isRebuilding = false;
+            ApplyRows(pairs);
+        });
+    }
+
+    private void ApplyRows(IReadOnlyList<BatchPairRow> pairs)
+    {
         foreach (var row in Rows)
         {
             row.PropertyChanged -= OnRowChanged;
         }
 
         Rows.Clear();
-
-        var pairs = ProfileBatch.BuildPairs(SourceParent, DestParent, _existing);
 
         foreach (var row in ProfileBatch.Sort(pairs, SelectedSort))
         {
@@ -245,6 +379,25 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
 
         OnPropertyChanged(nameof(HasRows));
         NotifySelectionChanged();
+    }
+
+    private void CancelPendingRebuild()
+    {
+        lock (_rebuildGate)
+        {
+            _closed = true;
+            _rebuildGeneration++;
+            _rebuildCts?.Cancel();
+            _rebuildCts = null;
+        }
+    }
+
+    private bool IsStale(int generation)
+    {
+        lock (_rebuildGate)
+        {
+            return _closed || generation != _rebuildGeneration;
+        }
     }
 
     partial void OnSelectedSortChanged(int value)
@@ -266,6 +419,6 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
 
     private bool CanCreate()
     {
-        return SelectedCount > 0;
+        return !_isRebuilding && SelectedCount > 0;
     }
 }

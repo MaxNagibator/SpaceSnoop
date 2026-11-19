@@ -10,6 +10,14 @@ public class GitCommitTests
         + "e4f5a6b\t2026-06-28T09:00:00+03:00\tБоб\tFix sync\twith tab\n"
         + "c7d8e9f\tnot-a-date\tЕва\tNo date";
 
+    [TestCase("")]
+    [TestCase("\n")]
+    [TestCase("\t2026-06-29T10:15:00+03:00\tЕва\tНет хеша")]
+    public void ParseLog_EmptyOrHashless_ReturnsEmpty(string input)
+    {
+        Assert.That(GitCommit.ParseLog(input), Is.Empty);
+    }
+
     [Test]
     public void ParseLog_MultipleCommits_ParsesEveryField()
     {
@@ -25,13 +33,5 @@ public class GitCommitTests
             Assert.That(commits[1].Subject, Is.EqualTo("Fix sync\twith tab"));
             Assert.That(commits[2].CommittedAt, Is.Null);
         }
-    }
-
-    [TestCase("")]
-    [TestCase("\n")]
-    [TestCase("\t2026-06-29T10:15:00+03:00\tЕва\tНет хеша")]
-    public void ParseLog_EmptyOrHashless_ReturnsEmpty(string input)
-    {
-        Assert.That(GitCommit.ParseLog(input), Is.Empty);
     }
 }

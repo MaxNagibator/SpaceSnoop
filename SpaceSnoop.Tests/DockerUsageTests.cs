@@ -13,6 +13,14 @@ public class DockerUsageTests
         {"Active":"0","Reclaimable":"19.45GB","Size":"31.25GB","TotalCount":"541","Type":"Build Cache"}
         """;
 
+    [TestCase("")]
+    [TestCase("   ")]
+    [TestCase("\n\n")]
+    public void Parse_BlankInput_ReturnsEmpty(string input)
+    {
+        Assert.That(DockerUsage.Parse(input), Is.Empty);
+    }
+
     [Test]
     public void Parse_ReadsAllBuckets()
     {
@@ -28,14 +36,6 @@ public class DockerUsageTests
             Assert.That(buckets[3].Type, Is.EqualTo("Build Cache"));
             Assert.That(buckets[3].Reclaimable, Is.EqualTo("19.45GB"));
         }
-    }
-
-    [TestCase("")]
-    [TestCase("   ")]
-    [TestCase("\n\n")]
-    public void Parse_BlankInput_ReturnsEmpty(string input)
-    {
-        Assert.That(DockerUsage.Parse(input), Is.Empty);
     }
 
     [Test]

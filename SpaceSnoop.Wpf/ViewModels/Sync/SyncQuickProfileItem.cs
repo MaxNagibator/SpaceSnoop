@@ -6,7 +6,7 @@ public sealed class SyncQuickProfileItem : ObservableObject
     private readonly Action<SyncQuickProfileItem> _confirmDelete;
     private readonly Action<SyncQuickProfileItem> _cancelDelete;
     private readonly Action<SyncQuickProfileItem> _requestUpdate;
-    private readonly Action<SyncQuickProfileItem> _confirmUpdate;
+    private readonly Func<SyncQuickProfileItem, Task> _confirmUpdate;
     private readonly Action<SyncQuickProfileItem> _cancelUpdate;
     private readonly Action<SyncQuickProfileItem> _requestRename;
     private readonly Action<SyncQuickProfileItem> _confirmRename;
@@ -16,41 +16,6 @@ public sealed class SyncQuickProfileItem : ObservableObject
     private bool _isRenameConfirming;
     private string _editName = string.Empty;
 
-    public SyncQuickProfileItem(
-        SyncProfile model,
-        bool isDefault,
-        Action<SyncQuickProfileItem> requestDelete,
-        Action<SyncQuickProfileItem> confirmDelete,
-        Action<SyncQuickProfileItem> cancelDelete,
-        Action<SyncQuickProfileItem> requestUpdate,
-        Action<SyncQuickProfileItem> confirmUpdate,
-        Action<SyncQuickProfileItem> cancelUpdate,
-        Action<SyncQuickProfileItem> requestRename,
-        Action<SyncQuickProfileItem> confirmRename,
-        Action<SyncQuickProfileItem> cancelRename)
-    {
-        Model = model;
-        IsDefault = isDefault;
-        _requestDelete = requestDelete;
-        _confirmDelete = confirmDelete;
-        _cancelDelete = cancelDelete;
-        _requestUpdate = requestUpdate;
-        _confirmUpdate = confirmUpdate;
-        _cancelUpdate = cancelUpdate;
-        _requestRename = requestRename;
-        _confirmRename = confirmRename;
-        _cancelRename = cancelRename;
-        RequestDeleteCommand = new RelayCommand(() => _requestDelete(this));
-        ConfirmDeleteCommand = new RelayCommand(() => _confirmDelete(this));
-        CancelDeleteCommand = new RelayCommand(() => _cancelDelete(this));
-        RequestUpdateCommand = new RelayCommand(() => _requestUpdate(this));
-        ConfirmUpdateCommand = new RelayCommand(() => _confirmUpdate(this));
-        CancelUpdateCommand = new RelayCommand(() => _cancelUpdate(this));
-        RequestRenameCommand = new RelayCommand(() => _requestRename(this));
-        ConfirmRenameCommand = new RelayCommand(() => _confirmRename(this));
-        CancelRenameCommand = new RelayCommand(() => _cancelRename(this));
-    }
-
     public IRelayCommand RequestDeleteCommand { get; }
 
     public IRelayCommand ConfirmDeleteCommand { get; }
@@ -59,7 +24,7 @@ public sealed class SyncQuickProfileItem : ObservableObject
 
     public IRelayCommand RequestUpdateCommand { get; }
 
-    public IRelayCommand ConfirmUpdateCommand { get; }
+    public IAsyncRelayCommand ConfirmUpdateCommand { get; }
 
     public IRelayCommand CancelUpdateCommand { get; }
 
@@ -128,5 +93,40 @@ public sealed class SyncQuickProfileItem : ObservableObject
                 OnPropertyChanged(nameof(CanConfirmRename));
             }
         }
+    }
+
+    public SyncQuickProfileItem(
+        SyncProfile model,
+        bool isDefault,
+        Action<SyncQuickProfileItem> requestDelete,
+        Action<SyncQuickProfileItem> confirmDelete,
+        Action<SyncQuickProfileItem> cancelDelete,
+        Action<SyncQuickProfileItem> requestUpdate,
+        Func<SyncQuickProfileItem, Task> confirmUpdate,
+        Action<SyncQuickProfileItem> cancelUpdate,
+        Action<SyncQuickProfileItem> requestRename,
+        Action<SyncQuickProfileItem> confirmRename,
+        Action<SyncQuickProfileItem> cancelRename)
+    {
+        Model = model;
+        IsDefault = isDefault;
+        _requestDelete = requestDelete;
+        _confirmDelete = confirmDelete;
+        _cancelDelete = cancelDelete;
+        _requestUpdate = requestUpdate;
+        _confirmUpdate = confirmUpdate;
+        _cancelUpdate = cancelUpdate;
+        _requestRename = requestRename;
+        _confirmRename = confirmRename;
+        _cancelRename = cancelRename;
+        RequestDeleteCommand = new RelayCommand(() => _requestDelete(this));
+        ConfirmDeleteCommand = new RelayCommand(() => _confirmDelete(this));
+        CancelDeleteCommand = new RelayCommand(() => _cancelDelete(this));
+        RequestUpdateCommand = new RelayCommand(() => _requestUpdate(this));
+        ConfirmUpdateCommand = new AsyncRelayCommand(() => _confirmUpdate(this));
+        CancelUpdateCommand = new RelayCommand(() => _cancelUpdate(this));
+        RequestRenameCommand = new RelayCommand(() => _requestRename(this));
+        ConfirmRenameCommand = new RelayCommand(() => _confirmRename(this));
+        CancelRenameCommand = new RelayCommand(() => _cancelRename(this));
     }
 }

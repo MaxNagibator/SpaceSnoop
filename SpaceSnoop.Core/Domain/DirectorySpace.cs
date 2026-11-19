@@ -5,25 +5,15 @@
 /// </summary>
 public class DirectorySpace : SpaceBase
 {
-    private readonly List<DirectorySpace> _subDirectories;
-    private readonly List<FileSpace> _files;
-    private long? _maxTotalSize;
-    private int? _totalFileCount;
-    private long _totalSize;
+    private const long UnknownSize = long.MinValue;
+    private const int UnknownCount = -1;
 
-    /// <summary>
-    /// Инициализирует новый экземпляр класса DirectorySpace.
-    /// </summary>
-    /// <param name="name">Название директории.</param>
-    /// <param name="parent">Родительская директория.</param>
-    /// <param name="creationDate">Дата создания директории.</param>
-    /// <param name="lastAccessTime">Время последнего доступа к директории.</param>
-    public DirectorySpace(string name, SpaceBase? parent, DateTime creationDate, DateTime lastAccessTime)
-        : base(name, parent, creationDate, lastAccessTime)
-    {
-        _subDirectories = [];
-        _files = [];
-    }
+    private DirectorySpace[] _subDirectories = [];
+    private FileSpace[] _files = [];
+    private long _maxTotalSize = UnknownSize;
+    private int _totalFileCount = UnknownCount;
+    private int _totalDirectoryCount = UnknownCount;
+    private long _totalSize;
 
     /// <summary>
     /// Общий размер всех файлов в директории, включая подкаталоги.
@@ -48,19 +38,35 @@ public class DirectorySpace : SpaceBase
     /// <summary>
     /// Максимальный размер среди подкаталогов.
     /// </summary>
-    public long MaxTotalSize => _maxTotalSize ??= GetMaxSize();
+    public long MaxTotalSize => _maxTotalSize != UnknownSize ? _maxTotalSize : _maxTotalSize = GetMaxSize();
 
     /// <summary>
     /// Количество всех файлов в директории, включая подкаталоги.
     /// </summary>
-    public int TotalFileCount => _totalFileCount ??= Files.Count + _subDirectories.Sum(x => x.TotalFileCount);
+    public int TotalFileCount => _totalFileCount != UnknownCount
+        ? _totalFileCount
+        : _totalFileCount = _files.Length + _subDirectories.Sum(x => x.TotalFileCount);
 
     /// <summary>
     /// Количество всех подкаталогов (включая вложенные).
     /// </summary>
-    public int TotalDirectoryCount => _subDirectories.Count + _subDirectories.Sum(x => x.TotalDirectoryCount);
+    public int TotalDirectoryCount => _totalDirectoryCount != UnknownCount
+        ? _totalDirectoryCount
+        : _totalDirectoryCount = _subDirectories.Length + _subDirectories.Sum(x => x.TotalDirectoryCount);
 
     private IEnumerable<SpaceBase> All => _subDirectories.AsEnumerable<SpaceBase>().Concat(Files);
+
+    /// <summary>
+    /// Инициализирует новый экземпляр класса DirectorySpace.
+    /// </summary>
+    /// <param name="name">Название директории.</param>
+    /// <param name="parent">Родительская директория.</param>
+    /// <param name="creationDate">Дата создания директории.</param>
+    /// <param name="lastAccessTime">Время последнего доступа к директории.</param>
+    public DirectorySpace(string name, SpaceBase? parent, DateTime creationDate, DateTime lastAccessTime)
+        : base(name, parent, creationDate, lastAccessTime)
+    {
+    }
 
     /// <summary>
     /// Инициализирует новый экземпляр класса DirectorySpace.
@@ -84,11 +90,11 @@ public class DirectorySpace : SpaceBase
     public override string GetTooltipText()
     {
         return $"""
-                {base.GetTooltipText()}
-                Общий размер: {TotalSizeText}
-                Размер файлов в директории: {SizeText}
-                Вложенных файлов: {TotalFileCount:N0} · каталогов: {TotalDirectoryCount:N0}
-                """;
+            {base.GetTooltipText()}
+            Общий размер: {TotalSizeText}
+            Размер файлов в директории: {SizeText}
+            Вложенных файлов: {TotalFileCount:N0} · каталогов: {TotalDirectoryCount:N0}
+            """;
     }
 
     /// <summary>
@@ -98,9 +104,8 @@ public class DirectorySpace : SpaceBase
     public void Add(DirectorySpace subDirectory)
     {
         _totalSize += subDirectory.TotalSize;
-        _subDirectories.Add(subDirectory);
-        _maxTotalSize = null;
-        _totalFileCount = null;
+        _subDirectories = [.. _subDirectories, subDirectory];
+        Invalidate();
     }
 
     /// <summary>
@@ -109,21 +114,26 @@ public class DirectorySpace : SpaceBase
     /// <param name="files">Список файлов, которые нужно добавить в директорию.</param>
     public void AddFiles(Span<FileInfo> files)
     {
+        var added = new FileSpace[_files.Length + files.Length];
+        _files.CopyTo(added, 0);
+        var size = Size;
+
         for (var i = 0; i < files.Length; i++)
         {
-            _files.Add(FileSpace.Create(files[i], this));
-            Size += files[i].Length;
+            added[_files.Length + i] = FileSpace.Create(files[i], this);
+            size += files[i].Length;
         }
 
-        _totalSize = Size;
-        _maxTotalSize = null;
-        _totalFileCount = null;
+        _files = added;
+        Size = size;
+        _totalSize = size;
+        Invalidate();
     }
 
     public FileSpace AddFile(FileInfo file)
     {
         var space = FileSpace.Create(file, this);
-        _files.Add(space);
+        _files = [.. _files, space];
         Size += file.Length;
         PropagateAddition(file.Length);
         return space;
@@ -142,11 +152,11 @@ public class DirectorySpace : SpaceBase
         switch (child)
         {
             case DirectorySpace subDir:
-                removed = _subDirectories.Remove(subDir);
+                removed = Without(ref _subDirectories, subDir);
                 break;
 
             case FileSpace file:
-                removed = _files.Remove(file);
+                removed = Without(ref _files, file);
 
                 if (removed)
                 {
@@ -165,8 +175,7 @@ public class DirectorySpace : SpaceBase
         }
 
         _totalSize -= child.TotalSize;
-        _maxTotalSize = null;
-        _totalFileCount = null;
+        Invalidate();
 
         if (Parent is DirectorySpace parentDir && parentDir.ContainsChild(this))
         {
@@ -191,6 +200,61 @@ public class DirectorySpace : SpaceBase
         Parent = new DirectorySpace(parent.FullName, null, parent.CreationTime, parent.LastAccessTime);
     }
 
+    internal void SetScanned(List<FileSpace> files, DirectorySpace[] subDirectories)
+    {
+        _files = files.ToArray();
+        _subDirectories = subDirectories;
+
+        var size = 0L;
+
+        foreach (var file in _files)
+        {
+            size += file.Size;
+        }
+
+        Size = size;
+        _totalSize = size;
+        Invalidate();
+    }
+
+    internal void AggregateTotals()
+    {
+        var stack = new Stack<(DirectorySpace Node, bool Ascending)>();
+        stack.Push((this, false));
+
+        while (stack.Count > 0)
+        {
+            var (node, ascending) = stack.Pop();
+
+            if (ascending)
+            {
+                var total = node.Size;
+                var fileCount = node._files.Length;
+                var directoryCount = node._subDirectories.Length;
+
+                foreach (var subDirectory in node._subDirectories)
+                {
+                    total += subDirectory._totalSize;
+                    fileCount += subDirectory.TotalFileCount;
+                    directoryCount += subDirectory.TotalDirectoryCount;
+                }
+
+                node._totalSize = total;
+                node._maxTotalSize = UnknownSize;
+                node._totalFileCount = fileCount;
+                node._totalDirectoryCount = directoryCount;
+                continue;
+            }
+
+            stack.Push((node, true));
+
+            foreach (var subDirectory in node._subDirectories)
+            {
+                stack.Push((subDirectory, false));
+            }
+        }
+    }
+
     /// <summary>
     /// Проверяет, является ли указанный элемент прямым дочерним в этой директории.
     /// </summary>
@@ -198,8 +262,8 @@ public class DirectorySpace : SpaceBase
     {
         return child switch
         {
-            DirectorySpace subDir => _subDirectories.Contains(subDir),
-            FileSpace file => _files.Contains(file),
+            DirectorySpace subDir => Array.IndexOf(_subDirectories, subDir) >= 0,
+            FileSpace file => Array.IndexOf(_files, file) >= 0,
             _ => false,
         };
     }
@@ -232,8 +296,7 @@ public class DirectorySpace : SpaceBase
     private void PropagateRemoval(long size)
     {
         _totalSize -= size;
-        _maxTotalSize = null;
-        _totalFileCount = null;
+        Invalidate();
 
         if (Parent is DirectorySpace parentDir && parentDir.ContainsChild(this))
         {
@@ -244,8 +307,7 @@ public class DirectorySpace : SpaceBase
     private void PropagateAddition(long size)
     {
         _totalSize += size;
-        _maxTotalSize = null;
-        _totalFileCount = null;
+        Invalidate();
 
         if (Parent is DirectorySpace parentDir && parentDir.ContainsChild(this))
         {
@@ -262,5 +324,30 @@ public class DirectorySpace : SpaceBase
         return _subDirectories.Select(x => x.MaxTotalSize)
             .Prepend(_totalSize)
             .Max();
+    }
+
+    // TODO: дети – массивы точного размера, поэтому Add, AddFile и Remove копируют массив целиком, O(n) на вызов.
+    // Понадобится добавлять или удалять по одному в каталоге на десятки тысяч детей – ёмкость с запасом и счётчик
+    private static bool Without<T>(ref T[] items, T item) where T : SpaceBase
+    {
+        var index = Array.IndexOf(items, item);
+
+        if (index < 0)
+        {
+            return false;
+        }
+
+        var rest = items.Length == 1 ? [] : new T[items.Length - 1];
+        Array.Copy(items, rest, index);
+        Array.Copy(items, index + 1, rest, index, rest.Length - index);
+        items = rest;
+        return true;
+    }
+
+    private void Invalidate()
+    {
+        _maxTotalSize = UnknownSize;
+        _totalFileCount = UnknownCount;
+        _totalDirectoryCount = UnknownCount;
     }
 }

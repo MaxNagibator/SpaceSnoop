@@ -38,14 +38,15 @@ public static class DockerInventory
             var size = Str(image, "Size");
             var containers = ParseInt(Str(image, "Containers"));
 
-            into.Add(new(
-                DockerObjectKind.Image,
-                Str(image, "ID"),
-                name,
-                size,
-                DockerSize.ToBytes(size),
-                containers > 0,
-                Str(image, "CreatedSince")));
+            into.Add(
+                new(
+                    DockerObjectKind.Image,
+                    Str(image, "ID"),
+                    name,
+                    size,
+                    DockerSize.ToBytes(size),
+                    containers > 0,
+                    DockerText.Age(Str(image, "CreatedSince"))));
         }
     }
 
@@ -56,14 +57,15 @@ public static class DockerInventory
             var size = Str(container, "Size");
             var running = Str(container, "State").Equals("running", StringComparison.OrdinalIgnoreCase);
 
-            into.Add(new(
-                DockerObjectKind.Container,
-                Str(container, "ID"),
-                Str(container, "Names"),
-                size,
-                DockerSize.ToBytes(size),
-                running,
-                Str(container, "Status")));
+            into.Add(
+                new(
+                    DockerObjectKind.Container,
+                    Str(container, "ID"),
+                    Str(container, "Names"),
+                    size,
+                    DockerSize.ToBytes(size),
+                    running,
+                    DockerText.Status(Str(container, "Status"))));
         }
     }
 
@@ -75,14 +77,15 @@ public static class DockerInventory
             var size = Str(volume, "Size");
             var links = ParseInt(Str(volume, "Links"));
 
-            into.Add(new(
-                DockerObjectKind.Volume,
-                name,
-                name,
-                size,
-                DockerSize.ToBytes(size),
-                links > 0,
-                links > 0 ? $"используется: {links}" : "не используется"));
+            into.Add(
+                new(
+                    DockerObjectKind.Volume,
+                    name,
+                    DockerText.ShortName(name),
+                    size,
+                    DockerSize.ToBytes(size),
+                    links > 0,
+                    links > 0 ? $"используется: {links}" : "не используется"));
         }
     }
 

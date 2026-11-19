@@ -1,4 +1,4 @@
-using SpaceSnoop.Core;
+﻿using SpaceSnoop.Core;
 
 namespace SpaceSnoop.Tests;
 
@@ -13,18 +13,6 @@ public class ExclusionFilterTests
         {
             Assert.That(filter.IsExcluded("file.txt"), Is.False);
             Assert.That(filter.IsExcluded(".git"), Is.False);
-        }
-    }
-
-    [Test]
-    public void WildcardFilter_ExcludesByExtension()
-    {
-        var filter = new ExclusionFilter("*.tmp, *.bak");
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(filter.IsExcluded("data.tmp"), Is.True);
-            Assert.That(filter.IsExcluded("backup.bak"), Is.True);
-            Assert.That(filter.IsExcluded("readme.txt"), Is.False);
         }
     }
 
@@ -59,6 +47,18 @@ public class ExclusionFilterTests
         {
             Assert.That(filter.IsExcluded("file.tmp"), Is.True);
             Assert.That(filter.IsExcluded("file.bak"), Is.True);
+        }
+    }
+
+    [Test]
+    public void WildcardFilter_ExcludesByExtension()
+    {
+        var filter = new ExclusionFilter("*.tmp, *.bak");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(filter.IsExcluded("data.tmp"), Is.True);
+            Assert.That(filter.IsExcluded("backup.bak"), Is.True);
+            Assert.That(filter.IsExcluded("readme.txt"), Is.False);
         }
     }
 }

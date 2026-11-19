@@ -3,113 +3,204 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Scan"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:views="clr-namespace:SpaceSnoop.Wpf.Views"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:ScanViewModel}"
              d:DesignWidth="980">
-    <Border Style="{StaticResource Card.Inset}"
-            Padding="14,10">
+    <Border>
+        <Border.Style>
+            <Style TargetType="Border"
+                   BasedOn="{StaticResource Card.Inset}">
+                <Setter Property="Padding"
+                        Value="14,10" />
+                <Setter Property="Margin"
+                        Value="0,0,0,12" />
+                <Style.Triggers>
+                    <DataTrigger
+                        Binding="{Binding IsCompact, RelativeSource={RelativeSource AncestorType=views:ScanView}}"
+                        Value="True">
+                        <Setter Property="Padding"
+                                Value="14,2" />
+                        <Setter Property="Margin"
+                                Value="0,0,0,6" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Border.Style>
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Column="0"
-                        Orientation="Horizontal"
-                        VerticalAlignment="Center">
-                <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.HardDrive}"
-                                          Width="16"
-                                          Height="16"
-                                          VerticalAlignment="Center"
-                                          Margin="2,0,10,0"
-                                          Foreground="{DynamicResource Fg.Secondary}" />
-                <ComboBox ItemsSource="{Binding Drives}"
-                          SelectedValue="{Binding SelectedDrive}"
-                          SelectedValuePath="Path"
-                          Style="{StaticResource ComboBox.Toolbar}"
-                          MinWidth="230"
-                          Margin="0,0,8,0"
-                          ToolTip="Диск или каталог для анализа">
-                    <ComboBox.ItemTemplate>
-                        <DataTemplate DataType="{x:Type vm:DriveItem}">
-                            <TextBlock Text="{Binding Label}"
-                                       TextTrimming="CharacterEllipsis" />
-                        </DataTemplate>
-                    </ComboBox.ItemTemplate>
-                </ComboBox>
-
-                <Button Style="{StaticResource Button.Secondary}"
-                        Command="{Binding BrowseCommand}"
-                        Margin="0,0,14,0"
-                        ToolTip="Выбрать каталог">
+            <WrapPanel Grid.Column="0"
+                       VerticalAlignment="Center">
+                <Button Command="{Binding OpenPickerCommand}"
+                        Margin="0,2,14,2"
+                        Visibility="{Binding ShowScanResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}"
+                        ToolTip="Выбрать другой диск или каталог"
+                        AutomationProperties.Name="{Binding SelectedDrive, StringFormat='Цель сканирования: {0}. Выбрать другую'}">
+                    <Button.Style>
+                        <Style TargetType="Button"
+                               BasedOn="{StaticResource Button.Secondary}">
+                            <Setter Property="MaxWidth"
+                                    Value="360" />
+                            <Style.Triggers>
+                                <DataTrigger
+                                    Binding="{Binding IsCompact, RelativeSource={RelativeSource AncestorType=views:ScanView}}"
+                                    Value="True">
+                                    <Setter Property="MaxWidth"
+                                            Value="320" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
                     <StackPanel Orientation="Horizontal">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FolderOpen}"
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.HardDrive}"
                                                   Width="15"
                                                   Height="15"
                                                   VerticalAlignment="Center"
-                                                  Margin="0,0,6,0" />
-                        <TextBlock Text="Обзор" />
-                    </StackPanel>
-                </Button>
-
-                <Button Style="{StaticResource Button.Primary}"
-                        Command="{Binding StartCommand}"
-                        Margin="0,0,6,0">
-                    <StackPanel Orientation="Horizontal">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Play}"
-                                                  Width="15"
-                                                  Height="15"
-                                                  VerticalAlignment="Center"
-                                                  Margin="0,0,6,0" />
-                        <TextBlock Text="Сканировать" />
-                    </StackPanel>
-                </Button>
-
-                <Button Style="{StaticResource Button.Ghost}"
-                        Command="{Binding StopCommand}"
-                        ToolTip="Остановить сканирование (ESC)">
-                    <StackPanel Orientation="Horizontal">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Square}"
+                                                  Margin="0,0,8,0"
+                                                  Foreground="{DynamicResource Fg.Secondary}" />
+                        <TextBlock Text="{Binding SelectedDrive}"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   FontFamily="{DynamicResource Font.Mono}" />
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.ChevronDown}"
                                                   Width="13"
                                                   Height="13"
                                                   VerticalAlignment="Center"
-                                                  Margin="0,0,6,0" />
-                        <TextBlock Text="Стоп" />
+                                                  Margin="8,0,0,0"
+                                                  Foreground="{DynamicResource Fg.Muted}" />
                     </StackPanel>
                 </Button>
-            </StackPanel>
 
-            <StackPanel Grid.Column="2"
+                <Button Margin="0,2,0,2">
+                    <Button.Style>
+                        <Style TargetType="Button"
+                               BasedOn="{StaticResource Button.Primary}">
+                            <Setter Property="Command"
+                                    Value="{Binding StartCommand}" />
+                            <Setter Property="AutomationProperties.Name"
+                                    Value="Сканировать" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsScanning}"
+                                             Value="True">
+                                    <Setter Property="Command"
+                                            Value="{Binding StopCommand}" />
+                                    <Setter Property="AutomationProperties.Name"
+                                            Value="Остановить сканирование" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                    <Button.ToolTip>
+                        <ToolTip>
+                            <TextBlock>
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text"
+                                                Value="Посчитать занятое место в выбранном каталоге" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsScanning}"
+                                                         Value="True">
+                                                <Setter Property="Text"
+                                                        Value="Остановить сканирование (Esc)" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </ToolTip>
+                    </Button.ToolTip>
+                    <Grid>
+                        <StackPanel Orientation="Horizontal"
+                                    Visibility="{Binding IsScanning, Converter={StaticResource InverseBoolToVisibility}, FallbackValue=Visible}">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Play}"
+                                                      Width="15"
+                                                      Height="15"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,6,0" />
+                            <TextBlock Text="Сканировать" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal"
+                                    Visibility="{Binding IsScanning, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Square}"
+                                                      Width="13"
+                                                      Height="13"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,6,0" />
+                            <TextBlock Text="Остановить" />
+                        </StackPanel>
+                    </Grid>
+                </Button>
+
+                <Button Style="{StaticResource Button.Secondary}"
+                        Command="{Binding ExportFullScanCommand}"
+                        Margin="8,2,0,2"
+                        Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}"
+                        ToolTip="Сохранить полный результат сканирования в JSON"
+                        AutomationProperties.Name="Сохранить полный результат сканирования">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.FileBraces}"
+                                                  Width="14"
+                                                  Height="14"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,6,0" />
+                        <TextBlock Text="Сохранить скан"
+                                   VerticalAlignment="Center">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <DataTrigger
+                                            Binding="{Binding IsCompact, RelativeSource={RelativeSource AncestorType=views:ScanView}}"
+                                            Value="True">
+                                            <Setter Property="Visibility"
+                                                    Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+                </Button>
+            </WrapPanel>
+
+            <StackPanel Grid.Column="1"
                         Orientation="Horizontal"
-                        VerticalAlignment="Center">
+                        VerticalAlignment="Center"
+                        Margin="10,0,0,0">
+                <Button x:Name="ResetIgnoredButton"
+                        Style="{StaticResource Button.Secondary}"
+                        Command="{Binding ResetIgnoredCommand}"
+                        Margin="0,0,8,0"
+                        Visibility="{Binding HasIgnoredItems, Converter={StaticResource BoolToVisibility}}"
+                        ToolTip="Снять все пометки игнорирования. Общая сводка сканирования включает игнорируемые элементы.">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Eye}"
+                                                  Width="14"
+                                                  Height="14"
+                                                  Margin="0,0,6,0"
+                                                  VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding ResetIgnoredCaption}"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
                 <Button Style="{StaticResource Button.Destructive}"
-                        Command="{Binding DeleteMarkedCommand}"
-                        ToolTip="Переместить помеченные элементы в корзину (пометка – ПКМ по узлу)">
+                        Command="{Binding Marks.DeleteMarkedCommand}"
+                        ToolTip="{Binding Marks.DeleteHint}"
+                        AutomationProperties.Name="{Binding Marks.MarkedCount, StringFormat='Удалить помеченное: {0}'}"
+                        Visibility="{Binding Marks.HasMarked, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
                     <StackPanel Orientation="Horizontal">
                         <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
                                                   Width="14"
                                                   Height="14"
                                                   VerticalAlignment="Center"
                                                   Margin="0,0,6,0" />
-                        <TextBlock Text="Удалить"
+                        <TextBlock Text="{Binding Marks.MarkedCount, StringFormat='Удалить ({0:N0})'}"
                                    VerticalAlignment="Center" />
-                        <Border Margin="8,0,0,0"
-                                Padding="6,0"
-                                MinWidth="20"
-                                Height="18"
-                                VerticalAlignment="Center"
-                                CornerRadius="{DynamicResource Radius.Pill}"
-                                Background="#40FFFFFF"
-                                Visibility="{Binding HasMarked, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
-                            <TextBlock Text="{Binding MarkedCount}"
-                                       VerticalAlignment="Center"
-                                       HorizontalAlignment="Center"
-                                       FontWeight="SemiBold"
-                                       FontSize="{DynamicResource Font.Size.XS}" />
-                        </Border>
                     </StackPanel>
                 </Button>
             </StackPanel>

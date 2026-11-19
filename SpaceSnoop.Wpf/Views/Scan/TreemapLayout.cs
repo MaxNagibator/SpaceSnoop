@@ -66,7 +66,7 @@ public static class TreemapLayout
             LayoutRow(items, rowStart, rowLength, rect, result);
         }
 
-        Debug.Assert(Math.Abs(Sum(result) - width * height) < 1.0, "treemap area scaling broken");
+        Debug.Assert(Math.Abs(Sum(result) - (width * height)) < 1.0, "treemap area scaling broken");
 
         return result;
     }

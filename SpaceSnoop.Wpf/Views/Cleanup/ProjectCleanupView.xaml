@@ -1,0 +1,360 @@
+﻿<UserControl x:Class="SpaceSnoop.Wpf.Views.Cleanup.ProjectCleanupView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Cleanup"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:ProjectCleanupViewModel}">
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  Padding="0,0,12,0">
+        <StackPanel>
+            <Border Style="{StaticResource Card}"
+                    Margin="0,0,0,10">
+                <StackPanel>
+                    <TextBlock Text="Проекты .NET"
+                               Style="{StaticResource SectionTitle}"
+                               Margin="0,0,0,6" />
+                    <TextBlock
+                        Text="Задайте корни проектов и отдельные каталоги нестандартных результатов. Поиск найдёт bin/obj, тесты, покрытие и бенчмарки."
+                        TextWrapping="Wrap"
+                        Style="{StaticResource TextBlock.Subtle}"
+                        Margin="0,0,0,12" />
+                    <TextBlock Text="Основной корень поиска"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,0,4" />
+                    <DockPanel LastChildFill="True">
+                        <Button DockPanel.Dock="Right"
+                                Content="Выбрать…"
+                                Style="{StaticResource Button.Secondary}"
+                                Command="{Binding BrowseCommand}"
+                                Margin="8,0,0,0" />
+                        <TextBox x:Name="ProjectRoot"
+                                 Text="{Binding RootPath, UpdateSourceTrigger=PropertyChanged}"
+                                 IsEnabled="{Binding IsIdle}"
+                                 AutomationProperties.Name="Каталог проектов"
+                                 ToolTip="Основной корень поиска. Ссылки не обходятся." />
+                    </DockPanel>
+                    <ItemsControl ItemsSource="{Binding AdditionalRoots}"
+                                  Margin="0,6,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <DockPanel Margin="0,2">
+                                    <Button DockPanel.Dock="Right"
+                                            Content="Убрать"
+                                            Style="{StaticResource Button.Ghost}"
+                                            Command="{Binding DataContext.RemoveRootCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            IsEnabled="{Binding DataContext.IsIdle, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                                    <TextBox Text="{Binding Mode=OneWay}"
+                                             IsReadOnly="True"
+                                             TextWrapping="Wrap"
+                                             MinWidth="0"
+                                             AutomationProperties.Name="Дополнительный корень проекта" />
+                                </DockPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <WrapPanel Margin="0,6,0,8">
+                        <Button Content="Добавить корень…"
+                                Style="{StaticResource Button.Ghost}"
+                                Command="{Binding AddRootCommand}" />
+                        <Button Content="Убрать все корни"
+                                Style="{StaticResource Button.Ghost}"
+                                Command="{Binding ClearRootsCommand}" />
+                    </WrapPanel>
+                    <TextBlock Text="Нестандартные каталоги результатов"
+                               Style="{StaticResource Caption}"
+                               Margin="0,8,0,2" />
+                    <ItemsControl ItemsSource="{Binding CustomOutputs}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <DockPanel Margin="0,2">
+                                    <Button DockPanel.Dock="Right"
+                                            Content="Убрать"
+                                            Style="{StaticResource Button.Ghost}"
+                                            Command="{Binding DataContext.RemoveCustomOutputCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            IsEnabled="{Binding DataContext.IsIdle, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                                    <TextBox Text="{Binding Mode=OneWay}"
+                                             IsReadOnly="True"
+                                             TextWrapping="Wrap"
+                                             MinWidth="0"
+                                             AutomationProperties.Name="Нестандартный output-каталог" />
+                                </DockPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <WrapPanel Margin="0,10,0,0">
+                        <Button Content="Добавить каталог результатов…"
+                                Style="{StaticResource Button.Ghost}"
+                                Command="{Binding AddCustomOutputCommand}"
+                                Padding="12,6"
+                                Margin="0,0,10,6" />
+                        <Button Content="Убрать все каталоги результатов"
+                                Style="{StaticResource Button.Ghost}"
+                                Command="{Binding ClearCustomOutputsCommand}"
+                                Padding="10,6"
+                                Margin="0,0,10,6" />
+                    </WrapPanel>
+                    <WrapPanel Margin="0,10,0,0">
+                        <Button Content="Найти артефакты"
+                                Style="{StaticResource Button.Primary}"
+                                Command="{Binding FindCommand}"
+                                Padding="12,6"
+                                Margin="0,0,10,6" />
+                        <Button Content="Остановить"
+                                Style="{StaticResource Button.Ghost}"
+                                Command="{Binding CancelCommand}"
+                                AutomationProperties.Name="Остановить операцию"
+                                Padding="10,6"
+                                Margin="0,0,0,6"
+                                Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+                    </WrapPanel>
+                    <TextBlock
+                        Text="Перед очисткой остановите сборки, тесты и бенчмарки. В bin/obj могут лежать ваши файлы; проверьте их перед выбором."
+                        TextWrapping="Wrap"
+                        Foreground="{DynamicResource State.WarningText}"
+                        Margin="0,4,0,0" />
+                    <TextBlock
+                        Text="Выбранные файлы отправляются в корзину. Чтобы освободить место, затем очистите её в разделе Windows."
+                        TextWrapping="Wrap"
+                        Style="{StaticResource Caption}"
+                        Margin="0,6,0,0" />
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource Card.Inset}"
+                    Margin="0,0,0,10"
+                    Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Text="Результат очистки проектов"
+                               Style="{StaticResource SectionTitle}"
+                               Margin="0,0,0,6" />
+                    <TextBlock Text="{Binding ResultText}"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource Fg.Primary}" />
+                    <TextBlock Text="Файлы остаются в корзине и продолжают занимать место на диске."
+                               TextWrapping="Wrap"
+                               Style="{StaticResource Caption}"
+                               Margin="0,6,0,0" />
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource Card}"
+                    Margin="0,0,0,10"
+                    Visibility="{Binding HasArtifacts, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,28,8">
+                            <TextBlock Text="Найдено"
+                                       Style="{StaticResource Caption}" />
+                            <TextBlock Text="{Binding TotalText}"
+                                       Style="{StaticResource StatValue}"
+                                       FontSize="{DynamicResource Font.Size.L}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1"
+                                    Margin="0,0,28,8">
+                            <TextBlock Text="Выбрано"
+                                       Style="{StaticResource Caption}" />
+                            <TextBlock Text="{Binding SelectedText}"
+                                       FontSize="{DynamicResource Font.Size.L}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock"
+                                           BasedOn="{StaticResource StatValue}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasSelectedBytes}"
+                                                         Value="True">
+                                                <Setter Property="Foreground"
+                                                        Value="{DynamicResource Accent.Text}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock Text="{Binding SelectionText}"
+                                       Style="{StaticResource Caption}" />
+                        </StackPanel>
+                        <WrapPanel Grid.Row="1"
+                                   Grid.ColumnSpan="2"
+                                   VerticalAlignment="Center"
+                                   Margin="0,8,0,8">
+                            <Button Content="Отправить выбранное в корзину"
+                                    Style="{StaticResource Button.Base}"
+                                    Command="{Binding CleanCommand}"
+                                    MinHeight="{DynamicResource Control.Height.Default}"
+                                    Padding="12,6"
+                                    Margin="0,0,8,4" />
+                            <Button Content="Выбрать все видимые bin/obj"
+                                    Style="{StaticResource Button.Ghost}"
+                                    Command="{Binding SelectBuildArtifactsCommand}"
+                                    ToolTip="Выбрать доступные bin/obj с учётом фильтра. Отчёты и нестандартные каталоги выбираются отдельно."
+                                    Padding="10,6"
+                                    Margin="0,0,8,4" />
+                            <Button Content="Снять выбор"
+                                    Style="{StaticResource Button.Ghost}"
+                                    Command="{Binding ClearSelectionCommand}"
+                                    Padding="10,6"
+                                    Margin="0,0,0,4" />
+                        </WrapPanel>
+                    </Grid>
+                    <TextBlock Text="Новые и изменившиеся файлы, а также пустые каталоги останутся."
+                               TextWrapping="Wrap"
+                               Style="{StaticResource Caption}"
+                               Margin="0,0,0,8" />
+                    <TextBlock Text="Есть выбранные скрытые строки – они тоже попадут в подтверждение."
+                               TextWrapping="Wrap"
+                               Style="{StaticResource Caption}"
+                               Foreground="{DynamicResource State.WarningText}"
+                               Visibility="{Binding HasHiddenSelection, Converter={StaticResource BoolToVisibility}}"
+                               Margin="0,0,0,8" />
+                    <WrapPanel Margin="0,0,0,8">
+                        <CheckBox Content="Сначала самые большие"
+                                  IsChecked="{Binding LargestFirst}"
+                                  VerticalAlignment="Center" />
+                        <StackPanel Margin="16,0,0,0">
+                            <TextBlock Text="Фильтр по проекту или пути"
+                                       Style="{StaticResource Caption}" />
+                            <TextBox Width="240"
+                                     Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                     AutomationProperties.Name="Поиск проектных артефактов"
+                                     ToolTip="Поиск по проекту, категории, пути и содержимому" />
+                        </StackPanel>
+                    </WrapPanel>
+                    <ListBox x:Name="ProjectArtifacts"
+                             ItemsSource="{Binding RowsView}"
+                             MaxHeight="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                             IsEnabled="{Binding IsIdle}"
+                             ScrollViewer.CanContentScroll="True"
+                             VirtualizingPanel.IsVirtualizing="True"
+                             VirtualizingPanel.IsVirtualizingWhenGrouping="True"
+                             VirtualizingPanel.VirtualizationMode="Standard"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             HorizontalContentAlignment="Stretch"
+                             Grid.IsSharedSizeScope="True">
+                        <ListBox.GroupStyle>
+                            <GroupStyle>
+                                <GroupStyle.HeaderTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Name}"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource Fg.Primary}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,10,0,4" />
+                                    </DataTemplate>
+                                </GroupStyle.HeaderTemplate>
+                            </GroupStyle>
+                        </ListBox.GroupStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:ProjectArtifactViewModel}">
+                                <Border Padding="0,12"
+                                        BorderBrush="{DynamicResource Border.Subtle}"
+                                        BorderThickness="0,1,0,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto"
+                                                              SharedSizeGroup="ProjectNumbers" />
+                                        </Grid.ColumnDefinitions>
+                                        <CheckBox IsChecked="{Binding IsSelected}"
+                                                  IsEnabled="{Binding CanSelect}"
+                                                  VerticalAlignment="Top"
+                                                  Margin="0,4,12,0"
+                                                  AutomationProperties.Name="{Binding Path}" />
+                                        <StackPanel Grid.Column="1"
+                                                    Margin="0,0,12,0">
+                                            <TextBlock Text="{Binding Name}"
+                                                       FontWeight="Medium"
+                                                       TextWrapping="Wrap"
+                                                       Foreground="{DynamicResource Fg.Primary}" />
+                                            <TextBox Text="{Binding Path, Mode=OneWay}"
+                                                     IsReadOnly="True"
+                                                     TextWrapping="Wrap"
+                                                     BorderThickness="0"
+                                                     Padding="0"
+                                                     Background="Transparent"
+                                                     MinHeight="0"
+                                                     Margin="0,4,0,0"
+                                                     AutomationProperties.Name="Путь проектных артефактов" />
+                                            <TextBlock Text="{Binding Hint}"
+                                                       TextWrapping="Wrap"
+                                                       Style="{StaticResource Caption}"
+                                                       Margin="0,4,0,0" />
+                                            <Button Content="Открыть каталог"
+                                                    Style="{StaticResource Button.Ghost}"
+                                                    HorizontalAlignment="Left"
+                                                    Command="{Binding DataContext.OpenFolderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Padding="6,4"
+                                                    Margin="-6,2,0,0" />
+                                            <TextBlock Text="{Binding ErrorText}"
+                                                       TextWrapping="Wrap"
+                                                       Foreground="{DynamicResource State.ErrorText}"
+                                                       Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}" />
+                                            <Expander Style="{StaticResource Expander.Section}"
+                                                      Header="Содержимое снимка"
+                                                      IsExpanded="False"
+                                                      IsEnabled="{Binding HasContents}"
+                                                      Margin="-6,2,0,-6">
+                                                <Border MaxHeight="220"
+                                                        BorderBrush="{DynamicResource Border.Subtle}"
+                                                        BorderThickness="1"
+                                                        Padding="6">
+                                                    <ListBox ItemsSource="{Binding Contents}"
+                                                             MaxHeight="200"
+                                                             ScrollViewer.CanContentScroll="True"
+                                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                                             VirtualizingPanel.IsVirtualizing="True"
+                                                             VirtualizingPanel.VirtualizationMode="Recycling"
+                                                             HorizontalContentAlignment="Stretch">
+                                                        <ListBox.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <DockPanel Margin="0,2">
+                                                                    <TextBlock DockPanel.Dock="Right"
+                                                                               Text="{Binding Bytes, StringFormat={}{0:N0} байт}"
+                                                                               Style="{StaticResource Caption}"
+                                                                               Margin="10,0,0,0" />
+                                                                    <TextBox Text="{Binding Path, Mode=OneWay}"
+                                                                             IsReadOnly="True"
+                                                                             TextWrapping="Wrap"
+                                                                             BorderThickness="0"
+                                                                             Padding="0"
+                                                                             Background="Transparent"
+                                                                             MinHeight="0"
+                                                                             AutomationProperties.Name="Путь файла в снимке артефактов" />
+                                                                </DockPanel>
+                                                            </DataTemplate>
+                                                        </ListBox.ItemTemplate>
+                                                    </ListBox>
+                                                </Border>
+                                            </Expander>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2"
+                                                    Margin="0,2,0,0">
+                                            <TextBlock Text="{Binding SizeText}"
+                                                       Style="{StaticResource TextBlock.Mono}"
+                                                       TextAlignment="Right" />
+                                            <TextBlock Text="{Binding FilesText}"
+                                                       Style="{StaticResource Caption}"
+                                                       TextAlignment="Right" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
+            </Border>
+            <TextBlock Text="{Binding StatusText}"
+                       TextWrapping="Wrap"
+                       Style="{StaticResource TextBlock.Subtle}" />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
