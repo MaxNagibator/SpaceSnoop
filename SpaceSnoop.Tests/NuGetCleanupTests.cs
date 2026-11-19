@@ -1,6 +1,7 @@
 ﻿using SpaceSnoop.Core;
 using SpaceSnoop.Core.Cleanup;
 using System.ComponentModel;
+using System.Text;
 
 namespace SpaceSnoop.Tests;
 
@@ -151,14 +152,17 @@ public class NuGetCleanupTests
     {
         var script = Path.Combine(_root, "discovery.ps1");
         var lines = NuGetCacheDiscovery.Names.Select(x => $"'{x.Value}: {_paths[x.Key]}'");
-        await File.WriteAllLinesAsync(
-            script,
-            (truncated
-                ? new[]
-                {
-                    "'x' * 30000",
-                }
-                : []).Concat(lines));
+        var body = new List<string>
+        {
+            "[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)",
+        };
+        if (truncated)
+        {
+            body.Add("'x' * 30000");
+        }
+
+        body.AddRange(lines);
+        await File.WriteAllLinesAsync(script, body, new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
 
         var starts = 0;
         var cli = new DotNetCli(
@@ -334,9 +338,9 @@ public class NuGetCleanupTests
         {
             Directory.CreateSymbolicLink(parent, outside);
         }
-        catch (UnauthorizedAccessException)
+        catch (Exception exception) when (exception is UnauthorizedAccessException or IOException)
         {
-            Assert.Ignore("Для создания тестовой ссылки нужны права или режим разработчика.");
+            Assert.Ignore($"Для создания тестовой ссылки нужны права или режим разработчика: {exception.Message}");
         }
 
         try

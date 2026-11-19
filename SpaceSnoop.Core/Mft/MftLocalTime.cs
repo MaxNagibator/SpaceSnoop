@@ -16,6 +16,7 @@ internal sealed class MftLocalTime(TimeZoneInfo zone, Func<long, DateTime> exact
     private static MftLocalTime? _local;
 
     private readonly long[] _slots = new long[Slots];
+    private readonly HashSet<long>? _exactDays = BuildExactDays(zone);
 
     public TimeZoneInfo Zone { get; } = zone;
 
@@ -63,7 +64,7 @@ internal sealed class MftLocalTime(TimeZoneInfo zone, Func<long, DateTime> exact
 
     private long Measure(long day)
     {
-        if (day < 3 || day > (LastDay - 3))
+        if (day < 3 || day > (LastDay - 3) || (_exactDays is not null && _exactDays.Contains(day)))
         {
             return Pack(day, ExactCode);
         }
@@ -94,6 +95,39 @@ internal sealed class MftLocalTime(TimeZoneInfo zone, Func<long, DateTime> exact
         }
 
         return Pack(day, seconds + ShiftBias);
+    }
+
+    private static void AddBoundaryDays(HashSet<long> days, DateTime date)
+    {
+        if (date.Ticks <= FileTimeEpoch || date.Ticks >= (DateTime.MaxValue.Ticks - TimeSpan.TicksPerDay))
+        {
+            return;
+        }
+
+        var day = (date.Ticks - FileTimeEpoch) / TimeSpan.TicksPerDay;
+        days.Add(day - 1);
+        days.Add(day);
+        days.Add(day + 1);
+    }
+
+    private static HashSet<long>? BuildExactDays(TimeZoneInfo zone)
+    {
+        var rules = zone.GetAdjustmentRules();
+
+        if (rules.Length == 0)
+        {
+            return null;
+        }
+
+        var days = new HashSet<long>();
+
+        foreach (var rule in rules)
+        {
+            AddBoundaryDays(days, rule.DateStart);
+            AddBoundaryDays(days, rule.DateEnd);
+        }
+
+        return days.Count == 0 ? null : days;
     }
 
     private static long Pack(long day, long code)

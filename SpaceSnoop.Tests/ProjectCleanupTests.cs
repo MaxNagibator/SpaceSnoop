@@ -372,7 +372,14 @@ public sealed class ProjectCleanupTests
         Write("app/bin/app.dll");
         var outside = Write("outside/important.txt");
         var link = Path.Combine(_root, "app", "bin", "linked");
-        Directory.CreateSymbolicLink(link, Path.GetDirectoryName(outside)!);
+        try
+        {
+            Directory.CreateSymbolicLink(link, Path.GetDirectoryName(outside)!);
+        }
+        catch (Exception exception) when (exception is UnauthorizedAccessException or IOException)
+        {
+            Assert.Ignore($"Создание ссылки недоступно: {exception.Message}");
+        }
         try
         {
             var plan = await _service.ScanAsync(_root, default);
