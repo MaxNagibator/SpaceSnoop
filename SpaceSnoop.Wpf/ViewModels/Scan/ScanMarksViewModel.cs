@@ -20,6 +20,8 @@ public sealed partial class ScanMarksViewModel : ObservableObject
     private readonly Action _reloadDrives;
     private long _markedBytes;
 
+    internal static Func<string, bool> SupportsRecycleBin { get; set; } = RecycleBin.SupportsRecycleBin;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasMarked))]
     [NotifyPropertyChangedFor(nameof(DeleteHint))]
@@ -268,11 +270,22 @@ public sealed partial class ScanMarksViewModel : ObservableObject
             return;
         }
 
-        var permanent = _operations.DeleteMode == DeleteMode.Permanent;
-        _logger.DeletionRequested(marked.Count, permanent);
-        var dialog = _deleteDialogFactory.Create(marked, permanent, UnmarkFromDialog);
+        var probe = SupportsRecycleBin;
+        var withoutRecycleBin = await Task.Run(() =>
+            marked.Where(item => !probe(item.AbsolutePath)).ToHashSet<SpaceBase>(ReferenceEqualityComparer.Instance));
 
-        if (!_operations.ConfirmBeforeDelete)
+        if (!CanDeleteMarked() || !marked.SequenceEqual(ScanTreeEditor.CollectMarked(_roots), ReferenceEqualityComparer.Instance))
+        {
+            return;
+        }
+
+        var modePermanent = _operations.DeleteMode == DeleteMode.Permanent;
+        var forcedByNetwork = withoutRecycleBin.Count > 0;
+        var permanent = modePermanent || forcedByNetwork;
+        _logger.DeletionRequested(marked.Count, permanent);
+        var dialog = _deleteDialogFactory.Create(marked, modePermanent, UnmarkFromDialog, withoutRecycleBin);
+
+        if (!_operations.ConfirmBeforeDelete && !forcedByNetwork)
         {
             dialog.StartCommand.Execute(null);
         }

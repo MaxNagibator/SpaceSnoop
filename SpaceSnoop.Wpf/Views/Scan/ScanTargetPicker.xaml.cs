@@ -1,4 +1,5 @@
-﻿using System.Windows.Controls.Primitives;
+﻿using SpaceSnoop.Wpf.Views.Behaviors;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
@@ -10,6 +11,21 @@ public partial class ScanTargetPicker : UserControl
     public ScanTargetPicker()
     {
         InitializeComponent();
+    }
+
+    private void OnPathBoxKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter
+            || sender is not TextBox box
+            || PathSuggest.IsPopupOpen(box)
+            || DataContext is not ScanViewModel scan
+            || !scan.StartCommand.CanExecute(null))
+        {
+            return;
+        }
+
+        scan.StartCommand.Execute(null);
+        e.Handled = true;
     }
 
     private void OnIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)

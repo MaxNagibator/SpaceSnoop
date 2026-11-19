@@ -44,6 +44,8 @@ public interface ISyncAutomation
 
     Func<SyncPlanExportModel>? CapturePlanBuilder(int entryLimit);
 
+    Task<bool> HasPermanentNetworkDeleteAsync(CancellationToken cancellationToken);
+
     Task CompareFromAutomationAsync(CancellationToken cancellationToken);
 
     Task<SyncRunResult?> SyncFromAutomationAsync(CancellationToken cancellationToken);

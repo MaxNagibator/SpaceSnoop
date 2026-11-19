@@ -411,7 +411,7 @@
             <StackPanel Orientation="Horizontal">
                 <views:CommandRadioButton Style="{StaticResource RecentChip.Select}">
                     <StackPanel Orientation="Horizontal">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Folder}"
+                        <iconPacks:PackIconLucide Kind="{Binding IconKind}"
                                                   Width="13"
                                                   Height="13"
                                                   VerticalAlignment="Center"

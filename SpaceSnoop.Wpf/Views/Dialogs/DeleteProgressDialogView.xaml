@@ -138,6 +138,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -170,6 +171,32 @@
         </Grid>
 
         <Border Grid.Row="2"
+                Background="{DynamicResource State.ErrorSoft}"
+                CornerRadius="{DynamicResource Radius.M}"
+                Padding="10,8"
+                Margin="0,12,0,0"
+                Visibility="{Binding ForcedByNetwork, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <iconPacks:PackIconLucide Grid.Column="0"
+                                          Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
+                                          Width="15"
+                                          Height="15"
+                                          VerticalAlignment="Top"
+                                          Margin="0,1,9,0"
+                                          Foreground="{DynamicResource State.ErrorText}" />
+                <TextBlock Grid.Column="1"
+                           Text="На сетевом хранилище нет корзины Windows – удаление необратимо"
+                           TextWrapping="Wrap"
+                           FontSize="{DynamicResource Font.Size.S}"
+                           Foreground="{DynamicResource State.ErrorText}" />
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="3"
                 Style="{StaticResource Card.Inset}"
                 Padding="6"
                 Margin="0,14,0,0"
@@ -291,7 +318,7 @@
             </ItemsControl>
         </Border>
 
-        <StackPanel Grid.Row="3"
+        <StackPanel Grid.Row="4"
                     Margin="0,14,0,0"
                     Visibility="{Binding IsIdle, Converter={StaticResource InverseBoolToVisibility}, FallbackValue=Collapsed}">
             <Grid>
@@ -390,7 +417,7 @@
                        Visibility="{Binding DiagnosticsText, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
         </StackPanel>
 
-        <Grid Grid.Row="4"
+        <Grid Grid.Row="5"
               Margin="0,18,0,0">
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Right"
@@ -414,7 +441,7 @@
                                                   Height="14"
                                                   VerticalAlignment="Center"
                                                   Margin="0,0,6,0" />
-                        <TextBlock Text="Удалить" />
+                        <TextBlock Text="{Binding StartButtonText}" />
                     </StackPanel>
                 </Button>
             </StackPanel>

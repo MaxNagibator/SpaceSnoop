@@ -129,7 +129,9 @@ public sealed partial class SyncSessionViewModel : ObservableObject
         int total = 0,
         CancellationToken external = default,
         long totalBytes = 0,
-        bool selfThrottled = false)
+        bool selfThrottled = false,
+        Func<Exception, string>? formatError = null,
+        Action<string>? onError = null)
         where T : class
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(external);
@@ -204,10 +206,19 @@ public sealed partial class SyncSessionViewModel : ObservableObject
         catch (Exception exception)
         {
             var cause = exception.Unwrap();
+            var message = formatError?.Invoke(cause) ?? cause.Message;
             _logger.SyncOperationFailed(cause, operation);
             _notifier.Notify($"Ошибка: {operation}", StatusSeverity.Error);
-            _dialogs.Error("Ошибка", cause.Message);
-            Report($"Ошибка: {cause.Message}");
+            if (onError is null)
+            {
+                _dialogs.Error("Ошибка", message);
+            }
+            else
+            {
+                onError(message);
+            }
+
+            Report($"Ошибка: {message}");
             return null;
         }
         finally

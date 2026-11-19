@@ -7,23 +7,43 @@ public sealed partial class ScanViewModel
 {
     private async Task<bool> ScanAsync(string path, CancellationToken external = default)
     {
+        path = path?.Trim() ?? string.Empty;
+
         if (string.IsNullOrWhiteSpace(path))
         {
             return false;
         }
 
-        var directory = new DirectoryInfo(path);
+        if (UncPath.IsIncompleteUnc(path))
+        {
+            _dialogs.Warning("Сканирование", @"Укажите полный сетевой путь вида \\сервер\шара.");
+            return false;
+        }
 
+        DirectoryInfo directory;
+
+        try
+        {
+            directory = new(path);
+        }
+        catch (Exception exception)
+        {
+            var cause = exception.Unwrap();
+            _logger.ScanFailed(cause, path);
+            _dialogs.Error("Ошибка сканирования", ScanTargetProbe.DescribeScanError(cause, path));
+            return false;
+        }
+
+        var targetPath = Path.TrimEndingDirectorySeparator(directory.FullName);
         _cts = new();
         using var runCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, external);
         _scanVersion++;
-        var stopToken = _cts.Token;
         var token = runCts.Token;
         IsPickerOpen = false;
         IsScanning = true;
         ScanWasCancelled = false;
-        ScanTargetPath = path;
-        StatusCaption = $"Сканирование: {path}";
+        ScanTargetPath = targetPath;
+        StatusCaption = $"Сканирование: {targetPath}";
 
         SelectedNode = null;
         var released = false;
@@ -33,58 +53,103 @@ public sealed partial class ScanViewModel
         {
             Progress.ReportPhase("Подготовка сканирования");
 
-            var (exists, refusal) = await Task.Run(
-                    () =>
-                    {
-                        if (!ScanTargetProbe.DirectoryExists(directory.FullName))
-                        {
-                            return (false, null);
-                        }
-
-                        return (true, ScanTargetProbe.RootRefusal(directory));
-                    },
-                    stopToken)
-                .WaitAsync(stopToken);
-
-            if (!exists)
+            if (_networkDrives is not null)
             {
-                _dialogs.Warning("Сканирование", $"Каталог не найден: {path}");
+                await _networkDrives.WaitForPathAsync(
+                    targetPath,
+                    TimeSpan.FromSeconds(AppDefaults.McpNetworkDriveTimeoutSeconds),
+                    token);
+            }
+
+            var probe = await ScanTargetProbe.CheckAsync(targetPath, token);
+
+            if (probe.Status == PathProbeStatus.Cancelled)
+            {
+                throw new OperationCanceledException(token);
+            }
+
+            if (probe.Status == PathProbeStatus.TimedOut)
+            {
+                _uiDispatcher.Invoke(() => _dialogs.Warning("Сканирование", ScanTargetProbe.FormatTimeoutMessage(targetPath)));
                 return false;
             }
+
+            if (probe.Status != PathProbeStatus.Exists)
+            {
+                var missingMessage = await ScanTargetProbe.DescribeMissingAsync(targetPath, token);
+                _uiDispatcher.Invoke(() => _dialogs.Warning("Сканирование", missingMessage));
+                return false;
+            }
+
+            string? refusal;
+
+            try
+            {
+                refusal = await Task.Run(() => ScanTargetProbe.RootRefusal(directory), token)
+                    .WaitAsync(TimeSpan.FromMilliseconds(AppDefaults.PathProbeTimeoutMs), token);
+            }
+            catch (TimeoutException)
+            {
+                _uiDispatcher.Invoke(() => _dialogs.Warning("Сканирование", ScanTargetProbe.FormatTimeoutMessage(targetPath)));
+                return false;
+            }
+
+            token.ThrowIfCancellationRequested();
 
             if (refusal is not null)
             {
-                _logger.ScanRootLinkRejected(path);
-                _dialogs.Warning("Сканирование", refusal);
+                _logger.ScanRootLinkRejected(targetPath);
+                _uiDispatcher.Invoke(() => _dialogs.Warning("Сканирование", refusal));
                 return false;
             }
 
-            released = ReleaseBeforeScan(directory);
-            var parallelism = await Preferences.ResolveParallelismAsync(path).WaitAsync(token);
-            var progress = Progress.Begin(directory, path, parallelism);
+            if (UncPath.IsUnc(targetPath))
+            {
+                NetworkDiscovery.Remember(targetPath);
+            }
+
+            _uiDispatcher.Invoke(() =>
+            {
+                var known = Drives.HasDrive(targetPath);
+                Drives.AddDrive(targetPath);
+
+                if (!known)
+                {
+                    Drives.LoadDriveLabels();
+                }
+
+                Persist(() => _settings.SetValue(SettingsKeys.ScanLastDrive, targetPath));
+                released = ReleaseBeforeScan(directory);
+            });
+            var parallelism = await Preferences.ResolveParallelismAsync(targetPath).WaitAsync(token);
+            var progress = Progress.Begin(directory, targetPath, parallelism);
 
             if (parallelism == 1 && Preferences.UseMultithreading && Preferences.MaxParallelism > 1)
             {
-                _logger.ScanMediaLimited(path, Preferences.MaxParallelism);
+                _logger.ScanMediaLimited(targetPath, Preferences.MaxParallelism);
             }
 
-            _logger.ScanStarted(path, parallelism > 1, parallelism);
+            _logger.ScanStarted(targetPath, parallelism > 1, parallelism);
 
             var outcome = await RunTraversalAsync(directory, parallelism, progress, token);
             token.ThrowIfCancellationRequested();
 
             var elapsed = Progress.Finish(releaseMeasurement: false);
+            var driveCapacity = await ReadCapacityAsync(outcome.Root.AbsolutePath, token);
             var applied = Stopwatch.StartNew();
 
             Progress.ReportPhase("Показ результата сканирования");
-            ApplyScanResult(outcome.Root, elapsed, Progress.Traversal, outcome.Notes);
-            resultApplied = true;
+            _uiDispatcher.Invoke(() =>
+            {
+                ApplyScanResult(outcome.Root, elapsed, Progress.Traversal, outcome.Notes, driveCapacity);
+                resultApplied = true;
+            });
 
             _logger.ScanPhases((long)elapsed.TotalMilliseconds, (long)applied.Elapsed.TotalMilliseconds);
 
             await ReturnScanMemoryAsync(outcome.Root, Progress.ReportPhase, token);
 
-            _notifier.Notify($"Сканирование завершено: {outcome.Root.AbsolutePath} · {outcome.Root.TotalSizeText}", StatusSeverity.Success);
+            _uiDispatcher.Invoke(() => _notifier.Notify($"Сканирование завершено: {outcome.Root.AbsolutePath} · {outcome.Root.TotalSizeText}", StatusSeverity.Success));
             return true;
         }
         catch (OperationCanceledException)
@@ -98,9 +163,13 @@ public sealed partial class ScanViewModel
         catch (Exception exception)
         {
             var cause = exception.Unwrap();
+            var message = ScanTargetProbe.DescribeScanError(cause, path);
             _logger.ScanFailed(cause, path);
-            _notifier.Notify($"Ошибка сканирования: {cause.Message}", StatusSeverity.Error);
-            _dialogs.Error("Ошибка сканирования", cause.Message);
+            _uiDispatcher.Invoke(() =>
+            {
+                _notifier.Notify($"Ошибка сканирования: {message}", StatusSeverity.Error);
+                _dialogs.Error("Ошибка сканирования", message);
+            });
             return false;
         }
         finally
@@ -121,6 +190,19 @@ public sealed partial class ScanViewModel
             _cts = null;
 
             await measurement;
+        }
+    }
+
+    private static async Task<DriveCapacity?> ReadCapacityAsync(string path, CancellationToken token)
+    {
+        try
+        {
+            return await Task.Run(() => DriveCapacity.TryRead(path), token)
+                .WaitAsync(TimeSpan.FromMilliseconds(AppDefaults.PathProbeTimeoutMs), token);
+        }
+        catch (TimeoutException)
+        {
+            return null;
         }
     }
 }

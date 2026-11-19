@@ -114,10 +114,15 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
             return;
         }
 
-        var planned = row.Comparison?.CountPlannedActions();
-        var lines = OverviewNarrative.BuildRowLines(row, planned);
+        var request = BuildCompareRequest(row.Profile);
+        var comparison = row.Comparison;
+        var planned = comparison?.CountPlannedActions();
+        var recycleOverwritten = _settings.GetBool(SettingsKeys.SyncRecycleOverwritten, AppDefaults.SyncRecycleOverwrittenDefault);
+        var permanentNetwork = await Task.Run(() => OverviewNarrative.HasNetworkDeleteOrOverwrite(request, comparison, recycleOverwritten), CancellationToken.None);
+        var lines = OverviewNarrative.BuildRowLines(row, planned, permanentNetwork);
 
-        if (!await ConfirmSyncAsync("Синхронизация профиля", lines, planned, OverviewNarrative.DescribeIncomplete([row])))
+        if (!await ConfirmSyncAsync("Синхронизация профиля", lines, planned, OverviewNarrative.BuildSyncWarning([row], permanentNetwork), permanentNetwork)
+            || IsBusy)
         {
             return;
         }
@@ -132,7 +137,7 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
                 var stopwatch = Stopwatch.StartNew();
                 _logger.OverviewSyncStarted(1);
 
-                await SyncRowCore(row, token);
+                await SyncRowCore(row, request, token, recycleOverwritten, permanentNetwork);
 
                 stopwatch.Stop();
                 var (synced, failed, skipped) = OverviewNarrative.Tally(row);
@@ -148,9 +153,18 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
         var targets = BatchTargets();
         var excluded = _rows.Rows.Count - targets.Count;
         var planned = OverviewNarrative.SumPlans(targets);
-        var lines = OverviewNarrative.BuildBatchLines(targets.Count, excluded, planned);
+        var requests = targets.ToDictionary(row => row, row => (Request: BuildCompareRequest(row.Profile), row.Comparison));
+        var recycleOverwritten = _settings.GetBool(SettingsKeys.SyncRecycleOverwritten, AppDefaults.SyncRecycleOverwrittenDefault);
+        var networkTargets = await Task.Run(
+            () => requests.Where(item => OverviewNarrative.HasNetworkDeleteOrOverwrite(item.Value.Request, item.Value.Comparison, recycleOverwritten))
+                .Select(item => item.Key)
+                .ToHashSet(),
+            CancellationToken.None);
+        var permanentNetwork = networkTargets.Count > 0;
+        var lines = OverviewNarrative.BuildBatchLines(targets.Count, excluded, planned, permanentNetwork);
 
-        if (!await ConfirmSyncAsync("Синхронизация всех профилей", lines, planned, OverviewNarrative.DescribeIncomplete(targets)))
+        if (!await ConfirmSyncAsync("Синхронизация всех профилей", lines, planned, OverviewNarrative.BuildSyncWarning(targets, permanentNetwork), permanentNetwork)
+            || IsBusy)
         {
             return;
         }
@@ -164,7 +178,7 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
                 var stopwatch = Stopwatch.StartNew();
                 _logger.OverviewSyncStarted(targets.Count);
 
-                await RunRowsAsync(targets, token, SyncRowCore);
+                await RunRowsAsync(targets, token, (row, rowToken) => SyncRowCore(row, requests[row].Request, rowToken, recycleOverwritten, networkTargets.Contains(row)));
 
                 stopwatch.Stop();
                 var tally = OverviewNarrative.TallySync(targets, excluded);
@@ -243,7 +257,7 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
         }
         catch (Exception exception)
         {
-            row.Error = exception.Unwrap().Message;
+            row.Error = OverviewNarrative.FormatUncError(exception.Unwrap(), row.Left, row.Right);
             row.Status = OverviewRunStatus.Error;
         }
         finally
@@ -256,13 +270,9 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
     private async Task CompareRowAsync(OverviewRowViewModel row, CancellationToken token)
     {
         var profile = row.Profile;
-        var preflight = await Task.Run(() => OverviewPipeline.Classify(profile), CancellationToken.None);
-        token.ThrowIfCancellationRequested();
 
-        if (preflight is { } refusal)
+        if (!await TryPreflightAsync(row, token, rowToken => OverviewPipeline.ClassifyAsync(profile, rowToken)))
         {
-            row.Error = refusal.Reason;
-            row.Status = refusal.Status;
             return;
         }
 
@@ -307,16 +317,23 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
         _rowCts?.Cancel();
     }
 
-    private async Task SyncRowCore(OverviewRowViewModel row, CancellationToken token)
+    private async Task SyncRowCore(
+        OverviewRowViewModel row,
+        CompareDirectoriesRequest request,
+        CancellationToken token,
+        bool recycleOverwritten,
+        bool allowPermanentNetworkDelete)
     {
         var profile = row.Profile;
-        var preflight = await Task.Run(() => OverviewPipeline.ClassifyForSync(profile), CancellationToken.None);
-        token.ThrowIfCancellationRequested();
 
-        if (preflight is { } refusal)
+        if (!await TryPreflightAsync(row, token, rowToken => OverviewPipeline.ClassifyForSyncAsync(profile, rowToken)))
         {
-            row.Error = refusal.Reason;
-            row.Status = refusal.Status;
+            return;
+        }
+
+        if (BuildCompareRequest(profile) != request)
+        {
+            MarkSkipped(row, "Профиль изменился. Запустите синхронизацию заново.");
             return;
         }
 
@@ -330,15 +347,15 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
             "Пропущено: часть файлов могла быть перенесена",
             async rowToken =>
             {
-                var request = BuildCompareRequest(profile);
-                var recycleOverwritten = _settings.GetBool(SettingsKeys.SyncRecycleOverwritten, AppDefaults.SyncRecycleOverwrittenDefault);
                 var verify = _settings.GetBool(SettingsKeys.SyncVerify, AppDefaults.SyncVerifyDefault);
 
                 var run = await Task.Run(
                     () =>
                     {
                         var result = _compare.Execute(request, rowToken);
-                        var applied = _sync.Execute(new(result, SyncConflictPolicy.SkipUnresolved, SyncDeleteUi.Silent, verify, recycleOverwritten), rowToken);
+                        var applied = _sync.Execute(
+                            new(result, SyncConflictPolicy.SkipUnresolved, SyncDeleteUi.Silent, verify, recycleOverwritten, allowPermanentNetworkDelete),
+                            rowToken);
                         var verifyState = SyncPlanNarrative.ResolveVerify(verify, applied);
                         AppendLog(SyncLogOrigin.Overview, profile.Name, applied, verifyState, _logger);
                         return (Report: applied, VerifyState: verifyState, Unreadable: result.IncompleteDirectories(), Links: result.SkippedLinks());
@@ -365,6 +382,42 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
             });
     }
 
+    private async Task<bool> TryPreflightAsync(
+        OverviewRowViewModel row,
+        CancellationToken token,
+        Func<CancellationToken, Task<OverviewPreflight?>> classify)
+    {
+        OverviewPreflight? preflight;
+        var rowCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+        _rowCts = rowCts;
+
+        try
+        {
+            preflight = await classify(rowCts.Token);
+        }
+        catch (OperationCanceledException) when (!token.IsCancellationRequested)
+        {
+            MarkSkipped(row);
+            return false;
+        }
+        finally
+        {
+            _rowCts = null;
+            rowCts.Dispose();
+        }
+
+        token.ThrowIfCancellationRequested();
+
+        if (preflight is { } refusal)
+        {
+            row.Error = refusal.Reason;
+            row.Status = refusal.Status;
+            return false;
+        }
+
+        return true;
+    }
+
     private static CompareDirectoriesRequest BuildCompareRequest(SyncProfile profile)
     {
         return new(profile.Left, profile.Right, profile.Exclusions, HeadlessSync.MapMode(profile.Mode), profile.Winner, profile.Mirror);
@@ -378,9 +431,14 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
         _logger.OverviewRowSkipped(row.Name);
     }
 
-    private async Task<bool> ConfirmSyncAsync(string title, IReadOnlyList<ConfirmLine> lines, PlannedActions? planned, string? warning = null)
+    private async Task<bool> ConfirmSyncAsync(
+        string title,
+        IReadOnlyList<ConfirmLine> lines,
+        PlannedActions? planned,
+        string? warning = null,
+        bool permanentNetwork = false)
     {
-        var destructive = planned is null || (planned.Deletes + planned.DirDeletes) > 0;
+        var destructive = permanentNetwork || planned is null || (planned.Deletes + planned.DirDeletes) > 0;
 
         var confirm = new ConfirmDialogViewModel(
             title,
@@ -391,7 +449,7 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
                 new("Синхронизировать", destructive ? ConfirmChoiceKind.Destructive : ConfirmChoiceKind.Primary),
             ])
         {
-            Summary = planned is null ? null : SyncPlanNarrative.DescribePlanVolume(planned),
+            Summary = planned is null ? null : SyncPlanNarrative.DescribePlanVolume(planned, permanentNetwork),
             Warning = warning,
         };
 

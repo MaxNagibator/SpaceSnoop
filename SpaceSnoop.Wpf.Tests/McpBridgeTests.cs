@@ -1,11 +1,17 @@
 ﻿using KeepShell.Diagnostics;
+using KeepShell.Testing;
+using Microsoft.Extensions.Logging.Abstractions;
 using ModelContextProtocol;
 using SpaceSnoop.Core;
 using SpaceSnoop.Core.Domain;
 using SpaceSnoop.Core.Export;
 using SpaceSnoop.Wpf.Bootstrap;
+using SpaceSnoop.Wpf.Bootstrap.Platform;
+using SpaceSnoop.Wpf.Bootstrap.Schedule;
 using SpaceSnoop.Wpf.Diagnostics;
 using SpaceSnoop.Wpf.Mcp;
+using SpaceSnoop.Wpf.ViewModels.Scan;
+using SpaceSnoop.Wpf.ViewModels.Settings;
 using SpaceSnoop.Wpf.ViewModels.Sync;
 using System.Text.Json;
 
@@ -368,5 +374,172 @@ public class McpBridgeTests
                     0,
                     null),
             ]);
+    }
+}
+
+[TestFixture]
+[NonParallelizable]
+public class McpListProfilesNetworkTests
+{
+    private string _root = string.Empty;
+    private string _left = string.Empty;
+    private string _right = string.Empty;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _root = Path.Combine(Path.GetTempPath(), "ss_mcp_profiles_" + Guid.NewGuid().ToString("N"));
+        _left = Path.Combine(_root, "left");
+        _right = Path.Combine(_root, "right");
+        Directory.CreateDirectory(_left);
+        Directory.CreateDirectory(_right);
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        if (Directory.Exists(_root))
+        {
+            Directory.Delete(_root, true);
+        }
+    }
+
+    [Test]
+    public async Task ListProfiles_не_зависает_на_зависшем_UNC_и_возвращает_причину_таймаута()
+    {
+        var previousProbe = PathProbe.DirectoryExists;
+        using var release = new ManualResetEventSlim();
+        var host = "hung-mcp-" + Guid.NewGuid().ToString("N")[..6];
+
+        PathProbe.DirectoryExists = path =>
+        {
+            if (path.Contains(host, StringComparison.Ordinal))
+            {
+                release.Wait(TimeSpan.FromSeconds(10));
+                return false;
+            }
+
+            return Directory.Exists(path);
+        };
+
+        try
+        {
+            var settings = new MemorySettings();
+            SyncProfileStore.Save(
+                settings,
+                [
+                    new()
+                    {
+                        Id = "local",
+                        Name = "Локальный",
+                        Left = _left,
+                        Right = _right,
+                    },
+                    new()
+                    {
+                        Id = "hung",
+                        Name = "Зависший NAS",
+                        Left = $@"\\{host}\share",
+                        Right = _right,
+                    },
+                ]);
+
+            using var monitor = TestDiagnostics.Monitor();
+            using var networkDrives = new NetworkDriveRestore();
+            var bridge = CreateBridge(settings, monitor, networkDrives);
+
+            var json = await bridge.Insight.ListProfilesAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(10));
+            using var doc = JsonDocument.Parse(json);
+            var profiles = doc.RootElement;
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(profiles.GetArrayLength(), Is.EqualTo(2));
+                Assert.That(profiles[0].TryGetProperty("unavailable", out _), Is.False);
+                Assert.That(profiles[1].GetProperty("unavailable").GetString(), Does.Contain("время ожидания"));
+            }
+        }
+        finally
+        {
+            release.Set();
+            PathProbe.DirectoryExists = previousProbe;
+        }
+    }
+
+    [Test]
+    public async Task ListProfiles_прерывается_по_отмене_токена_на_зависшем_UNC()
+    {
+        var previousProbe = PathProbe.DirectoryExists;
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        using var cts = new CancellationTokenSource();
+        var host = "cancel-mcp-" + Guid.NewGuid().ToString("N")[..6];
+
+        PathProbe.DirectoryExists = path =>
+        {
+            if (path.Contains(host, StringComparison.Ordinal))
+            {
+                entered.Set();
+                release.Wait(TimeSpan.FromSeconds(10));
+                return false;
+            }
+
+            return Directory.Exists(path);
+        };
+
+        try
+        {
+            var settings = new MemorySettings();
+            SyncProfileStore.Save(
+                settings,
+                [
+                    new()
+                    {
+                        Id = "hung",
+                        Name = "Зависший NAS",
+                        Left = $@"\\{host}\share",
+                        Right = _right,
+                    },
+                ]);
+
+            using var monitor = TestDiagnostics.Monitor();
+            using var networkDrives = new NetworkDriveRestore();
+            var bridge = CreateBridge(settings, monitor, networkDrives);
+
+            var task = bridge.Insight.ListProfilesAsync(cts.Token);
+            Assert.That(entered.Wait(TimeSpan.FromSeconds(5)), Is.True);
+
+            await cts.CancelAsync();
+            await Assert.ThatAsync(async () => await task.WaitAsync(TimeSpan.FromSeconds(2)), Throws.InstanceOf<OperationCanceledException>());
+        }
+        finally
+        {
+            release.Set();
+            PathProbe.DirectoryExists = previousProbe;
+        }
+    }
+
+    private static McpBridge CreateBridge(MemorySettings settings, PerformanceMonitor monitor, NetworkDriveRestore networkDrives)
+    {
+        var scanPreferences = new ScanPreferences(settings);
+
+        return new(
+            settings,
+            new SyncAutomationDouble(),
+            new ScanAutomationDouble(),
+            new McpPreferences(settings),
+            scanPreferences,
+            new(new(), new(), scanPreferences, NullLogger<ScanRunner>.Instance),
+            new(),
+            new(),
+            new(),
+            new CleanupAutomationDouble(),
+            new(new(), new(settings)),
+            monitor,
+            new PerformanceOperations(monitor),
+            new(NullLogger<DirectoryComparer>.Instance),
+            new FakeAppNavigator(),
+            networkDrives,
+            NullLogger<McpBridge>.Instance);
     }
 }

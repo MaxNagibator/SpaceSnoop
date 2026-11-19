@@ -124,30 +124,22 @@ internal sealed class McpSyncTools(
 
         try
         {
+            var networkDeleteCheck = McpDispatch.Run(() =>
+            {
+                EnsureSyncReady();
+                return sync.HasPermanentNetworkDeleteAsync(cancellationToken);
+            });
+
+            if (await networkDeleteCheck.ConfigureAwait(false))
+            {
+                logger.McpToolRejected("sync_current", "на сетевом хранилище нет корзины Windows, а план содержит удаление");
+
+                throw new McpException("Синхронизация через MCP отклонена: на сетевом хранилище нет корзины Windows, а план содержит удаление.");
+            }
+
             var run = McpDispatch.Run(() =>
             {
-                if (!sync.HasComparison)
-                {
-                    throw new McpException("Сначала выполните сравнение: open_sync с compare=true.");
-                }
-
-                if (sync.IsBusy)
-                {
-                    throw new McpException("Страница «Синхронизация» сейчас занята другой операцией.");
-                }
-
-                if (sync.HasPendingConflicts)
-                {
-                    throw new McpException("Есть неразрешённые спорные элементы – разрешите их в приложении.");
-                }
-
-                if (sync.PlanFreshness != SyncPlanFreshness.Fresh)
-                {
-                    logger.McpToolRejected("sync_current", "план уже исполнен");
-
-                    throw new McpException("План уже исполнен – выполните сравнение заново: open_sync с compare=true.");
-                }
-
+                EnsureSyncReady();
                 logger.McpMutationRequested("sync_current", $"«{sync.LeftPath}» → «{sync.RightPath}», режим {sync.Mode}, зеркало {sync.Mirror}");
                 notifier.Notify("Агент запустил синхронизацию", StatusSeverity.Warning);
 
@@ -189,6 +181,31 @@ internal sealed class McpSyncTools(
                 [.. report.Mismatches.Take(entryLimit)],
                 sync.SummaryText,
                 state.ReadSyncState())));
+    }
+
+    private void EnsureSyncReady()
+    {
+        if (!sync.HasComparison)
+        {
+            throw new McpException("Сначала выполните сравнение: open_sync с compare=true.");
+        }
+
+        if (sync.IsBusy)
+        {
+            throw new McpException("Страница «Синхронизация» сейчас занята другой операцией.");
+        }
+
+        if (sync.HasPendingConflicts)
+        {
+            throw new McpException("Есть неразрешённые спорные элементы – разрешите их в приложении.");
+        }
+
+        if (sync.PlanFreshness != SyncPlanFreshness.Fresh)
+        {
+            logger.McpToolRejected("sync_current", "план уже исполнен");
+
+            throw new McpException("План уже исполнен – выполните сравнение заново: open_sync с compare=true.");
+        }
     }
 
     private static async Task<string> BuildJsonAsync(Func<ComparisonExportModel> build, CancellationToken cancellationToken)

@@ -5,6 +5,7 @@ using SpaceSnoop.Core.Domain;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Bootstrap.Storage;
 using SpaceSnoop.Wpf.ViewModels.Scan;
+using System.ComponentModel;
 
 namespace SpaceSnoop.Wpf.Tests;
 
@@ -315,11 +316,32 @@ public class ScanPageNoticeTests
 
     private async Task CancelledScanAsync(string path)
     {
-        using var cancelled = new CancellationTokenSource();
-        await cancelled.CancelAsync();
-
-        await _scan.ScanFromAutomationAsync(path, cancelled.Token);
+        await CancelWhenTraversalBeginsAsync(_scan, path);
         await SettleDriveLabelsAsync();
+    }
+
+    internal static async Task CancelWhenTraversalBeginsAsync(ScanViewModel scan, string path)
+    {
+        using var cancelled = new CancellationTokenSource();
+
+        scan.Progress.PropertyChanged += CancelAtFirstProgress;
+
+        try
+        {
+            await scan.ScanFromAutomationAsync(path, cancelled.Token);
+        }
+        finally
+        {
+            scan.Progress.PropertyChanged -= CancelAtFirstProgress;
+        }
+
+        void CancelAtFirstProgress(object? sender, PropertyChangedEventArgs args)
+        {
+            if (args.PropertyName == nameof(ScanProgressViewModel.ProgressValue))
+            {
+                cancelled.Cancel();
+            }
+        }
     }
 
     private async Task SettleDriveLabelsAsync()

@@ -159,6 +159,46 @@ public class NetworkDrivesTests
     }
 
     [Test]
+    public async Task Ожидание_UNC_пути_ждёт_восстановления_диска_с_тем_же_RemotePath()
+    {
+        using var restore = new NetworkDriveRestore();
+        using var targetEntered = new ManualResetEventSlim();
+        using var releaseTarget = new ManualResetEventSlim();
+        using var hungRelease = new ManualResetEventSlim();
+
+        restore.Start(
+            true,
+            () => [Drive("Z:", @"\\target\share"), Drive("X:", @"\\hung\share")],
+            () => [@"C:\"],
+            drive =>
+            {
+                if (drive.LocalName == "Z:")
+                {
+                    targetEntered.Set();
+                    releaseTarget.Wait(TimeSpan.FromSeconds(10));
+                    return 0;
+                }
+
+                hungRelease.Wait(TimeSpan.FromSeconds(10));
+                return BadNetPath;
+            },
+            new CapturingLogger());
+
+        Assert.That(targetEntered.Wait(TimeSpan.FromSeconds(5)), Is.True);
+
+        await restore.WaitForPathAsync(@"\\other\share\dir", TimeSpan.FromSeconds(5));
+
+        var waiting = restore.WaitForPathAsync(@"//TARGET/Share/projects/demo", TimeSpan.FromSeconds(5));
+        Assert.That(waiting.IsCompleted, Is.False);
+
+        releaseTarget.Set();
+        await waiting.WaitAsync(TimeSpan.FromSeconds(5));
+
+        await restore.WaitForPathAsync(@"\\hung\share\backup", TimeSpan.FromMilliseconds(40)).WaitAsync(TimeSpan.FromSeconds(2));
+        hungRelease.Set();
+    }
+
+    [Test]
     public async Task Отказ_одной_буквы_пишется_строкой_и_не_мешает_остальным()
     {
         var logger = new CapturingLogger();

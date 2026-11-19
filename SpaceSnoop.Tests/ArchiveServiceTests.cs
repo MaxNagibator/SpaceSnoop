@@ -33,6 +33,26 @@ public class ArchiveServiceTests
         RemoveTree(_tempDir);
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void Удаление_покрытого_архивом_каталога_сохраняет_добавленные_или_переписанные_файлы(bool rewrite)
+    {
+        var service = new ArchiveService();
+        var content = service.Collect(_sourceDir, CancellationToken.None);
+        var stats = service.ZipFiles(_sourceDir, content, _zipPath, CompressionLevel.Optimal, null, CancellationToken.None);
+        var item = Path.Combine(_sourceDir, rewrite ? "a.txt" : "new.txt");
+
+        Assert.Throws<IOException>(() => service.VerifyCoverageAndDeleteSource(
+            _sourceDir, _zipPath, stats, null, null, static () => { }, null,
+            () => File.WriteAllText(item, "delta"), CancellationToken.None));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.ReadAllText(item), Is.EqualTo("delta"));
+            Assert.That(File.Exists(_zipPath), Is.True);
+        }
+    }
+
     [Test]
     public void CheckContent_CancelledThrowsInsteadOfReportingVerdict()
     {

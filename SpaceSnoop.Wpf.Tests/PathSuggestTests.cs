@@ -1,4 +1,5 @@
 ﻿using KeepShell.Testing;
+using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Views.Behaviors;
 using System.Windows;
 using System.Windows.Controls;
@@ -26,6 +27,8 @@ public class PathSuggestTests
     [TearDown]
     public void TearDown()
     {
+        PathSuggest.ClearCacheForTests();
+
         if (Directory.Exists(_tempDir))
         {
             Directory.Delete(_tempDir, true);
@@ -195,6 +198,340 @@ public class PathSuggestTests
             Assert.That(box.Text, Is.EqualTo(initial + typed));
             Assert.That(box.SelectedText, Is.Empty);
         }
+    }
+
+    [Test]
+    public void Ввод_двойного_слэша_и_корня_сервера_открывает_список_без_изменения_текста()
+    {
+        var prevHosts = PathSuggest.HostReader;
+        var prevShares = PathSuggest.ShareReader;
+        var prevKnown = PathSuggest.KnownShareReader;
+        PathSuggest.HostReader = static () => ["filesrv", "nas"];
+        PathSuggest.KnownShareReader = static _ => [];
+        PathSuggest.ShareReader = static _ => ["archive", "media"];
+
+        try
+        {
+            var box = new TextBox();
+            using var host = VisualTestHost.Show(new() { Content = box }, 400, 150, true);
+            box.Focus();
+
+            TypeInto(box, @"\", @"\");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(PathSuggest.IsPopupOpen(box), Is.True);
+                Assert.That(PathSuggest.PopupItems(box), Is.EqualTo(new[] { @"\\filesrv", @"\\nas" }));
+                Assert.That(PathSuggest.PopupSelectedIndex(box), Is.EqualTo(-1));
+                Assert.That(box.Text, Is.EqualTo(@"\\"));
+                Assert.That(box.SelectedText, Is.Empty);
+            }
+
+            box.Text = @"\\nas";
+            box.CaretIndex = box.Text.Length;
+            TextCompositionManager.StartComposition(new(InputManager.Current, box, @"\"));
+
+            Assert.That(PumpUntil(() => PathSuggest.PopupItems(box).Count == 2, TimeSpan.FromSeconds(5)), Is.True);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(PathSuggest.IsPopupOpen(box), Is.True);
+                Assert.That(PathSuggest.PopupItems(box), Is.EqualTo(new[] { @"\\nas\archive", @"\\nas\media" }));
+                Assert.That(PathSuggest.PopupSelectedIndex(box), Is.EqualTo(-1));
+                Assert.That(box.Text, Is.EqualTo(@"\\nas\"));
+                Assert.That(box.SelectedText, Is.Empty);
+            }
+
+            PathSuggest.SetEnabled(box, false);
+        }
+        finally
+        {
+            PathSuggest.HostReader = prevHosts;
+            PathSuggest.ShareReader = prevShares;
+            PathSuggest.KnownShareReader = prevKnown;
+        }
+    }
+
+    [Test]
+    public void Префикс_хоста_и_шары_дополняет_ввод_inline_и_открывает_список()
+    {
+        var prevHosts = PathSuggest.HostReader;
+        var prevShares = PathSuggest.ShareReader;
+        var prevKnown = PathSuggest.KnownShareReader;
+        PathSuggest.HostReader = static () => ["backup", "nas"];
+        PathSuggest.KnownShareReader = static _ => [];
+        PathSuggest.ShareReader = static _ => ["media", "music"];
+
+        try
+        {
+            var box = new TextBox();
+            using var host = VisualTestHost.Show(new() { Content = box }, 400, 150, true);
+            box.Focus();
+
+            TypeInto(box, "//n", "a");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(box.Text, Is.EqualTo(@"\\nas"));
+                Assert.That(box.SelectedText, Is.EqualTo("s"));
+                Assert.That(PathSuggest.IsPopupOpen(box), Is.True);
+                Assert.That(PathSuggest.PopupItems(box), Is.EqualTo(new[] { @"\\nas" }));
+            }
+
+            box.Text = @"\\nas\m";
+            box.CaretIndex = box.Text.Length;
+            TextCompositionManager.StartComposition(new(InputManager.Current, box, "e"));
+
+            Assert.That(PumpUntil(() => box.Text == @"\\nas\media", TimeSpan.FromSeconds(5)), Is.True);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(box.SelectedText, Is.EqualTo("dia"));
+                Assert.That(PathSuggest.IsPopupOpen(box), Is.True);
+                Assert.That(PathSuggest.PopupItems(box), Is.EqualTo(new[] { @"\\nas\media" }));
+            }
+
+            PathSuggest.SetEnabled(box, false);
+        }
+        finally
+        {
+            PathSuggest.HostReader = prevHosts;
+            PathSuggest.ShareReader = prevShares;
+            PathSuggest.KnownShareReader = prevKnown;
+        }
+    }
+
+    [Test]
+    public void Навигация_стрелками_фиксация_хоста_и_Escape_управляют_списком()
+    {
+        var prevHosts = PathSuggest.HostReader;
+        var prevShares = PathSuggest.ShareReader;
+        var prevKnown = PathSuggest.KnownShareReader;
+        PathSuggest.HostReader = static () => ["alpha", "nas"];
+        PathSuggest.KnownShareReader = static _ => [];
+        PathSuggest.ShareReader = static server => server == "nas" ? ["media"] : [];
+
+        try
+        {
+            var box = new TextBox();
+            using var host = VisualTestHost.Show(new() { Content = box }, 400, 150, true);
+            box.Focus();
+
+            TypeInto(box, @"\", @"\");
+            Assert.That(PathSuggest.IsPopupOpen(box), Is.True);
+
+            RaiseKey(box, Key.Down);
+            RaiseKey(box, Key.Down);
+            Assert.That(PathSuggest.PopupSelectedIndex(box), Is.EqualTo(1));
+            Assert.That(box.Text, Is.EqualTo(@"\\"));
+
+            var enterAccept = RaiseKey(box, Key.Enter);
+            Assert.That(enterAccept.Handled, Is.True);
+            Assert.That(box.Text, Is.EqualTo(@"\\nas\"));
+            Assert.That(PumpUntil(() => PathSuggest.IsPopupOpen(box) && PathSuggest.PopupItems(box).Contains(@"\\nas\media"), TimeSpan.FromSeconds(5)), Is.True);
+
+            var escapeFirst = RaiseKey(box, Key.Escape);
+            var escapeSecond = RaiseKey(box, Key.Escape);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(escapeFirst.Handled, Is.True);
+                Assert.That(escapeSecond.Handled, Is.False);
+                Assert.That(PathSuggest.IsPopupOpen(box), Is.False);
+            }
+
+            PathSuggest.SetEnabled(box, false);
+        }
+        finally
+        {
+            PathSuggest.HostReader = prevHosts;
+            PathSuggest.ShareReader = prevShares;
+            PathSuggest.KnownShareReader = prevKnown;
+        }
+    }
+
+    [Test]
+    public void Отказ_NetShareEnum_дополняется_локально_известными_шарами_и_не_кэшируется_навсегда()
+    {
+        var prevShares = PathSuggest.ShareReader;
+        var prevKnown = PathSuggest.KnownShareReader;
+        var server = "srv-" + Guid.NewGuid().ToString("N")[..6];
+        IReadOnlyList<string> netShares = [];
+
+        PathSuggest.KnownShareReader = s => string.Equals(s, server, StringComparison.OrdinalIgnoreCase) ? ["cached-share"] : [];
+        PathSuggest.ShareReader = _ => netShares;
+
+        try
+        {
+            var box = new TextBox();
+            using var host = VisualTestHost.Show(new() { Content = box }, 400, 150, true);
+            box.Focus();
+
+            TypeInto(box, $@"\\{server}", @"\");
+            PumpFor(TimeSpan.FromMilliseconds(80));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(PathSuggest.IsPopupOpen(box), Is.True);
+                Assert.That(PathSuggest.PopupItems(box), Is.EqualTo(new[] { $@"\\{server}\cached-share" }));
+            }
+
+            netShares = ["live-share"];
+            box.Text = $@"\\{server}";
+            box.CaretIndex = box.Text.Length;
+            TextCompositionManager.StartComposition(new(InputManager.Current, box, @"\"));
+
+            Assert.That(PumpUntil(() => PathSuggest.PopupItems(box).Count == 2, TimeSpan.FromSeconds(5)), Is.True);
+            Assert.That(PathSuggest.PopupItems(box), Is.EqualTo(new[] { $@"\\{server}\cached-share", $@"\\{server}\live-share" }));
+
+            PathSuggest.SetEnabled(box, false);
+        }
+        finally
+        {
+            PathSuggest.ShareReader = prevShares;
+            PathSuggest.KnownShareReader = prevKnown;
+        }
+    }
+
+    [Test]
+    public void Найденные_шары_дополняют_список_с_уже_подставленным_сетевым_путём()
+    {
+        var prevShares = PathSuggest.ShareReader;
+        var prevKnown = PathSuggest.KnownShareReader;
+        var server = "srv-" + Guid.NewGuid().ToString("N")[..6];
+        var prefix = $@"\\{server}\";
+        var known = prefix + "music";
+        var discovered = prefix + "media";
+        using var release = new ManualResetEventSlim();
+
+        PathSuggest.KnownShareReader = _ => ["music"];
+        PathSuggest.ShareReader = _ =>
+        {
+            release.Wait(TimeSpan.FromSeconds(5));
+            return ["media"];
+        };
+
+        try
+        {
+            var box = new TextBox();
+            using var host = VisualTestHost.Show(new() { Content = box }, 400, 150, true);
+            box.Focus();
+
+            TypeInto(box, prefix, "m");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(box.Text, Is.EqualTo(known));
+                Assert.That(box.SelectedText, Is.EqualTo("usic"));
+                Assert.That(PathSuggest.PopupItems(box), Is.EqualTo(new[] { known }));
+            }
+
+            release.Set();
+            Assert.That(PumpUntil(() => PathSuggest.PopupItems(box).Count == 2, TimeSpan.FromSeconds(5)), Is.True);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(PathSuggest.PopupItems(box), Is.EqualTo(new[] { discovered, known }));
+                Assert.That(PathSuggest.PopupSelectedIndex(box), Is.EqualTo(1));
+                Assert.That(box.Text, Is.EqualTo(known));
+                Assert.That(box.SelectedText, Is.EqualTo("usic"));
+            }
+
+            PathSuggest.SetEnabled(box, false);
+        }
+        finally
+        {
+            release.Set();
+            PathSuggest.ShareReader = prevShares;
+            PathSuggest.KnownShareReader = prevKnown;
+        }
+    }
+
+    [Test]
+    public void Ожидание_шар_уведомляет_оба_поля_сбрасывает_очередь_при_ошибке_и_истекает_по_TTL()
+    {
+        var prevShares = PathSuggest.ShareReader;
+        var prevKnown = PathSuggest.KnownShareReader;
+        var prevClock = PathSuggest.ClockMs;
+        var server = "srv-" + Guid.NewGuid().ToString("N")[..6];
+        long now = 1_000;
+        var calls = 0;
+        var shouldThrow = false;
+        IReadOnlyList<string> resultShares = ["alpha"];
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+
+        PathSuggest.ClockMs = () => Volatile.Read(ref now);
+        PathSuggest.KnownShareReader = static _ => [];
+        PathSuggest.ShareReader = _ =>
+        {
+            Interlocked.Increment(ref calls);
+            entered.Set();
+            release.Wait(TimeSpan.FromSeconds(10));
+
+            if (shouldThrow)
+            {
+                throw new InvalidOperationException("unexpected");
+            }
+
+            return resultShares;
+        };
+
+        try
+        {
+            var box1 = new TextBox();
+            var box2 = new TextBox();
+            using var host1 = VisualTestHost.Show(new() { Content = box1 }, 400, 150, true);
+            using var host2 = VisualTestHost.Show(new() { Content = box2 }, 400, 150, true);
+
+            box1.Focus();
+            TypeInto(box1, $@"\\{server}", @"\");
+            Assert.That(entered.Wait(TimeSpan.FromSeconds(5)), Is.True);
+
+            box2.Focus();
+            TypeInto(box2, $@"\\{server}", @"\");
+
+            release.Set();
+
+            Assert.That(PumpUntil(() => PathSuggest.PopupItems(box2).SequenceEqual([$@"\\{server}\alpha"]), TimeSpan.FromSeconds(5)), Is.True);
+            box1.Focus();
+            Assert.That(Volatile.Read(ref calls), Is.EqualTo(1));
+
+            Volatile.Write(ref now, now + (AppDefaults.NetworkDiscoveryCacheSeconds * 1000L) + 1);
+            shouldThrow = true;
+
+            box1.Text = $@"\\{server}";
+            box1.CaretIndex = box1.Text.Length;
+            TextCompositionManager.StartComposition(new(InputManager.Current, box1, @"\"));
+            Assert.That(PumpUntil(() => Volatile.Read(ref calls) == 2, TimeSpan.FromSeconds(5)), Is.True);
+            PumpFor(TimeSpan.FromMilliseconds(50));
+
+            shouldThrow = false;
+            resultShares = ["beta"];
+            box1.Text = $@"\\{server}";
+            box1.CaretIndex = box1.Text.Length;
+            TextCompositionManager.StartComposition(new(InputManager.Current, box1, @"\"));
+
+            Assert.That(PumpUntil(() => PathSuggest.PopupItems(box1).SequenceEqual([$@"\\{server}\beta"]), TimeSpan.FromSeconds(5)), Is.True);
+
+            PathSuggest.SetEnabled(box1, false);
+            PathSuggest.SetEnabled(box2, false);
+        }
+        finally
+        {
+            release.Set();
+            PathSuggest.ShareReader = prevShares;
+            PathSuggest.KnownShareReader = prevKnown;
+            PathSuggest.ClockMs = prevClock;
+        }
+    }
+
+    private static KeyEventArgs RaiseKey(TextBox box, Key key)
+    {
+        var args = new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(box)!, 0, key)
+        {
+            RoutedEvent = Keyboard.PreviewKeyDownEvent,
+        };
+        box.RaiseEvent(args);
+        return args;
     }
 
     private static void TypeInto(TextBox box, string initial, string typed)

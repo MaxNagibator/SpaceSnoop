@@ -70,6 +70,14 @@ public sealed partial class SyncViewModel : ISyncAutomation
         return Export.CapturePlanBuilder(entryLimit);
     }
 
+    Task<bool> ISyncAutomation.HasPermanentNetworkDeleteAsync(CancellationToken cancellationToken)
+    {
+        var result = Operations.Result;
+        return result is null
+            ? Task.FromResult(false)
+            : Task.Run(() => SyncPlanNarrative.HasUnblockedNetworkDelete(result), cancellationToken);
+    }
+
     Task ISyncAutomation.CompareFromAutomationAsync(CancellationToken cancellationToken)
     {
         return Operations.CompareFromAutomationAsync(cancellationToken);

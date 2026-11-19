@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Scan"
              xmlns:local="clr-namespace:SpaceSnoop.Wpf.Views.Scan"
+             xmlns:behaviors="clr-namespace:SpaceSnoop.Wpf.Views.Behaviors"
              xmlns:conv="clr-namespace:SpaceSnoop.Wpf.Converters"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -210,7 +211,51 @@
                         </ItemsControl.ItemsPanel>
                     </ItemsControl>
 
-                    <StackPanel Margin="0,12,0,12">
+                    <Grid Margin="0,2,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <iconPacks:PackIconLucide Grid.Column="0"
+                                                  Kind="{x:Static iconPacks:PackIconLucideKind.FolderSearch}"
+                                                  Width="15"
+                                                  Height="15"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,8,0"
+                                                  Foreground="{DynamicResource Fg.Secondary}" />
+
+                        <Grid Grid.Column="1">
+                            <TextBox x:Name="TargetPathBox"
+                                     Text="{Binding SelectedDrive, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource TextBox.Toolbar}"
+                                     behaviors:PathSuggest.Enabled="{Binding OperationPreferences.SyncPathSuggest}"
+                                     ToolTip="Путь к каталогу или \\сервер\шара"
+                                     AutomationProperties.Name="Путь к каталогу или \\сервер\шара"
+                                     KeyDown="OnPathBoxKeyDown" />
+                            <TextBlock Text="Путь к каталогу или \\сервер\шара"
+                                       IsHitTestVisible="False"
+                                       VerticalAlignment="Center"
+                                       Margin="10,0"
+                                       Foreground="{DynamicResource Fg.Muted}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility"
+                                                Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Text, ElementName=TargetPathBox}"
+                                                         Value="">
+                                                <Setter Property="Visibility"
+                                                        Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                    </Grid>
+
+                    <StackPanel Margin="0,0,0,12">
                         <StackPanel.Style>
                             <Style TargetType="StackPanel">
                                 <Style.Triggers>

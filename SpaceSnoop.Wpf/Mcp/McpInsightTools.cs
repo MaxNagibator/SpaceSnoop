@@ -29,25 +29,26 @@ internal sealed class McpInsightTools(
                 state.ReadSyncState())));
     }
 
-    public string ListProfiles()
+    public async Task<string> ListProfilesAsync(CancellationToken cancellationToken = default)
     {
         logger.McpToolInvoked("list_profiles", "-");
 
-        var profiles = SyncProfileStore.Load(settings)
-            .Select(static profile => new McpProfile(
-                profile.Id,
-                profile.Name,
-                profile.Left,
-                profile.Right,
-                HeadlessSync.MapMode(profile.Mode),
-                profile.Winner,
-                profile.Mirror,
-                profile.Exclusions,
-                profile.Enabled,
-                profile.SkipInBatch,
-                $"{profile.Interval} {profile.Time}",
-                McpFormat.DescribeUnavailable(profile)))
-            .ToList();
+        var loaded = SyncProfileStore.Load(settings);
+        var profiles = await Task.WhenAll(
+                loaded.Select(async profile => new McpProfile(
+                    profile.Id,
+                    profile.Name,
+                    profile.Left,
+                    profile.Right,
+                    HeadlessSync.MapMode(profile.Mode),
+                    profile.Winner,
+                    profile.Mirror,
+                    profile.Exclusions,
+                    profile.Enabled,
+                    profile.SkipInBatch,
+                    $"{profile.Interval} {profile.Time}",
+                    await McpFormat.DescribeUnavailableAsync(profile, cancellationToken).ConfigureAwait(false))))
+            .ConfigureAwait(false);
 
         return McpFormat.Serialize(profiles);
     }

@@ -48,12 +48,17 @@ public sealed partial class ScanViewModel : IScanAutomation
         };
     }
 
-    internal void SelectPathForAutomation(string path)
+    internal void SelectPathForAutomation(string path, bool remember = true)
     {
-        if (!Drives.HasDrive(path))
+        if (remember)
         {
+            var known = Drives.HasDrive(path);
             Drives.AddDrive(path);
-            Drives.LoadDriveLabels();
+
+            if (!known)
+            {
+                Drives.LoadDriveLabels();
+            }
         }
 
         SelectedDrive = path;
@@ -61,18 +66,38 @@ public sealed partial class ScanViewModel : IScanAutomation
 
     internal Task ScanFromAutomationAsync(string path, CancellationToken cancellationToken)
     {
-        SelectPathForAutomation(path);
+        SelectPathForAutomation(path, remember: false);
 
         return ScanAsync(path, cancellationToken);
     }
 
     internal void ApplyScanResult(DirectorySpace result, TimeSpan elapsed, PerformanceTraversal? traversal, ScanNotes notes)
     {
+        ApplyScanResultCore(result, elapsed, traversal, notes, DriveCapacity.TryRead(result.AbsolutePath));
+    }
+
+    internal void ApplyScanResult(
+        DirectorySpace result,
+        TimeSpan elapsed,
+        PerformanceTraversal? traversal,
+        ScanNotes notes,
+        DriveCapacity? driveCapacity)
+    {
+        ApplyScanResultCore(result, elapsed, traversal, notes, driveCapacity);
+    }
+
+    private void ApplyScanResultCore(
+        DirectorySpace result,
+        TimeSpan elapsed,
+        PerformanceTraversal? traversal,
+        ScanNotes notes,
+        DriveCapacity? driveCapacity)
+    {
         _scanVersion++;
         var previous = ScanTreeEditor.RemoveRoot(Roots, result.AbsolutePath);
         var (transferred, lost) = ScanTreeEditor.TransferMarks(previous, result, Marks.HasMarked);
 
-        var node = _nodeFactory.CreateRoot(result, Sort.State);
+        var node = _nodeFactory.CreateRoot(result, Sort.State, driveCapacity);
         node.IsExpanded = true;
 
         Roots.Insert(0, node);
@@ -206,9 +231,9 @@ public sealed partial class ScanViewModel : IScanAutomation
         return MarkForAutomation(targets, mark);
     }
 
-    void IScanAutomation.SelectPathForAutomation(string path)
+    void IScanAutomation.SelectPathForAutomation(string path, bool remember)
     {
-        SelectPathForAutomation(path);
+        SelectPathForAutomation(path, remember);
     }
 
     void IScanAutomation.ReleaseBeforeScan(string path)
@@ -219,6 +244,16 @@ public sealed partial class ScanViewModel : IScanAutomation
     void IScanAutomation.ApplyScanResult(DirectorySpace result, TimeSpan elapsed, PerformanceTraversal? traversal, ScanNotes notes)
     {
         ApplyScanResult(result, elapsed, traversal, notes);
+    }
+
+    void IScanAutomation.ApplyScanResult(
+        DirectorySpace result,
+        TimeSpan elapsed,
+        PerformanceTraversal? traversal,
+        ScanNotes notes,
+        DriveCapacity? driveCapacity)
+    {
+        ApplyScanResult(result, elapsed, traversal, notes, driveCapacity);
     }
 
     Task IScanAutomation.ReturnScanMemoryAsync(DirectorySpace result, Action<string> reportPhase, CancellationToken cancellationToken)

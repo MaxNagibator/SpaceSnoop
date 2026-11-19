@@ -33,16 +33,17 @@ public sealed partial class SyncOperationsViewModel
                 return;
             }
 
-            var confirm = await _ledger.BuildSyncConfirmationAsync(current, hashes);
+            var recycleOverwritten = _settings.GetBool(SettingsKeys.SyncRecycleOverwritten, AppDefaults.SyncRecycleOverwrittenDefault);
+            var confirmation = await _ledger.BuildSyncConfirmationAsync(current, hashes, recycleOverwritten);
 
-            if (confirm is null || !ReferenceEquals(Result, current))
+            if (confirmation is not { } confirmedPlan || !ReferenceEquals(Result, current))
             {
                 return;
             }
 
             var shown = current.CountPlannedActions();
 
-            if (!await _dialogs.ShowAsync(confirm))
+            if (!await _dialogs.ShowAsync(confirmedPlan.Dialog))
             {
                 return;
             }
@@ -52,9 +53,10 @@ public sealed partial class SyncOperationsViewModel
                 return;
             }
 
-            if (!ReferenceEquals(confirm.Chosen, hashes))
+            if (!ReferenceEquals(confirmedPlan.Dialog.Chosen, hashes))
             {
-                break;
+                await ExecuteSyncAsync(true, recycleOverwritten, confirmedPlan.WarnsPermanentNetworkDelete, CancellationToken.None);
+                return;
             }
 
             await HashCommand.ExecuteAsync(null);
@@ -64,11 +66,13 @@ public sealed partial class SyncOperationsViewModel
                 return;
             }
         }
-
-        await ExecuteSyncAsync(true, CancellationToken.None);
     }
 
-    private async Task<SyncRunResult?> ExecuteSyncAsync(bool interactive, CancellationToken external = default)
+    private async Task<SyncRunResult?> ExecuteSyncAsync(
+        bool interactive,
+        bool recycleOverwritten,
+        bool allowPermanentNetworkDelete,
+        CancellationToken external)
     {
         if (Result is null)
         {
@@ -93,17 +97,25 @@ public sealed partial class SyncOperationsViewModel
         _logger.SyncStarted(_setup.CurrentMode);
 
         var verify = _setup.Verify;
-        var recycleOverwritten = _settings.GetBool(SettingsKeys.SyncRecycleOverwritten, AppDefaults.SyncRecycleOverwrittenDefault);
 
-        var request = new ExecuteSyncRequest(result, SyncConflictPolicy.None, SyncDeleteUi.Interactive, verify, recycleOverwritten);
+        var request = new ExecuteSyncRequest(
+            result,
+            SyncConflictPolicy.None,
+            interactive ? SyncDeleteUi.Interactive : SyncDeleteUi.Silent,
+            verify,
+            recycleOverwritten,
+            AllowPermanentNetworkDelete: allowPermanentNetworkDelete);
 
+        string? automationError = null;
         var report = await _session.RunAsync(
             "Синхронизация:",
             (token, progress) => _sync.Execute(request, token, progress),
             planned.Total,
             external,
             planned.CopyBytes,
-            true);
+            true,
+            ex => FormatUncError(ex, result.LeftPath, result.RightPath),
+            onError: interactive ? null : message => automationError = message);
 
         stopwatch.Stop();
 
@@ -126,6 +138,12 @@ public sealed partial class SyncOperationsViewModel
             }
 
             DiscardComparisonIfInputChanged();
+            if (automationError is not null)
+            {
+                external.ThrowIfCancellationRequested();
+                throw new SyncPlanStaleException($"{automationError} {afterSync.RefusalMessage}");
+            }
+
             return null;
         }
 
@@ -172,6 +190,18 @@ public sealed partial class SyncOperationsViewModel
 
         DiscardComparisonIfInputChanged();
         return new(report, stopwatch.Elapsed, verifyState);
+    }
+
+    private static string FormatUncError(Exception exception, string leftPath, string rightPath)
+    {
+        if (UncPath.IsUnc(leftPath))
+        {
+            return NetworkErrorText.Describe(exception, leftPath, AdminElevation.IsElevated);
+        }
+
+        return UncPath.IsUnc(rightPath)
+            ? NetworkErrorText.Describe(exception, rightPath, AdminElevation.IsElevated)
+            : exception.Message;
     }
 
     private static bool SharesRoot(ComparisonResult comparison, ComparisonResult synced)

@@ -60,6 +60,7 @@ public sealed partial class DeleteProgressDialogViewModel
         _totalBytes = Math.Max(0, _totalBytes - target.Space.TotalSize);
         CountText = $"0 / {Items.Count}";
         SelectedItem = Items.Count > 0 ? Items[Math.Min(index, Items.Count - 1)] : null;
+        RefreshNetworkMode();
 
         OnPropertyChanged(nameof(IntroText));
         OnPropertyChanged(nameof(CancelHint));
@@ -72,5 +73,26 @@ public sealed partial class DeleteProgressDialogViewModel
         {
             CloseCommand.Execute(null);
         }
+    }
+
+    private void RefreshNetworkMode()
+    {
+        if (!ForcedByNetwork)
+        {
+            return;
+        }
+
+        var anyNetwork = Items.Any(row => _withoutRecycleBin!.Contains(row.Space));
+        ForcedByNetwork = anyNetwork;
+        var nextPermanent = _basePermanent || anyNetwork;
+
+        if (_permanent == nextPermanent)
+        {
+            return;
+        }
+
+        _permanent = nextPermanent;
+        OnPropertyChanged(nameof(ActionVerb));
+        OnPropertyChanged(nameof(StartButtonText));
     }
 }

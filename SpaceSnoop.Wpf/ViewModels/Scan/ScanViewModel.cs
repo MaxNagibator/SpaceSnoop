@@ -16,13 +16,16 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
     private readonly ToastNotifier _notifier;
     private readonly PerformanceOperations _performance;
     private readonly IFilePicker _filePicker;
+    private readonly IUiDispatcher _uiDispatcher;
     private readonly IAppNavigator _navigator;
+    private readonly NetworkDriveRestore? _networkDrives;
 
     private CancellationTokenSource? _cts;
     private int _scanVersion;
     private bool _suppressPersist;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsIncompleteUncTarget))]
     [NotifyPropertyChangedFor(nameof(HasTarget))]
     [NotifyPropertyChangedFor(nameof(StartCaption))]
     [NotifyCanExecuteChangedFor(nameof(StartCommand))]
@@ -109,6 +112,8 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
     public ScanPreferences Preferences { get; }
 
+    public OperationPreferences OperationPreferences { get; }
+
     public double Intensity
     {
         get => Preferences.Intensity;
@@ -154,7 +159,8 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         IAppNavigator navigator,
         IApplicationLifetime lifetime,
         ThemeSelectionViewModel theme,
-        UpdatePreferences updates)
+        UpdatePreferences updates,
+        NetworkDriveRestore? networkDrives = null)
     {
         _navigator = navigator;
         _runner = runner;
@@ -165,6 +171,9 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         _logger = logger;
         _notifier = notifier;
         _filePicker = filePicker;
+        _uiDispatcher = uiDispatcher;
+        _networkDrives = networkDrives;
+        OperationPreferences = operations;
 
         Inspector = inspector;
         Inspector.ChildSelected += OnInspectorChildSelected;
@@ -198,7 +207,7 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
         _nodeFactory.IgnoreRequested += OnIgnoreRequested;
         _nodeFactory.UnignoreRequested += OnUnignoreRequested;
 
-        Drives = new(logger);
+        Drives = new(logger, settings);
 
         Marks = new(
             dialogs,
@@ -338,8 +347,13 @@ public sealed partial class ScanViewModel : ObservableObject, IPageHeader, IPage
 
     partial void OnSelectedDriveChanged(string value)
     {
-        Drives.Select(value);
-        Persist(() => _settings.SetValue(SettingsKeys.ScanLastDrive, value));
+        var trimmed = value.Trim();
+        Drives.Select(trimmed);
+
+        if (Drives.HasDrive(trimmed))
+        {
+            Persist(() => _settings.SetValue(SettingsKeys.ScanLastDrive, trimmed));
+        }
     }
 
     partial void OnSelectedNodeChanged(ScanNodeViewModel? oldValue, ScanNodeViewModel? newValue)

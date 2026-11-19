@@ -37,6 +37,8 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
         new(PackIconLucideKind.LogIn, "При входе", "Запускать при входе пользователя в систему"),
     ];
 
+    public bool PathSuggest => Settings.GetBool(SettingsKeys.SyncPathSuggest, AppDefaults.SyncPathSuggestDefault);
+
     public ObservableCollection<SyncProfileViewModel> Profiles { get; } = [];
 
     public ObservableCollection<ScheduleRunEntry> History { get; } = [];
@@ -146,6 +148,15 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
         {
             ReloadProfiles();
         }
+        else if (key == SettingsKeys.SyncPathSuggest)
+        {
+            OnPropertyChanged(nameof(PathSuggest));
+
+            foreach (var profile in Profiles)
+            {
+                profile.NotifyPathSuggestChanged();
+            }
+        }
     }
 
     [RelayCommand]
@@ -246,6 +257,8 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
 
         foreach (var model in SyncProfileStore.Load(Settings))
         {
+            NetworkDiscovery.Remember(model.Left);
+            NetworkDiscovery.Remember(model.Right);
             Profiles.Add(new(this, model));
         }
 

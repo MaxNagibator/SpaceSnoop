@@ -1,5 +1,9 @@
-﻿using Microsoft.Extensions.Logging.Abstractions;
+﻿using KeepShell.Testing;
+using MahApps.Metro.IconPacks;
+using Microsoft.Extensions.Logging.Abstractions;
 using SpaceSnoop.Core;
+using SpaceSnoop.Wpf.Bootstrap.Platform;
+using SpaceSnoop.Wpf.Bootstrap.Storage;
 using SpaceSnoop.Wpf.ViewModels.Scan;
 
 namespace SpaceSnoop.Wpf.Tests;
@@ -115,7 +119,7 @@ public class DriveItemTests
     [Test]
     public async Task Неопрашиваемый_том_остаётся_живой_плиткой_без_подписи_и_доли()
     {
-        var item = new DriveItem($@"\\spacesnoop-нет-такого-сервера\backup{Path.DirectorySeparatorChar}");
+        var item = new DriveItem(@"Z:\", static (_, _) => default);
 
         await item.LoadAsync();
 
@@ -130,6 +134,68 @@ public class DriveItemTests
             Assert.That(item.RatioCaption, Is.Null);
             Assert.That(item.UsageLevel, Is.EqualTo(DriveUsageLevel.None));
         });
+    }
+
+    [Test]
+    public void Сетевая_шара_попадает_в_недавние_со_значком_сети_переживает_обновление_томов_и_сохраняется()
+    {
+        const string uncShare = @"\\nas\media";
+        var settings = new MemorySettings();
+        var catalog = new DriveCatalog(NullLogger.Instance, settings);
+
+        catalog.AddDrive(uncShare);
+        catalog.Select(uncShare);
+
+        var other = catalog.Volumes[0].Path;
+        catalog.Select(other);
+        catalog.ReloadLabels(other);
+
+        var restored = new DriveCatalog(NullLogger.Instance, settings);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(catalog.Volumes.Any(item => string.Equals(item.Path, uncShare, StringComparison.OrdinalIgnoreCase)), Is.False);
+            Assert.That(catalog.RecentDirectories.Select(item => item.Path), Does.Contain(uncShare));
+            Assert.That(catalog.RecentDirectories.Single(item => item.Path == uncShare).IconKind, Is.EqualTo(PackIconLucideKind.Network));
+            Assert.That(restored.RecentDirectories.Select(item => item.Path), Does.Contain(uncShare));
+            Assert.That(restored.RecentDirectories.Single(item => item.Path == uncShare).IconKind, Is.EqualTo(PackIconLucideKind.Network));
+            Assert.That(settings.GetStringValue(SettingsKeys.ScanRecentTargets), Does.Contain("media"));
+        }
+    }
+
+    [Test]
+    public void Ёмкость_сетевой_шары_читается_через_шлюз_с_подъёмом_к_корню()
+    {
+        var previous = DriveCapacity.FreeSpaceReader;
+        var probed = new List<string>();
+
+        DriveCapacity.FreeSpaceReader = dir =>
+        {
+            probed.Add(dir);
+            return string.Equals(dir, @"\\nas\media\", StringComparison.OrdinalIgnoreCase)
+                ? (1_000_000UL, 250_000UL)
+                : null;
+        };
+
+        try
+        {
+            var capacity = DriveCapacity.TryRead(@"\\nas\media\2026\photos");
+            var incomplete = DriveCapacity.TryRead(@"\\nas");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(capacity, Is.Not.Null);
+                Assert.That(capacity!.Value.Name, Is.EqualTo(@"\\nas\media"));
+                Assert.That(capacity.Value.TotalBytes, Is.EqualTo(1_000_000L));
+                Assert.That(capacity.Value.UsedBytes, Is.EqualTo(750_000L));
+                Assert.That(probed, Is.EqualTo(new[] { @"\\nas\media\2026\photos\", @"\\nas\media\2026\", @"\\nas\media\" }));
+                Assert.That(incomplete, Is.Null);
+            }
+        }
+        finally
+        {
+            DriveCapacity.FreeSpaceReader = previous;
+        }
     }
 
     [Test]
@@ -299,10 +365,10 @@ public class DriveItemTests
 
         public int Posts => Volatile.Read(ref _posts);
 
-        public override void Post(SendOrPostCallback callback, object? state)
+        public override void Post(SendOrPostCallback d, object? state)
         {
             Interlocked.Increment(ref _posts);
-            ThreadPool.QueueUserWorkItem(_ => callback(state));
+            ThreadPool.QueueUserWorkItem(_ => d(state));
         }
     }
 }

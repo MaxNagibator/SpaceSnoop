@@ -8,7 +8,8 @@ namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
 
 public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewModelBase
 {
-    private readonly bool _permanent;
+    private readonly bool _basePermanent;
+    private readonly IReadOnlySet<SpaceBase>? _withoutRecycleBin;
     private readonly PerformanceMonitor _monitor;
     private readonly PerformanceOperations _operations;
     private readonly ShellPreferences _preferences;
@@ -16,6 +17,9 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
     private readonly ILogger _logger;
     private readonly Action<SpaceBase>? _unmark;
     private readonly string _runId = Guid.NewGuid().ToString("N")[..8];
+
+    private bool _permanent;
+    private bool _forcedByNetwork;
 
     private long _totalBytes;
     private DeleteOperationDiagnostics _diagnostics;
@@ -57,7 +61,15 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
 
     public override string Title => "Удаление";
 
-    public string ActionVerb { get; }
+    public string ActionVerb => _permanent ? "удалены безвозвратно" : "перемещены в корзину";
+
+    public bool ForcedByNetwork
+    {
+        get => _forcedByNetwork;
+        private set => SetProperty(ref _forcedByNetwork, value);
+    }
+
+    public string StartButtonText => _permanent ? "Удалить безвозвратно" : "Удалить";
 
     public string IntroText => $"Будут {ActionVerb}: {Plural.Format(Items.Count, "объект", "объекта", "объектов")} · {SizeFormatter.Format(_totalBytes)}";
 
@@ -85,9 +97,15 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
         ShellPreferences preferences,
         IUiDispatcher uiDispatcher,
         ILogger logger,
-        Action<SpaceBase>? unmark = null)
+        Action<SpaceBase>? unmark = null,
+        IReadOnlySet<SpaceBase>? withoutRecycleBin = null)
     {
-        _permanent = permanent;
+        _basePermanent = permanent;
+        _withoutRecycleBin = withoutRecycleBin;
+        var forcedByNetwork = withoutRecycleBin is { Count: > 0 };
+        var effectivePermanent = permanent || forcedByNetwork;
+        _permanent = effectivePermanent;
+        _forcedByNetwork = forcedByNetwork;
         _monitor = monitor;
         _operations = operations;
         _preferences = preferences;
@@ -97,9 +115,8 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
         Items = new(items.Select(static item => new DeleteRowViewModel(item)));
         SelectedItem = Items.FirstOrDefault();
         _totalBytes = items.Sum(static item => item.TotalSize);
-        _diagnostics = new(permanent, Items.Count, _totalBytes, monitor, operations, preferences);
+        _diagnostics = new(effectivePermanent, Items.Count, _totalBytes, monitor, operations, preferences);
 
-        ActionVerb = permanent ? "удалены безвозвратно" : "перемещены в корзину";
         CountText = $"0 / {Items.Count}";
 
         WidestSizeText = Items.Select(static row => row.SizeText).MaxBy(static text => text.Length) ?? string.Empty;

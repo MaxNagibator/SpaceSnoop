@@ -17,6 +17,7 @@ public sealed class DriveItem : ObservableObject
     ];
 
     private readonly Lock _gate = new();
+    private readonly Func<string, bool, DriveProbe>? _probe;
     private Task? _loading;
     private int _generation;
     private bool _isSelected;
@@ -67,7 +68,7 @@ public sealed class DriveItem : ObservableObject
 
     public string? TypeHint => IsDirectory ? null : HintFor(DriveType);
 
-    public PackIconLucideKind IconKind => IsDirectory ? PackIconLucideKind.Folder : IconFor(DriveType);
+    public PackIconLucideKind IconKind => IsDirectory ? DirectoryIcon(Path) : IconFor(DriveType);
 
     public string AutomationName
     {
@@ -80,8 +81,14 @@ public sealed class DriveItem : ObservableObject
     }
 
     public DriveItem(string path)
+        : this(path, null)
+    {
+    }
+
+    internal DriveItem(string path, Func<string, bool, DriveProbe>? probe)
     {
         Path = path;
+        _probe = probe;
         IsDirectory = !IsVolumeRoot(path);
         Title = BuildTitle(path, IsDirectory);
     }
@@ -110,7 +117,7 @@ public sealed class DriveItem : ObservableObject
             return candidate;
         }
 
-        if (IsVolumeRoot(candidate))
+        if (IsVolumeRoot(candidate) || UncPath.IsShareRoot(candidate))
         {
             return trimmed;
         }
@@ -128,6 +135,11 @@ public sealed class DriveItem : ObservableObject
         }
 
         return ratio >= WarningRatio ? DriveUsageLevel.Warning : DriveUsageLevel.Normal;
+    }
+
+    private static PackIconLucideKind DirectoryIcon(string path)
+    {
+        return UncPath.IsUnc(path) ? PackIconLucideKind.Network : PackIconLucideKind.Folder;
     }
 
     private static PackIconLucideKind IconFor(DriveType type)
@@ -155,7 +167,7 @@ public sealed class DriveItem : ObservableObject
 
     private static bool IsVolumeRoot(string path)
     {
-        if (string.IsNullOrWhiteSpace(path))
+        if (string.IsNullOrWhiteSpace(path) || UncPath.IsUnc(path))
         {
             return false;
         }
@@ -244,7 +256,7 @@ public sealed class DriveItem : ObservableObject
 
     private async Task LoadCoreAsync(int generation)
     {
-        var probe = await Task.Run(() => Probe(Path, IsDirectory)).ConfigureAwait(false);
+        var probe = await Task.Run(() => (_probe ?? Probe)(Path, IsDirectory)).ConfigureAwait(false);
 
         lock (_gate)
         {
@@ -265,5 +277,5 @@ public sealed class DriveItem : ObservableObject
         OnPropertyChanged(string.Empty);
     }
 
-    private readonly record struct DriveProbe(bool IsKnownVolume, bool IsReady, string? VolumeLabel, DriveType Type, long TotalSize, long FreeSpace);
+    internal readonly record struct DriveProbe(bool IsKnownVolume, bool IsReady, string? VolumeLabel, DriveType Type, long TotalSize, long FreeSpace);
 }

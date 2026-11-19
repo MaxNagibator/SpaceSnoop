@@ -34,6 +34,11 @@ internal static class McpGuards
             throw new McpException("Путь к каталогу должен быть задан.");
         }
 
+        if (UncPath.IsIncompleteUnc(path))
+        {
+            throw new McpException(@"Укажите полный сетевой путь вида \\сервер\шара.");
+        }
+
         string full;
 
         try
@@ -63,6 +68,11 @@ internal static class McpGuards
         if (left.Length == 0 || right.Length == 0)
         {
             throw new McpException("Оба каталога должны быть заданы.");
+        }
+
+        if (UncPath.IsIncompleteUnc(left) || UncPath.IsIncompleteUnc(right))
+        {
+            throw new McpException(@"Укажите полный сетевой путь вида \\сервер\шара.");
         }
 
         if (SyncRoots.Refusal(left, right) is { } refusal)
