@@ -376,7 +376,7 @@ public sealed class ProjectCleanupTests
         {
             Directory.CreateSymbolicLink(link, Path.GetDirectoryName(outside)!);
         }
-        catch (Exception exception) when (exception is UnauthorizedAccessException or IOException)
+        catch (Exception exception) when (IsSymlinkUnavailable(exception))
         {
             Assert.Ignore($"Создание ссылки недоступно: {exception.Message}");
         }
@@ -589,6 +589,14 @@ public sealed class ProjectCleanupTests
     {
         await Assert.ThrowsAsync<IOException>(() => _service.ScanAsync(Path.GetPathRoot(_root)!, default));
         await Assert.ThrowsAsync<IOException>(() => _service.ScanAsync(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), default));
+    }
+
+    private static bool IsSymlinkUnavailable(Exception exception)
+    {
+        return exception is UnauthorizedAccessException
+            || (exception is IOException
+                && (unchecked((uint)exception.HResult) >> 16) == 0x8007
+                && (exception.HResult & 0xFFFF) is 1 or 5 or 50 or 1314);
     }
 
     private string Write(string relative, string content = "data")

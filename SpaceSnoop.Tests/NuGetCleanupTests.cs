@@ -151,51 +151,10 @@ public class NuGetCleanupTests
     public async Task Discovery_uses_shared_runner_and_rejects_truncated_output(bool truncated)
     {
         var script = Path.Combine(_root, "discovery.ps1");
-        var lines = NuGetCacheDiscovery.Names.Select(x => $"'{x.Value}: {_paths[x.Key]}'");
-        var body = new List<string>
-        {
-            "[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)",
-        };
-        if (truncated)
-        {
-            body.Add("'x' * 30000");
-        }
-
-        body.AddRange(lines);
-        await File.WriteAllLinesAsync(script, body, new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+        await WriteDiscoveryScriptAsync(script, _paths, truncated);
 
         var starts = 0;
-        var cli = new DotNetCli(
-            () => _root,
-            _ => true,
-            x =>
-            {
-                Assert.That(
-                    x.ArgumentList,
-                    Is.EqualTo(
-                        new[]
-                        {
-                            "nuget", "locals", "all", "--list", "--force-english-output",
-                        }));
-
-                Assert.That(x.WorkingDirectory, Is.EqualTo(_root));
-                Assert.That(x.Environment["DOTNET_SKIP_FIRST_TIME_EXPERIENCE"], Is.EqualTo("1"));
-                starts++;
-                x.FileName = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe");
-                x.ArgumentList.Clear();
-                foreach (var argument in new[]
-                {
-                    "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script,
-                })
-                {
-                    x.ArgumentList.Add(argument);
-                }
-
-                return new()
-                {
-                    StartInfo = x,
-                };
-            });
+        var cli = CreateDiscoveryCli(_root, script, () => starts++);
 
         var log = Path.Combine(_root, "discovery.log");
         if (truncated)
@@ -212,6 +171,31 @@ public class NuGetCleanupTests
         Assert.That(starts, Is.EqualTo(1));
         Assert.That(recorded, Does.Contain("Outcome: Succeeded"));
         Assert.That(recorded, Does.Contain("http-cache:"));
+    }
+
+    [Test]
+    public async Task Discovery_script_supports_cyrillic_and_apostrophe_paths()
+    {
+        var specialRoot = Path.Combine(_root, "Проекты О'Коннор и О\u2019Коннор");
+        var paths = Enum.GetValues<NuGetCacheKind>()
+            .Where(x => x != NuGetCacheKind.None)
+            .ToDictionary(x => x, x => Path.Combine(specialRoot, x.ToString()));
+        foreach (var path in paths.Values)
+        {
+            Directory.CreateDirectory(path);
+        }
+
+        var script = Path.Combine(specialRoot, "discovery.ps1");
+        await WriteDiscoveryScriptAsync(script, paths, truncated: false);
+
+        var starts = 0;
+        var cli = CreateDiscoveryCli(specialRoot, script, () => starts++);
+        var log = Path.Combine(specialRoot, "discovery.log");
+
+        var locations = await NuGetCacheDiscovery.DiscoverAsync(cli, specialRoot, _context, log, default);
+
+        Assert.That(starts, Is.EqualTo(1));
+        Assert.That(locations.Paths, Is.EquivalentTo(paths));
     }
 
     [Test]
@@ -338,7 +322,7 @@ public class NuGetCleanupTests
         {
             Directory.CreateSymbolicLink(parent, outside);
         }
-        catch (Exception exception) when (exception is UnauthorizedAccessException or IOException)
+        catch (Exception exception) when (IsSymlinkUnavailable(exception))
         {
             Assert.Ignore($"Для создания тестовой ссылки нужны права или режим разработчика: {exception.Message}");
         }
@@ -501,6 +485,70 @@ public class NuGetCleanupTests
         Assert.That(error!.InnerException, Is.TypeOf<Win32Exception>());
         Assert.That(((Win32Exception)error.InnerException!).NativeErrorCode, Is.EqualTo(2));
         Assert.That(error.Message, Does.Contain("Win32: 2"));
+    }
+
+    private static async Task WriteDiscoveryScriptAsync(string script, IReadOnlyDictionary<NuGetCacheKind, string> paths, bool truncated)
+    {
+        var output = Path.Combine(Path.GetDirectoryName(script)!, "discovery.out");
+        var data = new List<string>();
+        if (truncated)
+        {
+            data.Add(new('x', 30000));
+        }
+
+        data.AddRange(NuGetCacheDiscovery.Names.Select(x => $"{x.Value}: {paths[x.Key]}"));
+        var utf8Bom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
+        await File.WriteAllLinesAsync(output, data, utf8Bom);
+
+        var body = new[]
+        {
+            "[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)",
+            "Get-Content -LiteralPath (Join-Path $PSScriptRoot 'discovery.out') -Encoding UTF8",
+        };
+        await File.WriteAllLinesAsync(script, body, utf8Bom);
+    }
+
+    private static bool IsSymlinkUnavailable(Exception exception)
+    {
+        return exception is UnauthorizedAccessException
+            || (exception is IOException
+                && (unchecked((uint)exception.HResult) >> 16) == 0x8007
+                && (exception.HResult & 0xFFFF) is 1 or 5 or 50 or 1314);
+    }
+
+    private static DotNetCli CreateDiscoveryCli(string root, string script, Action onStart)
+    {
+        return new(
+            () => root,
+            _ => true,
+            x =>
+            {
+                Assert.That(
+                    x.ArgumentList,
+                    Is.EqualTo(
+                        new[]
+                        {
+                            "nuget", "locals", "all", "--list", "--force-english-output",
+                        }));
+
+                Assert.That(x.WorkingDirectory, Is.EqualTo(root));
+                Assert.That(x.Environment["DOTNET_SKIP_FIRST_TIME_EXPERIENCE"], Is.EqualTo("1"));
+                onStart();
+                x.FileName = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe");
+                x.ArgumentList.Clear();
+                foreach (var argument in new[]
+                {
+                    "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script,
+                })
+                {
+                    x.ArgumentList.Add(argument);
+                }
+
+                return new()
+                {
+                    StartInfo = x,
+                };
+            });
     }
 
     private string WritePackage(string id, string version)
