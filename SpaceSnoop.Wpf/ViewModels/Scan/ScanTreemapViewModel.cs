@@ -50,19 +50,18 @@ public sealed partial class ScanTreemapViewModel : ObservableObject
 
         TreemapRoot.EnsureLoaded();
 
-        var children = TreemapRoot.Children
-            .Where(static c => c.Space is not null && c.Weight > 0)
-            .OrderByDescending(static c => c.Weight)
-            .ToList();
+        var shown = ScanTopSelector.SelectTopWeightedNodes(
+            TreemapRoot.Children,
+            AppDefaults.TreemapTileLimit,
+            out var visibleCount);
 
-        var shown = children.Take(AppDefaults.TreemapTileLimit).ToList();
         TreemapTiles.ReplaceAll(shown);
-        HasTreemapTiles = shown.Count > 0;
+        HasTreemapTiles = shown.Length > 0;
 
-        var hidden = children.Count - shown.Count;
+        var hidden = visibleCount - shown.Length;
         TreemapTruncated = hidden > 0;
         TreemapTruncatedText = hidden > 0
-            ? $"Показаны крупнейшие {shown.Count} из {children.Count}"
+            ? $"Показаны крупнейшие {shown.Length} из {visibleCount}"
             : string.Empty;
     }
 

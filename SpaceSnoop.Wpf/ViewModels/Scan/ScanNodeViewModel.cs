@@ -3,6 +3,7 @@
 public sealed partial class ScanNodeViewModel : ObservableObject
 {
     private static readonly ScanNodeViewModel Dummy = new();
+    private static readonly System.ComponentModel.PropertyChangedEventArgs AllPropertiesChanged = new(string.Empty);
 
     private readonly ScanSortState? _sort;
     private readonly ScanNodeFactory? _factory;
@@ -231,7 +232,7 @@ public sealed partial class ScanNodeViewModel : ObservableObject
 
     public void NotifyPropertiesChanged()
     {
-        OnPropertyChanged(string.Empty);
+        OnPropertyChanged(AllPropertiesChanged);
     }
 
     public void Resort()
@@ -289,25 +290,9 @@ public sealed partial class ScanNodeViewModel : ObservableObject
             Share = Weight;
         }
 
-        if (_loaded)
+        if (_loaded && _children is { Count: > 0 } children)
         {
-            // TODO: десятки тысяч прямых детей требуют полной пересортировки; при заметных паузах – обновлять затронутые позиции.
-            if (!IsIgnored)
-            {
-                ReloadChildren();
-            }
-
-            foreach (var child in Children)
-            {
-                if (changed || inheritedChange || (child.Space is { } space && affected.Contains(space)))
-                {
-                    child.RefreshVisibility(affected, changed || inheritedChange);
-                }
-                else
-                {
-                    child.NotifyPropertiesChanged();
-                }
-            }
+            RefreshLoadedChildrenVisibility(children, affected, changed || inheritedChange);
         }
 
         _previewTiles = null;
@@ -340,6 +325,58 @@ public sealed partial class ScanNodeViewModel : ObservableObject
         }
     }
 
+    private void RefreshLoadedChildrenVisibility(
+        RangeObservableCollection<ScanNodeViewModel> children,
+        IReadOnlySet<SpaceBase> affected,
+        bool propagateChange)
+    {
+        var count = children.Count;
+        var updateShares = !IsIgnored;
+        var localMax = updateShares ? ComputeVisibleChildMax(children) : 0;
+        var parentWeight = updateShares ? Weight : 0;
+
+        for (var i = 0; i < count; i++)
+        {
+            var child = children[i];
+
+            if (updateShares)
+            {
+                child.Fraction = localMax;
+                child.Share = parentWeight;
+            }
+
+            if (propagateChange || (child.Space is { } space && affected.Contains(space)))
+            {
+                child.RefreshVisibility(affected, propagateChange);
+            }
+            else
+            {
+                child.NotifyPropertiesChanged();
+            }
+        }
+    }
+
+    private long ComputeVisibleChildMax(RangeObservableCollection<ScanNodeViewModel> children)
+    {
+        var count = children.Count;
+        long max = 0;
+
+        for (var i = 0; i < count; i++)
+        {
+            if (children[i].Space is { } space && IsVisible(space))
+            {
+                var size = VisibleSize(space);
+
+                if (size > max)
+                {
+                    max = size;
+                }
+            }
+        }
+
+        return max;
+    }
+
     private static IEnumerable<SpaceBase> EnumerateChildren(DirectorySpace dir)
     {
         return dir.SubDirectories.Cast<SpaceBase>().Concat(dir.Files);
@@ -348,12 +385,7 @@ public sealed partial class ScanNodeViewModel : ObservableObject
     private IReadOnlyList<ScanNodeViewModel> BuildPreviewTiles()
     {
         EnsureLoaded();
-
-        return Children
-            .Where(static c => c.Weight > 0)
-            .OrderByDescending(static c => c.Weight)
-            .Take(AppDefaults.TreemapPreviewLimit)
-            .ToList();
+        return ScanTopSelector.SelectTopWeightedNodes(Children, AppDefaults.TreemapPreviewLimit, out _);
     }
 
     private static bool HasDeletedRecursive(SpaceBase space)

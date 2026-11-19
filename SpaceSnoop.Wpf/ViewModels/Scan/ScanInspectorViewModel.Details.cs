@@ -123,31 +123,86 @@ public sealed partial class ScanInspectorViewModel
 
     private void BuildTopChildren(DirectorySpace dir, ScanNodeViewModel node)
     {
-        var children = dir.SubDirectories
-            .Cast<SpaceBase>()
-            .Concat(dir.Files)
-            .Where(node.IsVisible)
-            .OrderByDescending(node.VisibleSize)
-            .ToList();
+        var limit = AppDefaults.TopChildrenLimit;
+        var totalRaw = dir.SubDirectories.Count + dir.Files.Count;
+        var queue = new PriorityQueue<(SpaceBase Space, long Size), (double Weight, int Index)>(
+            Math.Min(totalRaw, limit),
+            ScanTopSelector.MinTopWeightComparer.Instance);
+        var visibleCount = 0;
+        var index = 0;
 
-        var max = children.Count > 0 ? node.VisibleSize(children[0]) : 0;
+        foreach (var sub in dir.SubDirectories)
+        {
+            ConsiderTopChild(sub, node, limit, queue, ref visibleCount, ref index);
+        }
 
-        var top = children
-            .Take(AppDefaults.TopChildrenLimit)
-            .Select(child => new ScanInspectorChild(
+        foreach (var file in dir.Files)
+        {
+            ConsiderTopChild(file, node, limit, queue, ref visibleCount, ref index);
+        }
+
+        var topSpaces = new (SpaceBase Space, long Size)[queue.Count];
+
+        for (var i = topSpaces.Length - 1; i >= 0; i--)
+        {
+            topSpaces[i] = queue.Dequeue();
+        }
+
+        var max = topSpaces.Length > 0 ? topSpaces[0].Size : 0;
+        var top = new ScanInspectorChild[topSpaces.Length];
+
+        for (var i = 0; i < topSpaces.Length; i++)
+        {
+            var (child, size) = topSpaces[i];
+            top[i] = new(
                 child.Name,
-                SizeFormatter.Format(node.VisibleSize(child)),
-                ShareFormatter.Format(node.Weight > 0 ? node.VisibleSize(child) / node.Weight : 0),
-                max > 0 ? Math.Clamp((double)node.VisibleSize(child) / max, 0, 1) : 0,
-                child is DirectorySpace));
+                SizeFormatter.Format(size),
+                ShareFormatter.Format(node.Weight > 0 ? size / node.Weight : 0),
+                max > 0 ? Math.Clamp((double)size / max, 0, 1) : 0,
+                child is DirectorySpace);
+        }
 
         TopChildren.ReplaceAll(top);
 
-        MoreChildrenCount = Math.Max(0, children.Count - AppDefaults.TopChildrenLimit);
+        MoreChildrenCount = Math.Max(0, visibleCount - limit);
         HasMoreChildren = MoreChildrenCount > 0;
         MoreChildrenText = HasMoreChildren ? $"…ещё {MoreChildrenCount}" : string.Empty;
 
         OnPropertyChanged(nameof(HasTopChildren));
+    }
+
+    private static void ConsiderTopChild(
+        SpaceBase candidate,
+        ScanNodeViewModel node,
+        int limit,
+        PriorityQueue<(SpaceBase Space, long Size), (double Weight, int Index)> queue,
+        ref int visibleCount,
+        ref int index)
+    {
+        var currentIndex = index++;
+
+        if (!node.IsVisible(candidate))
+        {
+            return;
+        }
+
+        visibleCount++;
+
+        if (limit <= 0)
+        {
+            return;
+        }
+
+        var size = node.VisibleSize(candidate);
+
+        if (queue.Count < limit)
+        {
+            queue.Enqueue((candidate, size), (size, currentIndex));
+        }
+        else if (queue.TryPeek(out _, out var minKey) && size > minKey.Weight)
+        {
+            queue.DequeueEnqueue((candidate, size), (size, currentIndex));
+        }
     }
 
     private void ClearTopChildren()
