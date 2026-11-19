@@ -225,6 +225,86 @@ public class ArchiveServiceTests
     }
 
     [Test]
+    public void VerifyCoverage_ReportsMonotonicFileAndByteProgressAndTotals()
+    {
+        var largeFile = Path.Combine(_sourceDir, "a.txt");
+        WriteIncompressible(largeFile, 3 * 1024 * 1024);
+        var expectedBytes = new FileInfo(largeFile).Length + new FileInfo(Path.Combine(_sourceDir, "nested", "b.txt")).Length;
+
+        var service = new ArchiveService();
+        var content = service.Collect(_sourceDir, CancellationToken.None);
+        service.ZipFiles(_sourceDir, content, _zipPath, CompressionLevel.NoCompression, null, CancellationToken.None);
+
+        var reports = new List<OperationProgress>();
+        (int Files, long Bytes) totals = default;
+
+        var coverage = service.VerifyCoverage(
+            _sourceDir,
+            _zipPath,
+            new InlineProgress(reports.Add),
+            (files, bytes) => totals = (files, bytes),
+            CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(coverage.Ok, Is.True);
+            Assert.That(totals.Files, Is.EqualTo(2));
+            Assert.That(totals.Bytes, Is.EqualTo(expectedBytes));
+            Assert.That(reports.Count, Is.GreaterThanOrEqualTo(4));
+            Assert.That(reports.Select(static x => x.Completed), Is.Ordered.Ascending);
+            Assert.That(reports.Select(static x => x.Bytes), Is.Ordered.Ascending);
+            Assert.That(reports[^1].Completed, Is.EqualTo(2));
+            Assert.That(reports[^1].Bytes, Is.EqualTo(expectedBytes));
+        }
+    }
+
+    [Test]
+    public void VerifyCoverage_CancelledMidContentCheck_ThrowsAndPreservesSourceAndArchive()
+    {
+        WriteIncompressible(Path.Combine(_sourceDir, "a.txt"), 2 * 1024 * 1024);
+
+        var service = new ArchiveService();
+        var content = service.Collect(_sourceDir, CancellationToken.None);
+        service.ZipFiles(_sourceDir, content, _zipPath, CompressionLevel.NoCompression, null, CancellationToken.None);
+
+        using var cts = new CancellationTokenSource();
+        var reports = 0;
+        var progress = new InlineProgress(
+            _ =>
+            {
+                reports++;
+                cts.Cancel();
+            });
+
+        Assert.Throws<OperationCanceledException>(() =>
+            service.VerifyCoverage(_sourceDir, _zipPath, progress, cts.Token));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(reports, Is.EqualTo(1));
+            Assert.That(File.Exists(_zipPath), Is.True);
+            Assert.That(Directory.Exists(_sourceDir), Is.True);
+        }
+    }
+
+    [Test]
+    public void VerifyCoverage_CancelledOnSingleSmallFileProgress_Throws()
+    {
+        File.Delete(Path.Combine(_sourceDir, "nested", "b.txt"));
+        Directory.Delete(Path.Combine(_sourceDir, "nested"));
+
+        var service = new ArchiveService();
+        var content = service.Collect(_sourceDir, CancellationToken.None);
+        service.ZipFiles(_sourceDir, content, _zipPath, CompressionLevel.NoCompression, null, CancellationToken.None);
+
+        using var cts = new CancellationTokenSource();
+        var progress = new InlineProgress(_ => cts.Cancel());
+
+        Assert.Throws<OperationCanceledException>(() =>
+            service.VerifyCoverage(_sourceDir, _zipPath, progress, cts.Token));
+    }
+
+    [Test]
     public void VerifyCoverage_FailsWhenAlternateStreamAppearsAfterPacking()
     {
         var service = new ArchiveService();

@@ -7,11 +7,14 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
     private readonly ArchiveRequest _request;
     private readonly ArchiveService _service;
     private readonly ILogger _logger;
+    private readonly Action<string, bool> _deleteDirectory;
     private readonly OperationProgressState _packProgress = new();
     private readonly OperationProgressState _verifyProgress = new();
+    private readonly OperationProgressState _coverageProgress = new();
     private readonly UiProgressPoller _progressPoller;
 
     private volatile ArchivePhase _phase;
+    private volatile CoverageTotals _coverageTotals = CoverageTotals.Empty;
     private bool _packed;
     private int _packTotal;
     private int _verifyTotal;
@@ -49,10 +52,21 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
     protected override bool HasFailedItems => _coverageIssue is not null || _unreadableIssue is not null;
 
     public ArchiveProgressDialogViewModel(ArchiveRequest request, ArchiveService service, IUiDispatcher uiDispatcher, ILogger logger)
+        : this(request, service, uiDispatcher, logger, service.DeleteDirectoryToRecycleBin)
+    {
+    }
+
+    internal ArchiveProgressDialogViewModel(
+        ArchiveRequest request,
+        ArchiveService service,
+        IUiDispatcher uiDispatcher,
+        ILogger logger,
+        Action<string, bool> deleteDirectory)
     {
         _request = request;
         _service = service;
         _logger = logger;
+        _deleteDirectory = deleteDirectory;
         _progressPoller = new(uiDispatcher, OnProgressTick);
 
         SourceName = Path.GetFileName(request.SourcePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
@@ -98,6 +112,9 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
         OriginalDeleted = false;
         CreatedArchivePath = null;
         _packed = false;
+        _phase = ArchivePhase.None;
+        _coverageTotals = CoverageTotals.Empty;
+        _coverageProgress.Reset();
         _resultSummary = string.Empty;
         SetPhaseTotal(0);
     }
@@ -108,6 +125,7 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
 
         _packProgress.Reset();
         _verifyProgress.Reset();
+        _coverageProgress.Reset();
 
         await using (_progressPoller.StartScope())
         {
@@ -209,9 +227,21 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
 
         if (_request.DeleteOriginal)
         {
+            _coverageProgress.Reset();
+            _coverageTotals = CoverageTotals.Empty;
             _phase = ArchivePhase.Coverage;
             stage.Report(new(ArchiveStage.Coverage, 0, 0, 0));
-            var coverage = _service.VerifyCoverage(_request.SourcePath, _request.TargetPath, token);
+
+            var coverage = _service.VerifyCoverage(
+                _request.SourcePath,
+                _request.TargetPath,
+                _coverageProgress,
+                (files, bytes) =>
+                {
+                    _coverageTotals = new(files, bytes);
+                    stage.Report(new(ArchiveStage.Coverage, files, files, bytes));
+                },
+                token);
 
             if (!coverage.Ok)
             {
@@ -230,25 +260,71 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
         }
 
         token.ThrowIfCancellationRequested();
-        _service.DeleteDirectoryToRecycleBin(_request.SourcePath, _request.Interactive);
+        _phase = ArchivePhase.None;
+        stage.Report(new(ArchiveStage.Deleting, 0, 0, 0));
+        _deleteDirectory(_request.SourcePath, _request.Interactive);
         OriginalDeleted = true;
+
+        var totals = _coverageTotals;
+        stage.Report(new(ArchiveStage.Finished, totals.Files, Math.Max(_verifyTotal, 1), totals.Bytes));
     }
 
     private void OnStage(ArchiveStageUpdate update)
     {
-        if (update.Stage == ArchiveStage.Coverage)
+        if (IsFinished)
         {
-            StatusText = "Сверка архива с каталогом…";
-            CurrentPath = string.Empty;
-            CountText = string.Empty;
-            ProgressValue = 0d;
-            SetPhaseTotal(0);
             return;
         }
 
-        _packTotal = update.Entries;
-        SourceSize = $"{SizeFormatter.Format(update.Bytes)} · {update.Files:N0} {Plural.Word(update.Files, "файл", "файла", "файлов")}";
-        SetPhaseTotal(update.Entries);
+        switch (update.Stage)
+        {
+            case ArchiveStage.Coverage when update.Files == 0 && update.Bytes == 0:
+                if (_coverageTotals == CoverageTotals.Empty)
+                {
+                    SetPhaseTotal(0);
+                    CurrentPath = string.Empty;
+                    CountText = string.Empty;
+                    ProgressValue = 0d;
+                    CountLabel = "Сверено";
+                    StatusText = "Сверка архива с каталогом…";
+                }
+
+                return;
+
+            case ArchiveStage.Coverage:
+                OnCoverageTick(_coverageProgress.CreateSnapshot(), update.Files, update.Bytes);
+                return;
+
+            case ArchiveStage.Deleting:
+                SetPhaseTotal(0);
+                CurrentPath = string.Empty;
+                CountText = string.Empty;
+                ProgressValue = 0d;
+                CountLabel = "Сверено";
+                StatusText = "Перемещение в корзину…";
+                return;
+
+            case ArchiveStage.Finished:
+                if (update.Files > 0 || update.Bytes > 0)
+                {
+                    OnCoverageTick(_coverageProgress.CreateSnapshot(), update.Files, update.Bytes);
+                }
+                else
+                {
+                    SetPhaseTotal(update.Entries);
+                    CurrentPath = string.Empty;
+                    CountText = "0 / 0";
+                    ProgressValue = 1d;
+                }
+
+                return;
+
+            default:
+                _packTotal = update.Entries;
+                SourceSize = $"{SizeFormatter.Format(update.Bytes)} · {update.Files:N0} {Plural.Word(update.Files, "файл", "файла", "файлов")}";
+                SetPhaseTotal(update.Entries);
+                return;
+        }
     }
 
     private void OnProgressTick()
@@ -263,9 +339,46 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
                 OnTick(_verifyProgress.CreateSnapshot(), true);
                 break;
 
+            case ArchivePhase.Coverage:
+                var totals = _coverageTotals;
+
+                if (totals.Files > 0 || totals.Bytes > 0)
+                {
+                    OnCoverageTick(_coverageProgress.CreateSnapshot(), totals.Files, totals.Bytes);
+                }
+
+                break;
+
             default:
                 return;
         }
+    }
+
+    private void OnCoverageTick(OperationProgress update, int totalFiles, long totalBytes)
+    {
+        if (IsFinished)
+        {
+            return;
+        }
+
+        SetPhaseTotal(totalFiles > 0 ? totalFiles : 1);
+        CountLabel = "Сверено";
+        CurrentPath = update.Current;
+        CountText = totalBytes > 0
+            ? $"{update.Completed} / {totalFiles} · {SizeFormatter.Format(update.Bytes)} / {SizeFormatter.Format(totalBytes)}"
+            : $"{update.Completed} / {totalFiles}";
+        ProgressValue = CoverageFraction(update, totalFiles, totalBytes);
+        StatusText = "Сверка архива с каталогом…";
+    }
+
+    private static double CoverageFraction(OperationProgress update, int totalFiles, long totalBytes)
+    {
+        if (totalBytes > 0)
+        {
+            return Math.Clamp((double)update.Bytes / totalBytes, 0d, 1d);
+        }
+
+        return totalFiles > 0 ? Math.Clamp((double)update.Completed / totalFiles, 0d, 1d) : 0d;
     }
 
     private void OnTick(OperationProgress update, bool verifying)
@@ -295,6 +408,10 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
         _phaseTotal = total;
         OnPropertyChanged(nameof(IsIndeterminate));
     }
+    private sealed record CoverageTotals(int Files, long Bytes)
+    {
+        internal static readonly CoverageTotals Empty = new(0, 0);
+    }
 }
 
 public enum ArchiveStage
@@ -302,6 +419,8 @@ public enum ArchiveStage
     None = 0,
     Packing = 1,
     Coverage = 2,
+    Deleting = 3,
+    Finished = 4,
 }
 
 internal enum ArchivePhase

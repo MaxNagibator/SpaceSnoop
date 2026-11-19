@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging.Abstractions;
+using SpaceSnoop.Core;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.ViewModels.Dialogs;
 using System.Diagnostics;
@@ -155,6 +156,194 @@ public class ArchiveDialogTests
         }
     }
 
+    [Test]
+    public async Task Сверка_покрытия_обновляет_счётчик_и_долю_при_включённом_удалении()
+    {
+        var largeFile = Path.Combine(_source, "a.txt");
+        await File.WriteAllBytesAsync(largeFile, new byte[160 * 1024]);
+        var totalBytes = new FileInfo(largeFile).Length + new FileInfo(Path.Combine(_source, "nested", "b.txt")).Length;
+
+        var dialog = Dialog(deleteOriginal: true);
+        var sawDeterminateCoverage = false;
+        var injectedLateFile = false;
+
+        dialog.PropertyChanged += (_, _) =>
+        {
+            if (dialog.StatusText == "Сверка архива с каталогом…" && !dialog.IsIndeterminate)
+            {
+                sawDeterminateCoverage = true;
+
+                if (!injectedLateFile)
+                {
+                    injectedLateFile = true;
+                    File.WriteAllText(Path.Combine(_source, "late.txt"), "late");
+                }
+            }
+        };
+
+        var previous = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(new InlineSynchronizationContext());
+
+        try
+        {
+            await dialog.StartCommand.ExecuteAsync(null);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previous);
+        }
+
+        var expectedTotalText = SizeFormatter.Format(totalBytes);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(sawDeterminateCoverage, Is.True);
+            Assert.That(dialog.IsIndeterminate, Is.False);
+            Assert.That(dialog.CountLabel, Is.EqualTo("Сверено"));
+            Assert.That(dialog.CountText, Is.EqualTo($"2 / 2 · {expectedTotalText} / {expectedTotalText}"));
+            Assert.That(dialog.ProgressValue, Is.EqualTo(1d));
+            Assert.That(dialog.OriginalDeleted, Is.False);
+            Assert.That(Directory.Exists(_source), Is.True);
+        }
+    }
+
+    [Test]
+    public async Task Сверка_покрытия_отражает_частичный_прогресс_при_отказе_на_следующем_файле()
+    {
+        var firstBytes = 160 * 1024;
+        await File.WriteAllBytesAsync(Path.Combine(_source, "a.txt"), new byte[firstBytes]);
+        var secondFile = Path.Combine(_source, "nested", "b.txt");
+        var totalBytes = firstBytes + new FileInfo(secondFile).Length;
+
+        var dialog = Dialog(deleteOriginal: true);
+        FileStream? lockStream = null;
+
+        dialog.PropertyChanged += (_, _) =>
+        {
+            if (lockStream is null && dialog.StatusText == "Сверка архива с каталогом…" && !dialog.IsIndeterminate)
+            {
+                lockStream = new(secondFile, FileMode.Open, FileAccess.Read, FileShare.None);
+            }
+        };
+
+        var previous = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(new InlineSynchronizationContext());
+
+        try
+        {
+            await dialog.StartCommand.ExecuteAsync(null);
+        }
+        finally
+        {
+            if (lockStream is not null)
+            {
+                await lockStream.DisposeAsync();
+            }
+
+            SynchronizationContext.SetSynchronizationContext(previous);
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(dialog.IsIndeterminate, Is.False);
+            Assert.That(dialog.CountLabel, Is.EqualTo("Сверено"));
+            Assert.That(dialog.CountText, Is.EqualTo($"1 / 2 · {SizeFormatter.Format(firstBytes)} / {SizeFormatter.Format(totalBytes)}"));
+            Assert.That(dialog.ProgressValue, Is.EqualTo((double)firstBytes / totalBytes).Within(1e-6));
+            Assert.That(dialog.HasErrors, Is.True);
+            Assert.That(dialog.OriginalDeleted, Is.False);
+        }
+    }
+
+    [Test]
+    public async Task Успешная_сверка_и_удаление_переключают_индикатор_в_неопределённый_режим_на_время_корзины()
+    {
+        var deleteCalls = 0;
+        var indeterminateDuringDelete = false;
+        var statusDuringDelete = string.Empty;
+        var currentDuringDelete = "dirty";
+        var countDuringDelete = "dirty";
+        var progressDuringDelete = -1d;
+
+        ArchiveProgressDialogViewModel? dialog = null;
+        dialog = Dialog(
+            deleteOriginal: true,
+            deleteDirectory: (_, _) =>
+            {
+                deleteCalls++;
+                indeterminateDuringDelete = dialog!.IsIndeterminate;
+                statusDuringDelete = dialog.StatusText;
+                currentDuringDelete = dialog.CurrentPath;
+                countDuringDelete = dialog.CountText;
+                progressDuringDelete = dialog.ProgressValue;
+            });
+
+        var previous = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(new InlineSynchronizationContext());
+
+        try
+        {
+            await dialog.StartCommand.ExecuteAsync(null);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previous);
+        }
+
+        var expectedBytes = SizeFormatter.Format("alpha".Length + "bravo".Length);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(deleteCalls, Is.EqualTo(1));
+            Assert.That(indeterminateDuringDelete, Is.True);
+            Assert.That(statusDuringDelete, Is.EqualTo("Перемещение в корзину…"));
+            Assert.That(currentDuringDelete, Is.Empty);
+            Assert.That(countDuringDelete, Is.Empty);
+            Assert.That(progressDuringDelete, Is.EqualTo(0d));
+            Assert.That(dialog.OriginalDeleted, Is.True);
+            Assert.That(dialog.IsIndeterminate, Is.False);
+            Assert.That(dialog.ProgressValue, Is.EqualTo(1d));
+            Assert.That(dialog.CountText, Is.EqualTo($"2 / 2 · {expectedBytes} / {expectedBytes}"));
+            Assert.That(dialog.StatusText, Does.Contain("Оригинал → в корзину"));
+        }
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task Сверка_покрытия_пустого_каталога_и_нулевых_файлов_не_делит_на_ноль(bool emptyDirectory)
+    {
+        File.Delete(Path.Combine(_source, "a.txt"));
+        File.Delete(Path.Combine(_source, "nested", "b.txt"));
+
+        if (!emptyDirectory)
+        {
+            await File.WriteAllBytesAsync(Path.Combine(_source, "zero1.bin"), []);
+            await File.WriteAllBytesAsync(Path.Combine(_source, "nested", "zero2.bin"), []);
+        }
+
+        var dialog = Dialog(deleteOriginal: true, deleteDirectory: (_, _) => { });
+
+        var previous = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(new InlineSynchronizationContext());
+
+        try
+        {
+            await dialog.StartCommand.ExecuteAsync(null);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previous);
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(dialog.OriginalDeleted, Is.True);
+            Assert.That(dialog.HasErrors, Is.False);
+            Assert.That(dialog.IsIndeterminate, Is.False);
+            Assert.That(dialog.ProgressValue, Is.EqualTo(1d));
+            Assert.That(dialog.CountText, Is.EqualTo(emptyDirectory ? "0 / 0" : "2 / 2"));
+        }
+    }
+
     private ArchiveProgressDialogViewModel Dialog(bool deleteOriginal)
     {
         ArchiveRequest request = new(
@@ -167,6 +356,20 @@ public class ArchiveDialogTests
             false);
 
         return new(request, new(), new FakeUiDispatcher(), NullLogger<ArchiveProgressDialogViewModel>.Instance);
+    }
+
+    private ArchiveProgressDialogViewModel Dialog(bool deleteOriginal, Action<string, bool> deleteDirectory)
+    {
+        ArchiveRequest request = new(
+            _source,
+            _target,
+            2,
+            10,
+            deleteOriginal,
+            CompressionLevel.Optimal,
+            false);
+
+        return new(request, new(), new FakeUiDispatcher(), NullLogger<ArchiveProgressDialogViewModel>.Instance, deleteDirectory);
     }
 
     private static bool CreateJunction(string path, string target)

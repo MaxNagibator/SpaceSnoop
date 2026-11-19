@@ -76,6 +76,7 @@ internal sealed class ArchiveIndex
 public sealed class ArchiveService
 {
     private const int BufferSize = 80 * 1024;
+    private const int ProgressChunkStep = 1024 * 1024;
     private const int ZipMinYear = 1980;
     private const int ZipMaxYear = 2107;
     private const int FindStreamInfoStandard = 0;
@@ -216,6 +217,25 @@ public sealed class ArchiveService
 
     public VerifyResult VerifyCoverage(string root, string zipPath, CancellationToken token)
     {
+        return VerifyCoverage(root, zipPath, null, null, token);
+    }
+
+    public VerifyResult VerifyCoverage(
+        string root,
+        string zipPath,
+        IProgress<OperationProgress>? progress,
+        CancellationToken token)
+    {
+        return VerifyCoverage(root, zipPath, progress, null, token);
+    }
+
+    public VerifyResult VerifyCoverage(
+        string root,
+        string zipPath,
+        IProgress<OperationProgress>? progress,
+        Action<int, long>? onTotals,
+        CancellationToken token)
+    {
         token.ThrowIfCancellationRequested();
 
         // TODO: чувствительность снимается с корня упаковки и наследуется поддеревом, поэтому у
@@ -230,7 +250,9 @@ public sealed class ArchiveService
             return coverage;
         }
 
-        if (CheckContent(root, content, index, token) is { Ok: false } rewritten)
+        onTotals?.Invoke(content.Files.Count, content.Bytes);
+
+        if (CheckContent(root, content, index, progress, token) is { Ok: false } rewritten)
         {
             return rewritten;
         }
@@ -345,15 +367,28 @@ public sealed class ArchiveService
         return new(true, string.Empty);
     }
 
+    internal VerifyResult CheckContent(string root, ArchiveContent content, ArchiveIndex index, CancellationToken token)
+    {
+        return CheckContent(root, content, index, null, token);
+    }
+
     // TODO: содержимое сверяется по CRC-32 из центрального каталога – 32 бита ловят случайную правку, но не
     // подобранную подмену; сверять побайтно с распакованной записью, когда упаковка пойдёт по каталогам, куда
     // пишут недоверенные процессы.
-    internal VerifyResult CheckContent(string root, ArchiveContent content, ArchiveIndex index, CancellationToken token)
+    internal VerifyResult CheckContent(
+        string root,
+        ArchiveContent content,
+        ArchiveIndex index,
+        IProgress<OperationProgress>? progress,
+        CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(index);
 
         var prefix = Prefix(root);
         var buffer = ArrayPool<byte>.Shared.Rent(BufferSize);
+        var completed = 0;
+        long totalRead = 0;
+        long reportedBytes = 0;
 
         try
         {
@@ -361,11 +396,19 @@ public sealed class ArchiveService
             {
                 token.ThrowIfCancellationRequested();
 
-                if (ContentMismatch(index.Stamp(Relative(prefix, file)), file, buffer, token) is { } mismatch)
+                var rel = Relative(prefix, file);
+
+                if (ContentMismatch(index.Stamp(rel), file, buffer, completed, rel, ref totalRead, ref reportedBytes, progress, token) is { } mismatch)
                 {
                     return new(false, mismatch);
                 }
+
+                completed++;
+                reportedBytes = totalRead;
+                progress?.Report(new(completed, rel, totalRead));
             }
+
+            token.ThrowIfCancellationRequested();
         }
         finally
         {
@@ -665,7 +708,16 @@ public sealed class ArchiveService
             : $"«{entry.FullName}»: контрольная сумма не сошлась";
     }
 
-    private static string? ContentMismatch(ZipEntryStamp stamp, string path, byte[] buffer, CancellationToken token)
+    private static string? ContentMismatch(
+        ZipEntryStamp stamp,
+        string path,
+        byte[] buffer,
+        int completed,
+        string relativePath,
+        ref long totalRead,
+        ref long reportedBytes,
+        IProgress<OperationProgress>? progress,
+        CancellationToken token)
     {
         var crc = new Crc32();
         long read = 0;
@@ -680,6 +732,13 @@ public sealed class ArchiveService
                 token.ThrowIfCancellationRequested();
                 crc.Append(buffer.AsSpan(0, chunk));
                 read += chunk;
+                totalRead += chunk;
+
+                if (progress is not null && (totalRead - reportedBytes) >= ProgressChunkStep)
+                {
+                    reportedBytes = totalRead;
+                    progress.Report(new(completed, relativePath, totalRead));
+                }
             }
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException)
