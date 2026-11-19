@@ -43,28 +43,32 @@
             <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Перед переносом помеченных элементов показывать диалог со списком и объёмом." />
 
-            <keepshell:SettingRowPanel Margin="0,16,0,0">
-                <StackPanel>
-                    <TextBlock Text="Куда удалять помеченные элементы"
-                               Style="{StaticResource Form.Label}"
-                               TextWrapping="Wrap" />
-                    <TextBlock Text="«Безвозвратно» минует корзину – отменить нельзя."
-                               Style="{StaticResource Form.Hint}"
-                               Margin="0,2,0,0" />
-                </StackPanel>
-                <ComboBox Style="{StaticResource ComboBox.Form}"
-                          ItemsSource="{Binding DeleteModeOptions}"
-                          SelectedItem="{Binding SelectedDeleteModeOption}"
-                          DisplayMemberPath="Label"
-                          Width="{StaticResource Setting.ControlWidth}"
-                          Margin="16,0,0,0"
-                          VerticalAlignment="Center" />
-                <Button Style="{StaticResource Form.RowReset}"
+            <TextBlock Text="Куда удалять помеченные элементы"
+                       Style="{StaticResource Form.Label}"
+                       Margin="0,16,0,0" />
+            <TextBlock Text="«Безвозвратно» минует корзину – отменить нельзя."
+                       Style="{StaticResource Form.Hint}"
+                       Margin="0,2,0,0" />
+            <Grid Margin="0,8,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ListBox Grid.Column="0"
+                         Style="{StaticResource ListBox.Segmented}"
+                         ItemsSource="{Binding DeleteModeOptions}"
+                         SelectedItem="{Binding SelectedDeleteModeOption}"
+                         HorizontalAlignment="Left"
+                         AutomationProperties.Name="Куда удалять помеченные элементы" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
                         DataContext="{Binding ResetFields[wpf.delete.mode]}"
                         Command="{Binding ResetCommand}"
                         ToolTip="{Binding Hint}"
-                        AutomationProperties.Name="{Binding AutomationName}" />
-            </keepshell:SettingRowPanel>
+                        AutomationProperties.Name="{Binding AutomationName}"
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center" />
+            </Grid>
         </StackPanel>
     </HeaderedContentControl>
 </UserControl>

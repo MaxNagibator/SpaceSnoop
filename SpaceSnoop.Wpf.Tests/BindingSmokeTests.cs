@@ -1645,13 +1645,13 @@ public partial class BindingSmokeTests
             Settle();
 
             details = Descendants<Expander>(_window).Single(expander => expander.IsVisible && Equals(expander.Header, header));
-            var row = Ancestor<SettingRowPanel>(details) ?? throw new InvalidOperationException($"Раскрытие «{header}» стоит не в строке формы.");
-            var before = Tops(row);
+            var (container, targets) = ResolveTargets(details, header);
+            var before = Tops(container, targets);
 
             details.IsExpanded = true;
             Settle();
 
-            Assert.That(Tops(row), Is.EqualTo(before), $"Раскрытие «{header}» сдвинуло контрол строки.");
+            Assert.That(Tops(container, targets), Is.EqualTo(before), $"Раскрытие «{header}» сдвинуло контрол строки.");
         }
         finally
         {
@@ -1660,9 +1660,32 @@ public partial class BindingSmokeTests
             Settle();
         }
 
-        static double[] Tops(SettingRowPanel row)
+        static (Visual Container, FrameworkElement[] Targets) ResolveTargets(Expander details, string header)
         {
-            return [.. row.Children.Cast<FrameworkElement>().Skip(1).Select(child => Math.Round(child.TransformToAncestor(row).Transform(default).Y, 1))];
+            if (Ancestor<SettingRowPanel>(details) is { } row)
+            {
+                return (row, [.. row.Children.Cast<FrameworkElement>().Skip(1)]);
+            }
+
+            if (VisualTreeHelper.GetParent(details) is Panel parent)
+            {
+                var index = parent.Children.IndexOf(details);
+                if (index > 0 && parent.Children[index - 1] is Panel controlRow)
+                {
+                    var items = controlRow.Children.Cast<FrameworkElement>().ToArray();
+                    if (items.Length > 0)
+                    {
+                        return (parent, items);
+                    }
+                }
+            }
+
+            throw new InvalidOperationException($"Раскрытие «{header}» стоит не рядом с контролом строки.");
+        }
+
+        static double[] Tops(Visual container, FrameworkElement[] targets)
+        {
+            return [.. targets.Select(child => Math.Round(child.TransformToAncestor(container).Transform(default).Y, 1))];
         }
     }
 

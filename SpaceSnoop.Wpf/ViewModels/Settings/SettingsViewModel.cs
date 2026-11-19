@@ -5,8 +5,15 @@ using System.IO.Compression;
 
 namespace SpaceSnoop.Wpf.ViewModels.Settings;
 
-public sealed record EnumOption<T>(T Value, string Label) where T : struct, Enum
+public sealed record EnumOption<T>(
+    T Value,
+    string Label,
+    PackIconLucideKind Kind = PackIconLucideKind.Circle,
+    string? SegmentText = null,
+    string? Tooltip = null) where T : struct, Enum
 {
+    public string Text => SegmentText ?? Label;
+
     public override string ToString()
     {
         return Label;
@@ -119,6 +126,12 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         get => StartupOptions.First(o => o.Value == Shell.StartupPage);
         set
         {
+            if (value is null)
+            {
+                OnPropertyChanged();
+                return;
+            }
+
             if (value.Value != Shell.StartupPage)
             {
                 Shell.StartupPage = value.Value;
@@ -132,6 +145,12 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         get => StartupAdminOptions.FirstOrDefault(o => o.Value == Shell.StartupAdmin) ?? StartupAdminOptions[0];
         set
         {
+            if (value is null)
+            {
+                OnPropertyChanged();
+                return;
+            }
+
             if (value.Value != Shell.StartupAdmin)
             {
                 Shell.StartupAdmin = value.Value;
@@ -145,6 +164,12 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         get => DeleteModeOptions.First(o => o.Value == Operations.DeleteMode);
         set
         {
+            if (value is null)
+            {
+                OnPropertyChanged();
+                return;
+            }
+
             if (value.Value != Operations.DeleteMode)
             {
                 Operations.DeleteMode = value.Value;
@@ -158,6 +183,12 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         get => CompressionOptions.First(o => o.Value == Operations.ArchiveCompression);
         set
         {
+            if (value is null)
+            {
+                OnPropertyChanged();
+                return;
+            }
+
             if (value.Value != Operations.ArchiveCompression)
             {
                 Operations.ArchiveCompression = value.Value;
@@ -171,6 +202,12 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         get => GitFolderOptions.First(o => o.Value == _settings.GetEnum(SettingsKeys.SyncGitFolders, GitFolderPromptChoice.Ask));
         set
         {
+            if (value is null)
+            {
+                OnPropertyChanged();
+                return;
+            }
+
             _settings.SetEnum(SettingsKeys.SyncGitFolders, value.Value);
             OnPropertyChanged();
             RefreshResetAvailability();
