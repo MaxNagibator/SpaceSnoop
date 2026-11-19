@@ -357,32 +357,24 @@
                 <TextBox Text="{Binding Exclusions, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource TextBox.Toolbar}" />
 
-                <Grid Margin="0,14,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0">
-                        <TextBlock Text="Периодичность"
-                                   Style="{StaticResource Form.Label}" />
-                        <ComboBox Style="{StaticResource ComboBox.Form}"
-                                  ItemsSource="{Binding Intervals}"
-                                  SelectedIndex="{Binding SelectedIntervalIndex}"
-                                  HorizontalAlignment="Left"
-                                  Width="240"
-                                  Margin="0,6,0,0" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1"
-                                Visibility="{Binding TimeApplicable, Converter={StaticResource BoolToVisibility}}">
-                        <TextBlock Text="Время (ЧЧ:ММ)"
-                                   Style="{StaticResource Form.Label}" />
-                        <TextBox Text="{Binding Time, UpdateSourceTrigger=PropertyChanged}"
-                                 Style="{StaticResource TextBox.Toolbar}"
-                                 Width="110"
-                                 HorizontalAlignment="Left"
-                                 Margin="0,6,0,0" />
-                    </StackPanel>
-                </Grid>
+                <TextBlock Text="Периодичность"
+                           Style="{StaticResource Schedule.FormLabel}" />
+                <ListBox Style="{StaticResource ListBox.Segmented}"
+                         ItemsSource="{Binding IntervalOptions}"
+                         SelectedIndex="{Binding SelectedIntervalIndex}"
+                         HorizontalAlignment="Left"
+                         AutomationProperties.Name="Периодичность" />
+
+                <StackPanel Margin="0,14,0,0"
+                            Visibility="{Binding TimeApplicable, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Text="Время (ЧЧ:ММ)"
+                               Style="{StaticResource Form.Label}" />
+                    <TextBox Text="{Binding Time, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource TextBox.Toolbar}"
+                             Width="110"
+                             HorizontalAlignment="Left"
+                             Margin="0,6,0,0" />
+                </StackPanel>
 
                 <TextBlock Style="{StaticResource Schedule.Message}" />
 

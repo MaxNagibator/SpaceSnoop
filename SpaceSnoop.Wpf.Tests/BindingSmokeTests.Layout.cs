@@ -219,7 +219,7 @@ public partial class BindingSmokeTests
                 var moreContent = (FrameworkElement)(morePopup.Child ?? throw new InvalidOperationException("Содержимое панели «Ещё» не построено."));
                 moreContent.UpdateLayout();
                 Settle();
-                AssertSegmentedWithin(moreContent, expectedCount: 2, "Синхронизация – Ещё");
+                AssertSegmentedWithin(moreContent, expectedCount: 3, "Синхронизация – Ещё");
             }
             finally
             {
@@ -273,7 +273,7 @@ public partial class BindingSmokeTests
             try
             {
                 var scheduleView = Descendant<ScheduleView>(_window) ?? throw new InvalidOperationException("Страница расписания не найдена.");
-                AssertSegmentedWithin(scheduleView, expectedCount: 4, "Расписание – пакетная панель и карточка профиля");
+                AssertSegmentedWithin(scheduleView, expectedCount: 6, "Расписание – пакетная панель и карточка профиля");
             }
             finally
             {

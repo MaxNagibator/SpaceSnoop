@@ -1,4 +1,6 @@
-﻿using SpaceSnoop.Wpf.ViewModels.Dialogs;
+﻿using KeepShell.Testing;
+using Microsoft.Extensions.Logging.Abstractions;
+using SpaceSnoop.Wpf.ViewModels.Dialogs;
 using SpaceSnoop.Wpf.ViewModels.Sync;
 
 namespace SpaceSnoop.Wpf.Tests;
@@ -96,6 +98,31 @@ public class SyncGitTests
         var right = new DateTimeOffset(2026, 6, 29, 12, 30, 0, TimeSpan.Zero);
 
         Assert.That(SyncGitViewModel.DescribeNewer(left, right), Is.EqualTo("справа новее на 2 ч."));
+    }
+
+    [Test]
+    public void Выбор_числа_коммитов_игнорирует_пустое_значение_и_сохраняет_текущее()
+    {
+        var git = new SyncGitViewModel(new MemorySettings(), new NoopDialogs(), NullLogger.Instance);
+        var changed = new List<string>();
+        git.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName is not null)
+            {
+                changed.Add(args.PropertyName);
+            }
+        };
+
+        git.SelectedGitHistoryCountOption = SyncGitViewModel.GitHistoryCountOptions[1];
+        changed.Clear();
+        git.SelectedGitHistoryCountOption = null!;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(git.GitHistoryCount, Is.EqualTo(8));
+            Assert.That(git.SelectedGitHistoryCountOption, Is.EqualTo(SyncGitViewModel.GitHistoryCountOptions[1]));
+            Assert.That(changed, Does.Contain(nameof(SyncGitViewModel.SelectedGitHistoryCountOption)));
+        }
     }
 
     private static IEnumerable<TestCaseData> NoNewerCases()

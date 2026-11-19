@@ -23,7 +23,22 @@ public sealed partial class SyncGitViewModel : ObservableObject
 
     public event Action? StateChanged;
 
-    public static int[] GitHistoryCounts { get; } = [4, 8, 16, 32];
+    public static IReadOnlyList<GitHistoryCountOption> GitHistoryCountOptions => GitHistoryCountOption.All;
+
+    public GitHistoryCountOption SelectedGitHistoryCountOption
+    {
+        get => GitHistoryCountOption.FromCount(GitHistoryCount);
+        set
+        {
+            if (value is null)
+            {
+                OnPropertyChanged();
+                return;
+            }
+
+            GitHistoryCount = value.Count;
+        }
+    }
 
     public bool HasGit => LeftState is not null || RightState is not null;
 
@@ -441,39 +456,30 @@ public sealed partial class SyncGitViewModel : ObservableObject
         _gitHistoryLoaded = false;
     }
 
+    private static readonly string[] ChangedProperties =
+    [
+        nameof(HasGit), nameof(LeftIsRepo), nameof(RightIsRepo),
+        nameof(LeftGitBranch), nameof(RightGitBranch), nameof(LeftGitHead), nameof(RightGitHead),
+        nameof(LeftGitDirty), nameof(RightGitDirty), nameof(LeftGitIsDirty), nameof(RightGitIsDirty),
+        nameof(LeftGitUpstream), nameof(RightGitUpstream), nameof(GitInSync), nameof(GitShowsNewer),
+        nameof(GitVerdictIconKind), nameof(GitVerdictText), nameof(GitTooltip),
+        nameof(LeftGitLog), nameof(RightGitLog), nameof(GitHistoryExpanded), nameof(GitHistoryIconKind),
+        nameof(LeftGitLogEmpty), nameof(RightGitLogEmpty), nameof(LeftGitLogEmptyText), nameof(RightGitLogEmptyText),
+    ];
+
     private void NotifyChanged()
     {
-        OnPropertyChanged(nameof(HasGit));
-        OnPropertyChanged(nameof(LeftIsRepo));
-        OnPropertyChanged(nameof(RightIsRepo));
-        OnPropertyChanged(nameof(LeftGitBranch));
-        OnPropertyChanged(nameof(RightGitBranch));
-        OnPropertyChanged(nameof(LeftGitHead));
-        OnPropertyChanged(nameof(RightGitHead));
-        OnPropertyChanged(nameof(LeftGitDirty));
-        OnPropertyChanged(nameof(RightGitDirty));
-        OnPropertyChanged(nameof(LeftGitIsDirty));
-        OnPropertyChanged(nameof(RightGitIsDirty));
-        OnPropertyChanged(nameof(LeftGitUpstream));
-        OnPropertyChanged(nameof(RightGitUpstream));
-        OnPropertyChanged(nameof(GitInSync));
-        OnPropertyChanged(nameof(GitShowsNewer));
-        OnPropertyChanged(nameof(GitVerdictIconKind));
-        OnPropertyChanged(nameof(GitVerdictText));
-        OnPropertyChanged(nameof(GitTooltip));
-        OnPropertyChanged(nameof(LeftGitLog));
-        OnPropertyChanged(nameof(RightGitLog));
-        OnPropertyChanged(nameof(GitHistoryExpanded));
-        OnPropertyChanged(nameof(GitHistoryIconKind));
-        OnPropertyChanged(nameof(LeftGitLogEmpty));
-        OnPropertyChanged(nameof(RightGitLogEmpty));
-        OnPropertyChanged(nameof(LeftGitLogEmptyText));
-        OnPropertyChanged(nameof(RightGitLogEmptyText));
+        foreach (var property in ChangedProperties)
+        {
+            OnPropertyChanged(property);
+        }
+
         StateChanged?.Invoke();
     }
 
     partial void OnGitHistoryCountChanged(int value)
     {
+        OnPropertyChanged(nameof(SelectedGitHistoryCountOption));
         _settings.SetValue(SettingsKeys.SyncGitHistoryCount, value.ToString());
 
         _gitHistoryLoaded = false;

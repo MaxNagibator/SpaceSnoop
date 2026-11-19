@@ -15,7 +15,6 @@ public sealed partial class ScheduleBulkViewModel : ObservableObject
     [ObservableProperty]
     private int _winnerIndex = -1;
 
-    [ObservableProperty]
     private int _intervalIndex = -1;
 
     [ObservableProperty]
@@ -43,6 +42,23 @@ public sealed partial class ScheduleBulkViewModel : ObservableObject
 
     public IReadOnlyList<string> Intervals => _owner.Intervals;
 
+    public IReadOnlyList<SegmentOption> IntervalOptions => _owner.IntervalOptions;
+
+    public int IntervalIndex
+    {
+        get => _intervalIndex;
+        set
+        {
+            if (value < 0)
+            {
+                OnPropertyChanged();
+                return;
+            }
+
+            SetProperty(ref _intervalIndex, value);
+        }
+    }
+
     public int SelectedCount => _owner.Profiles.Count(profile => profile.IsSelected);
 
     public bool HasSelection => SelectedCount > 0;
@@ -64,7 +80,8 @@ public sealed partial class ScheduleBulkViewModel : ObservableObject
 
         ModeIndex = -1;
         WinnerIndex = -1;
-        IntervalIndex = -1;
+        _intervalIndex = -1;
+        OnPropertyChanged(nameof(IntervalIndex));
         Message = string.Empty;
     }
 

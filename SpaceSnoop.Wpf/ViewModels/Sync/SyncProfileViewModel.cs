@@ -43,9 +43,6 @@ public sealed partial class SyncProfileViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(MirrorWarning))]
     private bool _mirror;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(TimeApplicable))]
-    [NotifyPropertyChangedFor(nameof(ScheduleSummary))]
     private int _selectedIntervalIndex;
 
     [ObservableProperty]
@@ -94,7 +91,26 @@ public sealed partial class SyncProfileViewModel : ObservableObject
 
     public IReadOnlyList<SegmentOption> Winners => _parent.Winners;
 
-    public IReadOnlyList<string> Intervals => _parent.Intervals;
+    public IReadOnlyList<SegmentOption> IntervalOptions => _parent.IntervalOptions;
+
+    public int SelectedIntervalIndex
+    {
+        get => _selectedIntervalIndex;
+        set
+        {
+            if (value < 0)
+            {
+                OnPropertyChanged();
+                return;
+            }
+
+            if (SetProperty(ref _selectedIntervalIndex, value))
+            {
+                OnPropertyChanged(nameof(TimeApplicable));
+                OnPropertyChanged(nameof(ScheduleSummary));
+            }
+        }
+    }
 
     public string DisplayName => string.IsNullOrWhiteSpace(Name) ? "Без названия" : Name;
 

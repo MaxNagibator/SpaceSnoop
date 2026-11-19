@@ -220,17 +220,14 @@
                       VerticalAlignment="Center"
                       Margin="0,0,16,8"
                       Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}" />
-            <ComboBox keepshell:StretchWrapPanel.Stretch="True"
-                      keepshell:StretchWrapPanel.StretchWidth="150"
-                      MinWidth="150"
-                      Style="{StaticResource ComboBox.Form}"
-                      ItemsSource="{Binding SortOptions}"
-                      SelectedIndex="{Binding SelectedSort}"
-                      VerticalAlignment="Center"
-                      Margin="0,0,16,8"
-                      AutomationProperties.Name="Сортировка пар"
-                      ToolTip="Сортировка пар"
-                      Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}" />
+            <ListBox Style="{StaticResource ListBox.Segmented}"
+                     ItemsSource="{Binding SortSegmentOptions}"
+                     SelectedIndex="{Binding SelectedSort}"
+                     VerticalAlignment="Center"
+                     Margin="0,0,16,8"
+                     AutomationProperties.Name="Сортировка пар"
+                     ToolTip="Сортировка пар"
+                     Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}" />
             <StackPanel keepshell:StretchWrapPanel.Stretch="True"
                         VerticalAlignment="Center"
                         Margin="0,0,0,8">
