@@ -12,8 +12,12 @@ public sealed partial class SyncSetupViewModel : ObservableObject
     private readonly ISettingsStore _settings;
     private readonly IFilePicker _filePicker;
     private readonly Func<bool> _canRun;
+    private readonly IUiDispatcher _uiDispatcher;
+    private readonly Lock _checkGate = new();
 
     private bool _suppressPersist;
+    private int _leftCheckGeneration;
+    private int _rightCheckGeneration;
 
     [ObservableProperty]
     private string _leftPath = string.Empty;
@@ -102,6 +106,12 @@ public sealed partial class SyncSetupViewModel : ObservableObject
 
     internal SyncWinner CurrentWinner => WinnerOrder[Math.Clamp(SelectedWinnerIndex, 0, WinnerOrder.Length - 1)];
 
+    internal static Func<string, bool> DirectoryExists { get; set; } = Directory.Exists;
+
+    internal Task PendingLeftCheck { get; private set; } = Task.CompletedTask;
+
+    internal Task PendingRightCheck { get; private set; } = Task.CompletedTask;
+
     public SyncSetupViewModel(
         ISettingsStore settings,
         IDialogService dialogs,
@@ -115,6 +125,7 @@ public sealed partial class SyncSetupViewModel : ObservableObject
         Preferences = operations;
         _filePicker = filePicker;
         _canRun = canRun;
+        _uiDispatcher = uiDispatcher;
 
         Profiles = new(settings, dialogs, BuildCurrentProfile, RaiseProfileSelected, canRun, setStatus, uiDispatcher);
         LoadSettings();
@@ -149,9 +160,72 @@ public sealed partial class SyncSetupViewModel : ObservableObject
         };
     }
 
-    private static bool PathMissing(string path)
+    private Task CheckPathAsync(string value, bool isLeft)
     {
-        return !string.IsNullOrWhiteSpace(path) && !Directory.Exists(path.Trim());
+        var trimmed = value.Trim();
+        int generation;
+
+        lock (_checkGate)
+        {
+            generation = isLeft ? ++_leftCheckGeneration : ++_rightCheckGeneration;
+        }
+
+        if (trimmed.Length == 0)
+        {
+            SetPathInvalid(isLeft, false);
+            return Task.CompletedTask;
+        }
+
+        return ProbePathAsync(trimmed, generation, isLeft, DirectoryExists);
+    }
+
+    private async Task ProbePathAsync(string path, int generation, bool isLeft, Func<string, bool> existsProbe)
+    {
+        bool exists;
+
+        try
+        {
+            exists = await Task.Run(() => existsProbe(path)).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            exists = false;
+        }
+
+        if (IsCheckStale(isLeft, generation))
+        {
+            return;
+        }
+
+        _uiDispatcher.Invoke(() =>
+        {
+            if (IsCheckStale(isLeft, generation))
+            {
+                return;
+            }
+
+            SetPathInvalid(isLeft, !exists);
+        });
+    }
+
+    private bool IsCheckStale(bool isLeft, int generation)
+    {
+        lock (_checkGate)
+        {
+            return generation != (isLeft ? _leftCheckGeneration : _rightCheckGeneration);
+        }
+    }
+
+    private void SetPathInvalid(bool isLeft, bool value)
+    {
+        if (isLeft)
+        {
+            LeftPathInvalid = value;
+        }
+        else
+        {
+            RightPathInvalid = value;
+        }
     }
 
     private void Browse(Action<string> assign)
@@ -194,7 +268,7 @@ public sealed partial class SyncSetupViewModel : ObservableObject
     partial void OnLeftPathChanged(string value)
     {
         Persist(SettingsKeys.SyncLeft, value);
-        LeftPathInvalid = PathMissing(value);
+        PendingLeftCheck = CheckPathAsync(value, isLeft: true);
         ActiveProfileId = null;
         Profiles.MarkCurrent();
         InputChanged?.Invoke();
@@ -203,7 +277,7 @@ public sealed partial class SyncSetupViewModel : ObservableObject
     partial void OnRightPathChanged(string value)
     {
         Persist(SettingsKeys.SyncRight, value);
-        RightPathInvalid = PathMissing(value);
+        PendingRightCheck = CheckPathAsync(value, isLeft: false);
         ActiveProfileId = null;
         Profiles.MarkCurrent();
         InputChanged?.Invoke();

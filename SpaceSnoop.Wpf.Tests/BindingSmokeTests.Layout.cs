@@ -280,7 +280,10 @@ public partial class BindingSmokeTests
                 Settle();
             }
 
-            var batchDialog = new BatchCreateProfilesDialogViewModel(settings, _services.GetRequiredService<IFilePicker>())
+            using var batchDialog = new BatchCreateProfilesDialogViewModel(
+                settings,
+                _services.GetRequiredService<IFilePicker>(),
+                _services.GetRequiredService<IUiDispatcher>())
             {
                 SelectedModeIndex = 2,
             };

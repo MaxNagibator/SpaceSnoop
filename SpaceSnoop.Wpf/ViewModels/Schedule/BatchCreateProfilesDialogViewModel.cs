@@ -5,11 +5,19 @@ using System.ComponentModel;
 
 namespace SpaceSnoop.Wpf.ViewModels.Schedule;
 
-public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObject, IDialogViewModel
+public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObject, IDialogViewModel, IDisposable
 {
     private readonly IReadOnlyList<SyncProfile> _existing;
     private readonly ISettingsStore _settings;
     private readonly IFilePicker _filePicker;
+    private readonly IUiDispatcher _uiDispatcher;
+    private readonly ILogger? _logger;
+    private readonly Lock _rebuildGate = new();
+
+    private CancellationTokenSource? _rebuildCts;
+    private int _rebuildGeneration;
+    private bool _isRebuilding;
+    private bool _closed;
 
     [ObservableProperty]
     private string _sourceParent = string.Empty;
@@ -103,10 +111,20 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
 
     public bool MirrorApplicable => SelectedModeIndex != 2 || SelectedWinnerIndex is 1 or 2;
 
-    public BatchCreateProfilesDialogViewModel(ISettingsStore settings, IFilePicker filePicker)
+    internal static Func<string, string, IReadOnlyList<SyncProfile>, CancellationToken, IReadOnlyList<BatchPairRow>> PairBuilder { get; set; } = ProfileBatch.BuildPairs;
+
+    internal Task PendingRebuild { get; private set; } = Task.CompletedTask;
+
+    public BatchCreateProfilesDialogViewModel(
+        ISettingsStore settings,
+        IFilePicker filePicker,
+        IUiDispatcher uiDispatcher,
+        ILogger? logger = null)
     {
         _settings = settings;
         _filePicker = filePicker;
+        _uiDispatcher = uiDispatcher;
+        _logger = logger;
         _existing = SyncProfileStore.Load(settings);
         PathSuggest = settings.GetBool(SettingsKeys.SyncPathSuggest, AppDefaults.SyncPathSuggestDefault);
 
@@ -175,6 +193,8 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
     [RelayCommand(CanExecute = nameof(CanCreate))]
     private void Create()
     {
+        CancelPendingRebuild();
+
         CreatedProfiles = Rows
             .Where(row => row.Include && row.IsSelectable)
             .Select(row => new SyncProfile
@@ -196,7 +216,13 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
     [RelayCommand]
     private void Cancel()
     {
+        CancelPendingRebuild();
         RequestClose?.Invoke(this, false);
+    }
+
+    public void Dispose()
+    {
+        CancelPendingRebuild();
     }
 
     [RelayCommand]
@@ -250,14 +276,100 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
 
     private void Rebuild()
     {
+        CancellationTokenSource? current = null;
+        int generation;
+        var source = SourceParent;
+        var dest = DestParent;
+        bool empty;
+
+        lock (_rebuildGate)
+        {
+            var previous = _rebuildCts;
+            generation = ++_rebuildGeneration;
+            empty = _closed || string.IsNullOrWhiteSpace(source) || string.IsNullOrWhiteSpace(dest);
+
+            if (empty)
+            {
+                _rebuildCts = null;
+            }
+            else
+            {
+                current = new();
+                _rebuildCts = current;
+            }
+
+            previous?.Cancel();
+        }
+
+        if (empty)
+        {
+            _isRebuilding = false;
+            ApplyRows([]);
+            PendingRebuild = Task.CompletedTask;
+            return;
+        }
+
+        _isRebuilding = true;
+        CreateCommand.NotifyCanExecuteChanged();
+        PendingRebuild = RebuildCoreAsync(source, dest, generation, current!);
+    }
+
+    private async Task RebuildCoreAsync(string source, string dest, int generation, CancellationTokenSource cts)
+    {
+        var token = cts.Token;
+        IReadOnlyList<BatchPairRow> pairs = [];
+
+        try
+        {
+            var builder = PairBuilder;
+            pairs = await Task.Run(() => builder(source, dest, _existing, token), token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            _logger?.ScheduleBatchBuildFailed(exception, source);
+        }
+        finally
+        {
+            lock (_rebuildGate)
+            {
+                if (ReferenceEquals(_rebuildCts, cts))
+                {
+                    _rebuildCts = null;
+                }
+
+                cts.Dispose();
+            }
+        }
+
+        if (token.IsCancellationRequested || IsStale(generation))
+        {
+            return;
+        }
+
+        _uiDispatcher.Invoke(() =>
+        {
+            if (IsStale(generation))
+            {
+                return;
+            }
+
+            _isRebuilding = false;
+            ApplyRows(pairs);
+        });
+    }
+
+    private void ApplyRows(IReadOnlyList<BatchPairRow> pairs)
+    {
         foreach (var row in Rows)
         {
             row.PropertyChanged -= OnRowChanged;
         }
 
         Rows.Clear();
-
-        var pairs = ProfileBatch.BuildPairs(SourceParent, DestParent, _existing);
 
         foreach (var row in ProfileBatch.Sort(pairs, SelectedSort))
         {
@@ -267,6 +379,25 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
 
         OnPropertyChanged(nameof(HasRows));
         NotifySelectionChanged();
+    }
+
+    private void CancelPendingRebuild()
+    {
+        lock (_rebuildGate)
+        {
+            _closed = true;
+            _rebuildGeneration++;
+            _rebuildCts?.Cancel();
+            _rebuildCts = null;
+        }
+    }
+
+    private bool IsStale(int generation)
+    {
+        lock (_rebuildGate)
+        {
+            return _closed || generation != _rebuildGeneration;
+        }
     }
 
     partial void OnSelectedSortChanged(int value)
@@ -288,6 +419,6 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
 
     private bool CanCreate()
     {
-        return SelectedCount > 0;
+        return !_isRebuilding && SelectedCount > 0;
     }
 }

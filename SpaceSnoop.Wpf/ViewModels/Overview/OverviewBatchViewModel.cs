@@ -1,7 +1,6 @@
 ﻿using KeepShell.Services;
 using MahApps.Metro.IconPacks;
 using System.Diagnostics;
-using System.IO;
 
 namespace SpaceSnoop.Wpf.ViewModels.Overview;
 
@@ -17,6 +16,8 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
 
     private CancellationTokenSource? _cts;
     private CancellationTokenSource? _rowCts;
+
+    internal static Action<SyncLogOrigin, string?, SyncReport, SyncVerifyState, ILogger> AppendLog { get; set; } = SyncLog.AppendSafe;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CompareAllCommand), nameof(SyncRowCommand), nameof(SyncAllCommand))]
@@ -309,28 +310,13 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
     private async Task SyncRowCore(OverviewRowViewModel row, CancellationToken token)
     {
         var profile = row.Profile;
-        var preflight = await Task.Run(() => OverviewPipeline.Classify(profile), CancellationToken.None);
+        var preflight = await Task.Run(() => OverviewPipeline.ClassifyForSync(profile), CancellationToken.None);
         token.ThrowIfCancellationRequested();
 
         if (preflight is { } refusal)
         {
             row.Error = refusal.Reason;
             row.Status = refusal.Status;
-            return;
-        }
-
-        var left = profile.Left.Trim();
-        var right = profile.Right.Trim();
-        var mode = HeadlessSync.MapMode(profile.Mode);
-        var mirror = profile.Mirror;
-        var winner = profile.Winner;
-
-        if (mirror
-            && SyncProfile.MirrorSource(mode, winner, left, right) is { } mirrorSource
-            && (!Directory.Exists(mirrorSource) || !Directory.EnumerateFileSystemEntries(mirrorSource).Any()))
-        {
-            row.Error = "Зеркало отменено: источник пуст.";
-            row.Status = OverviewRunStatus.Error;
             return;
         }
 
@@ -353,12 +339,14 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
                     {
                         var result = _compare.Execute(request, rowToken);
                         var applied = _sync.Execute(new(result, SyncConflictPolicy.SkipUnresolved, SyncDeleteUi.Silent, verify, recycleOverwritten), rowToken);
-                        return (Report: applied, Unreadable: result.IncompleteDirectories(), Links: result.SkippedLinks());
+                        var verifyState = SyncPlanNarrative.ResolveVerify(verify, applied);
+                        AppendLog(SyncLogOrigin.Overview, profile.Name, applied, verifyState, _logger);
+                        return (Report: applied, VerifyState: verifyState, Unreadable: result.IncompleteDirectories(), Links: result.SkippedLinks());
                     },
                     rowToken);
 
                 var report = run.Report;
-                var verifyState = SyncPlanNarrative.ResolveVerify(verify, report);
+                var verifyState = run.VerifyState;
 
                 if (run.Unreadable.Count > 0)
                 {
@@ -374,7 +362,6 @@ public sealed partial class OverviewBatchViewModel : ObservableObject
                 row.ApplySyncReport(report, verifyState);
                 row.ElapsedMs = (long)stopwatch.Elapsed.TotalMilliseconds;
                 row.Error = null;
-                SyncLog.AppendSafe(SyncLogOrigin.Overview, profile.Name, report, verifyState, _logger);
             });
     }
 

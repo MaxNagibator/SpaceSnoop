@@ -30,15 +30,21 @@ public sealed partial class BatchPairRow(
 
 public static class ProfileBatch
 {
-    public static IReadOnlyList<BatchPairRow> BuildPairs(string sourceParent, string destParent, IReadOnlyList<SyncProfile> existing)
+    public static IReadOnlyList<BatchPairRow> BuildPairs(
+        string sourceParent,
+        string destParent,
+        IReadOnlyList<SyncProfile> existing,
+        CancellationToken cancellationToken = default)
     {
         var rows = new List<BatchPairRow>();
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (string.IsNullOrWhiteSpace(sourceParent) || string.IsNullOrWhiteSpace(destParent) || !Directory.Exists(sourceParent))
         {
             return rows;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         string[] subdirectories;
 
         try
@@ -59,6 +65,8 @@ public static class ProfileBatch
 
         foreach (var directory in subdirectories)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var name = Path.GetFileName(directory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
 
             if (string.IsNullOrEmpty(name))

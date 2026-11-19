@@ -140,6 +140,11 @@ internal sealed class GalleryHost : IGalleryHost
                 throw new InvalidOperationException($"Диалог «{dialog}» не открылся за отведённое время.");
             }
 
+            if (modals.Current is BatchCreateProfilesDialogViewModel batch)
+            {
+                await batch.PendingRebuild.ConfigureAwait(true);
+            }
+
             GalleryStates.ApplyDialog(modals.Current, _options.State);
             await context.SettleAsync().ConfigureAwait(true);
 
@@ -147,9 +152,11 @@ internal sealed class GalleryHost : IGalleryHost
         }
         finally
         {
-            GalleryStates.ResetDialog(modals.Current);
+            var current = modals.Current;
+            GalleryStates.ResetDialog(current);
             modals.RequestCancel();
             await WaitForModalAsync(modals, false).ConfigureAwait(true);
+            (current as IDisposable)?.Dispose();
             GalleryDialogs.Cleanup(dialog, _services);
             await context.SettleAsync().ConfigureAwait(true);
         }

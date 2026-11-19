@@ -495,6 +495,7 @@ public class ScheduleBulkTests
             new FakeFilePicker(),
             new FakeShellLauncher(),
             scheduler ?? new FakeScheduleRunner(),
+            new FakeUiDispatcher(),
             NullLogger<ScheduleViewModel>.Instance);
     }
 

@@ -307,6 +307,9 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1260, Level = LogLevel.Warning, Message = "Журнал синхронизации «{Path}» не прочитан – история показана без него")]
     public static partial void SyncLogFileUnreadable(this ILogger logger, Exception exception, string path);
 
+    [LoggerMessage(EventId = 1261, Level = LogLevel.Warning, Message = "Не удалось подобрать пары профилей для «{Source}»")]
+    public static partial void ScheduleBatchBuildFailed(this ILogger logger, Exception exception, string source);
+
     [LoggerMessage(EventId = 1301, Level = LogLevel.Error, Message = "Не удалось открыть форму репорта")]
     public static partial void ReportFormFailed(this ILogger logger, Exception exception);
 

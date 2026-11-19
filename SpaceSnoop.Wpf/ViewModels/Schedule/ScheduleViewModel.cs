@@ -7,6 +7,7 @@ namespace SpaceSnoop.Wpf.ViewModels.Schedule;
 public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, IPageRefresh
 {
     private readonly IDialogService _dialogs;
+    private readonly IUiDispatcher _uiDispatcher;
     private readonly ILogger<ScheduleViewModel> _logger;
 
     private bool _migrated;
@@ -51,6 +52,7 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
         IFilePicker filePicker,
         IShellLauncher shell,
         IScheduleRunner scheduler,
+        IUiDispatcher uiDispatcher,
         ILogger<ScheduleViewModel> logger)
     {
         Settings = settings;
@@ -58,6 +60,7 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
         FilePicker = filePicker;
         Shell = shell;
         Scheduler = scheduler;
+        _uiDispatcher = uiDispatcher;
         _logger = logger;
 
         Bulk = new(this, dialogs, logger);
@@ -164,7 +167,7 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
     [RelayCommand]
     private async Task CreateBatch()
     {
-        var dialog = new BatchCreateProfilesDialogViewModel(Settings, FilePicker);
+        using var dialog = new BatchCreateProfilesDialogViewModel(Settings, FilePicker, _uiDispatcher, _logger);
 
         if (!await _dialogs.ShowAsync(dialog) || dialog.CreatedProfiles.Count == 0)
         {
