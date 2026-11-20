@@ -9,10 +9,13 @@ public enum StorageKind
     None = 0,
     SolidState = 1,
     Rotational = 2,
+    Network = 3,
 }
 
 public static class StorageMedia
 {
+    public const int NetworkParallelismCap = 8;
+
     private const uint IOCTL_STORAGE_QUERY_PROPERTY = 0x002D1400;
     private const int StorageDeviceSeekPenaltyProperty = 7;
     private const int PropertyStandardQuery = 0;
@@ -20,7 +23,7 @@ public static class StorageMedia
     private const uint FILE_SHARE_WRITE = 0x00000002;
     private const uint OPEN_EXISTING = 3;
 
-    private static readonly VolumeProbe SharedProbe = new(Query);
+    private static readonly VolumeProbe SharedProbe = new(Query, IsNetworkDrive);
 
     public static StorageKind Detect(string path)
     {
@@ -29,12 +32,34 @@ public static class StorageMedia
 
     public static int LimitParallelism(string path, int requested)
     {
-        return Detect(path) == StorageKind.Rotational ? 1 : requested;
+        return ApplyLimit(SharedProbe.Detect(path), requested);
     }
 
     public static Task<int> LimitParallelismAsync(string path, int requested, TimeSpan timeout)
     {
         return SharedProbe.LimitParallelismAsync(path, requested, timeout);
+    }
+
+    internal static int ApplyLimit(StorageKind kind, int requested)
+    {
+        return kind switch
+        {
+            StorageKind.Rotational => 1,
+            StorageKind.Network => requested <= 0 ? requested : Math.Min(requested, NetworkParallelismCap),
+            _ => requested,
+        };
+    }
+
+    private static bool IsNetworkDrive(string letter)
+    {
+        try
+        {
+            return new DriveInfo($"{letter}\\").DriveType == DriveType.Network;
+        }
+        catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException or SecurityException)
+        {
+            return false;
+        }
     }
 
     private static string? VolumeLetter(string path)
@@ -112,9 +137,10 @@ public static class StorageMedia
         }
     }
 
-    internal sealed class VolumeProbe(Func<string, StorageKind> query)
+    internal sealed class VolumeProbe(Func<string, StorageKind> query, Func<string, bool> isNetworkDrive)
     {
         private static readonly Task<StorageKind> None = Task.FromResult(StorageKind.None);
+        private static readonly Task<StorageKind> Network = Task.FromResult(StorageKind.Network);
 
         private readonly Lock _gate = new();
 
@@ -122,6 +148,11 @@ public static class StorageMedia
         // подменённый под той же буквой, отвечает типом прежнего. Апгрейд – сброс по событию
         // подключения тома, когда появится сценарий со съёмными дисками.
         private readonly Dictionary<string, Task<StorageKind>> _cache = new(StringComparer.OrdinalIgnoreCase);
+
+        internal VolumeProbe(Func<string, StorageKind> query)
+            : this(query, static _ => false)
+        {
+        }
 
         public StorageKind Detect(string path)
         {
@@ -133,7 +164,7 @@ public static class StorageMedia
             try
             {
                 var kind = await Start(path).WaitAsync(timeout).ConfigureAwait(false);
-                return kind == StorageKind.Rotational ? 1 : requested;
+                return ApplyLimit(kind, requested);
             }
             catch (TimeoutException)
             {
@@ -143,6 +174,11 @@ public static class StorageMedia
 
         private Task<StorageKind> Start(string path)
         {
+            if (UncPath.IsUnc(path))
+            {
+                return Network;
+            }
+
             var letter = VolumeLetter(path);
 
             if (letter is null)
@@ -154,7 +190,7 @@ public static class StorageMedia
             {
                 if (!_cache.TryGetValue(letter, out var task))
                 {
-                    task = Task.Run(() => query(letter));
+                    task = Task.Run(() => isNetworkDrive(letter) ? StorageKind.Network : query(letter));
                     _cache[letter] = task;
                 }
 

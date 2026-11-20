@@ -41,6 +41,9 @@ internal static partial class CoreLog
         Message = "Синхронизация: {Action} «{RelativePath}» отклонено, конфликт вида объектов ({Conflict})")]
     public static partial void SyncTypeConflictBlocked(this ILogger logger, SyncAction action, string relativePath, FileTypeConflict conflict);
 
+    [LoggerMessage(EventId = 1519, Level = LogLevel.Information, Message = "Синхронизация: безвозвратное сетевое удаление ({Kind}) «{Path}»")]
+    public static partial void SyncPermanentNetworkDelete(this ILogger logger, string kind, string path);
+
     [LoggerMessage(EventId = 1530, Level = LogLevel.Information, Message = "Очистка проектов: начат каталог «{Path}»")]
     public static partial void ProjectCleanupTargetStarted(this ILogger logger, string path);
 

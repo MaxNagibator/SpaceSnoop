@@ -1,4 +1,5 @@
 ﻿using KeepShell.Services;
+using MahApps.Metro.IconPacks;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 
@@ -28,6 +29,15 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
     public IReadOnlyList<SegmentOption> Winners => SyncOptions.Winners;
 
     public IReadOnlyList<string> Intervals { get; } = ["Ежедневно", "Каждый час", "При входе в систему"];
+
+    public IReadOnlyList<SegmentOption> IntervalOptions { get; } =
+    [
+        new(PackIconLucideKind.Calendar, "Ежедневно", "Запускать раз в сутки в указанное время"),
+        new(PackIconLucideKind.Clock, "Каждый час", "Запускать каждый час начиная с указанного времени"),
+        new(PackIconLucideKind.LogIn, "При входе", "Запускать при входе пользователя в систему"),
+    ];
+
+    public bool PathSuggest => Settings.GetBool(SettingsKeys.SyncPathSuggest, AppDefaults.SyncPathSuggestDefault);
 
     public ObservableCollection<SyncProfileViewModel> Profiles { get; } = [];
 
@@ -138,6 +148,15 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
         {
             ReloadProfiles();
         }
+        else if (key == SettingsKeys.SyncPathSuggest)
+        {
+            OnPropertyChanged(nameof(PathSuggest));
+
+            foreach (var profile in Profiles)
+            {
+                profile.NotifyPathSuggestChanged();
+            }
+        }
     }
 
     [RelayCommand]
@@ -238,6 +257,8 @@ public sealed partial class ScheduleViewModel : ObservableObject, IPageHeader, I
 
         foreach (var model in SyncProfileStore.Load(Settings))
         {
+            NetworkDiscovery.Remember(model.Left);
+            NetworkDiscovery.Remember(model.Right);
             Profiles.Add(new(this, model));
         }
 

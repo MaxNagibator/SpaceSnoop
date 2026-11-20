@@ -7,38 +7,38 @@ public static class SettingsOptions
 {
     public static IReadOnlyList<EnumOption<StartupPage>> StartupPages { get; } =
     [
-        new(StartupPage.LastUsed, "Последняя активная"),
-        new(StartupPage.Scan, "Сканирование"),
-        new(StartupPage.Sync, "Синхронизация"),
-        new(StartupPage.Logs, "Логи"),
+        new(StartupPage.LastUsed, "Последняя активная", PackIconLucideKind.Clock, "Последняя", "Открывать последнюю активную страницу перед закрытием"),
+        new(StartupPage.Scan, "Сканирование", PackIconLucideKind.HardDrive, Tooltip: "Открывать страницу сканирования дисков"),
+        new(StartupPage.Sync, "Синхронизация", PackIconLucideKind.FolderSync, Tooltip: "Открывать страницу сравнения и синхронизации"),
+        new(StartupPage.Logs, "Логи", PackIconLucideKind.FileText, Tooltip: "Открывать журнал событий приложения"),
     ];
 
     public static IReadOnlyList<EnumOption<StartupAdminMode>> StartupAdminModes { get; } =
     [
-        new(StartupAdminMode.Ask, "Спрашивать"),
-        new(StartupAdminMode.WithoutAdmin, "Продолжать без прав"),
-        new(StartupAdminMode.AlwaysAdmin, "Всегда с правами"),
+        new(StartupAdminMode.Ask, "Спрашивать", PackIconLucideKind.ShieldAlert, Tooltip: "Спрашивать при запуске без прав администратора"),
+        new(StartupAdminMode.WithoutAdmin, "Продолжать без прав", PackIconLucideKind.Shield, "Без прав", "Всегда запускать без прав администратора и не спрашивать"),
+        new(StartupAdminMode.AlwaysAdmin, "Всегда с правами", PackIconLucideKind.ShieldCheck, Tooltip: "Автоматически перезапускать от имени администратора"),
     ];
 
     public static IReadOnlyList<EnumOption<DeleteMode>> DeleteModes { get; } =
     [
-        new(DeleteMode.RecycleBin, "В корзину"),
-        new(DeleteMode.Permanent, "Безвозвратно"),
+        new(DeleteMode.RecycleBin, "В корзину", PackIconLucideKind.Trash2, Tooltip: "Перемещать в корзину Windows – файлы можно восстановить"),
+        new(DeleteMode.Permanent, "Безвозвратно", PackIconLucideKind.TriangleAlert, Tooltip: "Удалять сразу мимо корзины – быстрее, но отменить нельзя"),
     ];
 
     public static IReadOnlyList<EnumOption<CompressionLevel>> CompressionLevels { get; } =
     [
-        new(CompressionLevel.Optimal, "Оптимальное"),
-        new(CompressionLevel.SmallestSize, "Максимальное (медленно)"),
-        new(CompressionLevel.Fastest, "Быстрое"),
-        new(CompressionLevel.NoCompression, "Без сжатия (только упаковка)"),
+        new(CompressionLevel.NoCompression, "Без сжатия (только упаковка)", PackIconLucideKind.Package, "Без сжатия", "Только упаковка в .zip без сжатия – максимально быстро"),
+        new(CompressionLevel.Fastest, "Быстрое", PackIconLucideKind.Zap, Tooltip: "Быстрое сжатие с умеренным уменьшением размера"),
+        new(CompressionLevel.Optimal, "Оптимальное", PackIconLucideKind.Sparkles, Tooltip: "Сбалансированное соотношение скорости и размера архива"),
+        new(CompressionLevel.SmallestSize, "Максимальное (медленно)", PackIconLucideKind.Shrink, "Максимальное", "Минимальный размер архива – упаковка идёт медленнее"),
     ];
 
     public static IReadOnlyList<EnumOption<GitFolderPromptChoice>> GitFolders { get; } =
     [
-        new(GitFolderPromptChoice.Ask, "Спрашивать"),
-        new(GitFolderPromptChoice.Skip, "Всегда пропускать"),
-        new(GitFolderPromptChoice.Keep, "Синхронизировать"),
+        new(GitFolderPromptChoice.Ask, "Спрашивать", PackIconLucideKind.MessageCircle, Tooltip: "Спрашивать перед синхронизацией при обнаружении папок .git"),
+        new(GitFolderPromptChoice.Skip, "Всегда пропускать", PackIconLucideKind.Ban, "Пропускать", "Всегда исключать папки .git из синхронизации"),
+        new(GitFolderPromptChoice.Keep, "Синхронизировать", PackIconLucideKind.FolderGit2, Tooltip: "Синхронизировать папки .git без предупреждения"),
     ];
 
     public static IReadOnlyList<SegmentOption> AgentBackends { get; } =

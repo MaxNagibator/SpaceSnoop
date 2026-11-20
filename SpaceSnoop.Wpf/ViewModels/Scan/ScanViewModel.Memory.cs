@@ -15,7 +15,7 @@ public sealed partial class ScanViewModel
 
     private async Task ScanAfterRescanPromptAsync(string path, bool knownExists = false)
     {
-        if (string.IsNullOrWhiteSpace(path) || IsBusy || _isPreparing)
+        if (string.IsNullOrWhiteSpace(path) || UncPath.IsIncompleteUnc(path) || IsBusy || _isPreparing)
         {
             return;
         }
@@ -26,24 +26,28 @@ public sealed partial class ScanViewModel
             && TryGetUnmarkedRootCandidates(path, out var normalized, out var candidates))
         {
             SetPreparing(true);
-            bool exists;
+            PathProbeResult probe;
+            string? missingMessage = null;
             bool shouldAsk;
 
             try
             {
-                (exists, shouldAsk) = await Task.Run(
-                    () =>
+                if (knownExists)
+                {
+                    probe = new(PathProbeStatus.Exists, path);
+                }
+                else
+                {
+                    probe = await ScanTargetProbe.CheckAsync(path, CancellationToken.None);
+
+                    if (probe.Status is not PathProbeStatus.Exists and not PathProbeStatus.TimedOut)
                     {
-                        var found = knownExists || ScanTargetProbe.DirectoryExists(path);
+                        missingMessage = await ScanTargetProbe.DescribeMissingAsync(path, CancellationToken.None);
+                    }
+                }
 
-                        if (!found)
-                        {
-                            return (false, false);
-                        }
-
-                        return (true, candidates.Any(rootPath => ScanTreeEditor.SamePath(rootPath, normalized)));
-                    },
-                    CancellationToken.None);
+                shouldAsk = probe.Status == PathProbeStatus.Exists
+                    && candidates.Any(rootPath => ScanTreeEditor.SamePath(rootPath, normalized));
             }
             finally
             {
@@ -55,9 +59,15 @@ public sealed partial class ScanViewModel
                 return;
             }
 
-            if (!exists)
+            if (probe.Status == PathProbeStatus.TimedOut)
             {
-                _dialogs.Warning("Сканирование", $"Каталог не найден: {path}");
+                _uiDispatcher.Invoke(() => _dialogs.Warning("Сканирование", ScanTargetProbe.FormatTimeoutMessage(path)));
+                return;
+            }
+
+            if (probe.Status != PathProbeStatus.Exists)
+            {
+                _uiDispatcher.Invoke(() => _dialogs.Warning("Сканирование", missingMessage ?? $"Каталог не найден: {path}"));
                 return;
             }
 

@@ -1,6 +1,5 @@
 ﻿using MahApps.Metro.IconPacks;
 using System.Globalization;
-using System.IO;
 
 namespace SpaceSnoop.Wpf.ViewModels.Sync;
 
@@ -18,10 +17,16 @@ public sealed partial class SyncProfileViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Summary))]
+    [NotifyPropertyChangedFor(nameof(MirrorTargetWithoutRecycleBin))]
+    [NotifyPropertyChangedFor(nameof(MirrorWarningText))]
+    [NotifyPropertyChangedFor(nameof(CanAllowPermanentNetworkDelete), nameof(AllowPermanentNetworkDelete))]
     private string _leftPath;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Summary))]
+    [NotifyPropertyChangedFor(nameof(MirrorTargetWithoutRecycleBin))]
+    [NotifyPropertyChangedFor(nameof(MirrorWarningText))]
+    [NotifyPropertyChangedFor(nameof(CanAllowPermanentNetworkDelete), nameof(AllowPermanentNetworkDelete))]
     private string _rightPath;
 
     [ObservableProperty]
@@ -31,21 +36,27 @@ public sealed partial class SyncProfileViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(Summary))]
     [NotifyPropertyChangedFor(nameof(MirrorApplicable))]
     [NotifyPropertyChangedFor(nameof(MirrorWarning))]
+    [NotifyPropertyChangedFor(nameof(MirrorTargetWithoutRecycleBin))]
+    [NotifyPropertyChangedFor(nameof(MirrorWarningText))]
+    [NotifyPropertyChangedFor(nameof(CanAllowPermanentNetworkDelete), nameof(AllowPermanentNetworkDelete))]
     [NotifyPropertyChangedFor(nameof(WinnerApplicable))]
     private int _selectedModeIndex;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(MirrorApplicable))]
     [NotifyPropertyChangedFor(nameof(MirrorWarning))]
+    [NotifyPropertyChangedFor(nameof(MirrorTargetWithoutRecycleBin))]
+    [NotifyPropertyChangedFor(nameof(MirrorWarningText))]
+    [NotifyPropertyChangedFor(nameof(CanAllowPermanentNetworkDelete), nameof(AllowPermanentNetworkDelete))]
     private int _selectedWinnerIndex;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(MirrorWarning))]
+    [NotifyPropertyChangedFor(nameof(MirrorTargetWithoutRecycleBin))]
+    [NotifyPropertyChangedFor(nameof(MirrorWarningText))]
+    [NotifyPropertyChangedFor(nameof(CanAllowPermanentNetworkDelete), nameof(AllowPermanentNetworkDelete))]
     private bool _mirror;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(TimeApplicable))]
-    [NotifyPropertyChangedFor(nameof(ScheduleSummary))]
     private int _selectedIntervalIndex;
 
     [ObservableProperty]
@@ -94,7 +105,28 @@ public sealed partial class SyncProfileViewModel : ObservableObject
 
     public IReadOnlyList<SegmentOption> Winners => _parent.Winners;
 
-    public IReadOnlyList<string> Intervals => _parent.Intervals;
+    public IReadOnlyList<SegmentOption> IntervalOptions => _parent.IntervalOptions;
+
+    public int SelectedIntervalIndex
+    {
+        get => _selectedIntervalIndex;
+        set
+        {
+            if (value < 0)
+            {
+                OnPropertyChanged();
+                return;
+            }
+
+            if (SetProperty(ref _selectedIntervalIndex, value))
+            {
+                OnPropertyChanged(nameof(TimeApplicable));
+                OnPropertyChanged(nameof(ScheduleSummary));
+            }
+        }
+    }
+
+    public bool PathSuggest => _parent.PathSuggest;
 
     public string DisplayName => string.IsNullOrWhiteSpace(Name) ? "Без названия" : Name;
 
@@ -105,6 +137,8 @@ public sealed partial class SyncProfileViewModel : ObservableObject
     public bool MirrorApplicable => SelectedModeIndex != 2 || SelectedWinnerIndex is 1 or 2;
 
     public bool MirrorWarning => Mirror && MirrorApplicable;
+
+    internal int ProbeTimeoutMs { get; set; } = AppDefaults.PathProbeTimeoutMs;
 
     public PackIconLucideKind StatusIconKind =>
         Enabled && IsScheduled && OsEnabled ? PackIconLucideKind.CalendarCheck : PackIconLucideKind.CalendarOff;
@@ -153,6 +187,8 @@ public sealed partial class SyncProfileViewModel : ObservableObject
         _selectedModeIndex = Math.Clamp(model.Mode, 0, 2);
         _selectedWinnerIndex = SyncProfile.IndexOfWinner(model.Winner);
         _mirror = model.Mirror;
+        _savedPermanentNetworkDeleteTarget = model.PermanentNetworkDeleteTarget;
+        _draftPermanentNetworkDeleteTarget = _savedPermanentNetworkDeleteTarget;
         _selectedIntervalIndex = model.Interval switch
         {
             ScheduleInterval.Hourly => 1,
@@ -177,6 +213,9 @@ public sealed partial class SyncProfileViewModel : ObservableObject
             Mode = SelectedModeIndex,
             Winner = SyncProfile.WinnerFromIndex(SelectedWinnerIndex),
             Mirror = Mirror,
+            PermanentNetworkDeleteTarget = string.Equals(_savedPermanentNetworkDeleteTarget, MirrorTarget, StringComparison.Ordinal)
+                ? _savedPermanentNetworkDeleteTarget
+                : null,
             Exclusions = Exclusions.Trim(),
             Interval = SelectedIntervalIndex switch
             {
@@ -218,6 +257,11 @@ public sealed partial class SyncProfileViewModel : ObservableObject
         Enabled = value;
         _confirmedEnabled = value;
         _suppress = false;
+    }
+
+    internal void NotifyPathSuggestChanged()
+    {
+        OnPropertyChanged(nameof(PathSuggest));
     }
 
     internal void ApplySchedule()
@@ -344,6 +388,12 @@ public sealed partial class SyncProfileViewModel : ObservableObject
             SelectedModeIndex = Math.Clamp(model.Mode, 0, 2);
             SelectedWinnerIndex = SyncProfile.IndexOfWinner(model.Winner);
             Mirror = model.Mirror;
+            _savedPermanentNetworkDeleteTarget = model.PermanentNetworkDeleteTarget;
+            if (SetProperty(ref _draftPermanentNetworkDeleteTarget, _savedPermanentNetworkDeleteTarget, nameof(AllowPermanentNetworkDelete)))
+            {
+                OnPropertyChanged(nameof(MirrorWarningText));
+            }
+
             SelectedIntervalIndex = model.Interval switch
             {
                 ScheduleInterval.Hourly => 1,
@@ -379,6 +429,10 @@ public sealed partial class SyncProfileViewModel : ObservableObject
         }
 
         _confirmedEnabled = Enabled;
+        _savedPermanentNetworkDeleteTarget = AllowPermanentNetworkDelete ? MirrorTarget : null;
+        _draftPermanentNetworkDeleteTarget = _savedPermanentNetworkDeleteTarget;
+        NetworkDiscovery.Remember(LeftPath);
+        NetworkDiscovery.Remember(RightPath);
         Apply();
         IsEditing = false;
     }
@@ -433,44 +487,13 @@ public sealed partial class SyncProfileViewModel : ObservableObject
         ApplySchedule();
     }
 
-    private async Task<string?> RefuseSchedulingAsync()
+    private Task<string?> RefuseSchedulingAsync(CancellationToken cancellationToken = default)
     {
-        while (true)
-        {
-            var input = CaptureSchedulingInput();
-            var reason = await Task.Run(() => RefuseScheduling(input));
-
-            if (input == CaptureSchedulingInput())
-            {
-                return reason;
-            }
-        }
+        return SyncProfileValidation.RefuseSchedulingAsync(CaptureSchedulingInput, ProbeTimeoutMs, cancellationToken);
     }
 
-    private SchedulingInput CaptureSchedulingInput()
+    private (string Left, string Right, bool TimeInvalid) CaptureSchedulingInput()
     {
-        return new(LeftPath.Trim(), RightPath.Trim(), TimeApplicable && !SyncProfile.IsValidTime(Time));
+        return (LeftPath.Trim(), RightPath.Trim(), TimeApplicable && !SyncProfile.IsValidTime(Time));
     }
-
-    private static string? RefuseScheduling(SchedulingInput input)
-    {
-        if (input.Left.Length == 0 || input.Right.Length == 0)
-        {
-            return "Укажите оба каталога перед включением.";
-        }
-
-        if (!Directory.Exists(input.Left) || !Directory.Exists(input.Right))
-        {
-            return "Один из каталогов не существует.";
-        }
-
-        if (SyncRootsCheck.Refusal(input.Left, input.Right) is { } refusal)
-        {
-            return refusal;
-        }
-
-        return input.TimeInvalid ? "Время укажите в формате ЧЧ:ММ, например 03:00." : null;
-    }
-
-    private readonly record struct SchedulingInput(string Left, string Right, bool TimeInvalid);
 }

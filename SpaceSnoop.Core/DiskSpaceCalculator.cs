@@ -130,7 +130,14 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator>? logger = null)
     /// <returns>Текст отказа для человека или <c>null</c>, если каталог можно сканировать.</returns>
     public static string? DescribeRootRefusal(DirectoryInfo directory)
     {
-        if (!IsReparsePoint(directory, out var path))
+        var path = Path.TrimEndingDirectorySeparator(directory.FullName);
+
+        if (UncPath.IsShareRoot(path))
+        {
+            return null;
+        }
+
+        if (!IsReparsePoint(directory, out _))
         {
             return null;
         }

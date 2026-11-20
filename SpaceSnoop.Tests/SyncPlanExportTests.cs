@@ -115,4 +115,37 @@ public class SyncPlanExportTests
             Assert.That(model.Actions.NewCopies, Is.EqualTo(5));
         }
     }
+
+    [Test]
+    public void Build_MarksHasPermanentNetworkActionsWhenDeletionOrOverwriteTargetsUnc()
+    {
+        var deleteRoot = new DirectoryComparison("root", string.Empty);
+        deleteRoot.Files.Add(
+            new("old.txt", "old.txt")
+            {
+                Status = ComparisonStatus.RightOnly,
+                Action = SyncAction.DeleteRight,
+                RightSize = 10,
+            });
+
+        var copyOnlyRoot = new DirectoryComparison("root", string.Empty);
+        copyOnlyRoot.Files.Add(
+            new("new.txt", "new.txt")
+            {
+                Status = ComparisonStatus.LeftOnly,
+                Action = SyncAction.CopyToRight,
+                LeftSize = 10,
+            });
+
+        var withUncDelete = SyncPlanExport.Build(new(@"C:\local", @"\\nas\share", deleteRoot), Options);
+        var withUncNewCopy = SyncPlanExport.Build(new(@"C:\local", @"\\nas\share", copyOnlyRoot), Options);
+        var localDelete = SyncPlanExport.Build(new(@"C:\localA", @"C:\localB", deleteRoot), Options);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(withUncDelete.HasPermanentNetworkActions, Is.True);
+            Assert.That(withUncNewCopy.HasPermanentNetworkActions, Is.False);
+            Assert.That(localDelete.HasPermanentNetworkActions, Is.False);
+        }
+    }
 }

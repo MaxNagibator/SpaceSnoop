@@ -1,6 +1,6 @@
 ﻿namespace SpaceSnoop.Wpf.ViewModels.Sync;
 
-internal static class SyncPlanNarrative
+internal static partial class SyncPlanNarrative
 {
     internal static NewerSide CombineNewer(NewerSide freshness, bool gitInSync, int gitNewerSign)
     {
@@ -31,7 +31,8 @@ internal static class SyncPlanNarrative
         PlannedActions planned,
         string? direction,
         IReadOnlyList<PlanReceiver> receivers,
-        bool bothWays = false)
+        bool bothWays = false,
+        bool permanentNetwork = false)
     {
         var lines = new List<ConfirmLine>();
 
@@ -82,7 +83,7 @@ internal static class SyncPlanNarrative
         {
             lines.Add(
                 new ConfirmMetricLine(
-                    "Удалить файлов в корзину",
+                    permanentNetwork ? "Удалить файлов безвозвратно" : "Удалить файлов в корзину",
                     $"{planned.Deletes:N0}",
                     SizeFormatter.Format(planned.DeleteFileBytes),
                     ConfirmMetricTone.Danger));
@@ -97,9 +98,7 @@ internal static class SyncPlanNarrative
                     SizeFormatter.Format(planned.DeleteDirBytes),
                     ConfirmMetricTone.Danger));
 
-            var whole = planned.DirDeletes == 1
-                ? "Каталог уходит в корзину со всем содержимым"
-                : "Каталоги уходят в корзину со всем содержимым";
+            var whole = DescribeWholeDirs(planned.DirDeletes, permanentNetwork);
 
             lines.Add(
                 new ConfirmTextLine(
@@ -122,14 +121,30 @@ internal static class SyncPlanNarrative
             lines.Add(new ConfirmGapLine());
             lines.Add(
                 new ConfirmTextLine(
-                    "Удалённое уходит в корзину – место освободится после её очистки.",
+                    permanentNetwork
+                        ? "Удалённое на сетевом хранилище нельзя вернуть из корзины – удаление необратимо."
+                        : "Удалённое уходит в корзину – место освободится после её очистки.",
                     ConfirmTextTone.Muted));
         }
 
         return lines;
     }
 
-    internal static string DescribePlanVolume(PlannedActions planned)
+    private static string DescribeWholeDirs(int count, bool permanentNetwork)
+    {
+        if (permanentNetwork)
+        {
+            return count == 1
+                ? "Каталог удаляется безвозвратно со всем содержимым"
+                : "Каталоги удаляются безвозвратно со всем содержимым";
+        }
+
+        return count == 1
+            ? "Каталог уходит в корзину со всем содержимым"
+            : "Каталоги уходят в корзину со всем содержимым";
+    }
+
+    internal static string DescribePlanVolume(PlannedActions planned, bool permanentNetwork = false)
     {
         var parts = new List<string>();
 
@@ -140,7 +155,9 @@ internal static class SyncPlanNarrative
 
         if (planned.DeleteBytes > 0)
         {
-            parts.Add($"в корзину ≈{SizeFormatter.Format(planned.DeleteBytes)}");
+            parts.Add(permanentNetwork
+                ? $"удаление ≈{SizeFormatter.Format(planned.DeleteBytes)}"
+                : $"в корзину ≈{SizeFormatter.Format(planned.DeleteBytes)}");
         }
 
         return parts.Count > 0 ? string.Join(" · ", parts) : $"действий: {planned.Total:N0}";

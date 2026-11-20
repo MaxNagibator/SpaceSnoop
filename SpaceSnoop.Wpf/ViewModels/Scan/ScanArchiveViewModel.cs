@@ -13,6 +13,7 @@ internal sealed class ScanArchiveViewModel
     private readonly Func<ScanNodeViewModel?> _selectedNode;
     private readonly ScanMarksViewModel _marks;
     private readonly Action _reloadDrives;
+    private bool _archiveRequested;
 
     internal ScanArchiveViewModel(
         ArchiveProgressDialogFactory archiveDialogFactory,
@@ -64,23 +65,39 @@ internal sealed class ScanArchiveViewModel
 
     private async void OnArchiveRequested(ScanNodeViewModel node)
     {
-        if (node.Space is not DirectorySpace dir)
+        if (_archiveRequested || node.Space is not DirectorySpace dir)
         {
             return;
         }
 
-        var dialog = _archiveDialogFactory.Create(dir);
-
+        _archiveRequested = true;
         try
         {
-            await _dialogs.ShowAsync(dialog);
+            var dialog = await _archiveDialogFactory.CreateAsync(dir);
+            var root = dir;
+            while (root.Parent is DirectorySpace parent)
+            {
+                root = parent;
+            }
+
+            if (_roots.Any(item => ReferenceEquals(item.Space, root)))
+            {
+                try
+                {
+                    await _dialogs.ShowAsync(dialog);
+                }
+                finally
+                {
+                    await dialog.StopAsync();
+                }
+
+                ApplyArchiveResult(dir, dialog);
+            }
         }
         finally
         {
-            await dialog.StopAsync();
+            _archiveRequested = false;
         }
-
-        ApplyArchiveResult(dir, dialog);
     }
 
     private void ApplyArchiveResult(DirectorySpace dir, ArchiveProgressDialogViewModel dialog)

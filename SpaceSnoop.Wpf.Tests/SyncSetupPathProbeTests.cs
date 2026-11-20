@@ -1,6 +1,7 @@
 ﻿using KeepShell.Services.Platform;
 using KeepShell.Testing;
 using SpaceSnoop.Wpf.Bootstrap;
+using SpaceSnoop.Wpf.Bootstrap.Platform;
 using SpaceSnoop.Wpf.ViewModels.Sync;
 
 namespace SpaceSnoop.Wpf.Tests;
@@ -141,6 +142,77 @@ public class SyncSetupPathProbeTests
         finally
         {
             hungRelease.Set();
+            SyncSetupViewModel.DirectoryExists = previous;
+        }
+    }
+
+    [TestCase(@"\\")]
+    [TestCase(@"\\nas")]
+    [TestCase(@"\\nas\")]
+    public void Неполный_UNC_не_вызывает_файловую_систему_и_не_зажигает_ошибку(string path)
+    {
+        var previous = SyncSetupViewModel.DirectoryExists;
+        var calls = 0;
+
+        SyncSetupViewModel.DirectoryExists = _ =>
+        {
+            Interlocked.Increment(ref calls);
+            return false;
+        };
+
+        try
+        {
+            var setup = CreateSetup();
+            setup.LeftPath = path;
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(setup.LeftPathInvalid, Is.False);
+                Assert.That(Volatile.Read(ref calls), Is.Zero);
+            }
+        }
+        finally
+        {
+            SyncSetupViewModel.DirectoryExists = previous;
+        }
+    }
+
+    [Test]
+    public async Task Серия_из_20_изменений_на_зависшем_NAS_не_плодит_запросы_и_завершается_по_таймауту()
+    {
+        var previous = SyncSetupViewModel.DirectoryExists;
+        var calls = 0;
+        using var release = new ManualResetEventSlim();
+
+        SyncSetupViewModel.DirectoryExists = _ =>
+        {
+            Interlocked.Increment(ref calls);
+            release.Wait(TimeSpan.FromSeconds(10));
+            return true;
+        };
+
+        try
+        {
+            var setup = CreateSetup();
+            setup.NetworkDebounceMs = 20;
+            setup.ProbeTimeoutMs = 80;
+
+            for (var i = 0; i < 20; i++)
+            {
+                setup.LeftPath = $@"\\hung-nas\share\folder{i}";
+            }
+
+            await setup.PendingLeftCheck.WaitAsync(TimeSpan.FromSeconds(3));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(Volatile.Read(ref calls), Is.LessThanOrEqualTo(1));
+                Assert.That(setup.LeftPathInvalid, Is.True);
+            }
+        }
+        finally
+        {
+            release.Set();
             SyncSetupViewModel.DirectoryExists = previous;
         }
     }

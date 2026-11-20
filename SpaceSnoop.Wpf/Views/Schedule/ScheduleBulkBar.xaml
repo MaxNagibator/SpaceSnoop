@@ -183,29 +183,36 @@
                            Grid.Column="0"
                            Text="Расписание"
                            Style="{StaticResource Bulk.RowLabel}"
-                           Margin="0,12,14,0" />
-                <StackPanel Grid.Row="4"
-                            Grid.Column="1"
-                            Orientation="Horizontal"
-                            Margin="0,12,0,0">
-                    <ComboBox Style="{StaticResource ComboBox.Form}"
-                              ItemsSource="{Binding Intervals}"
-                              SelectedIndex="{Binding IntervalIndex}"
-                              Width="200"
-                              VerticalAlignment="Center"
-                              Margin="0,0,8,0"
-                              AutomationProperties.Name="Периодичность для выбранных профилей" />
-                    <TextBox Text="{Binding Time, UpdateSourceTrigger=PropertyChanged}"
-                             Style="{StaticResource TextBox.Toolbar}"
-                             Width="90"
-                             VerticalAlignment="Center"
-                             Margin="0,0,8,0"
-                             ToolTip="Время запуска в формате ЧЧ:ММ"
-                             AutomationProperties.Name="Время запуска для выбранных профилей" />
-                    <Button Style="{StaticResource Bulk.Action}"
-                            Command="{Binding ApplyScheduleCommand}"
-                            Content="Применить" />
-                </StackPanel>
+                           VerticalAlignment="Top"
+                           Margin="0,18,14,0" />
+                <Grid Grid.Row="4"
+                      Grid.Column="1"
+                      Margin="0,12,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <ListBox Grid.Row="0"
+                             Style="{StaticResource ListBox.Segmented}"
+                             ItemsSource="{Binding IntervalOptions}"
+                             SelectedIndex="{Binding IntervalIndex}"
+                             HorizontalAlignment="Left"
+                             AutomationProperties.Name="Периодичность для выбранных профилей" />
+                    <StackPanel Grid.Row="1"
+                                Orientation="Horizontal"
+                                Margin="0,8,0,0">
+                        <TextBox Text="{Binding Time, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource TextBox.Toolbar}"
+                                 Width="90"
+                                 VerticalAlignment="Center"
+                                 Margin="0,0,8,0"
+                                 ToolTip="Время запуска в формате ЧЧ:ММ"
+                                 AutomationProperties.Name="Время запуска для выбранных профилей" />
+                        <Button Style="{StaticResource Bulk.Action}"
+                                Command="{Binding ApplyScheduleCommand}"
+                                Content="Применить" />
+                    </StackPanel>
+                </Grid>
 
                 <TextBlock Grid.Row="5"
                            Grid.Column="0"

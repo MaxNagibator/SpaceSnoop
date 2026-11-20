@@ -83,6 +83,30 @@ public class ProfileBatchTests
     }
 
     [Test]
+    public void Снятие_выбора_сегмента_сортировки_игнорируется_и_восстанавливает_значение()
+    {
+        var dialog = new BatchCreateProfilesDialogViewModel(new MemorySettings(), new FakeFilePicker(), new FakeUiDispatcher());
+        var changed = new List<string>();
+        dialog.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName is not null)
+            {
+                changed.Add(args.PropertyName);
+            }
+        };
+
+        dialog.SelectedSort = 1;
+        changed.Clear();
+        dialog.SelectedSort = -1;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(dialog.SelectedSort, Is.EqualTo(1));
+            Assert.That(changed, Does.Contain(nameof(BatchCreateProfilesDialogViewModel.SelectedSort)));
+        }
+    }
+
+    [Test]
     public void Существующий_профиль_помечает_пару_как_дубль_и_снимает_галочку()
     {
         var source = Make("src", "A");

@@ -174,11 +174,11 @@ internal static class McpFormat
         };
     }
 
-    public static string? DescribeUnavailable(SyncProfile profile)
+    public static async Task<string?> DescribeUnavailableAsync(SyncProfile profile, CancellationToken cancellationToken = default)
     {
-        return OverviewPipeline.Classify(profile) switch
+        return await OverviewPipeline.ClassifyAsync(profile, cancellationToken).ConfigureAwait(false) switch
         {
-            { Status: OverviewRunStatus.Unavailable } => "каталог недоступен или не задан",
+            { Status: OverviewRunStatus.Unavailable, Reason: var reason } => reason ?? "каталог недоступен или не задан",
             { Status: OverviewRunStatus.Overlap, Reason: var reason } => reason ?? "каталоги совпадают или вложены",
             _ => null,
         };

@@ -1,15 +1,16 @@
 ﻿using System.Collections.ObjectModel;
 using System.IO;
 using System.Security;
+using System.Text.Json;
 
 namespace SpaceSnoop.Wpf.ViewModels.Scan;
 
 public sealed class DriveCatalog
 {
-    // TODO: недавние каталоги живут только текущую сессию, персист заводить при запросе «помнить цели между запусками»
     private const int RecentLimit = 8;
 
     private readonly ILogger _logger;
+    private readonly ISettingsStore? _settings;
     private string? _selectedPath;
 
     public ObservableCollection<DriveItem> Items { get; } = [];
@@ -31,11 +32,13 @@ public sealed class DriveCatalog
         }
     }
 
-    public DriveCatalog(ILogger logger)
+    public DriveCatalog(ILogger logger, ISettingsStore? settings = null)
     {
         _logger = logger;
+        _settings = settings;
 
         SyncVolumes(null);
+        LoadRecentTargets();
     }
 
     internal void Select(string? path)
@@ -50,43 +53,7 @@ public sealed class DriveCatalog
 
     internal void AddDrive(string path)
     {
-        var item = new DriveItem(path)
-        {
-            IsSelected = IsSelectedPath(path),
-        };
-
-        if (!item.IsDirectory)
-        {
-            Items.Add(item);
-            Volumes.Add(item);
-
-            return;
-        }
-
-        var known = RecentDirectories.FirstOrDefault(recent => ScanTreeEditor.SamePath(recent.Path, path));
-
-        if (known is not null)
-        {
-            var index = RecentDirectories.IndexOf(known);
-
-            if (index > 0)
-            {
-                RecentDirectories.Move(index, 0);
-            }
-
-            return;
-        }
-
-        Items.Add(item);
-        RecentDirectories.Insert(0, item);
-
-        while (RecentDirectories.Count > RecentLimit)
-        {
-            var evicted = RecentDirectories[^1];
-
-            RecentDirectories.RemoveAt(RecentDirectories.Count - 1);
-            Items.Remove(evicted);
-        }
+        AddDriveCore(path, persist: true);
     }
 
     internal bool RemoveDrive(string path)
@@ -99,8 +66,13 @@ public sealed class DriveCatalog
         }
 
         Items.Remove(item);
-        RecentDirectories.Remove(item);
+        var removedRecent = RecentDirectories.Remove(item);
         Volumes.Remove(item);
+
+        if (removedRecent)
+        {
+            PersistRecentTargets();
+        }
 
         return true;
     }
@@ -196,5 +168,129 @@ public sealed class DriveCatalog
             Items.Remove(volume);
             Volumes.Remove(volume);
         }
+    }
+
+    private void AddDriveCore(string path, bool persist)
+    {
+        if (string.IsNullOrWhiteSpace(path) || UncPath.IsIncompleteUnc(path))
+        {
+            return;
+        }
+
+        var item = new DriveItem(path)
+        {
+            IsSelected = IsSelectedPath(path),
+        };
+
+        if (!item.IsDirectory)
+        {
+            if (HasDrive(path))
+            {
+                return;
+            }
+
+            Items.Add(item);
+            Volumes.Add(item);
+
+            return;
+        }
+
+        var known = RecentDirectories.FirstOrDefault(recent => ScanTreeEditor.SamePath(recent.Path, path));
+
+        if (known is not null)
+        {
+            var index = RecentDirectories.IndexOf(known);
+
+            if (index > 0)
+            {
+                RecentDirectories.Move(index, 0);
+
+                if (persist)
+                {
+                    PersistRecentTargets();
+                }
+            }
+
+            return;
+        }
+
+        Items.Add(item);
+        RecentDirectories.Insert(0, item);
+
+        while (RecentDirectories.Count > RecentLimit)
+        {
+            var evicted = RecentDirectories[^1];
+
+            RecentDirectories.RemoveAt(RecentDirectories.Count - 1);
+            Items.Remove(evicted);
+        }
+
+        if (UncPath.IsUnc(path))
+        {
+            NetworkDiscovery.Remember(path);
+        }
+
+        if (persist)
+        {
+            PersistRecentTargets();
+        }
+    }
+
+    private void LoadRecentTargets()
+    {
+        if (_settings is null)
+        {
+            return;
+        }
+
+        var json = _settings.GetStringValue(SettingsKeys.ScanRecentTargets);
+
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return;
+        }
+
+        string[]? saved;
+
+        try
+        {
+            saved = JsonSerializer.Deserialize<string[]>(json);
+        }
+        catch (JsonException)
+        {
+            return;
+        }
+
+        if (saved is not { Length: > 0 })
+        {
+            return;
+        }
+
+        var candidates = saved
+            .Where(static path => !string.IsNullOrWhiteSpace(path) && !UncPath.IsIncompleteUnc(path))
+            .Select(static path => path.Trim())
+            .Take(RecentLimit)
+            .ToArray();
+
+        for (var i = candidates.Length - 1; i >= 0; i--)
+        {
+            var target = candidates[i];
+
+            if (!HasDrive(target))
+            {
+                AddDriveCore(target, persist: false);
+            }
+        }
+    }
+
+    private void PersistRecentTargets()
+    {
+        if (_settings is null)
+        {
+            return;
+        }
+
+        var paths = RecentDirectories.Select(static item => item.Path).ToArray();
+        _settings.SetValue(SettingsKeys.ScanRecentTargets, JsonSerializer.Serialize(paths));
     }
 }

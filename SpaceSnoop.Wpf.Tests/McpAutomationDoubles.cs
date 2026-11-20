@@ -98,7 +98,7 @@ internal sealed class ScanAutomationDouble : IScanAutomation
         return targets.Count;
     }
 
-    public void SelectPathForAutomation(string path)
+    public void SelectPathForAutomation(string path, bool remember = true)
     {
         SelectCalls++;
     }
@@ -182,6 +182,8 @@ internal sealed class SyncAutomationDouble : ISyncAutomation
 
     public bool HasPendingConflicts { get; set; }
 
+    public bool HasPermanentNetworkDelete { get; set; }
+
     public int IdenticalCount { get; set; }
 
     public int LeftOnlyCount { get; set; }
@@ -214,6 +216,12 @@ internal sealed class SyncAutomationDouble : ISyncAutomation
     public Func<SyncPlanExportModel>? CapturePlanBuilder(int entryLimit)
     {
         return PlanBuilder;
+    }
+
+    public Task<bool> HasPermanentNetworkDeleteAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(HasPermanentNetworkDelete);
     }
 
     public Task CompareFromAutomationAsync(CancellationToken cancellationToken)

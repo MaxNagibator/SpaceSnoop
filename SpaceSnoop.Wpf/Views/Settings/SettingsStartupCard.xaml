@@ -25,28 +25,31 @@
                             keepshell:Form.ResetCommandParameter="startup"
                             keepshell:Form.ResetHint="{Binding ResetPlans[startup].Hint}">
         <StackPanel>
-            <keepshell:SettingRowPanel>
-                <StackPanel>
-                    <TextBlock Text="Стартовая страница"
-                               Style="{StaticResource Form.Label}"
-                               TextWrapping="Wrap" />
-                    <TextBlock Text="Что открывать при запуске приложения."
-                               Style="{StaticResource Form.Hint}"
-                               Margin="0,2,0,0" />
-                </StackPanel>
-                <ComboBox Style="{StaticResource ComboBox.Form}"
-                          ItemsSource="{Binding StartupOptions}"
-                          SelectedItem="{Binding SelectedStartupOption}"
-                          DisplayMemberPath="Label"
-                          Width="{StaticResource Setting.ControlWidth}"
-                          Margin="16,0,0,0"
-                          VerticalAlignment="Center" />
-                <Button Style="{StaticResource Form.RowReset}"
+            <TextBlock Text="Стартовая страница"
+                       Style="{StaticResource Form.Label}" />
+            <TextBlock Text="Что открывать при запуске приложения."
+                       Style="{StaticResource Form.Hint}"
+                       Margin="0,2,0,0" />
+            <Grid Margin="0,8,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ListBox Grid.Column="0"
+                         Style="{StaticResource ListBox.Segmented}"
+                         ItemsSource="{Binding StartupOptions}"
+                         SelectedItem="{Binding SelectedStartupOption}"
+                         HorizontalAlignment="Left"
+                         AutomationProperties.Name="Стартовая страница" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
                         DataContext="{Binding ResetFields[wpf.shell.startup_page]}"
                         Command="{Binding ResetCommand}"
                         ToolTip="{Binding Hint}"
-                        AutomationProperties.Name="{Binding AutomationName}" />
-            </keepshell:SettingRowPanel>
+                        AutomationProperties.Name="{Binding AutomationName}"
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center" />
+            </Grid>
 
             <Grid Margin="0,16,0,0">
                 <Grid.ColumnDefinitions>
@@ -66,28 +69,32 @@
             <TextBlock Style="{StaticResource Form.CheckHint}"
                        Text="Применяется сразу и запоминается до следующего запуска. То же делает кнопка в верхней части бокового меню." />
 
-            <keepshell:SettingRowPanel Margin="0,16,0,0">
-                <StackPanel>
-                    <TextBlock Text="Права администратора при запуске"
-                               Style="{StaticResource Form.Label}"
-                               TextWrapping="Wrap" />
-                    <TextBlock Text="Без повышения прав часть каталогов недоступна, размеры выходят заниженными."
-                               Style="{StaticResource Form.Hint}"
-                               Margin="0,2,0,0" />
-                </StackPanel>
-                <ComboBox Style="{StaticResource ComboBox.Form}"
-                          ItemsSource="{Binding StartupAdminOptions}"
-                          SelectedItem="{Binding SelectedStartupAdminOption}"
-                          DisplayMemberPath="Label"
-                          Width="{StaticResource Setting.ControlWidth}"
-                          Margin="16,0,0,0"
-                          VerticalAlignment="Center" />
-                <Button Style="{StaticResource Form.RowReset}"
+            <TextBlock Text="Права администратора при запуске"
+                       Style="{StaticResource Form.Label}"
+                       Margin="0,16,0,0" />
+            <TextBlock Text="Без повышения прав часть каталогов недоступна, размеры выходят заниженными."
+                       Style="{StaticResource Form.Hint}"
+                       Margin="0,2,0,0" />
+            <Grid Margin="0,8,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ListBox Grid.Column="0"
+                         Style="{StaticResource ListBox.Segmented}"
+                         ItemsSource="{Binding StartupAdminOptions}"
+                         SelectedItem="{Binding SelectedStartupAdminOption}"
+                         HorizontalAlignment="Left"
+                         AutomationProperties.Name="Права администратора при запуске" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
                         DataContext="{Binding ResetFields[wpf.startup.admin]}"
                         Command="{Binding ResetCommand}"
                         ToolTip="{Binding Hint}"
-                        AutomationProperties.Name="{Binding AutomationName}" />
-            </keepshell:SettingRowPanel>
+                        AutomationProperties.Name="{Binding AutomationName}"
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center" />
+            </Grid>
         </StackPanel>
     </HeaderedContentControl>
 </UserControl>

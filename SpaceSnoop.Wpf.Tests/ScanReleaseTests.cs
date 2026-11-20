@@ -392,10 +392,7 @@ public class ScanReleaseTests
             _scan.MarkForAutomation([branch], true);
         }
 
-        using var cancelled = new CancellationTokenSource();
-        await cancelled.CancelAsync();
-
-        await _scan.ScanFromAutomationAsync(target.AbsolutePath, cancelled.Token);
+        await ScanPageNoticeTests.CancelWhenTraversalBeginsAsync(_scan, target.AbsolutePath);
 
         using (Assert.EnterMultipleScope())
         {

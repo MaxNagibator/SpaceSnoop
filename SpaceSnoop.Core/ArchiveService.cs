@@ -1,4 +1,5 @@
 ﻿using Microsoft.VisualBasic.FileIO;
+using SpaceSnoop.Core.Cleanup;
 using System.Buffers;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -38,11 +39,14 @@ internal sealed class ArchiveIndex
 
     internal static ArchiveIndex Read(string zipPath, StringComparer names)
     {
-        ArgumentNullException.ThrowIfNull(names);
-
-        var index = new ArchiveIndex(names);
-
         using var zip = ZipFile.OpenRead(zipPath);
+        return Read(zip, names);
+    }
+
+    internal static ArchiveIndex Read(ZipArchive zip, StringComparer names)
+    {
+        ArgumentNullException.ThrowIfNull(names);
+        var index = new ArchiveIndex(names);
 
         foreach (var entry in zip.Entries)
         {
@@ -91,6 +95,18 @@ public sealed class ArchiveService
     private const string CaseCollision = "в архиве не отличить по регистру путь";
 
     private static readonly IntPtr InvalidHandle = new(-1);
+
+    private readonly Func<string, bool> _supportsRecycleBin;
+
+    public ArchiveService()
+        : this(RecycleBin.SupportsRecycleBin)
+    {
+    }
+
+    internal ArchiveService(Func<string, bool> supportsRecycleBin)
+    {
+        _supportsRecycleBin = supportsRecycleBin;
+    }
 
     public ArchiveContent Collect(string root, CancellationToken token)
     {
@@ -243,7 +259,57 @@ public sealed class ArchiveService
         // имена, различающиеся только регистром, дают отказ в покрытии вместо разбора – снимать политику
         // на каждый каталог, когда в упаковку пойдут деревья WSL.
         var index = ArchiveIndex.Read(zipPath, PathCase.ComparerFor(root));
-        var content = Collect(root, token);
+        return VerifyCoverage(root, index, progress, onTotals, token, out _);
+    }
+
+    public VerifyResult VerifyCoverageAndDeleteSource(
+        string root,
+        string zipPath,
+        ZipStats expected,
+        IProgress<OperationProgress>? verifyProgress,
+        IProgress<OperationProgress>? coverageProgress,
+        Action onVerified,
+        Action<int, long>? onTotals,
+        Action onDeleting,
+        CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
+        var prefix = Path.EndsInDirectorySeparator(root) ? root : root + Path.DirectorySeparatorChar;
+        if (Path.GetFullPath(zipPath).StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new IOException("Архив для удаления исходника должен находиться вне исходного каталога.");
+        }
+
+        using var zip = ZipFile.OpenRead(zipPath);
+        if (VerifyZip(zip, expected, true, verifyProgress, token) is { Ok: false } integrity)
+        {
+            return integrity;
+        }
+
+        onVerified();
+        var index = ArchiveIndex.Read(zip, PathCase.ComparerFor(root));
+        var coverage = VerifyCoverage(root, index, coverageProgress, onTotals, token, out var content);
+        if (!coverage.Ok)
+        {
+            return coverage;
+        }
+
+        token.ThrowIfCancellationRequested();
+        onDeleting();
+        DeleteCoveredSource(root, content, index, token);
+        return coverage;
+    }
+
+    private VerifyResult VerifyCoverage(
+        string root,
+        ArchiveIndex index,
+        IProgress<OperationProgress>? progress,
+        Action<int, long>? onTotals,
+        CancellationToken token,
+        out ArchiveContent content)
+    {
+        content = Collect(root, token);
 
         if (CheckCoverage(root, content, index) is { Ok: false } coverage)
         {
@@ -271,6 +337,16 @@ public sealed class ArchiveService
 
         using var zip = ZipFile.OpenRead(zipPath);
 
+        return VerifyZip(zip, expected, checkContent, progress, token);
+    }
+
+    private static VerifyResult VerifyZip(
+        ZipArchive zip,
+        ZipStats expected,
+        bool checkContent,
+        IProgress<OperationProgress>? progress,
+        CancellationToken token)
+    {
         if (zip.Entries.Count != expected.Count)
         {
             return new(false, $"файлов в архиве {zip.Entries.Count}, ожидалось {expected.Count}");
@@ -293,6 +369,11 @@ public sealed class ArchiveService
 
     public void DeleteDirectoryToRecycleBin(string path, bool showUi)
     {
+        if (!_supportsRecycleBin(path))
+        {
+            throw new RecycleBinUnavailableException(path);
+        }
+
         if (showUi)
         {
             FileSystem.DeleteDirectory(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
@@ -300,6 +381,92 @@ public sealed class ArchiveService
         }
 
         RecycleBin.DeleteSilent(path);
+    }
+
+    private static void DeleteCoveredSource(string root, ArchiveContent content, ArchiveIndex index, CancellationToken token)
+    {
+        var directories = new HashSet<string>(StringComparer.Ordinal) { root };
+        var rootPrefix = Path.EndsInDirectorySeparator(root) ? root : root + Path.DirectorySeparatorChar;
+        foreach (var path in content.EmptyDirectories.Concat(content.Files.Select(Path.GetDirectoryName).OfType<string>()))
+        {
+            for (var directory = path;
+                 directory is not null && directory.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase) && directories.Add(directory);
+                 directory = Path.GetDirectoryName(directory))
+            {
+                token.ThrowIfCancellationRequested();
+            }
+        }
+
+        var order = directories.OrderBy(static path => path.Length).ToArray();
+        foreach (var directory in order)
+        {
+            token.ThrowIfCancellationRequested();
+            EnsureRegularDirectory(directory);
+        }
+
+        var prefix = Prefix(root);
+        var buffer = ArrayPool<byte>.Shared.Rent(BufferSize);
+        try
+        {
+            foreach (var file in content.Files)
+            {
+                token.ThrowIfCancellationRequested();
+                DeleteCoveredFile(file, index.Stamp(Relative(prefix, file)), buffer, token);
+            }
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
+
+        foreach (var directory in order.Reverse())
+        {
+            token.ThrowIfCancellationRequested();
+            EnsureRegularDirectory(directory);
+            Directory.Delete(directory);
+        }
+    }
+
+    private static void DeleteCoveredFile(string path, ZipEntryStamp stamp, byte[] buffer, CancellationToken token)
+    {
+        using var handle = CacheFileAccess.OpenFileForReadAndDelete(path);
+        var attributes = File.GetAttributes(handle);
+        var streams = new List<string>();
+        if ((attributes & (FileAttributes.ReparsePoint | FileAttributes.Directory)) != 0
+            || !CollectAlternateStreams(path, false, streams)
+            || streams.Count > 0)
+        {
+            throw new IOException($"После проверки изменился тип или потоки файла «{path}».");
+        }
+
+        using var source = new FileStream(handle, FileAccess.Read);
+        var crc = new Crc32();
+        int bytes;
+        while ((bytes = source.Read(buffer)) > 0)
+        {
+            token.ThrowIfCancellationRequested();
+            crc.Append(buffer.AsSpan(0, bytes));
+        }
+
+        if (source.Length != stamp.Length || crc.GetCurrentHashAsUInt32() != stamp.Crc32)
+        {
+            throw new IOException($"После проверки изменилось содержимое файла «{path}».");
+        }
+
+        token.ThrowIfCancellationRequested();
+        CacheFileAccess.Delete(handle, path);
+    }
+
+    private static void EnsureRegularDirectory(string directory)
+    {
+        var attributes = File.GetAttributes(directory);
+        var streams = new List<string>();
+        if ((attributes & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != FileAttributes.Directory
+            || !CollectAlternateStreams(directory, true, streams)
+            || streams.Count > 0)
+        {
+            throw new IOException($"После проверки изменился каталог «{directory}».");
+        }
     }
 
     public void SafeDelete(string path)

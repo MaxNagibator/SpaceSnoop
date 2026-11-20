@@ -8,9 +8,15 @@ public sealed class ArchiveProgressDialogFactory(
     IUiDispatcher uiDispatcher,
     ILogger<ArchiveProgressDialogViewModel> logger)
 {
-    public ArchiveProgressDialogViewModel Create(DirectorySpace dir)
+    public async Task<ArchiveProgressDialogViewModel> CreateAsync(DirectorySpace dir)
     {
-        return Create(CreateRequest(dir, operations.DeleteOriginalAfterArchive, true));
+        var deleteOriginal = operations.DeleteOriginalAfterArchive;
+        var (request, permanent) = await Task.Run(() =>
+        {
+            var request = CreateRequest(dir, deleteOriginal, true);
+            return (request, deleteOriginal && ArchiveProgressDialogViewModel.RequiresPermanentConfirmation(request.SourcePath));
+        });
+        return new(request, service, uiDispatcher, logger, service.DeleteDirectoryToRecycleBin, permanent);
     }
 
     public ArchiveProgressDialogViewModel Create(ArchiveRequest request)

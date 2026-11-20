@@ -9,7 +9,14 @@ public static class NetworkShares
     private const uint StypeMask = 0x0FFFFFFF;
     private const uint StypeSpecial = 0x80000000;
 
+    internal static Func<string, IReadOnlyList<string>> Enumerator { get; set; } = ListFromNetShareEnum;
+
     public static IReadOnlyList<string> List(string server)
+    {
+        return Enumerator(server);
+    }
+
+    private static IReadOnlyList<string> ListFromNetShareEnum(string server)
     {
         var buffer = IntPtr.Zero;
         var resume = 0;

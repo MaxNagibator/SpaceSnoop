@@ -55,7 +55,9 @@ internal sealed class HeadlessSync
             var sync = new ExecuteSyncUseCase(NullLogger<SyncEngine>.Instance);
             var recycleOverwritten = settings.GetBool(SettingsKeys.SyncRecycleOverwritten, AppDefaults.SyncRecycleOverwrittenDefault);
             var verify = settings.GetBool(SettingsKeys.SyncVerify, AppDefaults.SyncVerifyDefault);
-            var report = sync.Execute(new(result, SyncConflictPolicy.SkipUnresolved, SyncDeleteUi.Silent, verify, recycleOverwritten), CancellationToken.None);
+            var report = sync.Execute(
+                new(result, SyncConflictPolicy.SkipUnresolved, SyncDeleteUi.Silent, verify, recycleOverwritten, AllowPermanentNetworkDelete: ShouldAllowPermanentNetworkDelete(profileId, options)),
+                CancellationToken.None);
 
             stopwatch.Stop();
             WriteLog(options.Name, report, SyncPlanNarrative.ResolveVerify(verify, report), logger);
@@ -87,6 +89,14 @@ internal sealed class HeadlessSync
         return report.Mismatches.Count > 0 ? 6 : 0;
     }
 
+    internal static bool ShouldAllowPermanentNetworkDelete(string? profileId, RunOptions options)
+    {
+        return !string.IsNullOrEmpty(profileId)
+            && options.Mirror
+            && options.PermanentNetworkDeleteTarget is { } acceptedTarget
+            && string.Equals(acceptedTarget, SyncProfile.MirrorTarget(options.Mode, options.Winner, options.Left, options.Right), StringComparison.Ordinal);
+    }
+
     internal static SyncMode MapMode(int modeIndex)
     {
         return modeIndex switch
@@ -109,7 +119,7 @@ internal sealed class HeadlessSync
                 return null;
             }
 
-            return new(profile.Name, profile.Left.Trim(), profile.Right.Trim(), MapMode(profile.Mode), profile.Mirror, profile.Winner, profile.Exclusions);
+            return new(profile.Name, profile.Left.Trim(), profile.Right.Trim(), MapMode(profile.Mode), profile.Mirror, profile.Winner, profile.Exclusions, profile.PermanentNetworkDeleteTarget);
         }
 
         var exclusions = settings.GetStringValue(SettingsKeys.SyncExclusions) ?? string.Empty;
@@ -188,5 +198,6 @@ internal sealed class HeadlessSync
         SyncMode Mode,
         bool Mirror,
         SyncWinner Winner,
-        string Exclusions);
+        string Exclusions,
+        string? PermanentNetworkDeleteTarget = null);
 }
