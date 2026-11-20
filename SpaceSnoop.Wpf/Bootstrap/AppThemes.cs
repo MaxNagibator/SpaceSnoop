@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using MahApps.Metro.IconPacks;
+using System.Reflection;
 
 namespace SpaceSnoop.Wpf.Bootstrap;
 
@@ -29,6 +30,7 @@ public static class AppThemes
             {
                 Key = SystemKey,
                 DisplayName = SystemDisplayName,
+                Icon = PackIconLucideKind.Monitor,
                 PreviewPalette = ThemeManager.DefaultLight.Palette,
                 AlternatePreviewPalette = ThemeManager.DefaultDark.Palette,
             });

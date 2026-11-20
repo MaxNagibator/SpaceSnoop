@@ -10,11 +10,11 @@
       },
       "KeepShell.Testing": {
         "type": "Direct",
-        "requested": "[0.1.279, )",
-        "resolved": "0.1.279",
-        "contentHash": "RiJLuSUOMHIgpWRdC0BZHQ7XOfqe563lu4seIyZ3ayskaICk5BJSyN/usqDlUnMnog3KcTthYs7TTYP3DwaUtw==",
+        "requested": "[0.1.283, )",
+        "resolved": "0.1.283",
+        "contentHash": "bVsHxDj0P8618oWFeGAQI339JcnMxJgCnRapNi1br/4T8IOIYn+fBTb/Lq09UVUSipvN832uPHCGY+JBmvY/2Q==",
         "dependencies": {
-          "KeepShell": "0.1.279"
+          "KeepShell": "0.1.283"
         }
       },
       "Microsoft.NET.Test.Sdk": {
@@ -64,8 +64,8 @@
       },
       "KeepShell": {
         "type": "Transitive",
-        "resolved": "0.1.279",
-        "contentHash": "RnuiX3MGmXR8ZMao1RD0p2cNd0dsOouRb0PSsqIJ1IU2DLNz9V/6wggFrDcN5E3rqAHJLxMXBo6zwA75A8osqg==",
+        "resolved": "0.1.283",
+        "contentHash": "gswSnkx0YUXOcU0QjmuMxtHCXNNQx1LaHBcaVl/sroAEEwBEfzCeyJ88fcR4/s0wogMHtIdLhAHDwPVPSbEC2g==",
         "dependencies": {
           "CommunityToolkit.Mvvm": "8.4.2",
           "MahApps.Metro.IconPacks.Lucide": "6.2.1",
@@ -79,34 +79,34 @@
       },
       "KeepShell.Agents": {
         "type": "Transitive",
-        "resolved": "0.1.279",
-        "contentHash": "c1AKD//SlyfJhSImcxoK2NRoNaaZ4Mh0SghncFLxg43ZOjmQMjTBXIjmVR3rTRqG/2p2n3cVE5aJUaIGYWNxGA==",
+        "resolved": "0.1.283",
+        "contentHash": "P/d9zafpw3jo0DTubnJl2Ab8hgjaAPCaQiMEoGuorCXGNiiPxmtPiiJveCU8O6muhmQx72+SAbHrqCyn1lEXFg==",
         "dependencies": {
           "Microsoft.Extensions.Logging.Abstractions": "10.0.15"
         }
       },
       "KeepShell.Automation": {
         "type": "Transitive",
-        "resolved": "0.1.279",
-        "contentHash": "w+5PYLj4Ny5s6HJVgz+7zouSbO+5NGycpQPKUyODNpsahb2Q9s2LbknTKzldmeypuTBJPbxbPDSvN2hqQ2qeKQ==",
+        "resolved": "0.1.283",
+        "contentHash": "yj2dK1WoWl3cawbdykXM4xUzYgHRI8gFM7wKdTRFx0Fj3nJG5/fIfXHku5REadKzBf6h4fF6f6S7lE3KxAjv5A==",
         "dependencies": {
-          "KeepShell": "0.1.279"
+          "KeepShell": "0.1.283"
         }
       },
       "KeepShell.Themes.Sublime": {
         "type": "Transitive",
-        "resolved": "0.1.279",
-        "contentHash": "y1fXZlIuScht8vbf/Lc4lDcahA/zM0taKWrBBUJvukxNf8R+nAhDcOAH006vn5E78OlEQioSmbnfywXPJzVC5A==",
+        "resolved": "0.1.283",
+        "contentHash": "T2JPb/GQcxtgdFr80AR4I6fXcZXMUfa9xbHL7uF7Znsyip9hVtd+zS4hb+4o3X5SqIIdw6rhhznDseVUEOP7Cg==",
         "dependencies": {
-          "KeepShell": "0.1.279"
+          "KeepShell": "0.1.283"
         }
       },
       "KeepShell.Themes.Tarkov": {
         "type": "Transitive",
-        "resolved": "0.1.279",
-        "contentHash": "8Hu9wyEtFoz30PQCL7Safg6Uv5piPDq8RW+FtymLkciR4AYvY826dczTwZ9HfnVeKXZ6A0wDp36tDvRWm+0c/g==",
+        "resolved": "0.1.283",
+        "contentHash": "J5ttIXztyJBZou4kyQuc4kb4i/vVO7h+aUyi6xQcYLpCOoW+7dYT9xe6nagu4EmLUCtt4QCVrsnTuP7bOIJfeQ==",
         "dependencies": {
-          "KeepShell": "0.1.279"
+          "KeepShell": "0.1.283"
         }
       },
       "MahApps.Metro.IconPacks.Core": {
@@ -369,17 +369,17 @@
         "type": "Project",
         "dependencies": {
           "CommunityToolkit.Mvvm": "[8.4.2, )",
-          "KeepShell": "[0.1.279, )",
-          "KeepShell.Agents": "[0.1.279, )",
-          "KeepShell.Automation": "[0.1.279, )",
-          "KeepShell.Themes.Sublime": "[0.1.279, )",
-          "KeepShell.Themes.Tarkov": "[0.1.279, )",
+          "KeepShell": "[0.1.283, )",
+          "KeepShell.Agents": "[0.1.283, )",
+          "KeepShell.Automation": "[0.1.283, )",
+          "KeepShell.Themes.Sublime": "[0.1.283, )",
+          "KeepShell.Themes.Tarkov": "[0.1.283, )",
           "MahApps.Metro.IconPacks.Lucide": "[6.2.1, )",
           "Microsoft.Extensions.DependencyInjection": "[10.0.15, )",
           "ModelContextProtocol.AspNetCore": "[2.4.0, )",
           "Serilog": "[4.4.0, )",
           "Serilog.Sinks.File": "[7.0.0, )",
-          "SpaceSnoop.Core": "[2.8.88, )",
+          "SpaceSnoop.Core": "[2.8.89, )",
           "Tomlyn": "[2.11.1, )"
         }
       }

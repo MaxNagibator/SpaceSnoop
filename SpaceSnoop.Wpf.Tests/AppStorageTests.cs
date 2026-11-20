@@ -208,6 +208,7 @@ public class AppStorageTests
     [Test]
     public void Переключение_Portable_в_AppData_без_переноса_обновляет_оба_файла_и_оставляет_приёмник_свежим_профилем()
     {
+        const string themeKey = "unavailable-theme";
         var root = CreateTempRoot();
         var exe = Path.Combine(root, "portable");
         var secondPortable = Path.Combine(root, "usb", "portable");
@@ -223,7 +224,7 @@ public class AppStorageTests
             {
                 [AppStorage.StorageModeKey] = AppStorage.PortableModeValue,
             };
-            TomlSettingsFile.SetString(initialPortable, "_system_theme", "tarkov");
+            TomlSettingsFile.SetString(initialPortable, "_system_theme", themeKey);
             TomlSettingsFile.Save(Path.Combine(exe, TomlSettingsFile.PrimaryFileName), initialPortable);
 
             AppStorage.SetUseAppData(exe, appData, useAppData: true, migrated: false);
@@ -234,7 +235,7 @@ public class AppStorageTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(TomlSettingsFile.GetString(exeTable, AppStorage.StorageModeKey), Is.EqualTo(AppStorage.AppDataModeValue));
-                Assert.That(TomlSettingsFile.GetString(exeTable, "_system_theme"), Is.EqualTo("tarkov"));
+                Assert.That(TomlSettingsFile.GetString(exeTable, "_system_theme"), Is.EqualTo(themeKey));
                 Assert.That(TomlSettingsFile.GetString(appDataTable, AppStorage.StorageModeKey), Is.EqualTo(AppStorage.AppDataModeValue));
                 Assert.That(AppStorage.HasSettings(exe), Is.True);
                 Assert.That(AppStorage.HasSettings(appData), Is.False);

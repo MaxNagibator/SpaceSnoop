@@ -1,10 +1,15 @@
 ﻿using KeepShell.Bootstrap;
 using KeepShell.Testing;
+using KeepShell.ViewModels;
+using KeepShell.Views.Controls;
+using MahApps.Metro.IconPacks;
 using Microsoft.Extensions.DependencyInjection;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Bootstrap.Platform;
 using SpaceSnoop.Wpf.Bootstrap.Storage;
+using SpaceSnoop.Wpf.ViewModels;
 using SpaceSnoop.Wpf.ViewModels.Settings;
+using SpaceSnoop.Wpf.Views;
 using SpaceSnoop.Wpf.Views.Settings;
 using System.Windows;
 using System.Windows.Automation;
@@ -15,6 +20,79 @@ namespace SpaceSnoop.Wpf.Tests;
 
 public partial class BindingSmokeTests
 {
+    [Test]
+    public void Настройки_находятся_по_ключам_и_именам_зарегистрированных_тем()
+    {
+        var appearance = _services.GetRequiredService<SettingsViewModel>().Sections["appearance"];
+        foreach (var theme in ThemeManager.Themes)
+        {
+            Assert.That(appearance.Matches(SettingsSection.ParseQuery(theme.Key)), Is.True);
+            Assert.That(appearance.Matches(SettingsSection.ParseQuery(theme.DisplayName)), Is.True);
+        }
+    }
+
+    [Test]
+    public void Кнопки_тем_в_шапке_показывают_темы_из_реестра_и_сохраняют_выбор()
+    {
+        var store = _services.GetRequiredService<ISettingsStore>();
+        var preferences = _services.GetRequiredService<ShellPreferences>();
+        var (width, height, scale) = (_window.Width, _window.Height, preferences.FontScale);
+        var previousTheme = ThemeManager.Current!.Key;
+        var previousPreference = store.GetStringValue(SettingsKeys.Theme) ?? string.Empty;
+        var title = Descendants<TitleBarView>(_window).Single();
+        var switcher = Descendants<ThemeSwitcher>(title).Single();
+        var list = Descendants<ListBox>(switcher).Single();
+
+        try
+        {
+            _window.Width = SmallWindowWidth;
+            _window.Height = SmallWindowHeight;
+            preferences.FontScale = FontScaleManager.MaxScale;
+            _shell.Theme.Select(AppThemes.SystemKey);
+            Settle();
+
+            var options = list.Items.Cast<ThemeDefinition>().ToArray();
+            Assert.That(options.Select(option => option.Key), Is.EqualTo(ThemeManager.Themes.Select(theme => theme.Key)));
+            foreach (var option in options)
+            {
+                var button = (ListBoxItem)list.ItemContainerGenerator.ContainerFromItem(option);
+                var icon = Descendants<PackIconLucide>(button).Single();
+                var right = button.TransformToAncestor(title).Transform(new Point(button.ActualWidth, 0)).X;
+
+                Assert.That(button.IsVisible, Is.True);
+                Assert.That(right, Is.LessThanOrEqualTo(title.ActualWidth));
+                Assert.That(AutomationProperties.GetName(button), Is.EqualTo(option.DisplayName));
+                Assert.That(icon.IsVisible, Is.True);
+                Assert.That(icon.Kind, Is.EqualTo(option.Icon));
+            }
+
+            var darkOption = options.Single(option => option.Key == AppThemes.DarkKey);
+            var dark = (ListBoxItem)list.ItemContainerGenerator.ContainerFromItem(darkOption);
+            dark.SetCurrentValue(ListBoxItem.IsSelectedProperty, true);
+            Settle();
+
+            Assert.That(ThemeManager.Current?.Key, Is.EqualTo(AppThemes.DarkKey));
+            Assert.That(store.GetStringValue(SettingsKeys.Theme), Is.EqualTo(AppThemes.DarkKey));
+
+            dark.SetCurrentValue(ListBoxItem.IsSelectedProperty, false);
+            Settle();
+            Assert.That(dark.IsSelected, Is.True);
+
+            _shell.Theme.Select(AppThemes.LightKey);
+            Settle();
+            Assert.That(list.SelectedValue, Is.EqualTo(AppThemes.LightKey));
+        }
+        finally
+        {
+            ThemeManager.Apply(previousTheme);
+            store.SetValue(SettingsKeys.Theme, previousPreference);
+            preferences.FontScale = scale;
+            _window.Width = width;
+            _window.Height = height;
+            Settle();
+        }
+    }
+
     [TestCase(true, TestName = "Настройки показывают обе половины системной темы при светлом режиме Windows")]
     [TestCase(false, TestName = "Настройки показывают обе половины системной темы при тёмном режиме Windows")]
     public void Настройки_показывают_обе_половины_системной_темы(bool appsUseLightTheme)

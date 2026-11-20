@@ -34,14 +34,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SpaceSnoop.Core\SpaceSnoop.Core.csproj" />
-    <PackageReference Include="KeepShell" Version="0.1.279" />
-    <PackageReference Include="KeepShell.Agents" Version="0.1.279" />
-    <PackageReference Include="KeepShell.Automation" Version="0.1.279" />
+    <PackageReference Include="KeepShell" Version="0.1.283" />
+    <PackageReference Include="KeepShell.Agents" Version="0.1.283" />
+    <PackageReference Include="KeepShell.Automation" Version="0.1.283" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(IncludeExtraThemes)' != 'false'">
-    <PackageReference Include="KeepShell.Themes.Tarkov" Version="0.1.279" />
-    <PackageReference Include="KeepShell.Themes.Sublime" Version="0.1.279" />
+    <PackageReference Include="KeepShell.Themes.Tarkov" Version="0.1.283" />
+    <PackageReference Include="KeepShell.Themes.Sublime" Version="0.1.283" />
   </ItemGroup>
 
   <ItemGroup>
