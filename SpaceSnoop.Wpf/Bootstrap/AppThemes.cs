@@ -1,4 +1,5 @@
 ﻿using MahApps.Metro.IconPacks;
+using SpaceSnoop.Wpf.Converters;
 using System.Reflection;
 
 namespace SpaceSnoop.Wpf.Bootstrap;
@@ -12,6 +13,7 @@ public static class AppThemes
 
     public static void Register(Assembly? themeModules = null)
     {
+        HeatColor.AttachThemeSync();
         RegisterSystem(SystemTheme.AppsUseLightTheme());
         ThemeManager.Register(ThemeManager.DefaultLight);
         ThemeManager.Register(ThemeManager.DefaultDark);
@@ -20,6 +22,8 @@ public static class AppThemes
         {
             ThemeManager.RegisterModules(themeModules);
         }
+
+        HeatColor.SyncFromActiveTheme();
     }
 
     public static void RegisterSystem(bool appsUseLightTheme)

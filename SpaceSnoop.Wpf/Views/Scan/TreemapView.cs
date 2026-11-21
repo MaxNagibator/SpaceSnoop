@@ -345,6 +345,7 @@ public sealed class TreemapView : FrameworkElement
         _isLoaded = true;
         HookItems();
         FontScaleManager.Changed += OnFontScaleChanged;
+        ThemeManager.Changed += OnThemeChanged;
         InvalidateVisual();
     }
 
@@ -358,9 +359,15 @@ public sealed class TreemapView : FrameworkElement
         _isLoaded = false;
         UnhookItems();
         FontScaleManager.Changed -= OnFontScaleChanged;
+        ThemeManager.Changed -= OnThemeChanged;
     }
 
     private void OnFontScaleChanged(object? sender, double scale)
+    {
+        InvalidateVisual();
+    }
+
+    private void OnThemeChanged(object? sender, ThemeDefinition theme)
     {
         InvalidateVisual();
     }

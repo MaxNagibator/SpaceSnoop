@@ -74,7 +74,7 @@ public partial class BindingSmokeTests
         settings.SetBool(SettingsKeys.ScanDuplicatesEnabled, true);
         SyncProfileStore.Save(settings, GalleryFixtures.Profiles(_fixture));
 
-        AppThemes.Register();
+        AppThemes.Register(typeof(App).Assembly);
         ThemeManager.Apply(AppThemes.LightKey);
         ViewLocator.InstallIntoApplication();
 

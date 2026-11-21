@@ -10,9 +10,9 @@
       },
       "KeepShell": {
         "type": "Direct",
-        "requested": "[0.1.283, )",
-        "resolved": "0.1.283",
-        "contentHash": "gswSnkx0YUXOcU0QjmuMxtHCXNNQx1LaHBcaVl/sroAEEwBEfzCeyJ88fcR4/s0wogMHtIdLhAHDwPVPSbEC2g==",
+        "requested": "[0.1.304, )",
+        "resolved": "0.1.304",
+        "contentHash": "xzRF4Cf/aFAeKZrzg5r57dx51ulm5wbRdeqqVDHwSj4/wvy6sDELM95N75pleOC+Ec0ouQx17JXt0VYq/3Xcgw==",
         "dependencies": {
           "CommunityToolkit.Mvvm": "8.4.2",
           "MahApps.Metro.IconPacks.Lucide": "6.2.1",
@@ -26,38 +26,20 @@
       },
       "KeepShell.Agents": {
         "type": "Direct",
-        "requested": "[0.1.283, )",
-        "resolved": "0.1.283",
-        "contentHash": "P/d9zafpw3jo0DTubnJl2Ab8hgjaAPCaQiMEoGuorCXGNiiPxmtPiiJveCU8O6muhmQx72+SAbHrqCyn1lEXFg==",
+        "requested": "[0.1.304, )",
+        "resolved": "0.1.304",
+        "contentHash": "oHBDqz27Lu1rS2AareaENI9bbthBmy8Mk4v/w7SIxmhg9DOCoNFuNiTUdl4BoVzuq6vBL5fRDUjhbV/pc35/Tg==",
         "dependencies": {
           "Microsoft.Extensions.Logging.Abstractions": "10.0.15"
         }
       },
       "KeepShell.Automation": {
         "type": "Direct",
-        "requested": "[0.1.283, )",
-        "resolved": "0.1.283",
-        "contentHash": "yj2dK1WoWl3cawbdykXM4xUzYgHRI8gFM7wKdTRFx0Fj3nJG5/fIfXHku5REadKzBf6h4fF6f6S7lE3KxAjv5A==",
+        "requested": "[0.1.304, )",
+        "resolved": "0.1.304",
+        "contentHash": "Q1aMosMMhMZMuKEWjYqsEbae68QFzJSzbmgqcMyJCDvt8Enh+7XMmsUfh7hoRwuWM6p4Tjg6aoEhusxU1IJghw==",
         "dependencies": {
-          "KeepShell": "0.1.283"
-        }
-      },
-      "KeepShell.Themes.Sublime": {
-        "type": "Direct",
-        "requested": "[0.1.283, )",
-        "resolved": "0.1.283",
-        "contentHash": "T2JPb/GQcxtgdFr80AR4I6fXcZXMUfa9xbHL7uF7Znsyip9hVtd+zS4hb+4o3X5SqIIdw6rhhznDseVUEOP7Cg==",
-        "dependencies": {
-          "KeepShell": "0.1.283"
-        }
-      },
-      "KeepShell.Themes.Tarkov": {
-        "type": "Direct",
-        "requested": "[0.1.283, )",
-        "resolved": "0.1.283",
-        "contentHash": "J5ttIXztyJBZou4kyQuc4kb4i/vVO7h+aUyi6xQcYLpCOoW+7dYT9xe6nagu4EmLUCtt4QCVrsnTuP7bOIJfeQ==",
-        "dependencies": {
-          "KeepShell": "0.1.283"
+          "KeepShell": "0.1.304"
         }
       },
       "MahApps.Metro.IconPacks.Lucide": {

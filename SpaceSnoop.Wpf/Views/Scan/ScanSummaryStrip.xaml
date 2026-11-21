@@ -72,7 +72,7 @@
             </Grid.ColumnDefinitions>
 
             <Border Grid.Column="0"
-                    Background="{StaticResource HeatSpectrumVertical}"
+                    Background="{DynamicResource HeatSpectrumVertical}"
                     CornerRadius="10,0,0,10" />
 
             <views:CompactWrapPanel Grid.Column="1"

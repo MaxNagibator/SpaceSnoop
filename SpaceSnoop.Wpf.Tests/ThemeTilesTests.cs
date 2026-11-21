@@ -174,6 +174,135 @@ public partial class BindingSmokeTests
         }
     }
 
+    [Test]
+    public void Темы_с_хромом_и_шкалой_данных_подключают_декор_и_снимают_его_при_переключении()
+    {
+        var previousTheme = ThemeManager.Current!.Key;
+        var title = Descendants<TitleBarView>(_window).Single();
+        var statusBar = Descendants<StatusBarView>(_window).Single();
+        var titleHosts = Descendants<ThemeChromeHost>(title).ToArray();
+        var statusHosts = Descendants<ThemeChromeHost>(statusBar).ToArray();
+        var allHosts = titleHosts.Concat(statusHosts).ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(titleHosts.Select(h => h.Part), Is.EquivalentTo([ThemeChromePart.TitleBarBackdrop, ThemeChromePart.TitleBarOrnament]));
+            Assert.That(statusHosts.Select(h => h.Part), Is.EquivalentTo([ThemeChromePart.StatusBarBackdrop]));
+        }
+
+        try
+        {
+            ThemeManager.Apply(AppThemes.DarkKey);
+            Settle();
+            var baselineHeight = title.ActualHeight;
+            var baselineStatusHeight = statusBar.ActualHeight;
+
+            using (Assert.EnterMultipleScope())
+            {
+                foreach (var host in allHosts)
+                {
+                    Assert.That(host.Child, Is.Null);
+                    Assert.That(host.Visibility, Is.EqualTo(Visibility.Collapsed));
+                    Assert.That(host.IsHitTestVisible, Is.False);
+                }
+
+                Assert.That(Converters.HeatColor.Palette.HasCustomStops, Is.False);
+            }
+
+            foreach (var theme in ThemeManager.Themes.Where(t => t.CreateChrome is not null))
+            {
+                var revisionBefore = Converters.HeatColor.Palette.Revision;
+                ThemeManager.Apply(theme.Key);
+                Settle();
+
+                var hasStops = ThemeManager.FindPaletteDictionary()?.Contains(Converters.HeatColor.PaletteStopsResourceKey) == true;
+                using (Assert.EnterMultipleScope())
+                {
+                    foreach (var host in allHosts)
+                    {
+                        var expected = theme.CreateChrome!(host.Part) is not null;
+                        Assert.That(host.Child is not null, Is.EqualTo(expected), $"{theme.Key}/{host.Part}");
+                        Assert.That(host.Visibility, Is.EqualTo(expected ? Visibility.Visible : Visibility.Collapsed));
+                        Assert.That(host.IsHitTestVisible, Is.False);
+                        if (host.Child is not null)
+                        {
+                            Assert.That(host.Child.IsHitTestVisible, Is.False);
+                        }
+                    }
+
+                    Assert.That(title.ActualHeight, Is.EqualTo(baselineHeight).Within(0.5));
+                    Assert.That(statusBar.ActualHeight, Is.EqualTo(baselineStatusHeight).Within(0.5));
+                    Assert.That(Converters.HeatColor.Palette.HasCustomStops, Is.EqualTo(hasStops));
+                    if (hasStops)
+                    {
+                        Assert.That(Converters.HeatColor.Palette.Revision, Is.GreaterThanOrEqualTo(revisionBefore));
+                    }
+                }
+
+                ThemeManager.Apply(AppThemes.LightKey);
+                Settle();
+
+                using (Assert.EnterMultipleScope())
+                {
+                    foreach (var host in allHosts)
+                    {
+                        Assert.That(host.Child, Is.Null);
+                        Assert.That(host.Visibility, Is.EqualTo(Visibility.Collapsed));
+                    }
+
+                    Assert.That(Converters.HeatColor.Palette.HasCustomStops, Is.False);
+                }
+            }
+        }
+        finally
+        {
+            ThemeManager.Apply(previousTheme);
+            Settle();
+        }
+    }
+
+    [Test]
+    public void Переключение_на_тему_с_заставкой_показывает_её_в_оверлее()
+    {
+        if (!SystemParameters.ClientAreaAnimation)
+        {
+            Assert.Ignore("Системные анимации клиентской области отключены.");
+        }
+
+        var themesWithTransitions = ThemeManager.Themes.Where(t => t.CreateTransition is not null).ToArray();
+        var previousTheme = ThemeManager.Current!.Key;
+        var overlay = Descendants<KeepShell.Views.ThemeTransitionOverlay>(_window).Single();
+        var slot = (Border)overlay.FindName("uiCustomTransition");
+
+        try
+        {
+            foreach (var theme in themesWithTransitions)
+            {
+                ThemeManager.Apply(AppThemes.DarkKey);
+                Settle();
+
+                ThemeManager.Apply(theme.Key);
+                _window.UpdateLayout();
+
+                var transition = slot.Child as FrameworkElement;
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(overlay.Visibility, Is.EqualTo(Visibility.Visible), theme.Key);
+                    Assert.That(overlay.IsVisible, Is.True, theme.Key);
+                    Assert.That(transition, Is.Not.Null, theme.Key);
+                    Assert.That(transition!.IsVisible, Is.True, theme.Key);
+                    Assert.That(transition.ActualWidth, Is.GreaterThan(0d), theme.Key);
+                    Assert.That(transition.ActualHeight, Is.GreaterThan(0d), theme.Key);
+                }
+            }
+        }
+        finally
+        {
+            ThemeManager.Apply(previousTheme);
+            Settle();
+        }
+    }
+
     private static VisualTestHost ShowAppearance(SettingsViewModel settings, bool keyboardFocus = false)
     {
         var host = VisualTestHost.Show(

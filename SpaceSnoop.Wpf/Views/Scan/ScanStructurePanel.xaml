@@ -191,7 +191,7 @@
 
                             <Border Height="8"
                                     CornerRadius="{DynamicResource Radius.Pill}"
-                                    Background="{StaticResource HeatSpectrum}" />
+                                    Background="{DynamicResource HeatSpectrum}" />
 
                             <Grid Margin="0,10,0,0">
                                 <Grid.ColumnDefinitions>

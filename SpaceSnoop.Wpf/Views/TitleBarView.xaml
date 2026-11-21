@@ -15,12 +15,22 @@
     <Border Background="{DynamicResource Bg.Surface}"
             BorderBrush="{DynamicResource Border.Subtle}"
             BorderThickness="0,0,0,1"
+            ClipToBounds="True"
             keepshell:TitleBarBehavior.IsWindowChrome="True">
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
+
+            <keepshell:ThemeChromeHost Part="TitleBarBackdrop"
+                                       Grid.ColumnSpan="2" />
+
+            <keepshell:ThemeChromeHost Part="TitleBarOrnament"
+                                       Grid.Column="0"
+                                       Margin="0,0,18,0"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Top" />
 
             <Grid Grid.Column="0"
                   Margin="14,0">
