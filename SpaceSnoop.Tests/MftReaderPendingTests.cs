@@ -10,7 +10,7 @@ public class MftReaderPendingTests
     [Test]
     public void Байты_безымянной_записи_попадают_в_счётчик()
     {
-        var entries = Entries(name: null);
+        var entries = Entries(new(), name: null);
         entries[Record].Size = 8192;
 
         var statistics = new MftStatistics();
@@ -28,7 +28,7 @@ public class MftReaderPendingTests
     [Test]
     public void Известный_размер_записью_расширения_не_перебивается()
     {
-        var entries = Entries(name: "данные.bin");
+        var entries = Entries(new(), name: "данные.bin");
         entries[Record].Size = 100;
         entries[Record].SizeKnown = true;
         var pending = new MftPending();
@@ -42,16 +42,17 @@ public class MftReaderPendingTests
     [Test]
     public void Имя_из_чужого_поколения_записи_не_применяется()
     {
-        var entries = Entries(name: null);
+        var arena = new MftNameArena();
+        var entries = Entries(arena, name: null);
         var pending = new MftPending();
-        pending.Alternates[Record] = [new(20, 7, "чужое.vhdx", 9)];
+        pending.Alternates[Record] = [new(20, 7, arena.Append("чужое.vhdx"), 9)];
         var statistics = new MftStatistics();
 
         MftReader.ApplyPending(entries, pending, statistics);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(entries[Record].Name, Is.Null);
+            Assert.That(entries[Record].Name.HasValue, Is.False);
             Assert.That(statistics.Partial, Is.EqualTo(1));
             Assert.That(statistics.Nameless, Is.EqualTo(1));
         }
@@ -60,7 +61,7 @@ public class MftReaderPendingTests
     [Test]
     public void Размер_из_чужого_поколения_записи_не_применяется()
     {
-        var entries = Entries(name: "данные.bin");
+        var entries = Entries(new(), name: "данные.bin");
         var pending = new MftPending();
         pending.Sizes[Record] = new(4096, 9);
         var statistics = new MftStatistics();
@@ -74,12 +75,12 @@ public class MftReaderPendingTests
         }
     }
 
-    private static MftEntry[] Entries(string? name)
+    private static MftEntry[] Entries(MftNameArena arena, string? name)
     {
         var entries = new MftEntry[64];
         entries[Record] = new()
         {
-            Name = name,
+            Name = name is null ? default : arena.Append(name),
             Parent = -1,
             Names = 1,
             Present = true,

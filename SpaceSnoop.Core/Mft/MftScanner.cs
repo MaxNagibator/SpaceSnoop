@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using SpaceSnoop.Core.Domain;
 using System.Runtime.InteropServices;
 
 namespace SpaceSnoop.Core.Mft;
@@ -21,7 +22,20 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
         var letter = MftReader.VolumeLetter(directory.FullName)
             ?? throw new InvalidOperationException($"Путь {directory.FullName} не лежит на локальном томе с буквой");
 
-        var table = MftReader.Read(letter, progress, cancel);
+        using var volume = MftFileVolume.Open(letter);
+        return Calculate(volume, directory, letter, MftReader.ResolveThreads(letter), 4 * 1024 * 1024, progress, cancel);
+    }
+
+    internal MftScanResult Calculate(
+        IMftVolume volume,
+        DirectoryInfo directory,
+        char letter,
+        int threads,
+        int blockBytes,
+        ScanProgress? progress,
+        CancellationToken cancel = default)
+    {
+        var table = MftReader.Read(volume, letter, threads, blockBytes, progress, cancel);
 
         progress?.Announce($"Разбор связей тома {letter}:");
 
@@ -58,7 +72,7 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
             statistics.Partial,
             statistics.StaleParents,
             statistics.Rehomed,
-            MftReader.ResolveThreads(letter),
+            threads,
             FormatReport(statistics, totals.UnknownSizeFiles));
 
         _log.MftScanCompleted(directory.FullName, table.Entries.Length, result.ExtraNames, result.ExtraNameBytes, result.Report);
@@ -113,10 +127,17 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
         // режимом NTFS (`fsutil file setCaseSensitiveInfo`) получает политику корня; точное совпадение имени
         // предпочитается нечувствительному, и этого хватает, пока обе формы имени существуют рядом.
         // Триггер апгрейда: понадобится отличать `foo` от `Foo`, когда лежит только одна из них.
-        var comparer = PathCase.ComparerFor(root);
+        var caseSensitive = PathCase.IsCaseSensitive(root);
 
-        foreach (var segment in relative.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
+        foreach (var range in relative.AsSpan().Split(Path.DirectorySeparatorChar))
         {
+            var segment = relative.AsSpan(range);
+
+            if (segment.IsEmpty)
+            {
+                continue;
+            }
+
             var found = -1;
             var exact = -1;
 
@@ -127,13 +148,15 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
                     continue;
                 }
 
-                if (string.Equals(entries[child].Name, segment, StringComparison.Ordinal))
+                if (table.Names.Equals(entries[child].Name, segment, StringComparison.Ordinal))
                 {
                     exact = child;
                     break;
                 }
 
-                if (found < 0 && comparer.Equals(entries[child].Name, segment))
+                if (!caseSensitive
+                    && found < 0
+                    && table.Names.Equals(entries[child].Name, segment, StringComparison.OrdinalIgnoreCase))
                 {
                     found = child;
                 }
@@ -150,7 +173,7 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
         return current;
     }
 
-    private static DirectorySpace Materialize(
+    internal static DirectorySpace Materialize(
         MftTable table,
         MftLinks links,
         int start,
@@ -160,66 +183,84 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
         CancellationToken cancel)
     {
         var entries = table.Entries;
-        var root = new DirectorySpace(directory.Name, null, entries[start].CreationTime, entries[start].LastAccessTime);
-        var branches = 0;
+        var store = new ScanTreeStore(1, singleWriter: true);
+        var writer = new FileSlabWriter(store);
+        var root = new DirectorySpace(
+            store,
+            store.Names.Intern(directory.Name),
+            null,
+            TimestampEncoding.FromMftFileTime(entries[start].CreationFileTime),
+            TimestampEncoding.FromMftFileTime(entries[start].LastAccessFileTime),
+            FileEntry.UtcFileTimeFlag);
+
+        var branchCount = 0;
 
         for (var child = links.FirstChild[start]; child >= 0; child = links.NextSibling[child])
         {
             if (entries[child].IsDirectory)
             {
-                branches++;
+                branchCount++;
             }
         }
 
-        progress?.SetTopLevelTotal(branches);
+        progress?.SetTopLevelTotal(branchCount);
 
         var stack = new Stack<(int Record, DirectorySpace Node)>();
         var paths = new MftProgressPath(root, directory.FullName);
-        var files = new List<FileSpace>();
-        var roots = FillDirectory(table, links, start, root, paths, totals, files, progress);
+        var files = new List<FileEntry>();
+        var branches = new List<(int Record, DirectorySpace Node)>();
+        var children = new List<(int Record, DirectorySpace Node)>();
 
-        foreach (var branch in roots)
+        FillDirectory(table, links, start, root, store, writer, paths, totals, branches, files, progress);
+
+        for (var i = 0; i < branches.Count; i++)
         {
-            stack.Push(branch);
+            stack.Push(branches[i]);
 
             while (stack.Count > 0)
             {
                 cancel.ThrowIfCancellationRequested();
 
                 var (record, node) = stack.Pop();
+                FillDirectory(table, links, record, node, store, writer, paths, totals, children, files, progress);
 
-                foreach (var child in FillDirectory(table, links, record, node, paths, totals, files, progress))
+                for (var j = 0; j < children.Count; j++)
                 {
-                    stack.Push(child);
+                    stack.Push(children[j]);
                 }
             }
 
             progress?.CompleteTopLevel();
         }
 
+        store.Freeze();
         return root;
     }
 
-    private static List<(int Record, DirectorySpace Node)> FillDirectory(
+    private static void FillDirectory(
         MftTable table,
         MftLinks links,
         int record,
         DirectorySpace node,
+        ScanTreeStore store,
+        FileSlabWriter writer,
         MftProgressPath paths,
         MftSubtreeTotals totals,
-        List<FileSpace> files,
+        List<(int Record, DirectorySpace Node)> children,
+        List<FileEntry> files,
         ScanProgress? progress)
     {
         progress?.EnterDirectory(paths.For(node));
 
         var entries = table.Entries;
-        var children = new List<(int, DirectorySpace)>();
+        children.Clear();
         files.Clear();
+        var ownSize = 0L;
 
         for (var child = links.FirstChild[record]; child >= 0; child = links.NextSibling[child])
         {
             ref var entry = ref entries[child];
-            var names = Math.Max(1, entry.Names);
+            var names = Math.Max(1, (int)entry.Names);
 
             if (names > 1)
             {
@@ -227,9 +268,19 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
                 totals.ExtraNameBytes += entry.Size * (names - 1);
             }
 
+            var nameId = store.Names.Intern(table.Names.GetUtf8(entry.Name));
+
             if (entry.IsDirectory)
             {
-                children.Add((child, new(entry.Name!, node, entry.CreationTime, entry.LastAccessTime)));
+                children.Add(
+                    (child,
+                     new(
+                         store,
+                         nameId,
+                         node,
+                         TimestampEncoding.FromMftFileTime(entry.CreationFileTime),
+                         TimestampEncoding.FromMftFileTime(entry.LastAccessFileTime),
+                         FileEntry.UtcFileTimeFlag)));
                 continue;
             }
 
@@ -238,20 +289,29 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
                 totals.UnknownSizeFiles++;
             }
 
-            files.Add(FileSpace.Create(new ScanEntry(entry.Name!, entry.Size, entry.CreationTime, entry.LastAccessTime, FileAttributes.Normal, false), node));
+            files.Add(
+                new()
+                {
+                    Size = entry.Size,
+                    CreationRaw = TimestampEncoding.FromMftFileTime(entry.CreationFileTime),
+                    LastAccessRaw = TimestampEncoding.FromMftFileTime(entry.LastAccessFileTime),
+                    NameId = nameId,
+                    State = SpaceState.Added,
+                    Flags = FileEntry.UtcFileTimeFlag,
+                });
+            ownSize += entry.Size;
         }
 
         var subDirectories = children.Count == 0 ? [] : new DirectorySpace[children.Count];
 
         for (var i = 0; i < subDirectories.Length; i++)
         {
-            subDirectories[i] = children[i].Item2;
+            subDirectories[i] = children[i].Node;
         }
 
-        node.SetScanned(files, subDirectories);
+        writer.WriteFiles(CollectionsMarshal.AsSpan(files), out var fileStart);
+        node.SetScanned(store, fileStart, files.Count, ownSize, subDirectories);
         progress?.AddFiles(files.Count, node.Size);
-
-        return children;
     }
 }
 

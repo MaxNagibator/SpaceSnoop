@@ -21,6 +21,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="SpaceSnoop.Benchmarks" />
     <InternalsVisibleTo Include="SpaceSnoop.Tests" />
+    <InternalsVisibleTo Include="SpaceSnoop.Wpf" />
     <InternalsVisibleTo Include="SpaceSnoop.Wpf.Tests" />
   </ItemGroup>
 

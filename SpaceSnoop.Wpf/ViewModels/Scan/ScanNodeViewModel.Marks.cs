@@ -36,19 +36,7 @@ public sealed partial class ScanNodeViewModel
     {
         for (var current = candidate; !ReferenceEquals(current, root); current = current.Parent)
         {
-            if (current.Parent is not DirectorySpace parent)
-            {
-                return false;
-            }
-
-            var attached = current switch
-            {
-                DirectorySpace subDir => parent.SubDirectories.Contains(subDir, ReferenceEqualityComparer.Instance),
-                FileSpace file => parent.Files.Contains(file, ReferenceEqualityComparer.Instance),
-                _ => false,
-            };
-
-            if (!attached)
+            if (current.Parent is not DirectorySpace parent || !parent.ContainsChild(current))
             {
                 return false;
             }
@@ -62,6 +50,86 @@ public sealed partial class ScanNodeViewModel
         for (var parent = space.Parent; parent is not null; parent = parent.Parent)
         {
             if (parent.IsDeleted)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    internal static void RestoreRecursive(SpaceBase space)
+    {
+        if (space.IsDeleted)
+        {
+            space.Restore();
+        }
+
+        if (space is not DirectorySpace dir)
+        {
+            return;
+        }
+
+        var subs = dir.SubDirectoriesArray;
+
+        for (var i = 0; i < subs.Length; i++)
+        {
+            RestoreRecursive(subs[i]);
+        }
+
+        var files = dir.FileEntries;
+
+        for (var i = 0; i < files.Length; i++)
+        {
+            if (files[i].IsDeleted)
+            {
+                dir.GetFile(i).Restore();
+            }
+        }
+    }
+
+    private static bool HasAddedChild(DirectorySpace dir)
+    {
+        var subs = dir.SubDirectoriesArray;
+
+        for (var i = 0; i < subs.Length; i++)
+        {
+            if (subs[i].State == SpaceState.Added)
+            {
+                return true;
+            }
+        }
+
+        var files = dir.FileEntries;
+
+        for (var i = 0; i < files.Length; i++)
+        {
+            if (files[i].State == SpaceState.Added)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasMarkedChild(DirectorySpace dir)
+    {
+        var subs = dir.SubDirectoriesArray;
+
+        for (var i = 0; i < subs.Length; i++)
+        {
+            if (ScanTreeEditor.HasMarkedSelfOrChild(subs[i]))
+            {
+                return true;
+            }
+        }
+
+        var files = dir.FileEntries;
+
+        for (var i = 0; i < files.Length; i++)
+        {
+            if (files[i].IsDeleted)
             {
                 return true;
             }
@@ -173,10 +241,16 @@ public sealed partial class ScanNodeViewModel
         }
 
         var before = _factory?.CaptureMarks(dir, Root ?? dir);
+        var subs = dir.SubDirectoriesArray;
 
-        foreach (var child in EnumerateChildren(dir))
+        for (var i = 0; i < subs.Length; i++)
         {
-            child.Delete();
+            subs[i].Delete();
+        }
+
+        for (var i = 0; i < dir.FileCount; i++)
+        {
+            dir.GetFile(i).Delete();
         }
 
         ApplyMarkChange(before);
@@ -191,10 +265,21 @@ public sealed partial class ScanNodeViewModel
         }
 
         var before = _factory?.CaptureMarks(dir, Root ?? dir);
+        var subs = dir.SubDirectoriesArray;
 
-        foreach (var child in EnumerateChildren(dir))
+        for (var i = 0; i < subs.Length; i++)
         {
-            RestoreRecursive(child);
+            RestoreRecursive(subs[i]);
+        }
+
+        var files = dir.FileEntries;
+
+        for (var i = 0; i < files.Length; i++)
+        {
+            if (files[i].IsDeleted)
+            {
+                dir.GetFile(i).Restore();
+            }
         }
 
         ApplyMarkChange(before);

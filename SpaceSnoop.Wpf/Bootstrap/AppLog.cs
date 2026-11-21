@@ -118,6 +118,12 @@ internal static partial class AppLog
         Message = "Уплотнение после скана пропущено: нагрузка памяти {LoadBytes} Б ниже порога GC {ThresholdBytes} Б")]
     public static partial void ScanMemoryReturnSkipped(this ILogger logger, long loadBytes, long thresholdBytes);
 
+    [LoggerMessage(
+        EventId = 1022,
+        Level = LogLevel.Debug,
+        Message = "Запрошена фоновая сборка памяти после $MFT за {ElapsedMs} мс: куча {HeapBytes} Б, выделено ОС {CommittedBytes} Б")]
+    public static partial void ScanMftMemoryReclaimRequested(this ILogger logger, long elapsedMs, long heapBytes, long committedBytes);
+
     [LoggerMessage(EventId = 1019, Level = LogLevel.Information, Message = "Полный экспорт скана сохранён: {Path}, файлов {Files}, каталогов {Directories}")]
     public static partial void ScanExportCompleted(this ILogger logger, string path, int files, int directories);
 

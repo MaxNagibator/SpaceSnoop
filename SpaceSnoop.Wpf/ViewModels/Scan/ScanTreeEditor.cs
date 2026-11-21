@@ -3,7 +3,7 @@ using System.IO;
 
 namespace SpaceSnoop.Wpf.ViewModels.Scan;
 
-internal static class ScanTreeEditor
+internal static partial class ScanTreeEditor
 {
     private static readonly char[] Separators = [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar];
 
@@ -19,7 +19,27 @@ internal static class ScanTreeEditor
             return false;
         }
 
-        return dir.SubDirectories.Cast<SpaceBase>().Concat(dir.Files).Any(HasMarkedSelfOrChild);
+        var subs = dir.SubDirectoriesArray;
+
+        for (var i = 0; i < subs.Length; i++)
+        {
+            if (HasMarkedSelfOrChild(subs[i]))
+            {
+                return true;
+            }
+        }
+
+        var files = dir.FileEntries;
+
+        for (var i = 0; i < files.Length; i++)
+        {
+            if (files[i].IsDeleted)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     internal static List<SpaceBase> CollectMarked(IEnumerable<ScanNodeViewModel> roots, ScanNodeViewModel? unmarkedRoot = null)
@@ -48,8 +68,12 @@ internal static class ScanTreeEditor
 
     internal static void CollectMarked(DirectorySpace dir, List<SpaceBase> list)
     {
-        foreach (var sub in dir.SubDirectories)
+        var subs = dir.SubDirectoriesArray;
+
+        for (var i = 0; i < subs.Length; i++)
         {
+            var sub = subs[i];
+
             if (sub.IsDeleted)
             {
                 list.Add(sub);
@@ -60,11 +84,13 @@ internal static class ScanTreeEditor
             }
         }
 
-        foreach (var file in dir.Files)
+        var files = dir.FileEntries;
+
+        for (var i = 0; i < files.Length; i++)
         {
-            if (file.IsDeleted)
+            if (files[i].IsDeleted)
             {
-                list.Add(file);
+                list.Add(dir.GetFile(i));
             }
         }
     }
@@ -261,62 +287,6 @@ internal static class ScanTreeEditor
         return removed;
     }
 
-    internal static (List<SpaceBase> Transferred, int Lost) TransferMarks(IEnumerable<ScanNodeViewModel> previousRoots, DirectorySpace fresh, bool marksPresent)
-    {
-        var transferred = new List<SpaceBase>();
-        var lost = 0;
-
-        if (!marksPresent)
-        {
-            return (transferred, lost);
-        }
-
-        var lookups = new Dictionary<DirectorySpace, ILookup<string, SpaceBase>>(ReferenceEqualityComparer.Instance);
-
-        foreach (var root in previousRoots)
-        {
-            if (root.Space is not DirectorySpace previous)
-            {
-                continue;
-            }
-
-            var marked = new List<SpaceBase>();
-
-            if (previous.IsDeleted)
-            {
-                marked.Add(previous);
-            }
-            else
-            {
-                CollectMarked(previous, marked);
-            }
-
-            foreach (var item in marked)
-            {
-                switch (FindCounterpart(previous, item, fresh, lookups))
-                {
-                    case null:
-                        lost++;
-                        break;
-
-                    case { IsDeleted: false } counterpart:
-                        counterpart.Delete();
-
-                        if (counterpart.IsDeleted)
-                        {
-                            transferred.Add(counterpart);
-                        }
-
-                        break;
-                }
-            }
-        }
-
-        transferred.RemoveAll(HasMarkedAncestor);
-
-        return (transferred, lost);
-    }
-
     internal static bool SamePath(string left, string right)
     {
         if (string.Equals(left, right, StringComparison.Ordinal))
@@ -415,69 +385,6 @@ internal static class ScanTreeEditor
         }
 
         return false;
-    }
-
-    private static bool HasMarkedAncestor(SpaceBase space)
-    {
-        for (var parent = space.Parent; parent is not null; parent = parent.Parent)
-        {
-            if (parent.IsDeleted)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static SpaceBase? FindCounterpart(
-        DirectorySpace previousRoot,
-        SpaceBase item,
-        DirectorySpace fresh,
-        Dictionary<DirectorySpace, ILookup<string, SpaceBase>> lookups)
-    {
-        var steps = new Stack<SpaceBase>();
-
-        for (var current = item; current is not null && !ReferenceEquals(current, previousRoot); current = current.Parent)
-        {
-            steps.Push(current);
-        }
-
-        SpaceBase match = fresh;
-
-        while (steps.TryPop(out var step))
-        {
-            if (match is not DirectorySpace dir || FindChild(dir, step, lookups) is not { } child)
-            {
-                return null;
-            }
-
-            match = child;
-        }
-
-        return match;
-    }
-
-    private static SpaceBase? FindChild(DirectorySpace dir, SpaceBase step, Dictionary<DirectorySpace, ILookup<string, SpaceBase>> lookups)
-    {
-        if (!lookups.TryGetValue(dir, out var children))
-        {
-            children = dir.SubDirectories.Cast<SpaceBase>()
-                .Concat(dir.Files)
-                .ToLookup(static child => child.Name, StringComparer.OrdinalIgnoreCase);
-
-            lookups[dir] = children;
-        }
-
-        var candidates = children[step.Name].Where(child => child is DirectorySpace == step is DirectorySpace).ToList();
-        var exact = candidates.Find(child => string.Equals(child.Name, step.Name, StringComparison.Ordinal));
-
-        if (exact is not null || candidates.Count == 0 || PathCase.IsCaseSensitive(dir.AbsolutePath))
-        {
-            return exact;
-        }
-
-        return candidates[0];
     }
 
     private static bool KeepsMarks(ScanNodeViewModel root, bool marksPresent)

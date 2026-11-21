@@ -256,9 +256,9 @@ public sealed partial class ScanViewModel : IScanAutomation
         ApplyScanResult(result, elapsed, traversal, notes, driveCapacity);
     }
 
-    Task IScanAutomation.ReturnScanMemoryAsync(DirectorySpace result, Action<string> reportPhase, CancellationToken cancellationToken)
+    Task IScanAutomation.ReturnScanMemoryAsync(DirectorySpace result, bool usedMft, Action<string> reportPhase, CancellationToken cancellationToken)
     {
-        return ReturnScanMemoryAsync(result, reportPhase, cancellationToken);
+        return ReturnScanMemoryAsync(result, usedMft, reportPhase, cancellationToken);
     }
 
     Task IScanAutomation.ScanFromAutomationAsync(string path, CancellationToken cancellationToken)

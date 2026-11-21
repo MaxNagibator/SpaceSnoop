@@ -36,7 +36,7 @@ internal sealed class MftLinks(int[] firstChild, int[] nextSibling)
             if (entry.IsLink)
             {
                 table.Statistics.SkippedLinks++;
-                entry.Name = null;
+                entry.ClearName();
                 continue;
             }
 
@@ -50,7 +50,7 @@ internal sealed class MftLinks(int[] firstChild, int[] nextSibling)
                     table.Statistics.OrphanBytes += entry.Size;
                 }
 
-                entry.Name = null;
+                entry.ClearName();
                 continue;
             }
 
@@ -165,7 +165,7 @@ internal sealed class MftLinks(int[] firstChild, int[] nextSibling)
                 table.Statistics.OrphanBytes += entry.Size;
             }
 
-            entry.Name = null;
+            entry.ClearName();
         }
     }
 

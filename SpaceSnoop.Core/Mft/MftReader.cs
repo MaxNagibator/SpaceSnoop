@@ -1,4 +1,5 @@
-﻿using System.Buffers.Binary;
+﻿using SpaceSnoop.Core.Domain;
+using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
@@ -162,6 +163,7 @@ internal static class MftReader
         }
 
         var entries = new MftEntry[records];
+        var arena = new MftNameArena();
         var blockRecords = Math.Max(1, blockBytes / recordSize);
         var blocks = (records + blockRecords - 1) / blockRecords;
         var parts = new MftPart[blocks];
@@ -181,7 +183,7 @@ internal static class MftReader
                 0,
                 blocks,
                 options,
-                () => workers.TryPop(out var idle) ? idle : new(blockRecords * recordSize, alignment),
+                () => workers.TryPop(out var idle) ? idle : new(blockRecords * recordSize, alignment, arena),
                 (block, _, worker) =>
                 {
                     var start = block * blockRecords;
@@ -199,7 +201,8 @@ internal static class MftReader
                             start + offset,
                             entries,
                             part.Pending,
-                            part.Statistics);
+                            part.Statistics,
+                            worker.NameWriter);
                     }
 
                     parts[block] = part;
@@ -213,13 +216,6 @@ internal static class MftReader
         {
             ExceptionDispatchInfo.Capture(exception.Flatten().InnerExceptions[0]).Throw();
         }
-        finally
-        {
-            foreach (var worker in workers)
-            {
-                worker.Dispose();
-            }
-        }
 
         var pending = new MftPending();
         var statistics = new MftStatistics();
@@ -227,7 +223,7 @@ internal static class MftReader
         Merge(parts, pending, statistics);
         ApplyPending(entries, pending, statistics);
 
-        return new(entries, statistics, pending.Alternates);
+        return new(entries, statistics, pending.Alternates, arena);
     }
 
     internal static void ApplyPending(MftEntry[] entries, MftPending pending, MftStatistics statistics)
@@ -268,7 +264,7 @@ internal static class MftReader
                 continue;
             }
 
-            if (entry.Name is null)
+            if (!entry.Name.HasValue)
             {
                 var chosen = names[0];
                 names.RemoveAt(0);
@@ -277,7 +273,7 @@ internal static class MftReader
                 entry.Name = chosen.Name;
             }
 
-            entry.Names = names.Count + 1;
+            entry.Names = (ushort)Math.Min(ushort.MaxValue, names.Count + 1);
 
             if (entry.Names > 1)
             {
@@ -287,7 +283,7 @@ internal static class MftReader
 
         for (var index = MftLayout.FirstUserRecord; index < entries.Length; index++)
         {
-            if (!entries[index].Present || entries[index].Name is not null)
+            if (!entries[index].Present || entries[index].Name.HasValue)
             {
                 continue;
             }
@@ -307,7 +303,8 @@ internal static class MftReader
         int index,
         MftEntry[] entries,
         MftPending pending,
-        MftStatistics statistics)
+        MftStatistics statistics,
+        MftNameArenaWriter writer)
     {
         statistics.RecordsScanned++;
 
@@ -354,7 +351,8 @@ internal static class MftReader
                 (int)baseReference,
                 (ushort)(reference >> MftLayout.ReferenceMaskBits),
                 pending,
-                statistics);
+                statistics,
+                writer);
 
             return;
         }
@@ -399,7 +397,7 @@ internal static class MftReader
 
             if (!nonResident)
             {
-                ReadResident(attribute, type, ref entry, ref bestNamespace, ref names);
+                ReadResident(attribute, type, ref entry, ref bestNamespace, ref names, writer);
             }
 
             if (type == MftLayout.AttributeData && attribute[0x09] == 0 && !entry.SizeKnown)
@@ -412,7 +410,7 @@ internal static class MftReader
 
         if (names > 1 || !entry.Exists)
         {
-            CollectAlternates(record, index, entry, pending);
+            CollectAlternates(record, index, entry, pending, writer);
         }
 
         entries[index] = entry;
@@ -488,7 +486,13 @@ internal static class MftReader
         entry.SizeKnown = true;
     }
 
-    private static void ReadResident(Span<byte> attribute, uint type, ref MftEntry entry, ref byte bestNamespace, ref int names)
+    private static void ReadResident(
+        Span<byte> attribute,
+        uint type,
+        ref MftEntry entry,
+        ref byte bestNamespace,
+        ref int names,
+        MftNameArenaWriter writer)
     {
         var valueOffset = BinaryPrimitives.ReadUInt16LittleEndian(attribute[0x14..]);
 
@@ -502,8 +506,8 @@ internal static class MftReader
         switch (type)
         {
             case MftLayout.AttributeStandardInformation when value.Length >= 0x20:
-                entry.CreationTime = MftLayout.ToDateTime(BinaryPrimitives.ReadInt64LittleEndian(value));
-                entry.LastAccessTime = MftLayout.ToDateTime(BinaryPrimitives.ReadInt64LittleEndian(value[0x18..]));
+                entry.CreationFileTime = BinaryPrimitives.ReadInt64LittleEndian(value);
+                entry.LastAccessFileTime = BinaryPrimitives.ReadInt64LittleEndian(value[0x18..]);
                 break;
 
             case MftLayout.AttributeFileName when value.Length >= FileNameHeaderBytes:
@@ -526,13 +530,14 @@ internal static class MftReader
                     var record = (long)(parent & MftLayout.ReferenceMask);
                     entry.Parent = record <= int.MaxValue ? (int)record : -1;
                     entry.ParentSequence = (ushort)(parent >> MftLayout.ReferenceMaskBits);
-                    entry.Name = MemoryMarshal.Cast<byte, char>(value.Slice(FileNameHeaderBytes, candidateLength * 2)).ToString();
+                    entry.Name = writer.AppendUtf16(value.Slice(FileNameHeaderBytes, candidateLength * 2));
                 }
 
                 break;
 
             case MftLayout.AttributeReparsePoint when value.Length >= 4:
-                entry.ReparseTag = BinaryPrimitives.ReadUInt32LittleEndian(value);
+                var reparseTag = BinaryPrimitives.ReadUInt32LittleEndian(value);
+                entry.IsReparseLink = (reparseTag & MftLayout.ReparseNameSurrogate) != 0;
                 entry.ReparseUnknown = false;
                 break;
         }
@@ -543,7 +548,8 @@ internal static class MftReader
         int baseIndex,
         ushort baseSequence,
         MftPending pending,
-        MftStatistics statistics)
+        MftStatistics statistics,
+        MftNameArenaWriter writer)
     {
         var position = (int)BinaryPrimitives.ReadUInt16LittleEndian(record[0x14..]);
 
@@ -568,7 +574,7 @@ internal static class MftReader
 
             if (type == MftLayout.AttributeFileName && attribute[0x08] == 0)
             {
-                AddName(attribute, baseIndex, pending, baseSequence);
+                AddName(attribute, baseIndex, pending, baseSequence, writer);
             }
             else if (type == MftLayout.AttributeData && attribute[0x09] == 0)
             {
@@ -585,7 +591,7 @@ internal static class MftReader
         }
     }
 
-    private static void CollectAlternates(Span<byte> record, int index, MftEntry entry, MftPending pending)
+    private static void CollectAlternates(Span<byte> record, int index, MftEntry entry, MftPending pending, MftNameArenaWriter writer)
     {
         var position = (int)BinaryPrimitives.ReadUInt16LittleEndian(record[0x14..]);
 
@@ -609,7 +615,7 @@ internal static class MftReader
 
             if (type == MftLayout.AttributeFileName && attribute[0x08] == 0)
             {
-                AddName(attribute, index, pending, entry.Sequence, entry);
+                AddName(attribute, index, pending, entry.Sequence, writer, entry);
             }
 
             position += length;
@@ -621,6 +627,7 @@ internal static class MftReader
         int index,
         MftPending pending,
         ushort baseSequence,
+        MftNameArenaWriter writer,
         MftEntry chosen = default)
     {
         var valueOffset = BinaryPrimitives.ReadUInt16LittleEndian(attribute[0x14..]);
@@ -652,15 +659,19 @@ internal static class MftReader
             return;
         }
 
-        var name = MemoryMarshal.Cast<byte, char>(value.Slice(FileNameHeaderBytes, nameLength * 2)).ToString();
+        var chars = MemoryMarshal.Cast<byte, char>(value.Slice(FileNameHeaderBytes, nameLength * 2));
+        Span<byte> utf8Buffer = stackalloc byte[768];
+        var written = Wtf8.FromUtf16(chars, utf8Buffer);
+        var utf8 = utf8Buffer[..written];
 
-        if (chosen.Exists && chosen.Parent == (int)record && string.Equals(chosen.Name, name, StringComparison.Ordinal))
+        if (chosen.Exists && chosen.Parent == (int)record && writer.Arena.GetUtf8(chosen.Name).SequenceEqual(utf8))
         {
             return;
         }
 
+        var nameRef = writer.AppendUtf8(utf8);
         var alternates = pending.Alternates.TryGetValue(index, out var existing) ? existing : pending.Alternates[index] = [];
-        alternates.Add(new((int)record, (ushort)(reference >> MftLayout.ReferenceMaskBits), name, baseSequence));
+        alternates.Add(new((int)record, (ushort)(reference >> MftLayout.ReferenceMaskBits), nameRef, baseSequence));
     }
 
     private static MftSelfRuns ReadSelfRuns(
@@ -964,27 +975,23 @@ internal sealed class MftPart
     public MftStatistics Statistics { get; } = new();
 }
 
-internal sealed class MftWorker : IDisposable
+internal sealed class MftWorker
 {
     private readonly byte[] _data;
-    private readonly GCHandle _pin;
     private readonly int _offset;
 
-    public MftWorker(int bytes, int alignment)
+    public MftNameArenaWriter NameWriter { get; }
+
+    public MftWorker(int bytes, int alignment, MftNameArena arena)
     {
-        _data = new byte[bytes + alignment];
-        _pin = GCHandle.Alloc(_data, GCHandleType.Pinned);
-        _offset = (int)((alignment - (_pin.AddrOfPinnedObject().ToInt64() % alignment)) % alignment);
+        _data = GC.AllocateUninitializedArray<byte>(bytes + alignment, pinned: true);
+        _offset = (int)((alignment - (Marshal.UnsafeAddrOfPinnedArrayElement(_data, 0).ToInt64() % alignment)) % alignment);
+        NameWriter = new(arena);
     }
 
     public Span<byte> Buffer(int bytes)
     {
         return _data.AsSpan(_offset, bytes);
-    }
-
-    public void Dispose()
-    {
-        _pin.Free();
     }
 }
 

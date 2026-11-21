@@ -147,7 +147,7 @@ public sealed partial class ScanViewModel
 
             _logger.ScanPhases((long)elapsed.TotalMilliseconds, (long)applied.Elapsed.TotalMilliseconds);
 
-            await ReturnScanMemoryAsync(outcome.Root, Progress.ReportPhase, token);
+            await ReturnScanMemoryAsync(outcome.Root, outcome.Notes.UsedMft, Progress.ReportPhase, token);
 
             _uiDispatcher.Invoke(() => _notifier.Notify($"Сканирование завершено: {outcome.Root.AbsolutePath} · {outcome.Root.TotalSizeText}", StatusSeverity.Success));
             return true;

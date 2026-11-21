@@ -49,7 +49,7 @@ public interface IScanAutomation
         ApplyScanResult(result, elapsed, traversal, notes);
     }
 
-    Task ReturnScanMemoryAsync(DirectorySpace result, Action<string> reportPhase, CancellationToken cancellationToken);
+    Task ReturnScanMemoryAsync(DirectorySpace result, bool usedMft, Action<string> reportPhase, CancellationToken cancellationToken);
 
     Task ScanFromAutomationAsync(string path, CancellationToken cancellationToken);
 

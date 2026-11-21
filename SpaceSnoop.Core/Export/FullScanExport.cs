@@ -80,19 +80,20 @@ public static class FullScanExport
         {
             cancel.ThrowIfCancellationRequested();
 
-            var fileIndex = 0;
+            var fileEntries = item.Directory.FileEntries;
 
-            foreach (var file in item.Directory.Files)
+            for (var i = 0; i < fileEntries.Length; i++)
             {
-                if ((fileIndex++ & 1023) == 0)
+                if ((i & 1023) == 0)
                 {
                     cancel.ThrowIfCancellationRequested();
                 }
 
-                var path = item.Path.Length == 0 ? file.Name : Path.Combine(item.Path, file.Name);
+                var fileName = item.Directory.GetFileName(i);
+                var path = item.Path.Length == 0 ? fileName : Path.Combine(item.Path, fileName);
                 writer.WriteStartObject();
                 writer.WriteString("path", path);
-                writer.WriteNumber("bytes", file.Size);
+                writer.WriteNumber("bytes", fileEntries[i].Size);
                 writer.WriteEndObject();
 
                 completed++;
@@ -127,9 +128,11 @@ public static class FullScanExport
         int depth,
         Stack<(DirectorySpace Directory, string Path, int Depth)> destination)
     {
-        for (var index = parent.SubDirectories.Count - 1; index >= 0; index--)
+        var subs = parent.SubDirectoriesArray;
+
+        for (var index = subs.Length - 1; index >= 0; index--)
         {
-            var directory = parent.SubDirectories[index];
+            var directory = subs[index];
             var childPath = path.Length == 0 ? directory.Name : Path.Combine(path, directory.Name);
             destination.Push((directory, childPath, depth));
         }
@@ -140,9 +143,11 @@ public static class FullScanExport
         string path,
         Stack<(DirectorySpace Directory, string Path)> destination)
     {
-        for (var index = parent.SubDirectories.Count - 1; index >= 0; index--)
+        var subs = parent.SubDirectoriesArray;
+
+        for (var index = subs.Length - 1; index >= 0; index--)
         {
-            var directory = parent.SubDirectories[index];
+            var directory = subs[index];
             var childPath = path.Length == 0 ? directory.Name : Path.Combine(path, directory.Name);
             destination.Push((directory, childPath));
         }

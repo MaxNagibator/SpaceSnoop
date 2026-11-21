@@ -264,4 +264,25 @@ public class ScanProgressTests
     {
         Assert.That(ScanViewModel.ShouldReturnScanMemory(load, threshold), Is.EqualTo(expected));
     }
+
+    [TestCase(false, false, 0L, 100L, nameof(ScanMemoryAction.None))]
+    [TestCase(false, false, 100L, 100L, nameof(ScanMemoryAction.None))]
+    [TestCase(false, true, 0L, 100L, nameof(ScanMemoryAction.ReclaimMft))]
+    [TestCase(false, true, 100L, 100L, nameof(ScanMemoryAction.ReclaimMft))]
+    [TestCase(true, false, 99L, 100L, nameof(ScanMemoryAction.None))]
+    [TestCase(true, false, 100L, 100L, nameof(ScanMemoryAction.Compact))]
+    [TestCase(true, false, 100L, 0L, nameof(ScanMemoryAction.None))]
+    [TestCase(true, true, 0L, 100L, nameof(ScanMemoryAction.Compact))]
+    [TestCase(true, true, 100L, 100L, nameof(ScanMemoryAction.Compact))]
+    public void Выбор_действия_возврата_памяти_учитывает_настройку_MFT_и_давление(
+        bool returnMemoryAfterScan,
+        bool usedMft,
+        long loadBytes,
+        long thresholdBytes,
+        string expected)
+    {
+        Assert.That(
+            ScanViewModel.SelectScanMemoryAction(returnMemoryAfterScan, usedMft, loadBytes, thresholdBytes),
+            Is.EqualTo(Enum.Parse<ScanMemoryAction>(expected)));
+    }
 }

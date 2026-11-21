@@ -80,6 +80,11 @@ public sealed partial class ScanMarksViewModel : ObservableObject
 
     internal void RecountMarkedAfterScan(ScanNodeViewModel freshRoot, List<SpaceBase> transferred)
     {
+        if (!HasMarked && transferred.Count == 0)
+        {
+            return;
+        }
+
         var marked = ScanTreeEditor.CollectMarked(_roots, freshRoot);
         marked.AddRange(transferred);
         Recount(marked);

@@ -88,4 +88,13 @@ internal sealed class MftStatistics
     }
 }
 
-internal sealed record MftTable(MftEntry[] Entries, MftStatistics Statistics, Dictionary<int, List<MftName>> Alternates);
+internal sealed record MftTable(
+    MftEntry[] Entries,
+    MftStatistics Statistics,
+    Dictionary<int, List<MftName>> Alternates,
+    MftNameArena Names)
+{
+    public string GetName(MftNameRef name) => Names.GetString(name);
+
+    public string GetName(int index) => Names.GetString(Entries[index].Name);
+}

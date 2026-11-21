@@ -123,7 +123,7 @@ internal sealed class ScanAutomationDouble : IScanAutomation
         return Task.CompletedTask;
     }
 
-    public Task ReturnScanMemoryAsync(DirectorySpace result, Action<string> reportPhase, CancellationToken cancellationToken)
+    public Task ReturnScanMemoryAsync(DirectorySpace result, bool usedMft, Action<string> reportPhase, CancellationToken cancellationToken)
     {
         return Task.CompletedTask;
     }

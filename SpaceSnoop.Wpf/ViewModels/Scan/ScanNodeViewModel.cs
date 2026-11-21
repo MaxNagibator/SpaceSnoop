@@ -27,7 +27,7 @@ public sealed partial class ScanNodeViewModel : ObservableObject
 
     public bool IsDirectory => Space is DirectorySpace;
 
-    public bool HasChildren => Space is DirectorySpace dir && (dir.SubDirectories.Count + dir.Files.Count) > 0;
+    public bool HasChildren => Space is DirectorySpace dir && (dir.FileCount > 0 || dir.SubDirectoriesArray.Length > 0);
 
     public string Name => Space?.Name ?? string.Empty;
 
@@ -139,12 +139,13 @@ public sealed partial class ScanNodeViewModel : ObservableObject
 
     public bool CanAskAgent => Space is not null && _factory?.ChatEnabled == true;
 
-    public bool CanMarkContentsDeleted => Space is DirectorySpace dir
-        && EnumerateChildren(dir).Any(static child => child.State == SpaceState.Added);
+    public bool CanMarkContentsDeleted => Space is DirectorySpace dir && HasAddedChild(dir);
 
     public bool CanUnmarkContents => IsDirectory && HasMarkedContents;
 
     public IReadOnlyList<ScanNodeViewModel> PreviewTiles => _previewTiles ??= BuildPreviewTiles();
+
+    internal bool HasIgnoredItems => _factory?.Visibility.Count > 0;
 
     private long OwnSize => Space is DirectorySpace dir
         ? IsIgnored ? dir.Size : _factory?.Visibility.OwnSizeOf(dir) ?? dir.Size
@@ -152,7 +153,7 @@ public sealed partial class ScanNodeViewModel : ObservableObject
 
     private bool HasMarkedContents => _factory?.MarksPresent == true
         && Space is DirectorySpace dir
-        && EnumerateChildren(dir).Any(HasDeletedRecursive);
+        && HasMarkedChild(dir);
 
     internal ScanNodeViewModel(
         SpaceBase space,
@@ -205,7 +206,18 @@ public sealed partial class ScanNodeViewModel : ObservableObject
 
         _loaded = true;
 
-        var items = EnumerateChildren(dir).ToList();
+        var subs = dir.SubDirectoriesArray;
+        var items = new List<SpaceBase>(subs.Length + dir.FileCount);
+
+        for (var i = 0; i < subs.Length; i++)
+        {
+            items.Add(subs[i]);
+        }
+
+        for (var i = 0; i < dir.FileCount; i++)
+        {
+            items.Add(dir.GetFile(i));
+        }
 
         var localMax = items.Where(IsVisible).Select(VisibleSize).DefaultIfEmpty().Max();
 
@@ -262,6 +274,11 @@ public sealed partial class ScanNodeViewModel : ObservableObject
         return _factory?.Visibility.IsIgnored(space) != true;
     }
 
+    internal bool HasIgnoredFileIn(DirectorySpace dir)
+    {
+        return _factory?.Visibility.HasIgnoredFileIn(dir) == true;
+    }
+
     internal int VisibleFileCount(DirectorySpace dir)
     {
         return _factory?.Visibility.FileCountOf(dir) ?? dir.TotalFileCount;
@@ -297,32 +314,6 @@ public sealed partial class ScanNodeViewModel : ObservableObject
 
         _previewTiles = null;
         NotifyPropertiesChanged();
-    }
-
-    internal static void RestoreRecursive(SpaceBase space)
-    {
-        if (space.IsDeleted)
-        {
-            space.Restore();
-        }
-
-        if (space is not DirectorySpace dir)
-        {
-            return;
-        }
-
-        foreach (var sub in dir.SubDirectories)
-        {
-            RestoreRecursive(sub);
-        }
-
-        foreach (var file in dir.Files)
-        {
-            if (file.IsDeleted)
-            {
-                file.Restore();
-            }
-        }
     }
 
     private void RefreshLoadedChildrenVisibility(
@@ -377,25 +368,10 @@ public sealed partial class ScanNodeViewModel : ObservableObject
         return max;
     }
 
-    private static IEnumerable<SpaceBase> EnumerateChildren(DirectorySpace dir)
-    {
-        return dir.SubDirectories.Cast<SpaceBase>().Concat(dir.Files);
-    }
-
     private IReadOnlyList<ScanNodeViewModel> BuildPreviewTiles()
     {
         EnsureLoaded();
         return ScanTopSelector.SelectTopWeightedNodes(Children, AppDefaults.TreemapPreviewLimit, out _);
-    }
-
-    private static bool HasDeletedRecursive(SpaceBase space)
-    {
-        if (space.IsDeleted)
-        {
-            return true;
-        }
-
-        return space is DirectorySpace dir && EnumerateChildren(dir).Any(HasDeletedRecursive);
     }
 
     partial void OnIsExpandedChanged(bool value)

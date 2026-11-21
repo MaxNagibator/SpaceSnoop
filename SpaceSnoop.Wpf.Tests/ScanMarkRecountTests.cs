@@ -204,6 +204,89 @@ public class ScanMarkRecountTests
         CheckTotals(0, 0);
     }
 
+    [Test]
+    public void Пересчёт_после_скана_пропускается_без_пометок_и_сбрасывается_при_потере_всех()
+    {
+        var existing = AddTree("existing");
+        existing.Files.Single().Delete();
+
+        var freshWithoutMarks = new DirectorySpace(Path.Combine(_directory, "fresh1"), null, DateTime.Now, DateTime.Now);
+        var freshNode1 = Node(freshWithoutMarks, freshWithoutMarks);
+        _roots.Add(freshNode1);
+        _marks.RecountMarkedAfterScan(freshNode1, []);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(_marks.HasMarked, Is.False);
+            Assert.That(_marks.MarkedCount, Is.EqualTo(0));
+        }
+
+        _roots.Clear();
+        var markedRoot = AddTree("marked");
+        Node(markedRoot.Files.Single(), markedRoot).MarkDeletedCommand.Execute(null);
+        Assert.That(_marks.HasMarked, Is.True);
+
+        _roots.Clear();
+        var freshAfterLoss = new DirectorySpace(Path.Combine(_directory, "fresh2"), null, DateTime.Now, DateTime.Now);
+        var freshNode2 = Node(freshAfterLoss, freshAfterLoss);
+        _roots.Add(freshNode2);
+        _marks.RecountMarkedAfterScan(freshNode2, []);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(_marks.HasMarked, Is.False);
+            Assert.That(_marks.MarkedCount, Is.EqualTo(0));
+            Assert.That(_marks.MarkedSizeText, Is.Empty);
+            Assert.That(_factory.MarksPresent, Is.False);
+        }
+    }
+
+    [Test]
+    public void Сбор_и_поиск_пометок_работают_на_дереве_из_ScanTreeStore()
+    {
+        var store = new ScanTreeStore();
+        var writer = new FileSlabWriter(store);
+        var root = new DirectorySpace(store, store.Names.Intern(@"C:\StoreRoot"), null, 0, 0, 0);
+        var branch = new DirectorySpace(store, store.Names.Intern("branch"), root, 0, 0, 0);
+
+        writer.WriteFiles(
+            [
+                new FileEntry { Size = 10, NameId = store.Names.Intern("clean.bin"), State = SpaceState.Added },
+                new FileEntry { Size = 25, NameId = store.Names.Intern("marked.bin"), State = SpaceState.Added },
+            ],
+            out var branchStart);
+        branch.SetScanned(store, branchStart, 2, 35, []);
+
+        writer.WriteFiles(
+            [new FileEntry { Size = 40, NameId = store.Names.Intern("root.bin"), State = SpaceState.Added }],
+            out var rootStart);
+        root.SetScanned(store, rootStart, 1, 40, [branch]);
+        store.Freeze();
+        root.AggregateTotals();
+
+        Assert.That(ScanTreeEditor.HasMarkedSelfOrChild(root), Is.False);
+        Assert.That(ScanTreeEditor.CollectMarked(root), Is.Empty);
+
+        var target = branch.GetFile(1);
+        target.Delete();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(ScanTreeEditor.HasMarkedSelfOrChild(root), Is.True);
+            var collected = ScanTreeEditor.CollectMarked(root);
+            Assert.That(collected, Has.Count.EqualTo(1));
+            Assert.That(collected[0], Is.SameAs(target));
+        }
+
+        ScanNodeViewModel.RestoreRecursive(root);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(ScanTreeEditor.HasMarkedSelfOrChild(root), Is.False);
+            Assert.That(ScanTreeEditor.CollectMarked(root), Is.Empty);
+        }
+    }
+
     private DirectorySpace AddTree(string name)
     {
         var root = new DirectorySpace(Path.Combine(_directory, name), null, DateTime.Now, DateTime.Now);
