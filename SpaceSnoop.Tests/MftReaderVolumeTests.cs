@@ -1,4 +1,5 @@
-﻿using SpaceSnoop.Core.Mft;
+﻿using SpaceSnoop.Core;
+using SpaceSnoop.Core.Mft;
 
 namespace SpaceSnoop.Tests;
 
@@ -7,6 +8,44 @@ public class MftReaderVolumeTests
 {
     private const int Records = 32;
     private const char Letter = 'T';
+
+    [Test]
+    public void Готовность_тома_сообщается_после_чтения_собственной_записи_MFT()
+    {
+        var image = new MftVolumeBuilder()
+            .Record(20, new MftRecordBuilder().FileName(MftLayout.RootRecord, 1, "отчёт.pdf").ResidentData(128))
+            .Build(Records);
+
+        var progress = new ScanProgress();
+        var readyCalls = 0;
+        var readyAtSecondRead = -1;
+        var readyAtThirdRead = -1;
+
+        progress.OnVolumeReady(() => Interlocked.Increment(ref readyCalls));
+
+        var volume = new MftCountingVolume(
+            image,
+            x =>
+            {
+                if (x == 2)
+                {
+                    readyAtSecondRead = Volatile.Read(ref readyCalls);
+                }
+                else if (x == 3)
+                {
+                    readyAtThirdRead = Volatile.Read(ref readyCalls);
+                }
+            });
+
+        MftReader.Read(volume, Letter, 1, 4096, progress, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(readyAtSecondRead, Is.Zero);
+            Assert.That(readyAtThirdRead, Is.EqualTo(1));
+            Assert.That(Volatile.Read(ref readyCalls), Is.EqualTo(1));
+        }
+    }
 
     [Test]
     public void Записи_тома_читаются_подряд()

@@ -18,6 +18,7 @@ public sealed class ScanProgress
     private int _topLevelTotal;
     private int _topLevelCompleted;
     private volatile object _current = string.Empty;
+    private Action? _volumeReady;
 
     /// <summary>Каталогов пройдено (включая корень).</summary>
     public long DirectoriesScanned => Interlocked.Read(ref _directoriesScanned);
@@ -51,6 +52,23 @@ public sealed class ScanProgress
     public void Announce(string stage)
     {
         _current = new Stage(stage);
+    }
+
+    /// <summary>
+    /// Регистрирует одноразовый колбэк готовности тома после завершения стартового сброса DASD.
+    /// </summary>
+    /// <param name="callback">Действие, выполняемое после первого чтения за загрузочным сектором.</param>
+    public void OnVolumeReady(Action? callback)
+    {
+        Volatile.Write(ref _volumeReady, callback);
+    }
+
+    /// <summary>
+    /// Сообщает о завершении стартового обращения к тому и однократно запускает зарегистрированный колбэк.
+    /// </summary>
+    public void NotifyVolumeReady()
+    {
+        Interlocked.Exchange(ref _volumeReady, null)?.Invoke();
     }
 
     /// <summary>

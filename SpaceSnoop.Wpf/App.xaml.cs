@@ -253,6 +253,7 @@ public partial class App : Application
             AppThemes.Register(typeof(App).Assembly);
             ThemeManager.Apply(AppThemes.StartupKey(settings, freshProfile));
             FontScaleManager.Initialize(settings.GetDouble(SettingsKeys.FontScale, FontScaleManager.DefaultScale));
+            DirectWriteFontPin.PinSystemFonts();
 
             ViewLocator.InstallIntoApplication();
 

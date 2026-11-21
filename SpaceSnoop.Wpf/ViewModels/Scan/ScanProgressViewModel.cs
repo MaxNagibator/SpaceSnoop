@@ -8,8 +8,11 @@ public sealed partial class ScanProgressViewModel : ObservableObject
     internal const string MeasuringText = "считаем…";
 
     private readonly PerformanceOperations _operations;
+    private readonly IUiDispatcher _uiDispatcher;
     private readonly IUiTimer _progressTimer;
     private readonly Lock _estimateGate = new();
+    private static readonly Lock EstimateProbeGate = new();
+    private static readonly Dictionary<string, Task<long?>> ActiveVolumeProbes = new(StringComparer.OrdinalIgnoreCase);
 
     private ScanProgress? _progress;
     private PerformanceOperation? _reported;
@@ -81,6 +84,7 @@ public sealed partial class ScanProgressViewModel : ObservableObject
     public ScanProgressViewModel(PerformanceOperations operations, IUiDispatcher uiDispatcher)
     {
         _operations = operations;
+        _uiDispatcher = uiDispatcher;
 
         _progressTimer = uiDispatcher.CreateTimer(UiProgressPoller.DefaultInterval, OnProgressTick);
     }
@@ -95,7 +99,52 @@ public sealed partial class ScanProgressViewModel : ObservableObject
         return TryGetVolumeRoot(directory, out var root) ? VolumeUsedReader(root) : null;
     }
 
-    internal ScanProgress Begin(DirectoryInfo directory, string path, int parallelism, long? estimatedTotalBytes = null)
+    internal static Task<long?> EstimateTotalBytesAsync(DirectoryInfo directory, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!TryGetVolumeRoot(directory, out var root))
+        {
+            return Task.FromResult<long?>(null);
+        }
+
+        Task<long?> probe;
+        var reader = VolumeUsedReader;
+
+        lock (EstimateProbeGate)
+        {
+            if (!ActiveVolumeProbes.TryGetValue(root, out probe!))
+            {
+                probe = ProbeVolumeAsync(root, reader);
+                ActiveVolumeProbes[root] = probe;
+            }
+        }
+
+        return probe.WaitAsync(cancellationToken);
+    }
+
+    private static async Task<long?> ProbeVolumeAsync(string volumeRoot, Func<string, long?> reader)
+    {
+        try
+        {
+            return await Task.Run(() => reader(volumeRoot)).ConfigureAwait(false);
+        }
+        finally
+        {
+            lock (EstimateProbeGate)
+            {
+                ActiveVolumeProbes.Remove(volumeRoot);
+            }
+        }
+    }
+
+    internal ScanProgress Begin(
+        DirectoryInfo directory,
+        string path,
+        int parallelism,
+        long? estimatedTotalBytes = null,
+        bool deferTimer = false,
+        bool probeEstimate = true)
     {
         int runId;
 
@@ -112,10 +161,18 @@ public sealed partial class ScanProgressViewModel : ObservableObject
         Traversal = null;
 
         ResetLiveProgress(path);
-        _progressTimer.Start();
+        if (!deferTimer)
+        {
+            _progressTimer.Start();
+        }
+        else
+        {
+            _progress.OnVolumeReady(() => ResumeProgressTimer(runId));
+        }
+
         UpdateLiveProgress();
 
-        if (estimatedTotalBytes is null && TryGetVolumeRoot(directory, out var volumeRoot))
+        if (probeEstimate && estimatedTotalBytes is null && TryGetVolumeRoot(directory, out var volumeRoot))
         {
             var reader = VolumeUsedReader;
             PendingEstimate = Task.Run(() => ProbeTotalBytes(runId, volumeRoot, reader));
@@ -126,6 +183,23 @@ public sealed partial class ScanProgressViewModel : ObservableObject
         }
 
         return _progress;
+    }
+
+    private void ResumeProgressTimer(int runId)
+    {
+        _uiDispatcher.Invoke(() =>
+        {
+            lock (_estimateGate)
+            {
+                if (runId != _runId || _progress is null)
+                {
+                    return;
+                }
+            }
+
+            _progressTimer.Start();
+            UpdateLiveProgress();
+        });
     }
 
     internal void ShiftStartForAutomation(TimeSpan elapsed)
@@ -149,6 +223,7 @@ public sealed partial class ScanProgressViewModel : ObservableObject
 
         if (_progress is { } progress)
         {
+            progress.OnVolumeReady(null);
             Traversal = Describe(progress.CreateSnapshot());
         }
 

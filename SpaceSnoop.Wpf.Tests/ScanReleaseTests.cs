@@ -116,6 +116,34 @@ public class ScanReleaseTests
     }
 
     [Test]
+    public async Task Ожидание_кадра_не_ждёт_свёрнутое_главное_окно()
+    {
+        var operations = _services.GetRequiredService<PerformanceOperations>();
+        var app = Application.Current;
+        var previousWindow = app.MainWindow;
+        using var host = VisualTestHost.Show(new(), 800, 600);
+        host.Window.WindowState = WindowState.Minimized;
+        app.MainWindow = host.Window;
+
+        try
+        {
+            var stopwatch = Stopwatch.StartNew();
+            var waited = await operations.WaitForRenderedFrameAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+            stopwatch.Stop();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(waited, Is.False);
+                Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromMilliseconds(500)));
+            }
+        }
+        finally
+        {
+            app.MainWindow = previousWindow;
+        }
+    }
+
+    [Test]
     public void Игнорирование_всех_детей_даёт_пустую_карту_и_сохраняет_узлы_дерева()
     {
         var root = ArrangeDisplayTree();

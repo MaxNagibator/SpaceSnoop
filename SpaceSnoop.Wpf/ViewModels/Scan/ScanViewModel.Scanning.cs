@@ -108,6 +108,8 @@ public sealed partial class ScanViewModel
                 NetworkDiscovery.Remember(targetPath);
             }
 
+            var lastDriveChanged = false;
+
             _uiDispatcher.Invoke(() =>
             {
                 var known = Drives.HasDrive(targetPath);
@@ -118,11 +120,36 @@ public sealed partial class ScanViewModel
                     Drives.LoadDriveLabels();
                 }
 
-                Persist(() => _settings.SetValue(SettingsKeys.ScanLastDrive, targetPath));
+                if (!string.Equals(_settings.GetStringValue(SettingsKeys.ScanLastDrive), targetPath, StringComparison.Ordinal))
+                {
+                    Persist(() =>
+                    {
+                        _settings.SetValue(SettingsKeys.ScanLastDrive, targetPath);
+                        lastDriveChanged = true;
+                    });
+                }
+
                 released = ReleaseBeforeScan(directory);
             });
+
+            if (lastDriveChanged)
+            {
+                await Task.Run(() => Persist(_settings.Flush), CancellationToken.None);
+                token.ThrowIfCancellationRequested();
+            }
             var parallelism = await Preferences.ResolveParallelismAsync(targetPath).WaitAsync(token);
-            var progress = Progress.Begin(directory, targetPath, parallelism);
+            var willUseMft = Preferences.MftEnabled
+                && (!Preferences.MftRootOnly || ScanRunner.IsVolumeRoot(directory));
+            var estimatedBytes = willUseMft
+                ? await ScanProgressViewModel.EstimateTotalBytesAsync(directory, token)
+                : null;
+            var progress = Progress.Begin(
+                directory,
+                targetPath,
+                parallelism,
+                estimatedBytes,
+                deferTimer: willUseMft,
+                probeEstimate: !willUseMft);
 
             if (parallelism == 1 && Preferences.UseMultithreading && Preferences.MaxParallelism > 1)
             {
@@ -130,6 +157,11 @@ public sealed partial class ScanViewModel
             }
 
             _logger.ScanStarted(targetPath, parallelism > 1, parallelism);
+
+            if (willUseMft)
+            {
+                await _performance.WaitForRenderedFrameAsync(token);
+            }
 
             var outcome = await RunTraversalAsync(directory, parallelism, progress, token);
             token.ThrowIfCancellationRequested();

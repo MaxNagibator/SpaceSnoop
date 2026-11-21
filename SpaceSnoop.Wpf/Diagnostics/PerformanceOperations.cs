@@ -1,10 +1,13 @@
 ﻿using KeepShell.Diagnostics;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace SpaceSnoop.Wpf.Diagnostics;
 
 public sealed class PerformanceOperations(PerformanceMonitor monitor)
 {
+    private static readonly TimeSpan DefaultRenderedFrameTimeout = TimeSpan.FromMilliseconds(250);
+
     private readonly Dispatcher _dispatcher = Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
 
     private readonly Lock _gate = new();
@@ -110,6 +113,96 @@ public sealed class PerformanceOperations(PerformanceMonitor monitor)
             : Task.CompletedTask;
     }
 
+    public Task WaitForRenderedFrameAsync(CancellationToken cancellationToken = default)
+    {
+        return WaitForRenderedFrameAsync(DefaultRenderedFrameTimeout, cancellationToken);
+    }
+
+    internal async Task<bool> WaitForRenderedFrameAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(timeout);
+        var waitToken = timeoutCts.Token;
+
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        EventHandler? handler = null;
+        Application? subscribedApp = null;
+
+        try
+        {
+            await FlushFramesAsync().WaitAsync(waitToken);
+
+            RefreshWindowVisibility();
+
+            if (!Volatile.Read(ref _hasVisibleWindow) || Application.Current is not { } app || app.Dispatcher.HasShutdownStarted)
+            {
+                return false;
+            }
+
+            subscribedApp = app;
+            var skipped = false;
+
+            await app.Dispatcher.InvokeAsync(
+                () =>
+                {
+                    if (app.MainWindow is not { IsVisible: true } window || window.WindowState == WindowState.Minimized)
+                    {
+                        skipped = true;
+                        return;
+                    }
+
+                    var remaining = 2;
+                    handler = (_, _) =>
+                    {
+                        if (--remaining > 0)
+                        {
+                            return;
+                        }
+
+                        if (Interlocked.Exchange(ref handler, null) is { } current)
+                        {
+                            CompositionTarget.Rendering -= current;
+                        }
+
+                        tcs.TrySetResult();
+                    };
+                    CompositionTarget.Rendering += handler;
+                },
+                DispatcherPriority.Normal,
+                waitToken);
+
+            if (skipped)
+            {
+                return false;
+            }
+
+            await tcs.Task.WaitAsync(waitToken);
+            return true;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
+        finally
+        {
+            if (subscribedApp is { } app
+                && Interlocked.Exchange(ref handler, null) is { } current
+                && !app.Dispatcher.HasShutdownStarted)
+            {
+                if (app.Dispatcher.CheckAccess())
+                {
+                    CompositionTarget.Rendering -= current;
+                }
+                else
+                {
+                    _ = app.Dispatcher.BeginInvoke(() => CompositionTarget.Rendering -= current);
+                }
+            }
+        }
+    }
+
     public void ClearRun()
     {
         if (Volatile.Read(ref _last) is null)
@@ -129,7 +222,7 @@ public sealed class PerformanceOperations(PerformanceMonitor monitor)
         }
         else if (app.Dispatcher.CheckAccess())
         {
-            Volatile.Write(ref _hasVisibleWindow, app.MainWindow?.IsVisible == true);
+            Volatile.Write(ref _hasVisibleWindow, app.MainWindow is { IsVisible: true } window && window.WindowState != WindowState.Minimized);
         }
     }
 

@@ -70,6 +70,22 @@ public class ScanRunnerTests
     }
 
     [Test]
+    public void Откат_с_MFT_на_обход_всё_равно_сообщает_о_готовности_тома()
+    {
+        var progress = new Core.ScanProgress();
+        var ready = 0;
+        progress.OnVolumeReady(() => ready++);
+
+        var outcome = Runner(mftEnabled: true, mftRootOnly: true).Run(new(_tempDir), 1, progress, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(outcome.Notes.UsedMft, Is.False);
+            Assert.That(ready, Is.EqualTo(1));
+        }
+    }
+
+    [Test]
     public void Обход_каталогами_докладывает_свой_параллелизм()
     {
         var outcome = Runner(mftEnabled: false).Run(new(_tempDir), 4, new(), CancellationToken.None);

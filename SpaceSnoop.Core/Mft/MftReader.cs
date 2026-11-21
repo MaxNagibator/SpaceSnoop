@@ -133,6 +133,7 @@ internal static class MftReader
 
         var self = new byte[recordSize];
         volume.ReadAt(mftCluster * bytesPerCluster, self);
+        progress?.NotifyVolumeReady();
 
         if (!"FILE"u8.SequenceEqual(self.AsSpan(0, 4)) || !MftLayout.ApplyFixup(self, bytesPerSector))
         {

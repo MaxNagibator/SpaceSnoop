@@ -15,6 +15,8 @@ public sealed class ScanRunner(
             return outcome;
         }
 
+        progress.NotifyVolumeReady();
+
         var root = parallelism > 1
             ? calculator.CalculateMultithreaded(directory, parallelism, progress, cancel)
             : calculator.Calculate(directory, progress, cancel);

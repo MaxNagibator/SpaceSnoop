@@ -786,6 +786,20 @@ public class PerformanceTests
         Assert.That(PerformanceText.Rate(operation), Is.EqualTo($"50 файлов/с · {SizeFormatter.Format(1024)}/с"));
     }
 
+    [Test]
+    public async Task Ожидание_кадра_завершается_сразу_без_видимого_окна_и_учитывает_отмену()
+    {
+        using var monitor = TestDiagnostics.Monitor();
+        var operations = new PerformanceOperations(monitor);
+
+        await operations.WaitForRenderedFrameAsync(CancellationToken.None);
+
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+
+        await Assert.CatchAsync<OperationCanceledException>(() => operations.WaitForRenderedFrameAsync(cancelled.Token));
+    }
+
     private static PerformanceOperation Page()
     {
         return new("Сканирование", 1, 1, TimeSpan.FromSeconds(1));
