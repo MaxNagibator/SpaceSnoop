@@ -49,6 +49,9 @@ public partial class App : Application
         services.AddSingleton<ScanPreferences>();
         services.AddSingleton<UpdatePreferences>();
         services.AddSingleton<ThemeSelectionViewModel>();
+        services.AddSingleton(AppThemes.Packages);
+        services.AddSingleton(AppThemes.Catalog);
+        services.AddSingleton<ThemePacksViewModel>();
         services.AddSingleton<SystemTheme>();
 
         services.AddSingleton(
@@ -422,6 +425,7 @@ public partial class App : Application
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         AppThemes.Register(typeof(App).Assembly);
+        AppThemes.Packages.RegisterInstalled();
 
         var directory = Path.Combine(AppStorage.DataDirectory, GalleryRunner.FolderName);
         var options = GalleryOptions.Parse(args, directory);

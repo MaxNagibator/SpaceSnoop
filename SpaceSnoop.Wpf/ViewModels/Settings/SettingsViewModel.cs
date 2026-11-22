@@ -42,6 +42,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     public SettingsSectionList Sections { get; } = CreateSections();
 
     public ThemeSelectionViewModel Theme { get; }
+    public ThemePacksViewModel ThemePacks { get; }
 
     public ShellPreferences Shell { get; }
 
@@ -216,6 +217,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
 
     public SettingsViewModel(
         ThemeSelectionViewModel theme,
+        ThemePacksViewModel themePacks,
         ShellPreferences shell,
         OperationPreferences operations,
         ScanPreferences scan,
@@ -238,6 +240,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         AgentModel = agentModels;
         _agentBackends = agentBackends;
         Theme = theme;
+        ThemePacks = themePacks;
         Shell = shell;
         Operations = operations;
         Scan = scan;

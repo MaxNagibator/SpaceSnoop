@@ -1,5 +1,7 @@
 ﻿using MahApps.Metro.IconPacks;
+using Serilog;
 using SpaceSnoop.Wpf.Converters;
+using System.IO;
 using System.Reflection;
 
 namespace SpaceSnoop.Wpf.Bootstrap;
@@ -10,6 +12,14 @@ public static class AppThemes
     public const string DarkKey = "dark";
     public const string SystemKey = "system";
     public const string SystemDisplayName = "Как в системе";
+
+    private static readonly Lazy<ThemePackLoader> PackLoader = new(() =>
+        new ThemePackLoader(Path.Combine(AppStorage.DataDirectory, "Themes"), LogThemeLoadFailure));
+
+    internal static ThemePackLoader Packages => PackLoader.Value;
+
+    internal static ThemePackCatalog Catalog { get; } = new(
+        new Uri("https://github.com/TheVSAKeeper/KeepShell.Themes/releases/latest/download/themes.json"));
 
     public static void Register(Assembly? themeModules = null)
     {
@@ -40,6 +50,9 @@ public static class AppThemes
             });
     }
 
+    private static void LogThemeLoadFailure(string path, Exception error) =>
+        Log.Warning(error, "Пакет темы пропущен: {ThemePackPath}", path);
+
     public static string StartupKey(ISettingsStore settings, bool freshProfile)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -49,10 +62,13 @@ public static class AppThemes
             settings.SetValue(SettingsKeys.Theme, AppDefaults.ThemeDefault);
         }
 
-        var stored = settings.GetStringValue(SettingsKeys.Theme);
-        return string.IsNullOrWhiteSpace(stored)
-            ? LightKey
-            : ThemeManager.Find(stored.Trim())?.Key ?? AppDefaults.ThemeDefault;
+        var stored = settings.GetStringValue(SettingsKeys.Theme)?.Trim();
+        if (string.IsNullOrEmpty(stored))
+        {
+            return LightKey;
+        }
+
+        return Packages.Restore(settings) ?? AppDefaults.ThemeDefault;
     }
 
     public static void FollowSystem(bool appsUseLightTheme)
