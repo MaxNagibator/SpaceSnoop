@@ -1,4 +1,5 @@
 ﻿using KeepShell.Bootstrap;
+using KeepShell.Services;
 using KeepShell.Testing;
 using KeepShell.ViewModels;
 using KeepShell.Views.Controls;
@@ -307,16 +308,15 @@ public partial class BindingSmokeTests
     }
 
     [Test]
-    public void Каталог_тем_в_DI_подключён_и_ViewLocator_разрешает_модальное_окно_каталога()
+    public void Каталог_тем_в_DI_подключён_и_открывается_через_оконный_сервис()
     {
         var settings = _services.GetRequiredService<SettingsViewModel>();
-        var resources = new ResourceDictionary();
-        ViewLocator.InstallInto(resources);
+        var catalogWindow = _services.GetRequiredService<IThemeCatalogWindowService>();
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(settings.ThemePacks.HasCatalog, Is.True);
-            Assert.That(resources.Contains(new DataTemplateKey(typeof(ThemeCatalogDialogViewModel))), Is.True);
+            Assert.That(catalogWindow, Is.InstanceOf<ThemeCatalogWindowService>());
         }
     }
 
