@@ -142,15 +142,12 @@ public sealed class PerformanceOperations(PerformanceMonitor monitor)
             }
 
             subscribedApp = app;
-            var skipped = false;
-
-            await app.Dispatcher.InvokeAsync(
+            var subscribed = await app.Dispatcher.InvokeAsync(
                 () =>
                 {
                     if (app.MainWindow is not { IsVisible: true } window || window.WindowState == WindowState.Minimized)
                     {
-                        skipped = true;
-                        return;
+                        return false;
                     }
 
                     var remaining = 2;
@@ -169,11 +166,12 @@ public sealed class PerformanceOperations(PerformanceMonitor monitor)
                         tcs.TrySetResult();
                     };
                     CompositionTarget.Rendering += handler;
+                    return true;
                 },
                 DispatcherPriority.Normal,
                 waitToken);
 
-            if (skipped)
+            if (!subscribed)
             {
                 return false;
             }

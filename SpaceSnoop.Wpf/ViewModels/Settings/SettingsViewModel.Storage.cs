@@ -42,7 +42,7 @@ public sealed partial class SettingsViewModel
                 new ConfirmTextLine($"Файлы приложения будут храниться {place}:"),
                 new ConfirmTextLine(destination, ConfirmTextTone.Muted),
                 new ConfirmGapLine(),
-                new ConfirmTextLine("Текущие настройки, логи и журналы можно перенести туда или оставить на старом месте."),
+                new ConfirmTextLine("Текущие настройки, темы, логи и журналы можно перенести туда или оставить на старом месте."),
                 new ConfirmTextLine("После смены приложение перезапустится."),
             ],
             [

@@ -22,11 +22,11 @@
       },
       "KeepShell.Testing": {
         "type": "Direct",
-        "requested": "[0.1.307, )",
-        "resolved": "0.1.307",
-        "contentHash": "hUf68XDtCtaVPI4upiIHQ/Xl1/u1MVL2JzoxZKwk7oC6ibIgCy0aHt/uBGJkrQMuozDllyi9joWnzC8HaV2FMg==",
+        "requested": "[0.1.308, )",
+        "resolved": "0.1.308",
+        "contentHash": "Kqtg3Ja3YelfQ0Ic+qnFHpRyJBaLkwTyBOCTe3NHl8j+JpokwbwdXqeCP6ikHWNmfT2/bAq2ygygLthO2MJLQg==",
         "dependencies": {
-          "KeepShell": "0.1.307"
+          "KeepShell": "0.1.308"
         }
       },
       "SonarAnalyzer.CSharp": {
@@ -62,8 +62,8 @@
       },
       "KeepShell": {
         "type": "Transitive",
-        "resolved": "0.1.307",
-        "contentHash": "F5K23EvbyEo8SeauhbUtgcKP5BVcxLXbI0uLo+A+NL1o5mIBybm2U5HzG22hiHv6NVZS6PlT/nx6aKUSPvazVA==",
+        "resolved": "0.1.308",
+        "contentHash": "4Oe4HsC/bhrLHric+Fdpnly5G3zDAH6IqcL5ERskxOoWrChUH2CeWFx+eyJe0qG5KjS9NKS3Zv2GGCE7+ZtKJQ==",
         "dependencies": {
           "CommunityToolkit.Mvvm": "8.4.2",
           "MahApps.Metro.IconPacks.Lucide": "6.2.1",
@@ -85,10 +85,10 @@
       },
       "KeepShell.Automation": {
         "type": "Transitive",
-        "resolved": "0.1.307",
-        "contentHash": "COQ18zfJnhRpPOI3w9GkdPeSPM2+5QUbWA59rDugbp29Mz/EXlT/Me81sRzrWFxCobZY7B8QN47N6R8NDjRCAg==",
+        "resolved": "0.1.308",
+        "contentHash": "mkOXupm2C1yO/a66m0ZKcKoOi4Tm5pd40tYVt57UHtCt1G67sb5od0chTPKYxYBi1wLXrYrgvp673jsKHuZViQ==",
         "dependencies": {
-          "KeepShell": "0.1.307"
+          "KeepShell": "0.1.308"
         }
       },
       "MahApps.Metro.IconPacks.Core": {
@@ -360,9 +360,9 @@
         "type": "Project",
         "dependencies": {
           "CommunityToolkit.Mvvm": "[8.4.2, )",
-          "KeepShell": "[0.1.307, )",
+          "KeepShell": "[0.1.308, )",
           "KeepShell.Agents": "[0.1.304, )",
-          "KeepShell.Automation": "[0.1.307, )",
+          "KeepShell.Automation": "[0.1.308, )",
           "MahApps.Metro.IconPacks.Lucide": "[6.2.1, )",
           "Microsoft.Extensions.DependencyInjection": "[10.0.15, )",
           "ModelContextProtocol.AspNetCore": "[2.4.0, )",

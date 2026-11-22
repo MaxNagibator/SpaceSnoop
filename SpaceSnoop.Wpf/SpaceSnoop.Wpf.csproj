@@ -34,9 +34,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SpaceSnoop.Core\SpaceSnoop.Core.csproj" />
-    <PackageReference Include="KeepShell" Version="0.1.307" />
+    <PackageReference Include="KeepShell" Version="0.1.308" />
     <PackageReference Include="KeepShell.Agents" Version="0.1.304" />
-    <PackageReference Include="KeepShell.Automation" Version="0.1.307" />
+    <PackageReference Include="KeepShell.Automation" Version="0.1.308" />
   </ItemGroup>
 
   <ItemGroup>

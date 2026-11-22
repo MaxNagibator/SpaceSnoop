@@ -108,9 +108,7 @@ public sealed partial class ScanViewModel
                 NetworkDiscovery.Remember(targetPath);
             }
 
-            var lastDriveChanged = false;
-
-            _uiDispatcher.Invoke(() =>
+            var lastDriveChanged = await _uiDispatcher.InvokeAsync(() =>
             {
                 var known = Drives.HasDrive(targetPath);
                 Drives.AddDrive(targetPath);
@@ -120,16 +118,15 @@ public sealed partial class ScanViewModel
                     Drives.LoadDriveLabels();
                 }
 
-                if (!string.Equals(_settings.GetStringValue(SettingsKeys.ScanLastDrive), targetPath, StringComparison.Ordinal))
+                var changed = !_suppressPersist
+                    && !string.Equals(_settings.GetStringValue(SettingsKeys.ScanLastDrive), targetPath, StringComparison.Ordinal);
+                if (changed)
                 {
-                    Persist(() =>
-                    {
-                        _settings.SetValue(SettingsKeys.ScanLastDrive, targetPath);
-                        lastDriveChanged = true;
-                    });
+                    _settings.SetValue(SettingsKeys.ScanLastDrive, targetPath);
                 }
 
                 released = ReleaseBeforeScan(directory);
+                return changed;
             });
 
             if (lastDriveChanged)

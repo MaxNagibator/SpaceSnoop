@@ -287,13 +287,14 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
 
     public static SettingsSectionList CreateSections()
     {
-        var themeKeywords = string.Join(' ', ThemeManager.Themes.Select(static theme => $"{theme.Key} {theme.DisplayName}"));
         return new(
             new SettingsSection(
                 "appearance",
                 "Внешний вид",
                 PackIconLucideKind.Palette,
-                $"тема оформления светлая тёмная как в системе windows масштаб шрифта размер текста показывать заголовок страницы показывать всплывающие уведомления тосты показывать производительность в строке состояния отклик память диагностика {themeKeywords}"),
+                "тема оформления темы светлая тёмная как в системе windows каталог zip пакет установить масштаб шрифта размер текста показывать заголовок страницы показывать всплывающие уведомления тосты показывать производительность в строке состояния отклик память диагностика",
+                [],
+                static () => string.Join(' ', ThemeManager.Themes.Select(static theme => $"{theme.Key} {theme.DisplayName}"))),
             new SettingsSection(
                 "startup",
                 "Запуск",

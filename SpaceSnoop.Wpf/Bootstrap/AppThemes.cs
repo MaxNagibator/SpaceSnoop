@@ -14,7 +14,7 @@ public static class AppThemes
     public const string SystemDisplayName = "Как в системе";
 
     private static readonly Lazy<ThemePackLoader> PackLoader = new(() =>
-        new ThemePackLoader(Path.Combine(AppStorage.DataDirectory, "Themes"), LogThemeLoadFailure));
+        new ThemePackLoader(Path.Combine(AppStorage.DataDirectory, AppStorage.ThemesFolderName), LogThemeLoadFailure));
 
     internal static ThemePackLoader Packages => PackLoader.Value;
 
@@ -53,9 +53,13 @@ public static class AppThemes
     private static void LogThemeLoadFailure(string path, Exception error) =>
         Log.Warning(error, "Пакет темы пропущен: {ThemePackPath}", path);
 
-    public static string StartupKey(ISettingsStore settings, bool freshProfile)
+    public static string StartupKey(ISettingsStore settings, bool freshProfile) =>
+        StartupKey(settings, freshProfile, Packages);
+
+    internal static string StartupKey(ISettingsStore settings, bool freshProfile, ThemePackLoader loader)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(loader);
 
         if (freshProfile)
         {
@@ -68,7 +72,7 @@ public static class AppThemes
             return LightKey;
         }
 
-        return Packages.Restore(settings) ?? AppDefaults.ThemeDefault;
+        return loader.Restore(settings) ?? AppDefaults.ThemeDefault;
     }
 
     public static void FollowSystem(bool appsUseLightTheme)

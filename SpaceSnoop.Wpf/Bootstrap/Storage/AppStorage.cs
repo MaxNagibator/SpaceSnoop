@@ -9,6 +9,8 @@ public static class AppStorage
 {
     public const string LogsFolderName = "logs";
 
+    public const string ThemesFolderName = "Themes";
+
     internal const string StorageModeKey = "storage";
 
     internal const string PortableModeValue = "portable";
@@ -102,6 +104,19 @@ public static class AppStorage
             foreach (var file in Directory.GetFiles(logsSource))
             {
                 File.Copy(file, Path.Combine(logsDestination, Path.GetFileName(file)), true);
+                copied.Add(file);
+            }
+        }
+
+        var themesSource = Path.Combine(source, ThemesFolderName);
+
+        if (Directory.Exists(themesSource))
+        {
+            var themesDestination = EnsureExists(Path.Combine(destination, ThemesFolderName));
+
+            foreach (var file in Directory.GetFiles(themesSource))
+            {
+                File.Copy(file, Path.Combine(themesDestination, Path.GetFileName(file)), true);
                 copied.Add(file);
             }
         }

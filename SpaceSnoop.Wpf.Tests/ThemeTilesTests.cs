@@ -29,6 +29,9 @@ public partial class BindingSmokeTests
             Assert.That(appearance.Matches(SettingsSection.ParseQuery(theme.Key)), Is.True);
             Assert.That(appearance.Matches(SettingsSection.ParseQuery(theme.DisplayName)), Is.True);
         }
+
+        Assert.That(appearance.Matches(SettingsSection.ParseQuery("каталог")), Is.True);
+        Assert.That(appearance.Matches(SettingsSection.ParseQuery("zip")), Is.True);
     }
 
     [Test]
@@ -300,6 +303,20 @@ public partial class BindingSmokeTests
         {
             ThemeManager.Apply(previousTheme);
             Settle();
+        }
+    }
+
+    [Test]
+    public void Каталог_тем_в_DI_подключён_и_ViewLocator_разрешает_модальное_окно_каталога()
+    {
+        var settings = _services.GetRequiredService<SettingsViewModel>();
+        var resources = new ResourceDictionary();
+        ViewLocator.InstallInto(resources);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(settings.ThemePacks.HasCatalog, Is.True);
+            Assert.That(resources.Contains(new DataTemplateKey(typeof(ThemeCatalogDialogViewModel))), Is.True);
         }
     }
 
