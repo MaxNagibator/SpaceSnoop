@@ -154,13 +154,13 @@
                     <TextBlock Text="Оформление"
                                Style="{StaticResource Form.Label}" />
                     <keepshell:ThemeSwitcher DataContext="{Binding Theme}"
-                                           ShowPreviews="True"
-                                           HorizontalAlignment="Left"
-                                           Margin="-8,4,0,-8" />
+                                             ShowPreviews="True"
+                                             HorizontalAlignment="Left"
+                                             Margin="0,8,0,0" />
                 </StackPanel>
             </Grid>
 
-            <Grid Margin="0,10,0,0">
+            <Grid Margin="0,4,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
