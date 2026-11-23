@@ -51,7 +51,24 @@ public partial class App : Application
         services.AddSingleton<ThemeSelectionViewModel>();
         services.AddSingleton(AppThemes.Packages);
         services.AddSingleton(AppThemes.Catalog);
-        services.AddSingleton<ThemePacksViewModel>();
+        services.AddSingleton<ThemePackUpdateService>();
+        services.AddSingleton(static provider => new ThemePacksViewModel(
+            provider.GetRequiredService<ThemePackLoader>(),
+            provider.GetRequiredService<ThemeSelectionViewModel>(),
+            provider.GetRequiredService<IFilePicker>(),
+            provider.GetRequiredService<ILogger<ThemePacksViewModel>>(),
+            provider.GetRequiredService<ThemePackCatalog>(),
+            provider.GetRequiredService<IThemeCatalogWindowService>(),
+            provider.GetRequiredService<IDialogService>(),
+            provider.GetRequiredService<IClipboardService>(),
+            provider.GetRequiredService<ThemePackUpdateService>(),
+            ThemeUpdateStartup.CreateRestartCallback(provider)));
+        services.AddSingleton(static provider => new ThemeUpdateStartup(
+            provider.GetRequiredService<ThemePackUpdateService>(),
+            provider.GetRequiredService<ToastNotifier>(),
+            provider.GetRequiredService<ThemePacksViewModel>(),
+            ThemeUpdateStartup.CreateRestartCallback(provider),
+            provider.GetRequiredService<ILogger<ThemeUpdateStartup>>()));
         services.AddSingleton<SystemTheme>();
 
         services.AddSingleton(
@@ -300,6 +317,7 @@ public partial class App : Application
             monitor.Start();
 
             _ = Task.Run(() => ScheduleReconciler.Reconcile(settings, _logging.CreateLogger<ScheduleViewModel>()));
+            _services.GetRequiredService<ThemeUpdateStartup>().Start();
 
             splash.Dispose();
             splash = null;

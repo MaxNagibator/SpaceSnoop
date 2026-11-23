@@ -409,6 +409,12 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 1805, Level = LogLevel.Debug, Message = "Незавершённая загрузка не удалена: {Path}")]
     public static partial void UpdateTempFileLeft(this ILogger logger, Exception exception, string path);
 
+    [LoggerMessage(EventId = 1806, Level = LogLevel.Debug, Message = "Не удалось проверить обновления тем при запуске")]
+    public static partial void ThemeUpdateCheckFailed(this ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 1807, Level = LogLevel.Warning, Message = "Не удалось перезапустить приложение после обновления тем")]
+    public static partial void ThemeUpdateRestartFailed(this ILogger logger, Exception exception);
+
     [LoggerMessage(EventId = 1900, Level = LogLevel.Information, Message = "Пакетное сравнение начато: пар {Total}")]
     public static partial void OverviewCompareStarted(this ILogger logger, int total);
 
