@@ -102,7 +102,7 @@ internal sealed class ScanArchiveViewModel
 
     private void ApplyArchiveResult(DirectorySpace dir, ArchiveProgressDialogViewModel dialog)
     {
-        if (dialog.CreatedArchivePath is { } archivePath && ScanTreeEditor.AddArchiveToTree(_roots, dir, archivePath))
+        if (dialog.CreatedArchive is { } archive && ScanTreeEditor.AddArchiveToTree(_roots, dir, archive))
         {
             if (_treemap.TreemapRoot is not null)
             {

@@ -253,14 +253,17 @@ internal static partial class ScanTreeEditor
         return path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
     }
 
-    internal static bool AddArchiveToTree(ObservableCollection<ScanNodeViewModel> roots, DirectorySpace source, string archivePath)
+    internal static bool AddArchiveToTree(
+        ObservableCollection<ScanNodeViewModel> roots,
+        DirectorySpace source,
+        ArchiveFileMetadata archive)
     {
-        if (source.Parent is not DirectorySpace parent || !File.Exists(archivePath))
+        if (source.Parent is not DirectorySpace parent)
         {
             return false;
         }
 
-        parent.AddFile(new(archivePath));
+        parent.AddFile(archive.Name, archive.Length, archive.CreationTime, archive.LastAccessTime);
 
         foreach (var root in roots)
         {

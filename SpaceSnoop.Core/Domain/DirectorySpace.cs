@@ -233,13 +233,18 @@ public class DirectorySpace : SpaceBase
 
     public FileSpace AddFile(FileInfo file)
     {
+        return AddFile(file.Name, file.Length, file.CreationTime, file.LastAccessTime);
+    }
+
+    public FileSpace AddFile(string name, long length, DateTime creationTime, DateTime lastAccessTime)
+    {
         var store = EnsureStore();
         var entry = new FileEntry
         {
-            Size = file.Length,
-            CreationRaw = TimestampEncoding.FromDateTime(file.CreationTime),
-            LastAccessRaw = TimestampEncoding.FromDateTime(file.LastAccessTime),
-            NameId = store.Names.Intern(file.Name),
+            Size = length,
+            CreationRaw = TimestampEncoding.FromDateTime(creationTime),
+            LastAccessRaw = TimestampEncoding.FromDateTime(lastAccessTime),
+            NameId = store.Names.Intern(name),
             State = SpaceState.Added,
             Flags = 0,
         };
@@ -251,10 +256,10 @@ public class DirectorySpace : SpaceBase
             var newIndex = _fileCount;
             store.AppendFile(ref _fileStart, ref _fileCount, in entry);
             space = store.GetOrCreateFacadeLocked(this, newIndex);
-            Size += file.Length;
+            Size += length;
         }
 
-        PropagateAddition(file.Length);
+        PropagateAddition(length);
         return space;
     }
 

@@ -227,7 +227,9 @@ public sealed partial class ArchiveProgressDialogViewModel
 
     private void SetArchiveResult(ZipStats stats)
     {
-        _resultSummary = Summarize(new FileInfo(_request.TargetPath).Length, stats.Bytes);
+        var metadata = _readArchiveMetadata(_request.TargetPath);
+        _resultSummary = Summarize(metadata.Length, stats.Bytes);
+        CreatedArchive = metadata;
         CreatedArchivePath = _request.TargetPath;
     }
 }

@@ -8,6 +8,7 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
     private readonly ArchiveService _service;
     private readonly ILogger _logger;
     private readonly Action<string, bool> _deleteDirectory;
+    private readonly Func<string, ArchiveFileMetadata> _readArchiveMetadata;
     private readonly OperationProgressState _packProgress = new();
     private readonly OperationProgressState _verifyProgress = new();
     private readonly OperationProgressState _coverageProgress = new();
@@ -54,6 +55,8 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
 
     public string? CreatedArchivePath { get; private set; }
 
+    internal ArchiveFileMetadata? CreatedArchive { get; private set; }
+
     public bool IsIndeterminate => _phaseTotal == 0;
 
     protected override string RunningStatus => "Обход каталога…";
@@ -73,12 +76,14 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
         IUiDispatcher uiDispatcher,
         ILogger logger,
         Action<string, bool> deleteDirectory,
-        bool? needsPermanentConfirm = null)
+        bool? needsPermanentConfirm = null,
+        Func<string, ArchiveFileMetadata>? readArchiveMetadata = null)
     {
         _request = request;
         _service = service;
         _logger = logger;
         _deleteDirectory = deleteDirectory;
+        _readArchiveMetadata = readArchiveMetadata ?? ReadArchiveMetadata;
         _progressPoller = new(uiDispatcher, OnProgressTick);
 
         SourceName = Path.GetFileName(request.SourcePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
@@ -86,6 +91,13 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
         TargetName = Path.GetFileName(request.TargetPath);
         NeedsPermanentOriginalConfirm = request.DeleteOriginal && request.Interactive
             && (needsPermanentConfirm ?? RequiresPermanentConfirmation(request.SourcePath));
+    }
+
+    internal static ArchiveFileMetadata ReadArchiveMetadata(string path)
+    {
+        FileInfo info = new(path);
+        var length = info.Length;
+        return new(info.Name, length, info.CreationTime, info.LastAccessTime);
     }
 
     internal static bool RequiresPermanentConfirmation(string sourcePath) => !SupportsRecycleBin(sourcePath);
@@ -125,6 +137,7 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
         OriginalDeleted = false;
         ConfirmPermanentOriginalDelete = false;
         CreatedArchivePath = null;
+        CreatedArchive = null;
         _packed = false;
         _deletingOriginal = false;
         _phase = ArchivePhase.None;
@@ -297,3 +310,5 @@ internal enum ArchivePhase
 }
 
 public readonly record struct ArchiveStageUpdate(ArchiveStage Stage, int Files, int Entries, long Bytes);
+
+internal readonly record struct ArchiveFileMetadata(string Name, long Length, DateTime CreationTime, DateTime LastAccessTime);

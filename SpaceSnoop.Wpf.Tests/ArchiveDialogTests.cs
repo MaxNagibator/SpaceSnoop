@@ -1,9 +1,15 @@
-﻿using Microsoft.Extensions.Logging.Abstractions;
+﻿using KeepShell.Testing;
+using Microsoft.Extensions.Logging.Abstractions;
 using SpaceSnoop.Core;
+using SpaceSnoop.Core.Domain;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.ViewModels.Dialogs;
+using SpaceSnoop.Wpf.ViewModels.Scan;
+using SpaceSnoop.Wpf.ViewModels.Settings;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO.Compression;
+using System.Windows.Threading;
 
 namespace SpaceSnoop.Wpf.Tests;
 
@@ -344,21 +350,106 @@ public class ArchiveDialogTests
         }
     }
 
-    private ArchiveProgressDialogViewModel Dialog(bool deleteOriginal)
+    [Test]
+    [Apartment(ApartmentState.STA)]
+    public void Метаданные_архива_читаются_в_фоне_и_не_блокируют_диспетчер_WPF()
     {
-        ArchiveRequest request = new(
-            _source,
-            _target,
-            2,
-            10,
-            deleteOriginal,
-            CompressionLevel.Optimal,
-            false);
+        var dispatcher = Dispatcher.CurrentDispatcher;
+        var uiThreadId = Environment.CurrentManagedThreadId;
+        var previous = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(dispatcher));
 
-        return new(request, new(), new FakeUiDispatcher(), NullLogger<ArchiveProgressDialogViewModel>.Instance);
+        try
+        {
+            using var readerEntered = new ManualResetEventSlim(false);
+            using var allowRead = new ManualResetEventSlim(false);
+            var readerThreadId = 0;
+
+            var dialog = Dialog(
+                deleteOriginal: false,
+                readArchiveMetadata: path =>
+                {
+                    readerThreadId = Environment.CurrentManagedThreadId;
+                    readerEntered.Set();
+
+                    if (!allowRead.Wait(TimeSpan.FromSeconds(10)))
+                    {
+                        throw new TimeoutException("Таймаут ожидания чтения метаданных архива.");
+                    }
+
+                    return ArchiveProgressDialogViewModel.ReadArchiveMetadata(path);
+                });
+
+            var run = dialog.StartCommand.ExecuteAsync(null);
+            Assert.That(readerEntered.Wait(TimeSpan.FromSeconds(10)), Is.True);
+
+            var dispatcherResponded = false;
+            var probeFrame = new DispatcherFrame();
+            _ = dispatcher.BeginInvoke(
+                DispatcherPriority.Normal,
+                () =>
+                {
+                    dispatcherResponded = true;
+                    probeFrame.Continue = false;
+                });
+            Dispatcher.PushFrame(probeFrame);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(dispatcherResponded, Is.True);
+                Assert.That(run.IsCompleted, Is.False);
+                Assert.That(readerThreadId, Is.Not.EqualTo(uiThreadId));
+            }
+
+            allowRead.Set();
+
+            var completionFrame = new DispatcherFrame();
+            _ = run.ContinueWith(
+                _ => dispatcher.BeginInvoke(() => completionFrame.Continue = false),
+                TaskScheduler.Default);
+
+            if (!run.IsCompleted)
+            {
+                Dispatcher.PushFrame(completionFrame);
+            }
+
+            run.GetAwaiter().GetResult();
+
+            Assert.That(dialog.CreatedArchive, Is.Not.Null);
+            var expectedMetadata = dialog.CreatedArchive!.Value;
+            var expectedName = Path.GetFileName(_target);
+
+            File.Delete(_target);
+
+            var settings = new MemorySettings();
+            var nodeFactory = new ScanNodeFactory(new ScanPreferences(settings), new AgentPreferences(settings), new FakeShellLauncher());
+            var rootSpace = new DirectorySpace(_root, null, DateTime.Now, DateTime.Now);
+            var sourceSpace = new DirectorySpace("source", rootSpace, DateTime.Now, DateTime.Now);
+            rootSpace.Add(sourceSpace);
+            ObservableCollection<ScanNodeViewModel> roots = [nodeFactory.CreateRoot(rootSpace, new(), null)];
+
+            var added = ScanTreeEditor.AddArchiveToTree(roots, sourceSpace, expectedMetadata);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(added, Is.True);
+                var addedFile = rootSpace.Files.Single(f => f.Name == expectedName);
+                Assert.That(addedFile.TotalSize, Is.EqualTo(expectedMetadata.Length));
+                Assert.That(addedFile.CreationDate, Is.EqualTo(expectedMetadata.CreationTime).Within(TimeSpan.FromMilliseconds(1)));
+                Assert.That(addedFile.LastAccessTime, Is.EqualTo(expectedMetadata.LastAccessTime).Within(TimeSpan.FromMilliseconds(1)));
+                Assert.That(roots[0].Children.Select(static c => c.Name), Does.Contain(expectedName));
+            }
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previous);
+        }
     }
 
-    private ArchiveProgressDialogViewModel Dialog(bool deleteOriginal, Action<string, bool> deleteDirectory)
+    private ArchiveProgressDialogViewModel Dialog(
+        bool deleteOriginal,
+        Action<string, bool>? deleteDirectory = null,
+        Func<string, ArchiveFileMetadata>? readArchiveMetadata = null)
     {
         ArchiveRequest request = new(
             _source,
@@ -369,7 +460,14 @@ public class ArchiveDialogTests
             CompressionLevel.Optimal,
             false);
 
-        return new(request, new(), new FakeUiDispatcher(), NullLogger<ArchiveProgressDialogViewModel>.Instance, deleteDirectory);
+        var service = new ArchiveService();
+        return new(
+            request,
+            service,
+            new FakeUiDispatcher(),
+            NullLogger<ArchiveProgressDialogViewModel>.Instance,
+            deleteDirectory ?? service.DeleteDirectoryToRecycleBin,
+            readArchiveMetadata: readArchiveMetadata);
     }
 
     private static bool CreateJunction(string path, string target)
