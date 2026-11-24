@@ -113,6 +113,69 @@ public class CleanupServiceTests
     }
 
     [Test]
+    public void Clean_VanishedFileAfterWalkDistinguishedFromChangedAndAccessError()
+    {
+        var vanished = Path.Combine(_targetDir, "nested", "b.tmp");
+        var changed = Path.Combine(_targetDir, "nested", "c.tmp");
+        var locked = Path.Combine(_targetDir, "nested", "d.tmp");
+        WriteAged(changed, "charlie");
+        WriteAged(locked, "delta");
+
+        using var lockStream = new FileStream(locked, FileMode.Open, FileAccess.Read, FileShare.None);
+
+        var triggered = false;
+        var progress = new InlineProgress(_ =>
+        {
+            if (triggered)
+            {
+                return;
+            }
+
+            triggered = true;
+            File.Delete(vanished);
+            File.WriteAllText(changed, "charlie-rewritten");
+        });
+
+        var report = new CleanupService().Clean(Target(), progress, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.Deleted, Is.EqualTo(1));
+            Assert.That(report.FreedBytes, Is.EqualTo("alpha".Length));
+            Assert.That(report.Skipped, Is.EqualTo(2));
+            Assert.That(report.Errors, Has.Count.EqualTo(2));
+            Assert.That(report.Errors, Has.None.Contains(vanished));
+            Assert.That(report.Errors, Has.Some.Contains(changed).And.Some.Contains("изменился после обхода"));
+            Assert.That(report.Errors.Any(e => e.Contains(locked, StringComparison.OrdinalIgnoreCase) && !e.Contains("изменился после обхода", StringComparison.Ordinal)), Is.True);
+        }
+    }
+
+    [Test]
+    public void Clean_VanishedFileInEmptyRunLeavesZeroErrorsAndZeroSkipped()
+    {
+        var vanished = Path.Combine(_targetDir, "nested", "b.tmp");
+        var triggered = false;
+        var progress = new InlineProgress(_ =>
+        {
+            if (!triggered)
+            {
+                triggered = true;
+                File.Delete(vanished);
+            }
+        });
+
+        var report = new CleanupService().Clean(Target(), progress, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.Deleted, Is.EqualTo(1));
+            Assert.That(report.FreedBytes, Is.EqualTo("alpha".Length));
+            Assert.That(report.Skipped, Is.Zero);
+            Assert.That(report.Errors, Is.Empty);
+        }
+    }
+
+    [Test]
     public void Clean_JunctionTargetSurvives()
     {
         var outside = Path.Combine(_tempDir, "outside");
