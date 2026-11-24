@@ -76,6 +76,8 @@ public class ScanTreeLayoutTests
     public void SetUp()
     {
         _scan.Roots.Clear();
+        _scan.HasResult = true;
+        _scan.ViewMode = ScanViewMode.Tree;
         _scan.Marks.RecountMarked();
         _host.Settle();
     }
@@ -90,6 +92,7 @@ public class ScanTreeLayoutTests
         _scan.Roots.Add(node);
         node.IsExpanded = true;
         _host.Settle();
+        Assert.That(_tree.IsVisible, Is.True);
         var branch = node.Children.Single();
         Assert.That(Descendants<TreeViewItem>(_tree).Any(item => item.DataContext is ScanNodeViewModel file && file.Name.StartsWith("sample-", StringComparison.Ordinal)), Is.False);
         branch.IsExpanded = true;
