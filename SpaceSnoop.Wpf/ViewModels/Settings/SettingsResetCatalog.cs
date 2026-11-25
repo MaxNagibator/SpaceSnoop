@@ -129,6 +129,12 @@ public static class SettingsResetCatalog
                         () => scan.MftRootOnly == AppDefaults.ScanMftRootOnlyDefault,
                         () => scan.MftRootOnly = AppDefaults.ScanMftRootOnlyDefault),
                     Field(
+                        SettingsKeys.ScanMftRawDisk,
+                        "чтение физического диска напрямую",
+                        Flag(AppDefaults.ScanMftRawDiskDefault),
+                        () => scan.MftRawDisk == AppDefaults.ScanMftRawDiskDefault,
+                        () => scan.MftRawDisk = AppDefaults.ScanMftRawDiskDefault),
+                    Field(
                         SettingsKeys.ScanReleaseBeforeRescan,
                         "освобождение прежнего результата",
                         Flag(AppDefaults.ScanReleaseBeforeRescanDefault),

@@ -30,6 +30,7 @@ public static class AppDefaults
     public const bool ScanDuplicatesEnabledDefault = false;
     public const bool ScanMftEnabledDefault = false;
     public const bool ScanMftRootOnlyDefault = true;
+    public const bool ScanMftRawDiskDefault = false;
 
     public const int ScanDuplicatesMinSizeMbDefault = 1;
 

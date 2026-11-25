@@ -95,6 +95,12 @@ internal static partial class AppLog
     public static partial void MftSkippedForSubdirectory(this ILogger logger, string path);
 
     [LoggerMessage(
+        EventId = 1023,
+        Level = LogLevel.Warning,
+        Message = "Обход по $MFT для «{Path}»: прямой режим физического диска не подошёл, используется чтение тома ({Reason})")]
+    public static partial void MftRawDiskFallback(this ILogger logger, string path, string reason);
+
+    [LoggerMessage(
         EventId = 1014,
         Level = LogLevel.Information,
         Message = "Прежний результат «{Path}» снят до повторного скана, сборка {CollectMs} мс")]

@@ -29,7 +29,7 @@ public sealed class ScanRunner(
         return directory.Parent is null;
     }
 
-    private ScanOutcome? TryReadMft(DirectoryInfo directory, ScanProgress progress, CancellationToken cancel)
+    internal ScanOutcome? TryReadMft(DirectoryInfo directory, ScanProgress progress, CancellationToken cancel)
     {
         if (preferences.MftRootOnly && !IsVolumeRoot(directory))
         {
@@ -37,17 +37,22 @@ public sealed class ScanRunner(
             return null;
         }
 
-        var availability = MftScanner.Probe(directory.FullName);
-
-        if (availability != MftAvailability.Available)
-        {
-            logger.MftUnavailable(directory.FullName, availability);
-            return null;
-        }
+        var mode = preferences.MftRawDisk ? MftReadMode.RawDisk : MftReadMode.Volume;
 
         try
         {
-            var scan = mftScanner.Calculate(directory, progress, cancel);
+            var scan = mftScanner.TryCalculate(directory, progress, out var availability, mode, cancel);
+
+            if (scan is null)
+            {
+                logger.MftUnavailable(directory.FullName, availability);
+                return null;
+            }
+
+            if (scan.FallbackReason is not null)
+            {
+                AppLog.MftRawDiskFallback(logger, directory.FullName, scan.FallbackReason);
+            }
 
             if (!scan.IsComplete)
             {

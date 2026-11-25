@@ -140,6 +140,12 @@ public sealed partial class ScanViewModel
             var estimatedBytes = willUseMft
                 ? await ScanProgressViewModel.EstimateTotalBytesAsync(directory, token)
                 : null;
+
+            if (willUseMft)
+            {
+                await _performance.WaitForRenderedFrameAsync(token);
+            }
+
             var progress = Progress.Begin(
                 directory,
                 targetPath,
@@ -154,11 +160,6 @@ public sealed partial class ScanViewModel
             }
 
             _logger.ScanStarted(targetPath, parallelism > 1, parallelism);
-
-            if (willUseMft)
-            {
-                await _performance.WaitForRenderedFrameAsync(token);
-            }
 
             var outcome = await RunTraversalAsync(directory, parallelism, progress, token);
             token.ThrowIfCancellationRequested();
