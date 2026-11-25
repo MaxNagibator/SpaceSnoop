@@ -1118,8 +1118,8 @@ public partial class BindingSmokeTests
             var ignoredRow = Descendants<TreeViewItem>(_window).Single(item => ReferenceEquals(item.DataContext, node));
             Assert.That(ignoredRow.IsSelected, Is.True);
             Assert.That(
-                Descendants<PackIconLucide>(ignoredRow)
-                    .Any(static icon => icon.Kind == PackIconLucideKind.EyeOff && icon.IsVisible),
+                Descendants<System.Windows.Shapes.Path>(ignoredRow)
+                    .Any(static icon => IconGeometry.GetKind(icon) == PackIconLucideKind.EyeOff && icon.IsVisible),
                 Is.True);
 
             Assert.That(scan.SelectedNode, Is.SameAs(node));

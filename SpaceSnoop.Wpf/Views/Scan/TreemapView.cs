@@ -24,6 +24,7 @@ public sealed class TreemapView : FrameworkElement
     private const double IconSize = 12;
     private const double IconGap = 5;
     private const double MarkerSize = 9;
+    private const double TooltipRepositionThresholdSq = 4.0;
 
     public static readonly DependencyProperty ItemsSourceProperty =
         DependencyProperty.Register(
@@ -74,9 +75,11 @@ public sealed class TreemapView : FrameworkElement
     private static readonly Geometry BeakDown = FrozenGeometry("M 0,0 L 8,8 L 16,0");
     private static readonly Geometry BeakLeft = FrozenGeometry("M 8,0 L 0,8 L 8,16");
     private static readonly Geometry BeakRight = FrozenGeometry("M 0,0 L 8,8 L 0,16");
+    private static readonly Geometry FolderMarker = CreateFolderMarker();
 
     private readonly FrameworkElement _menuHost = new();
     private readonly List<INotifyPropertyChanged> _subscribed = [];
+    private readonly List<ScanNodeViewModel> _nodesBuffer = [];
 
     private readonly ToolTip _toolTip = new()
     {
@@ -84,11 +87,21 @@ public sealed class TreemapView : FrameworkElement
     };
 
     private (Rect Rect, ScanNodeViewModel Node)[] _tiles = [];
+    private double[] _weightsBuffer = [];
     private ScanNodeViewModel? _hover;
     private Path? _beak;
     private Point _cursor;
+    private Point _tooltipCursor;
     private bool _nudge;
     private bool _isLoaded;
+    private Brush? _selectionBrush;
+    private Pen? _selectionPen;
+    private Brush? _deletedBrush;
+    private Pen? _deletedPen;
+    private FontFamily? _labelFontFamily;
+    private Typeface? _labelTypeface;
+    private FontFamily? _subLabelFontFamily;
+    private Typeface? _subLabelTypeface;
 
     public IEnumerable? ItemsSource
     {
@@ -153,6 +166,7 @@ public sealed class TreemapView : FrameworkElement
         }
 
         _cursor = point;
+        _tooltipCursor = point;
         _hover = node;
         ShowTooltip(node);
 
@@ -177,28 +191,40 @@ public sealed class TreemapView : FrameworkElement
 
         drawingContext.DrawRectangle(Brushes.Transparent, null, new(0, 0, width, height));
 
-        var nodes = Nodes();
-        var weights = new double[nodes.Count];
+        PopulateNodes(_nodesBuffer);
+        var count = _nodesBuffer.Count;
 
-        for (var i = 0; i < nodes.Count; i++)
+        if (_weightsBuffer.Length != count)
         {
-            weights[i] = nodes[i].Weight;
+            _weightsBuffer = count == 0 ? [] : new double[count];
+        }
+
+        for (var i = 0; i < count; i++)
+        {
+            _weightsBuffer[i] = _nodesBuffer[i].Weight;
         }
 
         var inset = Gap / 2;
-        var layout = TreemapLayout.Squarify(weights, Math.Max(0, width - Gap), Math.Max(0, height - Gap));
-        var tiles = new (Rect, ScanNodeViewModel)[nodes.Count];
+        var layout = TreemapLayout.Squarify(_weightsBuffer, Math.Max(0, width - Gap), Math.Max(0, height - Gap));
+        var tiles = count == 0 ? [] : new (Rect, ScanNodeViewModel)[count];
+
+        var baseFont = TextElement.GetFontFamily(this);
+        var subFont = TryFindResource("Font.Sans") as FontFamily ?? baseFont;
+        var labelTypeface = ResolveTypeface(baseFont, FontWeights.SemiBold, ref _labelFontFamily, ref _labelTypeface);
+        var subLabelTypeface = ResolveTypeface(subFont, FontWeights.Normal, ref _subLabelFontFamily, ref _subLabelTypeface);
 
         var style = new TileStyle(
-            ResourcePen("Fg.Primary", 1.5),
-            ResourcePen("State.Error", 1.5),
-            TryFindResource("Font.Sans") as FontFamily,
+            ResolvePen("Fg.Primary", 1.5, ref _selectionBrush, ref _selectionPen),
+            ResolvePen("State.Error", 1.5, ref _deletedBrush, ref _deletedPen),
+            labelTypeface,
+            subLabelTypeface,
             Intensity,
-            FontScaleManager.Current);
+            FontScaleManager.Current,
+            VisualTreeHelper.GetDpi(this).PixelsPerDip);
 
-        for (var i = 0; i < nodes.Count; i++)
+        for (var i = 0; i < count; i++)
         {
-            var node = nodes[i];
+            var node = _nodesBuffer[i];
             var bounds = new Rect(layout[i].X + inset, layout[i].Y + inset, layout[i].Width, layout[i].Height);
             tiles[i] = (bounds, node);
 
@@ -271,14 +297,29 @@ public sealed class TreemapView : FrameworkElement
         if (!ReferenceEquals(node, _hover))
         {
             _hover = node;
+            _tooltipCursor = point;
             ShowTooltip(node);
             return;
         }
 
-        if (node is not null && _toolTip.IsOpen)
+        if (node is not null && _toolTip.IsOpen && ShouldRepositionTooltip(point))
         {
             Reposition();
         }
+    }
+
+    internal bool ShouldRepositionTooltip(Point point)
+    {
+        var dx = point.X - _tooltipCursor.X;
+        var dy = point.Y - _tooltipCursor.Y;
+
+        if (((dx * dx) + (dy * dy)) < TooltipRepositionThresholdSq)
+        {
+            return false;
+        }
+
+        _tooltipCursor = point;
+        return true;
     }
 
     protected override void OnMouseLeave(MouseEventArgs e)
@@ -294,14 +335,7 @@ public sealed class TreemapView : FrameworkElement
             return;
         }
 
-        var fill = new SolidColorBrush(HeatColor.From(node.Fraction, style.Intensity));
-
-        if (node.IsMarkedDeleted)
-        {
-            fill.Opacity = 0.5;
-        }
-
-        fill.Freeze();
+        var fill = HeatBrushConverter.GetBrush(node.Fraction, style.Intensity, node.IsMarkedDeleted);
 
         var pen = (ReferenceEquals(node, SelectedItem), node.IsMarkedDeleted) switch
         {
@@ -326,7 +360,7 @@ public sealed class TreemapView : FrameworkElement
 
         if (tile.Width >= LabelMinWidth && tile.Height >= (LabelMinHeight * style.Scale))
         {
-            DrawLabel(context, node, tile, style.Mono, style.Scale);
+            DrawLabel(context, node, tile, style);
         }
 
         if (node.IsDirectory)
@@ -369,6 +403,14 @@ public sealed class TreemapView : FrameworkElement
 
     private void OnThemeChanged(object? sender, ThemeDefinition theme)
     {
+        _selectionBrush = null;
+        _selectionPen = null;
+        _deletedBrush = null;
+        _deletedPen = null;
+        _labelFontFamily = null;
+        _labelTypeface = null;
+        _subLabelFontFamily = null;
+        _subLabelTypeface = null;
         InvalidateVisual();
     }
 
@@ -490,6 +532,21 @@ public sealed class TreemapView : FrameworkElement
         return brush;
     }
 
+    private static Geometry CreateFolderMarker()
+    {
+        var geometry = new StreamGeometry();
+
+        using (var sink = geometry.Open())
+        {
+            sink.BeginFigure(new(0, 0), true, true);
+            sink.LineTo(new(MarkerSize, 0), false, false);
+            sink.LineTo(new(MarkerSize, MarkerSize), false, false);
+        }
+
+        geometry.Freeze();
+        return geometry;
+    }
+
     private static void DrawFolderMarker(DrawingContext context, Rect tile)
     {
         if (tile.Width < (MarkerSize * 1.8) || tile.Height < (MarkerSize * 1.8))
@@ -497,17 +554,9 @@ public sealed class TreemapView : FrameworkElement
             return;
         }
 
-        var geometry = new StreamGeometry();
-
-        using (var sink = geometry.Open())
-        {
-            sink.BeginFigure(new(tile.Right - MarkerSize, tile.Top), true, true);
-            sink.LineTo(new(tile.Right, tile.Top), false, false);
-            sink.LineTo(new(tile.Right, tile.Top + MarkerSize), false, false);
-        }
-
-        geometry.Freeze();
-        context.DrawGeometry(MarkerBrush, null, geometry);
+        context.PushTransform(new TranslateTransform(tile.Right - MarkerSize, tile.Top));
+        context.DrawGeometry(MarkerBrush, null, FolderMarker);
+        context.Pop();
     }
 
     private static void ApplyBeak(Path beak, TooltipSide side)
@@ -593,11 +642,13 @@ public sealed class TreemapView : FrameworkElement
 
         if (ReferenceEquals(node, _hover))
         {
+            _tooltipCursor = _cursor;
             Reposition();
             return;
         }
 
         _hover = node;
+        _tooltipCursor = _cursor;
         ShowTooltip(node);
     }
 
@@ -682,10 +733,17 @@ public sealed class TreemapView : FrameworkElement
     private List<ScanNodeViewModel> Nodes()
     {
         var nodes = new List<ScanNodeViewModel>();
+        PopulateNodes(nodes);
+        return nodes;
+    }
+
+    private void PopulateNodes(List<ScanNodeViewModel> nodes)
+    {
+        nodes.Clear();
 
         if (ItemsSource is null)
         {
-            return nodes;
+            return;
         }
 
         foreach (var item in ItemsSource)
@@ -695,8 +753,6 @@ public sealed class TreemapView : FrameworkElement
                 nodes.Add(node);
             }
         }
-
-        return nodes;
     }
 
     private ScanNodeViewModel? HitTest(Point point)
@@ -712,25 +768,46 @@ public sealed class TreemapView : FrameworkElement
         return null;
     }
 
-    private void DrawLabel(DrawingContext context, ScanNodeViewModel node, Rect tile, FontFamily? monoFont, double scale)
+    private static void DrawLabel(DrawingContext context, ScanNodeViewModel node, Rect tile, TileStyle style)
     {
         var x = tile.X + Padding;
         var y = tile.Y + 4;
 
-        var name = Text(node.Name, 12 * scale, LabelBrush, FontWeights.SemiBold, tile.Width - (2 * Padding) - IconSize - IconGap, node.IsMarkedDeleted, null);
+        var name = Text(
+            node.Name,
+            12 * style.Scale,
+            LabelBrush,
+            style.LabelTypeface,
+            tile.Width - (2 * Padding) - IconSize - IconGap,
+            node.IsMarkedDeleted,
+            style.PixelsPerDip);
+
         var icon = node.IsDirectory ? FolderIcon : FileIcon;
 
         DrawIcon(context, icon, new(x, y + ((name.Height - IconSize) / 2), IconSize, IconSize));
         context.DrawText(name, new(x + IconSize + IconGap, y));
 
-        var size = Text(node.SizeText, 11 * scale, SubLabelBrush, FontWeights.Normal, tile.Width - (2 * Padding), false, monoFont);
+        var size = Text(
+            node.SizeText,
+            11 * style.Scale,
+            SubLabelBrush,
+            style.SubLabelTypeface,
+            tile.Width - (2 * Padding),
+            false,
+            style.PixelsPerDip);
+
         context.DrawText(size, new(x, y + name.Height + 1));
     }
 
-    private FormattedText Text(string value, double size, Brush brush, FontWeight weight, double maxWidth, bool strikethrough, FontFamily? fontFamily)
+    private static FormattedText Text(
+        string value,
+        double size,
+        Brush brush,
+        Typeface typeface,
+        double maxWidth,
+        bool strikethrough,
+        double pixelsPerDip)
     {
-        var typeface = new Typeface(fontFamily ?? TextElement.GetFontFamily(this), FontStyles.Normal, weight, FontStretches.Normal);
-
         var text = new FormattedText(
             value,
             CultureInfo.CurrentUICulture,
@@ -738,7 +815,7 @@ public sealed class TreemapView : FrameworkElement
             typeface,
             size,
             brush,
-            VisualTreeHelper.GetDpi(this).PixelsPerDip)
+            pixelsPerDip)
         {
             MaxTextWidth = Math.Max(0, maxWidth),
             MaxLineCount = 1,
@@ -753,9 +830,40 @@ public sealed class TreemapView : FrameworkElement
         return text;
     }
 
-    private Pen? ResourcePen(object resourceKey, double thickness)
+    private Pen? ResolvePen(object resourceKey, double thickness, ref Brush? cachedBrush, ref Pen? cachedPen)
     {
-        return TryFindResource(resourceKey) is Brush brush ? new(brush, thickness) : null;
+        if (TryFindResource(resourceKey) is not Brush brush)
+        {
+            cachedBrush = null;
+            cachedPen = null;
+            return null;
+        }
+
+        if (!ReferenceEquals(brush, cachedBrush) || cachedPen is null)
+        {
+            cachedBrush = brush;
+            var pen = new Pen(brush, thickness);
+            pen.Freeze();
+            cachedPen = pen;
+        }
+
+        return cachedPen;
+    }
+
+    private static Typeface ResolveTypeface(
+        FontFamily fontFamily,
+        FontWeight weight,
+        ref FontFamily? cachedFont,
+        ref Typeface? cachedTypeface)
+    {
+        if (cachedTypeface is not null && Equals(fontFamily, cachedFont))
+        {
+            return cachedTypeface;
+        }
+
+        cachedFont = fontFamily;
+        cachedTypeface = new(fontFamily, FontStyles.Normal, weight, FontStretches.Normal);
+        return cachedTypeface;
     }
 
     private string DescribeTopTilesForAutomation()
@@ -768,7 +876,14 @@ public sealed class TreemapView : FrameworkElement
                 .Select(static node => $"{node.Name} ({node.SizeText})"));
     }
 
-    private readonly record struct TileStyle(Pen? Selection, Pen? Deleted, FontFamily? Mono, double Intensity, double Scale);
+    private readonly record struct TileStyle(
+        Pen? Selection,
+        Pen? Deleted,
+        Typeface LabelTypeface,
+        Typeface SubLabelTypeface,
+        double Intensity,
+        double Scale,
+        double PixelsPerDip);
 
     private sealed class TreemapAutomationPeer(TreemapView owner) : FrameworkElementAutomationPeer(owner)
     {
