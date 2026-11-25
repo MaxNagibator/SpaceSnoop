@@ -13,7 +13,7 @@ internal sealed class NameTable
     private readonly int _shardMask;
     private readonly int _shardShift;
 
-    public NameTable(int shardCount = 1, bool singleWriter = false)
+    public NameTable(int shardCount = 1, bool singleWriter = false, int initialSlotCapacity = 0)
     {
         if (shardCount <= 0 || (shardCount & (shardCount - 1)) != 0)
         {
@@ -26,7 +26,7 @@ internal sealed class NameTable
 
         for (var i = 0; i < shardCount; i++)
         {
-            _shards[i] = new(_shardMask != 0, _shardShift, singleWriter);
+            _shards[i] = new(_shardMask != 0, _shardShift, singleWriter, initialSlotCapacity);
         }
     }
 
@@ -155,16 +155,19 @@ internal sealed class NameTable
         private int _resizeThreshold;
         private bool _singleWriter;
 
-        public Shard(bool multiShard, int shardShift, bool singleWriter)
+        public Shard(bool multiShard, int shardShift, bool singleWriter, int initialSlotCapacity = 0)
         {
             _singleWriter = singleWriter && !multiShard;
             _shardShift = shardShift;
             _nextChunkSize = multiShard ? MultiShardInitialChunkSize : SingleShardInitialChunkSize;
             _maxChunkSize = multiShard ? MultiShardMaxChunkSize : SingleShardMaxChunkSize;
             _initialOffsetCapacity = multiShard ? MultiShardInitialOffsetCapacity : SingleShardInitialOffsetCapacity;
-            var initialSlotCapacity = multiShard ? MultiShardInitialSlotCapacity : SingleShardInitialSlotCapacity;
-            _slots = new int[initialSlotCapacity];
-            _resizeThreshold = ComputeResizeThreshold(initialSlotCapacity);
+            var defaultSlotCapacity = multiShard ? MultiShardInitialSlotCapacity : SingleShardInitialSlotCapacity;
+            var slotCapacity = initialSlotCapacity > 0
+                ? Math.Max(defaultSlotCapacity, (int)BitOperations.RoundUpToPowerOf2((uint)Math.Clamp(initialSlotCapacity, defaultSlotCapacity, 1 << 24)))
+                : defaultSlotCapacity;
+            _slots = new int[slotCapacity];
+            _resizeThreshold = ComputeResizeThreshold(slotCapacity);
         }
 
         public int Intern(ReadOnlySpan<byte> utf8, uint hash)
@@ -244,7 +247,7 @@ internal sealed class NameTable
                 }
 
                 var existingId = entry - 1;
-                GetSlice(existingId, out var chunk, out var start, out var length);
+                GetSliceLocked(existingId, out var chunk, out var start, out var length);
 
                 if (utf8.SequenceEqual(chunk.AsSpan(start, length)))
                 {
@@ -401,7 +404,7 @@ internal sealed class NameTable
                 }
 
                 var localId = entry - 1;
-                GetSlice(localId, out var chunk, out var start, out var length);
+                GetSliceLocked(localId, out var chunk, out var start, out var length);
                 var hash = HashUtf8(chunk.AsSpan(start, length));
                 var slotIndex = (int)(BitOperations.RotateRight(hash, _shardShift) & (uint)mask);
 
@@ -415,6 +418,24 @@ internal sealed class NameTable
 
             _slots = newSlots;
             _resizeThreshold = ComputeResizeThreshold(newCapacity);
+        }
+
+        private void GetSliceLocked(int localId, out byte[] chunk, out int start, out int length)
+        {
+            var encoded = _offsets[localId >> OffsetBlockShift][localId & OffsetBlockMask];
+
+            if (encoded < 0)
+            {
+                chunk = _overflow![~encoded];
+                start = 0;
+                length = chunk.Length;
+                return;
+            }
+
+            chunk = _chunks[encoded >> ChunkShift];
+            var pos = encoded & ChunkMask;
+            var varintLength = ReadVarint(chunk, pos, out length);
+            start = pos + varintLength;
         }
 
         private void GetSlice(int localId, out byte[] chunk, out int start, out int length)
@@ -495,5 +516,88 @@ internal sealed class NameTable
                 shift += 7;
             }
         }
+    }
+}
+
+internal readonly struct LocalNameCache
+{
+    private const int SlotCount = 2048;
+    private const int SlotMask = SlotCount - 1;
+    private const int MaxStackUtf8Chars = 341;
+
+    private readonly CacheSlot[]? _slots;
+
+    public bool IsCreated => _slots is not null;
+
+    private LocalNameCache(CacheSlot[] slots)
+    {
+        _slots = slots;
+    }
+
+    public static LocalNameCache Create()
+    {
+        var slots = new CacheSlot[SlotCount];
+
+        for (var i = 0; i < slots.Length; i++)
+        {
+            slots[i].NameId = -1;
+        }
+
+        return new(slots);
+    }
+
+    public int Intern(NameTable names, ReadOnlySpan<char> chars)
+    {
+        if (_slots is null)
+        {
+            return names.Intern(chars);
+        }
+
+        if (chars.Length <= MaxStackUtf8Chars)
+        {
+            Span<byte> buffer = stackalloc byte[1024];
+            var written = Wtf8.FromUtf16(chars, buffer);
+            return Intern(names, buffer[..written]);
+        }
+
+        var maxBytes = Wtf8.GetMaxByteCount(chars.Length);
+        var rented = ArrayPool<byte>.Shared.Rent(maxBytes);
+
+        try
+        {
+            var written = Wtf8.FromUtf16(chars, rented);
+            return Intern(names, rented.AsSpan(0, written));
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(rented);
+        }
+    }
+
+    public int Intern(NameTable names, ReadOnlySpan<byte> utf8)
+    {
+        if (_slots is null)
+        {
+            return names.Intern(utf8);
+        }
+
+        var hash = NameTable.HashUtf8(utf8);
+        ref var slot = ref _slots[(int)(hash & SlotMask)];
+
+        if (slot.NameId >= 0 && slot.Hash == hash && names.GetUtf8(slot.NameId).SequenceEqual(utf8))
+        {
+            return slot.NameId;
+        }
+
+        var nameId = names.Intern(utf8, hash);
+        slot.Hash = hash;
+        slot.NameId = nameId;
+        return nameId;
+    }
+
+    private struct CacheSlot
+    {
+        public uint Hash;
+        public int NameId;
     }
 }

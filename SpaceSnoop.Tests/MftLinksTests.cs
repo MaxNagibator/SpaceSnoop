@@ -1,4 +1,5 @@
-﻿using SpaceSnoop.Core.Mft;
+﻿using SpaceSnoop.Core.Domain;
+using SpaceSnoop.Core.Mft;
 
 namespace SpaceSnoop.Tests;
 
@@ -15,7 +16,7 @@ public class MftLinksTests
     {
         var table = Table();
         table.Entries[File] = Leaf(table.Names, "внутри.bin", Target, 7, 100);
-        table.Alternates[File] = [new(Outside, 9, table.Names.Append("снаружи.bin"))];
+        table.Alternates[File] = [new(Outside, 9, table.Names.Intern("снаружи.bin"))];
 
         var links = MftLinks.Build(table, CancellationToken.None);
         links.Rehome(table, Target, CancellationToken.None);
@@ -50,7 +51,7 @@ public class MftLinksTests
         table.Entries[Outside] = Leaf(table.Names, "exceptions.py", Root, 1, 50);
         table.Entries[Outside].Sequence = 48;
         table.Entries[File] = Leaf(table.Names, "кэш_0", Outside, 27, 24654);
-        table.Alternates[File] = [new(Target, 7, table.Names.Append("внутри.bin"))];
+        table.Alternates[File] = [new(Target, 7, table.Names.Intern("внутри.bin"))];
 
         var links = MftLinks.Build(table, CancellationToken.None);
         links.Rehome(table, Root, CancellationToken.None);
@@ -74,7 +75,7 @@ public class MftLinksTests
     {
         var table = Table();
         table.Entries[File] = Leaf(table.Names, "снаружи.bin", Outside, 9, 100);
-        table.Alternates[File] = [new(Target, 7, table.Names.Append("внутри.bin"))];
+        table.Alternates[File] = [new(Target, 7, table.Names.Intern("внутри.bin"))];
 
         var links = MftLinks.Build(table, CancellationToken.None);
         links.Rehome(table, Target, CancellationToken.None);
@@ -105,7 +106,7 @@ public class MftLinksTests
     {
         var table = Table();
         table.Entries[File] = Leaf(table.Names, "снаружи.bin", Outside, 3, 100);
-        table.Alternates[File] = [new(Target, 7, table.Names.Append("внутри.bin"))];
+        table.Alternates[File] = [new(Target, 7, table.Names.Intern("внутри.bin"))];
 
         var links = MftLinks.Build(table, CancellationToken.None);
         links.Rehome(table, Target, CancellationToken.None);
@@ -155,7 +156,7 @@ public class MftLinksTests
         table.Entries[Target].Parent = Outside;
         table.Entries[Target].ParentSequence = 9;
         table.Entries[File] = Leaf(table.Names, "внутри.bin", Target, 7, 100);
-        table.Alternates[Outside] = [new(Target, 7, table.Names.Append("повреждённый-предок"))];
+        table.Alternates[Outside] = [new(Target, 7, table.Names.Intern("повреждённый-предок"))];
         var links = MftLinks.Build(table, CancellationToken.None);
         links.Rehome(table, Target, CancellationToken.None);
         links.DropUnreachable(table, CancellationToken.None);
@@ -175,7 +176,7 @@ public class MftLinksTests
         var table = Table();
         table.Entries[Outside].Parent = 63;
         table.Entries[File] = Leaf(table.Names, "внутри.bin", Outside, 9, 100);
-        table.Alternates[Outside] = [new(Target, 7, table.Names.Append("спасённый-каталог"))];
+        table.Alternates[Outside] = [new(Target, 7, table.Names.Intern("спасённый-каталог"))];
         var links = MftLinks.Build(table, CancellationToken.None);
 
         links.Rehome(table, Target, CancellationToken.None);
@@ -243,7 +244,7 @@ public class MftLinksTests
     {
         var table = Table();
         table.Entries[35] = Leaf(table.Names, "спасённый.bin", 60, 1, 128);
-        table.Alternates[35] = [new(Target, 7, table.Names.Append("внутри.bin"))];
+        table.Alternates[35] = [new(Target, 7, table.Names.Intern("внутри.bin"))];
         table.Entries[36] = Leaf(table.Names, "удалённый-родитель.bin", 61, 1, 256);
         table.Entries[37] = Leaf(table.Names, "устаревший-родитель.bin", Target, 3, 512);
         table.Entries[40] = Folder(table.Names, "оторванный", 63, 1, 5);
@@ -283,7 +284,7 @@ public class MftLinksTests
 
         table.Entries[File] = Leaf(table.Names, "ссылка", Outside, 9, 100);
         table.Entries[File].IsReparseLink = true;
-        table.Alternates[File] = [new(Target, 7, table.Names.Append("внутри.bin"))];
+        table.Alternates[File] = [new(Target, 7, table.Names.Intern("внутри.bin"))];
 
         var links = MftLinks.Build(table, CancellationToken.None);
         links.Rehome(table, Target, CancellationToken.None);
@@ -446,22 +447,122 @@ public class MftLinksTests
         }
     }
 
-    private static MftTable Table()
+    [Test]
+    public void Параллельная_сборка_и_отсечение_сохраняют_связи_и_детерминированные_образцы_отрыва()
     {
-        var arena = new MftNameArena();
-        var entries = new MftEntry[64];
-        entries[Root] = Folder(arena, ".", Root, 1, 1);
-        entries[Target] = Folder(arena, "цель", Root, 1, 7);
-        entries[Outside] = Folder(arena, "чужой", Root, 1, 9);
+        const int count = 70_000;
+        var store = new ScanTreeStore(16);
+        var entries = new MftEntry[count];
+        var names = store.Names;
+        entries[Root] = Folder(names, ".", Root, 1, 1);
+        entries[Target] = Folder(names, "цель", Root, 1, 7);
+        entries[Outside] = Folder(names, "чужой", Root, 1, 9);
 
-        return new(entries, new(), [], arena);
+        var fileName = names.Intern("файл.bin");
+        var detachedDirName = names.Intern("оторванная");
+        var cascadeName = names.Intern("каскад.bin");
+
+        for (var i = 100; i < count; i++)
+        {
+            var entry = new MftEntry
+            {
+                Parent = i % 2 == 0 ? Target : Outside,
+                ParentSequence = i % 2 == 0 ? (ushort)7 : (ushort)9,
+                Sequence = 1,
+                Size = 10,
+                SizeKnown = true,
+                Names = 1,
+                Present = true,
+            };
+            entry.SetName(fileName);
+            entries[i] = entry;
+        }
+
+        entries[40] = Folder(names, "оторванный", 69_999, 99, 5);
+        entries[41] = Leaf(names, "каскад.bin", 40, 5, 500);
+        entries[69_998] = new()
+        {
+            Parent = Target,
+            ParentSequence = 7,
+            Sequence = 1,
+            IsDirectory = true,
+            Names = 1,
+            Present = true,
+        };
+        entries[69_998].SetName(detachedDirName);
+        entries[69_998].Parent = 69_995;
+        entries[69_998].ParentSequence = 99;
+        entries[69_997] = new()
+        {
+            Parent = 69_998,
+            ParentSequence = 1,
+            Sequence = 1,
+            Size = 333,
+            SizeKnown = true,
+            Names = 1,
+            Present = true,
+        };
+        entries[69_997].SetName(cascadeName);
+        entries[69_995] = Folder(names, "каталог", Root, 1, 2);
+
+        var table = new MftTable(entries, new(), [], store);
+        var links = MftLinks.Build(table, CancellationToken.None);
+        links.DropUnreachable(table, CancellationToken.None);
+
+        var targetChildren = 0;
+
+        for (var c = links.FirstChild[Target]; c >= 0; c = links.NextSibling[c])
+        {
+            targetChildren++;
+        }
+
+        var outsideChildren = 0;
+
+        for (var c = links.FirstChild[Outside]; c >= 0; c = links.NextSibling[c])
+        {
+            outsideChildren++;
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(targetChildren, Is.GreaterThan(34_000));
+            Assert.That(outsideChildren, Is.GreaterThan(34_000));
+            Assert.That(table.Statistics.StaleParents, Is.EqualTo(2));
+            Assert.That(table.Statistics.Unreachable, Is.EqualTo(2));
+            Assert.That(table.Statistics.Detached, Is.EqualTo(4));
+            Assert.That(table.Statistics.OrphanFiles, Is.EqualTo(2));
+            Assert.That(table.Statistics.OrphanBytes, Is.EqualTo(833));
+            Assert.That(entries[40].Exists, Is.False);
+            Assert.That(entries[41].Exists, Is.False);
+            Assert.That(entries[69_998].Exists, Is.False);
+            Assert.That(entries[69_997].Exists, Is.False);
+            Assert.That(
+                table.Statistics.DetachedSamples.Select(static x => x.Text),
+                Is.EqualTo(new[]
+                {
+                    "69998->69995[поколение 99!=2]",
+                    "40->69999[поколение 99!=1]",
+                    "41->40[ветка]",
+                    "69997->69998[ветка]",
+                }));
+        }
     }
 
-    private static MftEntry Folder(MftNameArena arena, string name, int parent, ushort parentSequence, ushort sequence)
+    private static MftTable Table()
     {
-        return new()
+        var store = new ScanTreeStore(1);
+        var entries = new MftEntry[64];
+        entries[Root] = Folder(store.Names, ".", Root, 1, 1);
+        entries[Target] = Folder(store.Names, "цель", Root, 1, 7);
+        entries[Outside] = Folder(store.Names, "чужой", Root, 1, 9);
+
+        return new(entries, new(), [], store);
+    }
+
+    private static MftEntry Folder(NameTable names, string name, int parent, ushort parentSequence, ushort sequence)
+    {
+        var entry = new MftEntry
         {
-            Name = arena.Append(name),
             Parent = parent,
             ParentSequence = parentSequence,
             Sequence = sequence,
@@ -469,13 +570,14 @@ public class MftLinksTests
             Names = 1,
             Present = true,
         };
+        entry.SetName(names.Intern(name));
+        return entry;
     }
 
-    private static MftEntry Leaf(MftNameArena arena, string name, int parent, ushort parentSequence, long size)
+    private static MftEntry Leaf(NameTable names, string name, int parent, ushort parentSequence, long size)
     {
-        return new()
+        var entry = new MftEntry
         {
-            Name = arena.Append(name),
             Parent = parent,
             ParentSequence = parentSequence,
             Sequence = 1,
@@ -484,5 +586,7 @@ public class MftLinksTests
             Names = 1,
             Present = true,
         };
+        entry.SetName(names.Intern(name));
+        return entry;
     }
 }

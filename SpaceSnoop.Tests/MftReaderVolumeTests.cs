@@ -238,7 +238,7 @@ public class MftReaderVolumeTests
             Assert.That(table.GetName(20), Is.EqualTo("первое.dll"));
             Assert.That(table.Entries[20].Names, Is.EqualTo(3));
             Assert.That(
-                table.Alternates[20].Select(x => table.GetName(x.Name)),
+                table.Alternates[20].Select(x => table.Names.GetString(x.NameId)),
                 Is.EqualTo(
                     new[]
                     {

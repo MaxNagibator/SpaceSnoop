@@ -490,64 +490,6 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator>? logger = null)
         }
     }
 
-    private readonly struct LocalNameCache
-    {
-        private const int SlotCount = 1024;
-        private const int SlotMask = SlotCount - 1;
-        private const int MaxStackUtf8Chars = 341;
-
-        private readonly CacheSlot[]? _slots;
-
-        public bool IsCreated => _slots is not null;
-
-        private LocalNameCache(CacheSlot[] slots)
-        {
-            _slots = slots;
-        }
-
-        public static LocalNameCache Create()
-        {
-            var slots = new CacheSlot[SlotCount];
-
-            for (var i = 0; i < slots.Length; i++)
-            {
-                slots[i].NameId = -1;
-            }
-
-            return new(slots);
-        }
-
-        public int Intern(NameTable names, ReadOnlySpan<char> chars)
-        {
-            if (chars.Length > MaxStackUtf8Chars)
-            {
-                return names.Intern(chars);
-            }
-
-            Span<byte> buffer = stackalloc byte[1024];
-            var written = Wtf8.FromUtf16(chars, buffer);
-            var utf8 = buffer[..written];
-            var hash = NameTable.HashUtf8(utf8);
-            ref var slot = ref _slots![(int)(hash & SlotMask)];
-
-            if (slot.NameId >= 0 && slot.Hash == hash && names.GetUtf8(slot.NameId).SequenceEqual(utf8))
-            {
-                return slot.NameId;
-            }
-
-            var nameId = names.Intern(utf8, hash);
-            slot.Hash = hash;
-            slot.NameId = nameId;
-            return nameId;
-        }
-
-        private struct CacheSlot
-        {
-            public uint Hash;
-            public int NameId;
-        }
-    }
-
     private readonly record struct ScanChild(string Path, DirectorySpace Node, ScanBranch? Branch = null);
 
     private sealed class SkipJournal

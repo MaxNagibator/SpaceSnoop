@@ -434,6 +434,13 @@ public class DirectorySpace : SpaceBase
         Invalidate();
     }
 
+    internal void SetAggregatedTotals(long totalSize, int totalFileCount, int totalDirectoryCount)
+    {
+        _totalSize = totalSize;
+        _totalFileCount = totalFileCount;
+        _totalDirectoryCount = totalDirectoryCount;
+    }
+
     internal void AggregateTotals()
     {
         var stack = new Stack<(DirectorySpace Node, bool Ascending)>();

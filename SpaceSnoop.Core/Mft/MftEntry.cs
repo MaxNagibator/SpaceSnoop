@@ -11,16 +11,7 @@ internal enum MftRecordState : byte
     SizeKnown = 4,
     ReparseUnknown = 8,
     ReparseLink = 16,
-}
-
-[StructLayout(LayoutKind.Sequential)]
-internal readonly struct MftNameRef(int offset, ushort chunk, ushort byteLength)
-{
-    public readonly int Offset = offset;
-    public readonly ushort Chunk = chunk;
-    public readonly ushort ByteLength = byteLength;
-
-    public bool HasValue => ByteLength != 0;
+    HasName = 32,
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -29,8 +20,8 @@ internal struct MftEntry
     public long Size;
     public long CreationFileTime;
     public long LastAccessFileTime;
-    public MftNameRef Name;
     public int Parent;
+    public int NameId;
     public ushort ParentSequence;
     public ushort Sequence;
     public ushort Names;
@@ -66,13 +57,26 @@ internal struct MftEntry
         set => SetFlag(MftRecordState.ReparseLink, value);
     }
 
-    public readonly bool Exists => Present && Name.HasValue;
+    public bool HasName
+    {
+        readonly get => (Flags & MftRecordState.HasName) != 0;
+        set => SetFlag(MftRecordState.HasName, value);
+    }
+
+    public readonly bool Exists => (Flags & (MftRecordState.Present | MftRecordState.HasName)) == (MftRecordState.Present | MftRecordState.HasName);
 
     public readonly bool IsLink => IsReparseLink || (IsDirectory && ReparseUnknown);
 
+    public void SetName(int nameId)
+    {
+        NameId = nameId;
+        HasName = true;
+    }
+
     public void ClearName()
     {
-        Name = default;
+        NameId = 0;
+        HasName = false;
     }
 
     public void IncrementNames()
@@ -96,6 +100,6 @@ internal struct MftEntry
     }
 }
 
-internal readonly record struct MftName(int Parent, ushort ParentSequence, MftNameRef Name, ushort BaseSequence = 0);
+internal readonly record struct MftName(int Parent, ushort ParentSequence, int NameId, ushort BaseSequence = 0);
 
 internal readonly record struct MftPendingSize(long Size, ushort BaseSequence = 0);

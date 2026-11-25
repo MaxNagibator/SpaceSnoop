@@ -215,6 +215,32 @@ public class NameTableTests
     }
 
     [Test]
+    public void LocalNameCache_InternsCharsAndUtf8AndPreSizesSlots()
+    {
+        var table = new NameTable(64, singleWriter: false, initialSlotCapacity: 4096);
+        var cache = LocalNameCache.Create();
+        var longName = new string('ф', 500) + "_🚀";
+
+        var id1 = cache.Intern(table, "readme.txt".AsSpan());
+        var id2 = cache.Intern(table, "readme.txt"u8);
+        var idLong = cache.Intern(table, longName.AsSpan());
+        var idLongRepeat = cache.Intern(table, longName.AsSpan());
+        var idSurrogate = cache.Intern(table, "bad_\uD800".AsSpan());
+        var idReplacement = cache.Intern(table, "bad_\uFFFD".AsSpan());
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(id2, Is.EqualTo(id1));
+            Assert.That(idLongRepeat, Is.EqualTo(idLong));
+            Assert.That(idSurrogate, Is.Not.EqualTo(idReplacement));
+            Assert.That(table.GetString(id1), Is.EqualTo("readme.txt"));
+            Assert.That(table.GetString(idLong), Is.EqualTo(longName));
+            Assert.That(table.GetString(idSurrogate), Is.EqualTo("bad_\uD800"));
+            Assert.That(table.GetString(idReplacement), Is.EqualTo("bad_\uFFFD"));
+        }
+    }
+
+    [Test]
     public void GetUtf8_LockFreeConcurrentReadsMatch64ShardInternAndPrecomputedHash()
     {
         var table = new NameTable(64);

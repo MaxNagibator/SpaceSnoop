@@ -1,4 +1,6 @@
-﻿namespace SpaceSnoop.Core.Mft;
+﻿using SpaceSnoop.Core.Domain;
+
+namespace SpaceSnoop.Core.Mft;
 
 internal sealed class MftStatistics
 {
@@ -92,9 +94,10 @@ internal sealed record MftTable(
     MftEntry[] Entries,
     MftStatistics Statistics,
     Dictionary<int, List<MftName>> Alternates,
-    MftNameArena Names)
+    ScanTreeStore Store)
 {
-    public string GetName(MftNameRef name) => Names.GetString(name);
+    public NameTable Names => Store.Names;
 
-    public string GetName(int index) => Names.GetString(Entries[index].Name);
+    public string GetName(int index)
+        => Entries[index].HasName ? Store.Names.GetString(Entries[index].NameId) : string.Empty;
 }

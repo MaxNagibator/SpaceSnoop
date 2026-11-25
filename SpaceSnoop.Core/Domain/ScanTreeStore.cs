@@ -22,14 +22,14 @@ internal sealed class ScanTreeStore
 
     internal Lock FacadeLock => _facadeLock;
 
-    public ScanTreeStore(int shardCount = 1, bool singleWriter = false)
-        : this(shardCount, singleWriter, MaxRegularChunks)
+    public ScanTreeStore(int shardCount = 1, bool singleWriter = false, int initialNameSlotsPerShard = 0)
+        : this(shardCount, singleWriter, MaxRegularChunks, initialNameSlotsPerShard)
     {
     }
 
-    internal ScanTreeStore(int shardCount, bool singleWriter, int maxRegularChunks)
+    internal ScanTreeStore(int shardCount, bool singleWriter, int maxRegularChunks, int initialNameSlotsPerShard = 0)
     {
-        Names = new(shardCount, singleWriter);
+        Names = new(shardCount, singleWriter, initialNameSlotsPerShard);
         _maxRegularChunks = maxRegularChunks;
     }
 

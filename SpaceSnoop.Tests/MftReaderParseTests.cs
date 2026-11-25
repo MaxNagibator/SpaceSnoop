@@ -1,4 +1,5 @@
-﻿using SpaceSnoop.Core.Mft;
+﻿using SpaceSnoop.Core.Domain;
+using SpaceSnoop.Core.Mft;
 
 namespace SpaceSnoop.Tests;
 
@@ -17,14 +18,14 @@ public class MftReaderParseTests
             .FileName(Parent, 1, "битый.bin")
             .BrokenAttribute();
 
-        var arena = new MftNameArena();
-        var entry = Parse(record, statistics, arena: arena);
+        var names = new NameTable(1);
+        var entry = Parse(record, statistics, names: names);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(statistics.Partial, Is.EqualTo(1));
             Assert.That(statistics.Damaged, Is.Zero);
-            Assert.That(arena.GetString(entry.Name), Is.EqualTo("битый.bin"));
+            Assert.That(names.GetString(entry.NameId), Is.EqualTo("битый.bin"));
         }
     }
 
@@ -32,19 +33,19 @@ public class MftReaderParseTests
     public void Второе_имя_копится_отдельно_от_выбранного()
     {
         var pending = new MftPending();
-        var arena = new MftNameArena();
+        var names = new NameTable(1);
 
         var record = new MftRecordBuilder()
             .FileName(Parent, 1, "ссылка.dll")
             .FileName(60, 3, "оригинал.dll");
 
-        var entry = Parse(record, pending: pending, arena: arena);
+        var entry = Parse(record, pending: pending, names: names);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(arena.GetString(entry.Name), Is.EqualTo("ссылка.dll"));
+            Assert.That(names.GetString(entry.NameId), Is.EqualTo("ссылка.dll"));
             Assert.That(pending.Alternates[0], Has.Count.EqualTo(1));
-            Assert.That(arena.GetString(pending.Alternates[0][0].Name), Is.EqualTo("оригинал.dll"));
+            Assert.That(names.GetString(pending.Alternates[0][0].NameId), Is.EqualTo("оригинал.dll"));
             Assert.That(pending.Alternates[0][0].Parent, Is.EqualTo(60));
             Assert.That(pending.Alternates[0][0].ParentSequence, Is.EqualTo(3));
         }
@@ -54,19 +55,19 @@ public class MftReaderParseTests
     public void Длина_атрибута_у_края_int_не_роняет_разбор()
     {
         var statistics = new MftStatistics();
-        var arena = new MftNameArena();
+        var names = new NameTable(1);
 
         var record = new MftRecordBuilder()
             .FileName(Parent, 1, "переполнение.bin")
             .OverflowingAttribute();
 
-        var entry = Parse(record, statistics, arena: arena);
+        var entry = Parse(record, statistics, names: names);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(statistics.Partial, Is.EqualTo(1));
             Assert.That(statistics.Damaged, Is.Zero);
-            Assert.That(arena.GetString(entry.Name), Is.EqualTo("переполнение.bin"));
+            Assert.That(names.GetString(entry.NameId), Is.EqualTo("переполнение.bin"));
         }
     }
 
@@ -88,17 +89,17 @@ public class MftReaderParseTests
     public void Имя_в_пространстве_dos_не_выбирается()
     {
         var pending = new MftPending();
-        var arena = new MftNameArena();
+        var names = new NameTable(1);
 
         var record = new MftRecordBuilder()
             .FileName(Parent, 1, "PROGRA~1", MftLayout.NamespaceDos)
             .FileName(Parent, 1, "Program Files");
 
-        var entry = Parse(record, pending: pending, arena: arena);
+        var entry = Parse(record, pending: pending, names: names);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(arena.GetString(entry.Name), Is.EqualTo("Program Files"));
+            Assert.That(names.GetString(entry.NameId), Is.EqualTo("Program Files"));
             Assert.That(pending.Alternates, Is.Empty);
         }
     }
@@ -114,7 +115,7 @@ public class MftReaderParseTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(entry.Name.HasValue, Is.False);
+            Assert.That(entry.HasName, Is.False);
             Assert.That(entry.Exists, Is.False);
         }
     }
@@ -123,7 +124,7 @@ public class MftReaderParseTests
     public void Имя_родитель_и_размер_читаются_из_базовой_записи()
     {
         var statistics = new MftStatistics();
-        var arena = new MftNameArena();
+        var names = new NameTable(1);
         var creation = new DateTime(2024, 5, 1, 10, 0, 0, DateTimeKind.Utc);
         var access = new DateTime(2025, 6, 2, 11, 0, 0, DateTimeKind.Utc);
 
@@ -132,11 +133,11 @@ public class MftReaderParseTests
             .FileName(Parent, 7, "отчёт.pdf")
             .ResidentData(64);
 
-        var entry = Parse(record, statistics, arena: arena);
+        var entry = Parse(record, statistics, names: names);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(arena.GetString(entry.Name), Is.EqualTo("отчёт.pdf"));
+            Assert.That(names.GetString(entry.NameId), Is.EqualTo("отчёт.pdf"));
             Assert.That(entry.Parent, Is.EqualTo(Parent));
             Assert.That(entry.ParentSequence, Is.EqualTo(7));
             Assert.That(entry.Size, Is.EqualTo(64));
@@ -183,7 +184,7 @@ public class MftReaderParseTests
         var entries = new MftEntry[1];
         var statistics = new MftStatistics();
 
-        MftReader.Parse(new byte[1024], 512, 0, entries, new(), statistics, new(new MftNameArena()));
+        MftReader.Parse(new byte[1024], 512, 0, entries, new(), statistics, new(1));
 
         using (Assert.EnterMultipleScope())
         {
@@ -289,10 +290,10 @@ public class MftReaderParseTests
         MftRecordBuilder builder,
         MftStatistics? statistics = null,
         MftPending? pending = null,
-        MftNameArena? arena = null)
+        NameTable? names = null)
     {
         var entries = new MftEntry[1];
-        MftReader.Parse(builder.Build(), 512, 0, entries, pending ?? new(), statistics ?? new(), new(arena ?? new MftNameArena()));
+        MftReader.Parse(builder.Build(), 512, 0, entries, pending ?? new(), statistics ?? new(), names ?? new(1));
         return entries[0];
     }
 }

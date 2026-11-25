@@ -146,6 +146,29 @@ public sealed class ScanProgress
             current is Stage);
     }
 
+    internal void AddBatch(int directories, int files, long bytes, string? currentPath)
+    {
+        if (directories > 0)
+        {
+            Interlocked.Add(ref _directoriesScanned, directories);
+        }
+
+        if (files > 0)
+        {
+            Interlocked.Add(ref _filesScanned, files);
+        }
+
+        if (bytes > 0)
+        {
+            Interlocked.Add(ref _bytesScanned, bytes);
+        }
+
+        if (currentPath is not null)
+        {
+            _current = currentPath;
+        }
+    }
+
     private sealed record Stage(string Text);
 }
 
