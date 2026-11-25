@@ -211,6 +211,16 @@ public class FileSpace : SpaceBase
         return Flags;
     }
 
+    protected override string GetAbsolutePath()
+    {
+        if (Parent is DirectorySpace { DirIndex: >= 0 } dir)
+        {
+            return dir.CombineChildPath(Name);
+        }
+
+        return base.GetAbsolutePath();
+    }
+
     protected override SpaceState GetState()
     {
         var owner = Volatile.Read(ref _owner);

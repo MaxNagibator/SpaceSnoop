@@ -6,8 +6,10 @@
 public class DirectorySpace : SpaceBase
 {
     private const int UnknownCount = -1;
+    private const int MaxArenaPathDepth = 512;
     private static readonly Lock StoreAttachLock = new();
 
+    private readonly int _dirIndex = -1;
     private DirectorySpace[] _subDirectories = [];
     private object _nameOrStore;
     private long _totalSize;
@@ -16,17 +18,44 @@ public class DirectorySpace : SpaceBase
     private int _fileStart;
     private int _fileCount;
 
-    public override string Name => Volatile.Read(ref _nameOrStore) is ScanTreeStore store ? store.Names.GetString(NodeTag) : (string)_nameOrStore;
+    public override string Name
+    {
+        get
+        {
+            if (_dirIndex >= 0)
+            {
+                var store = (ScanTreeStore)_nameOrStore;
+                return store.Names.GetString(store.GetDirectoryRef(_dirIndex).NameId);
+            }
+
+            return Volatile.Read(ref _nameOrStore) is ScanTreeStore fallbackStore
+                ? fallbackStore.Names.GetString(NodeTag)
+                : (string)_nameOrStore;
+        }
+    }
+
+    public override DateTime CreationDate =>
+        _dirIndex >= 0
+            ? ((ScanTreeStore)_nameOrStore).GetDirectoryRef(_dirIndex).GetCreationDate()
+            : base.CreationDate;
+
+    public override DateTime LastAccessTime =>
+        _dirIndex >= 0
+            ? ((ScanTreeStore)_nameOrStore).GetDirectoryRef(_dirIndex).GetLastAccessTime()
+            : base.LastAccessTime;
 
     /// <summary>
     /// Общий размер всех файлов в директории, включая подкаталоги.
     /// </summary>
-    public override long TotalSize => _totalSize;
+    public override long TotalSize =>
+        _dirIndex >= 0
+            ? ((ScanTreeStore)_nameOrStore).GetDirectoryRef(_dirIndex).TotalSize
+            : _totalSize;
 
     /// <summary>
     /// Общий размер всех файлов в директории в виде строки с суффиксом размера.
     /// </summary>
-    public string TotalSizeText => SizeFormatter.Format(_totalSize);
+    public string TotalSizeText => SizeFormatter.Format(TotalSize);
 
     /// <summary>
     /// Список файлов.
@@ -35,10 +64,36 @@ public class DirectorySpace : SpaceBase
     {
         get
         {
-            if (Volatile.Read(ref _fileCount) == 0 || _nameOrStore is not ScanTreeStore store)
+            if (_dirIndex >= 0)
+            {
+                var arenaStore = (ScanTreeStore)_nameOrStore;
+
+                lock (arenaStore.FacadeLock)
+                {
+                    var count = arenaStore.GetDirectoryRef(_dirIndex).FileCount;
+
+                    if (count == 0)
+                    {
+                        return Array.Empty<FileSpace>();
+                    }
+
+                    var result = new FileSpace[count];
+
+                    for (var i = 0; i < result.Length; i++)
+                    {
+                        result[i] = arenaStore.GetOrCreateFacadeLocked(this, i);
+                    }
+
+                    return result;
+                }
+            }
+
+            if (Volatile.Read(ref _fileCount) == 0 || Volatile.Read(ref _nameOrStore) is not ScanTreeStore)
             {
                 return Array.Empty<FileSpace>();
             }
+
+            var store = (ScanTreeStore)_nameOrStore;
 
             lock (store.FacadeLock)
             {
@@ -62,7 +117,7 @@ public class DirectorySpace : SpaceBase
     /// <summary>
     /// Список подкаталогов.
     /// </summary>
-    public IReadOnlyList<DirectorySpace> SubDirectories => _subDirectories;
+    public IReadOnlyList<DirectorySpace> SubDirectories => _dirIndex >= 0 ? BuildArenaSubDirectories() : _subDirectories;
 
     /// <summary>
     /// Максимальный размер среди подкаталогов.
@@ -76,6 +131,27 @@ public class DirectorySpace : SpaceBase
     {
         get
         {
+            if (_dirIndex >= 0)
+            {
+                var store = (ScanTreeStore)_nameOrStore;
+                ref var entry = ref store.GetDirectoryRef(_dirIndex);
+
+                if (entry.TotalFileCount != UnknownCount)
+                {
+                    return entry.TotalFileCount;
+                }
+
+                store.ComputeSubtreeCounts(_dirIndex, out var arenaFiles, out var arenaDirs);
+                entry.TotalFileCount = arenaFiles;
+
+                if (entry.TotalDirCount == UnknownCount)
+                {
+                    entry.TotalDirCount = arenaDirs;
+                }
+
+                return arenaFiles;
+            }
+
             if (_totalFileCount != UnknownCount)
             {
                 return _totalFileCount;
@@ -100,6 +176,27 @@ public class DirectorySpace : SpaceBase
     {
         get
         {
+            if (_dirIndex >= 0)
+            {
+                var store = (ScanTreeStore)_nameOrStore;
+                ref var entry = ref store.GetDirectoryRef(_dirIndex);
+
+                if (entry.TotalDirCount != UnknownCount)
+                {
+                    return entry.TotalDirCount;
+                }
+
+                store.ComputeSubtreeCounts(_dirIndex, out var arenaFiles, out var arenaDirs);
+
+                if (entry.TotalFileCount == UnknownCount)
+                {
+                    entry.TotalFileCount = arenaFiles;
+                }
+
+                entry.TotalDirCount = arenaDirs;
+                return arenaDirs;
+            }
+
             if (_totalDirectoryCount != UnknownCount)
             {
                 return _totalDirectoryCount;
@@ -117,14 +214,31 @@ public class DirectorySpace : SpaceBase
         }
     }
 
-    internal int FileCount => _fileCount;
+    internal int DirIndex => _dirIndex;
 
-    internal ReadOnlySpan<FileEntry> FileEntries =>
-        _fileCount > 0 && _nameOrStore is ScanTreeStore store
-            ? store.GetSpan(_fileStart, _fileCount)
-            : ReadOnlySpan<FileEntry>.Empty;
+    internal int FileCount =>
+        _dirIndex >= 0
+            ? ((ScanTreeStore)_nameOrStore).GetDirectoryRef(_dirIndex).FileCount
+            : _fileCount;
 
-    internal DirectorySpace[] SubDirectoriesArray => _subDirectories;
+    internal ReadOnlySpan<FileEntry> FileEntries
+    {
+        get
+        {
+            if (_dirIndex >= 0)
+            {
+                var arenaStore = (ScanTreeStore)_nameOrStore;
+                ref readonly var entry = ref arenaStore.GetDirectoryRef(_dirIndex);
+                return entry.FileCount > 0 ? arenaStore.GetSpan(entry.FileStart, entry.FileCount) : ReadOnlySpan<FileEntry>.Empty;
+            }
+
+            return _fileCount > 0 && _nameOrStore is ScanTreeStore store
+                ? store.GetSpan(_fileStart, _fileCount)
+                : ReadOnlySpan<FileEntry>.Empty;
+        }
+    }
+
+    internal DirectorySpace[] SubDirectoriesArray => _dirIndex >= 0 ? BuildArenaSubDirectories() : _subDirectories;
 
     internal ScanTreeStore? Store => Volatile.Read(ref _nameOrStore) as ScanTreeStore;
 
@@ -147,6 +261,14 @@ public class DirectorySpace : SpaceBase
     {
         _nameOrStore = store;
         NodeTag = nameId;
+    }
+
+    internal DirectorySpace(ScanTreeStore store, int dirIndex)
+        : base(null, 0L, 0L, 0)
+    {
+        _nameOrStore = store;
+        _dirIndex = dirIndex;
+        NodeTag = dirIndex;
     }
 
     /// <summary>
@@ -195,6 +317,36 @@ public class DirectorySpace : SpaceBase
     /// <param name="files">Список файлов, которые нужно добавить в директорию.</param>
     public void AddFiles(Span<FileInfo> files)
     {
+        if (_dirIndex >= 0)
+        {
+            if (files.IsEmpty)
+            {
+                return;
+            }
+
+            var arenaStore = (ScanTreeStore)_nameOrStore;
+            Span<FileEntry> arenaEntries = files.Length <= 64 ? stackalloc FileEntry[files.Length] : new FileEntry[files.Length];
+            var arenaAddedSize = 0L;
+
+            for (var i = 0; i < files.Length; i++)
+            {
+                var info = files[i];
+                arenaEntries[i] = new()
+                {
+                    Size = info.Length,
+                    CreationRaw = TimestampEncoding.FromDateTime(info.CreationTime),
+                    LastAccessRaw = TimestampEncoding.FromDateTime(info.LastAccessTime),
+                    NameId = arenaStore.Names.Intern(info.Name),
+                    State = SpaceState.Added,
+                    Flags = 0,
+                };
+                arenaAddedSize += info.Length;
+            }
+
+            arenaStore.AppendFilesAtDirectory(_dirIndex, arenaEntries, arenaAddedSize);
+            return;
+        }
+
         if (files.IsEmpty)
         {
             _totalSize = Size;
@@ -238,6 +390,22 @@ public class DirectorySpace : SpaceBase
 
     public FileSpace AddFile(string name, long length, DateTime creationTime, DateTime lastAccessTime)
     {
+        if (_dirIndex >= 0)
+        {
+            var arenaStore = (ScanTreeStore)_nameOrStore;
+            var arenaEntry = new FileEntry
+            {
+                Size = length,
+                CreationRaw = TimestampEncoding.FromDateTime(creationTime),
+                LastAccessRaw = TimestampEncoding.FromDateTime(lastAccessTime),
+                NameId = arenaStore.Names.Intern(name),
+                State = SpaceState.Added,
+                Flags = 0,
+            };
+
+            return arenaStore.AppendFileAtDirectory(this, _dirIndex, in arenaEntry);
+        }
+
         var store = EnsureStore();
         var entry = new FileEntry
         {
@@ -271,6 +439,24 @@ public class DirectorySpace : SpaceBase
     /// <param name="child">Дочерний элемент, который нужно удалить.</param>
     public void Remove(SpaceBase child)
     {
+        if (_dirIndex >= 0)
+        {
+            var arenaStore = (ScanTreeStore)_nameOrStore;
+
+            switch (child)
+            {
+                case DirectorySpace subDir:
+                    arenaStore.RemoveDirectory(_dirIndex, subDir, out _, out _, out _);
+                    break;
+
+                case FileSpace file:
+                    arenaStore.RemoveFileAtDirectory(this, _dirIndex, file, out _);
+                    break;
+            }
+
+            return;
+        }
+
         long removedTotalSize;
 
         switch (child)
@@ -285,14 +471,14 @@ public class DirectorySpace : SpaceBase
                 break;
 
             case FileSpace file:
-                if (Volatile.Read(ref _nameOrStore) is not ScanTreeStore store
-                    || !store.RemoveFile(this, _fileStart, ref _fileCount, file, out removedTotalSize))
+                if (Volatile.Read(ref _nameOrStore) is ScanTreeStore store
+                    && store.RemoveFile(this, _fileStart, ref _fileCount, file, out removedTotalSize))
                 {
-                    return;
+                    Size -= removedTotalSize;
+                    break;
                 }
 
-                Size -= removedTotalSize;
-                break;
+                return;
 
             default:
                 return;
@@ -321,23 +507,68 @@ public class DirectorySpace : SpaceBase
             return;
         }
 
+        if (_dirIndex >= 0)
+        {
+            var store = (ScanTreeStore)_nameOrStore;
+
+            if (store.GetDirectoryRef(_dirIndex).ParentIndex >= 0)
+            {
+                return;
+            }
+
+            store.SetSyntheticParent(_dirIndex, new DirectorySpace(parent.FullName, null, parent.CreationTime, parent.LastAccessTime));
+            return;
+        }
+
         Parent = new DirectorySpace(parent.FullName, null, parent.CreationTime, parent.LastAccessTime);
+    }
+
+    internal string CombineChildPath(string childName)
+    {
+        return BuildArenaPath(childName);
+    }
+
+    internal bool IsAttachedTo(DirectorySpace parent)
+    {
+        if (_dirIndex < 0 || parent._dirIndex < 0 || !ReferenceEquals(Store, parent.Store))
+        {
+            return false;
+        }
+
+        var store = (ScanTreeStore)_nameOrStore;
+
+        lock (store.FacadeLock)
+        {
+            return IsAttachedToLocked(store, parent._dirIndex);
+        }
+    }
+
+    internal bool IsAttachedToLocked(ScanTreeStore store, int parentIndex)
+    {
+        if (_dirIndex < 0 || !ReferenceEquals(_nameOrStore, store))
+        {
+            return false;
+        }
+
+        ref readonly var entry = ref store.GetDirectoryRef(_dirIndex);
+        return entry.ParentIndex == parentIndex && !entry.IsDetached;
     }
 
     internal FileSpace GetFile(int index)
     {
-        if (Volatile.Read(ref _nameOrStore) is not ScanTreeStore store)
+        if (Volatile.Read(ref _nameOrStore) is ScanTreeStore store)
         {
-            throw new ArgumentOutOfRangeException(nameof(index));
+            lock (store.FacadeLock)
+            {
+                var count = _dirIndex >= 0 ? store.GetDirectoryRef(_dirIndex).FileCount : _fileCount;
+                ArgumentOutOfRangeException.ThrowIfNegative(index);
+                ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, count);
+
+                return store.GetOrCreateFacadeLocked(this, index);
+            }
         }
 
-        lock (store.FacadeLock)
-        {
-            ArgumentOutOfRangeException.ThrowIfNegative(index);
-            ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, _fileCount);
-
-            return store.GetOrCreateFacadeLocked(this, index);
-        }
+        throw new ArgumentOutOfRangeException(nameof(index));
     }
 
     internal string GetFileName(int index)
@@ -360,6 +591,12 @@ public class DirectorySpace : SpaceBase
 
     internal bool NameEquals(ReadOnlySpan<char> value, StringComparison comparison)
     {
+        if (_dirIndex >= 0)
+        {
+            var arenaStore = (ScanTreeStore)_nameOrStore;
+            return arenaStore.Names.Equals(arenaStore.GetDirectoryRef(_dirIndex).NameId, value, comparison);
+        }
+
         if (_nameOrStore is ScanTreeStore store)
         {
             return store.Names.Equals(NodeTag, value, comparison);
@@ -370,6 +607,15 @@ public class DirectorySpace : SpaceBase
 
     internal ref FileEntry GetFileEntryRef(int index)
     {
+        if (_dirIndex >= 0)
+        {
+            var arenaStore = (ScanTreeStore)_nameOrStore;
+            ref readonly var entry = ref arenaStore.GetDirectoryRef(_dirIndex);
+            ArgumentOutOfRangeException.ThrowIfNegative(index);
+            ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, entry.FileCount);
+            return ref arenaStore.GetWritableSpan(entry.FileStart, entry.FileCount)[index];
+        }
+
         ArgumentOutOfRangeException.ThrowIfNegative(index);
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, _fileCount);
 
@@ -436,6 +682,15 @@ public class DirectorySpace : SpaceBase
 
     internal void SetAggregatedTotals(long totalSize, int totalFileCount, int totalDirectoryCount)
     {
+        if (_dirIndex >= 0)
+        {
+            ref var entry = ref ((ScanTreeStore)_nameOrStore).GetDirectoryRef(_dirIndex);
+            entry.TotalSize = totalSize;
+            entry.TotalFileCount = totalFileCount;
+            entry.TotalDirCount = totalDirectoryCount;
+            return;
+        }
+
         _totalSize = totalSize;
         _totalFileCount = totalFileCount;
         _totalDirectoryCount = totalDirectoryCount;
@@ -486,14 +741,233 @@ public class DirectorySpace : SpaceBase
     {
         return child switch
         {
-            DirectorySpace subDir => Array.IndexOf(_subDirectories, subDir) >= 0,
+            DirectorySpace subDir => _dirIndex >= 0 ? subDir.IsAttachedTo(this) : Array.IndexOf(_subDirectories, subDir) >= 0,
             FileSpace file => file.IsAttachedTo(this),
             _ => false,
         };
     }
 
+    internal bool HasMarkedSelfOrChild()
+    {
+        if (_dirIndex >= 0)
+        {
+            return ((ScanTreeStore)_nameOrStore).HasMarkedInSubtree(_dirIndex);
+        }
+
+        if (IsDeleted)
+        {
+            return true;
+        }
+
+        for (var i = 0; i < _subDirectories.Length; i++)
+        {
+            if (_subDirectories[i].HasMarkedSelfOrChild())
+            {
+                return true;
+            }
+        }
+
+        var files = FileEntries;
+
+        for (var i = 0; i < files.Length; i++)
+        {
+            if (files[i].IsDeleted)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    internal void CollectMarked(List<SpaceBase> destination)
+    {
+        if (_dirIndex >= 0)
+        {
+            ((ScanTreeStore)_nameOrStore).CollectMarkedInSubtree(_dirIndex, destination);
+            return;
+        }
+
+        if (IsDeleted)
+        {
+            destination.Add(this);
+            return;
+        }
+
+        for (var i = 0; i < _subDirectories.Length; i++)
+        {
+            _subDirectories[i].CollectMarked(destination);
+        }
+
+        var files = FileEntries;
+
+        for (var i = 0; i < files.Length; i++)
+        {
+            if (files[i].IsDeleted)
+            {
+                destination.Add(GetFile(i));
+            }
+        }
+    }
+
+    internal void RestoreRecursive()
+    {
+        if (IsDeleted)
+        {
+            Restore();
+        }
+
+        if (_dirIndex >= 0)
+        {
+            ((ScanTreeStore)_nameOrStore).RestoreDirectoryRecursive(_dirIndex);
+            return;
+        }
+
+        for (var i = 0; i < _subDirectories.Length; i++)
+        {
+            _subDirectories[i].RestoreRecursive();
+        }
+
+        var files = FileEntries;
+
+        for (var i = 0; i < files.Length; i++)
+        {
+            if (files[i].IsDeleted)
+            {
+                GetFile(i).Restore();
+            }
+        }
+    }
+
+    internal bool HasAddedChild()
+    {
+        if (_dirIndex >= 0)
+        {
+            return ((ScanTreeStore)_nameOrStore).HasAddedChildInDirectory(_dirIndex);
+        }
+
+        for (var i = 0; i < _subDirectories.Length; i++)
+        {
+            if (_subDirectories[i].State == SpaceState.Added)
+            {
+                return true;
+            }
+        }
+
+        var files = FileEntries;
+
+        for (var i = 0; i < files.Length; i++)
+        {
+            if (files[i].State == SpaceState.Added)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    internal bool HasMarkedChild()
+    {
+        if (_dirIndex >= 0)
+        {
+            return ((ScanTreeStore)_nameOrStore).HasMarkedChildInDirectory(_dirIndex);
+        }
+
+        for (var i = 0; i < _subDirectories.Length; i++)
+        {
+            if (_subDirectories[i].HasMarkedSelfOrChild())
+            {
+                return true;
+            }
+        }
+
+        var files = FileEntries;
+
+        for (var i = 0; i < files.Length; i++)
+        {
+            if (files[i].IsDeleted)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected override SpaceBase? GetParent()
+    {
+        if (_dirIndex < 0)
+        {
+            return base.GetParent();
+        }
+
+        var store = (ScanTreeStore)_nameOrStore;
+        var parentIndex = store.GetDirectoryRef(_dirIndex).ParentIndex;
+        return parentIndex >= 0 ? store.GetOrCreateDirectoryFacade(parentIndex) : store.GetSyntheticParent(_dirIndex);
+    }
+
+    protected override void SetParent(SpaceBase? value)
+    {
+        if (_dirIndex < 0)
+        {
+            base.SetParent(value);
+            return;
+        }
+
+        var store = (ScanTreeStore)_nameOrStore;
+
+        if (store.GetDirectoryRef(_dirIndex).ParentIndex < 0)
+        {
+            store.SetSyntheticParent(_dirIndex, value);
+        }
+    }
+
+    protected override string GetAbsolutePath()
+    {
+        return _dirIndex >= 0 ? BuildArenaPath(leafName: null) : base.GetAbsolutePath();
+    }
+
+    protected override SpaceState GetState()
+    {
+        return _dirIndex >= 0 ? ((ScanTreeStore)_nameOrStore).GetDirectoryRef(_dirIndex).State : base.GetState();
+    }
+
+    protected override void SetState(SpaceState value)
+    {
+        if (_dirIndex >= 0)
+        {
+            ((ScanTreeStore)_nameOrStore).GetDirectoryRef(_dirIndex).State = value;
+            return;
+        }
+
+        base.SetState(value);
+    }
+
+    protected override long GetSize()
+    {
+        return _dirIndex >= 0 ? ((ScanTreeStore)_nameOrStore).GetDirectoryRef(_dirIndex).Size : base.GetSize();
+    }
+
+    protected override void SetSize(long value)
+    {
+        if (_dirIndex >= 0)
+        {
+            ((ScanTreeStore)_nameOrStore).GetDirectoryRef(_dirIndex).Size = value;
+            return;
+        }
+
+        base.SetSize(value);
+    }
+
     protected override void DeleteInner()
     {
+        if (_dirIndex >= 0)
+        {
+            ((ScanTreeStore)_nameOrStore).DeleteDirectorySubtree(_dirIndex);
+            return;
+        }
+
         for (var i = 0; i < _subDirectories.Length; i++)
         {
             _subDirectories[i].Delete();
@@ -514,6 +988,12 @@ public class DirectorySpace : SpaceBase
 
     protected override void RestoreInner()
     {
+        if (_dirIndex >= 0)
+        {
+            ((ScanTreeStore)_nameOrStore).RestoreDirectorySubtree(_dirIndex);
+            return;
+        }
+
         // TODO: Костыль для восстановления только конкретных фалов, не затрагивая другие
         for (var i = 0; i < _subDirectories.Length; i++)
         {
@@ -547,6 +1027,84 @@ public class DirectorySpace : SpaceBase
                 entry.State = SpaceState.Added;
             }
         }
+    }
+
+    private DirectorySpace[] BuildArenaSubDirectories()
+    {
+        var store = (ScanTreeStore)_nameOrStore;
+
+        lock (store.FacadeLock)
+        {
+            ref readonly var entry = ref store.GetDirectoryRef(_dirIndex);
+
+            if (entry.SubDirCount == 0)
+            {
+                return [];
+            }
+
+            var result = new DirectorySpace[entry.SubDirCount];
+            var i = 0;
+
+            for (var child = entry.FirstChildDir; child >= 0; child = store.GetDirectoryRef(child).NextSiblingDir)
+            {
+                result[i++] = store.GetOrCreateDirectoryFacadeLocked(child);
+            }
+
+            return result;
+        }
+    }
+
+    private string BuildArenaPath(string? leafName)
+    {
+        var store = (ScanTreeStore)_nameOrStore;
+        string[] segments;
+
+        lock (store.FacadeLock)
+        {
+            var arenaDepth = 0;
+            var lastDir = _dirIndex;
+
+            for (var cur = _dirIndex; cur >= 0 && arenaDepth < MaxArenaPathDepth; cur = store.GetDirectoryRef(cur).ParentIndex)
+            {
+                arenaDepth++;
+                lastDir = cur;
+            }
+
+            var synthetic = store.GetSyntheticParentLocked(lastDir);
+            var syntheticDepth = 0;
+
+            for (var p = synthetic; p is not null && syntheticDepth < MaxArenaPathDepth; p = p.Parent)
+            {
+                syntheticDepth++;
+            }
+
+            var extra = leafName is null ? 0 : 1;
+            segments = new string[syntheticDepth + arenaDepth + extra];
+            var index = segments.Length;
+
+            if (leafName is not null)
+            {
+                segments[--index] = leafName;
+            }
+
+            var step = 0;
+
+            for (var cur = _dirIndex; cur >= 0 && step < arenaDepth; cur = store.GetDirectoryRef(cur).ParentIndex)
+            {
+                segments[--index] = store.Names.GetString(store.GetDirectoryRef(cur).NameId);
+                step++;
+            }
+
+            step = 0;
+
+            for (var p = synthetic; p is not null && step < syntheticDepth; p = p.Parent)
+            {
+                segments[--index] = p.Name;
+                step++;
+            }
+        }
+
+        return Path.Combine(segments);
     }
 
     private ScanTreeStore EnsureStore()
@@ -586,6 +1144,13 @@ public class DirectorySpace : SpaceBase
 
     private Span<FileEntry> GetWritableFileEntries()
     {
+        if (_dirIndex >= 0)
+        {
+            var arenaStore = (ScanTreeStore)_nameOrStore;
+            ref readonly var entry = ref arenaStore.GetDirectoryRef(_dirIndex);
+            return entry.FileCount > 0 ? arenaStore.GetWritableSpan(entry.FileStart, entry.FileCount) : Span<FileEntry>.Empty;
+        }
+
         return _fileCount > 0 && _nameOrStore is ScanTreeStore store
             ? store.GetWritableSpan(_fileStart, _fileCount)
             : Span<FileEntry>.Empty;
@@ -622,6 +1187,31 @@ public class DirectorySpace : SpaceBase
     /// <returns>Максимальный размер среди подкаталогов.</returns>
     private long GetMaxSize()
     {
+        if (_dirIndex >= 0)
+        {
+            var store = (ScanTreeStore)_nameOrStore;
+            var maxArena = store.GetDirectoryRef(_dirIndex).TotalSize;
+            var stackArena = new Stack<int>();
+            stackArena.Push(_dirIndex);
+
+            while (stackArena.Count > 0)
+            {
+                ref readonly var entry = ref store.GetDirectoryRef(stackArena.Pop());
+
+                if (entry.TotalSize > maxArena)
+                {
+                    maxArena = entry.TotalSize;
+                }
+
+                for (var child = entry.FirstChildDir; child >= 0; child = store.GetDirectoryRef(child).NextSiblingDir)
+                {
+                    stackArena.Push(child);
+                }
+            }
+
+            return maxArena;
+        }
+
         var max = _totalSize;
 
         if (_subDirectories.Length == 0)

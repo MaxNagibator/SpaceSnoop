@@ -7,6 +7,7 @@ public abstract class SpaceBase
     protected int NodeTag = -1;
     protected byte Flags;
 
+    private SpaceBase? _parent;
     private long _size;
     private SpaceState _state = SpaceState.Added;
 
@@ -18,7 +19,11 @@ public abstract class SpaceBase
     /// <summary>
     /// Родительская директория.
     /// </summary>
-    public SpaceBase? Parent { get; protected set; }
+    public SpaceBase? Parent
+    {
+        get => GetParent();
+        protected set => SetParent(value);
+    }
 
     /// <summary>
     /// Полный путь до директории.
@@ -69,7 +74,7 @@ public abstract class SpaceBase
 
     protected SpaceBase(SpaceBase? parent, long creationRaw, long lastAccessRaw, byte flags)
     {
-        Parent = parent;
+        _parent = parent;
         CreationRaw = creationRaw;
         LastAccessRaw = lastAccessRaw;
         Flags = flags;
@@ -142,6 +147,16 @@ public abstract class SpaceBase
         State = SpaceState.Error;
     }
 
+    protected virtual SpaceBase? GetParent()
+    {
+        return _parent;
+    }
+
+    protected virtual void SetParent(SpaceBase? value)
+    {
+        _parent = value;
+    }
+
     protected virtual SpaceState GetState()
     {
         return _state;
@@ -170,7 +185,7 @@ public abstract class SpaceBase
     {
     }
 
-    private string GetAbsolutePath()
+    protected virtual string GetAbsolutePath()
     {
         var depth = 0;
 

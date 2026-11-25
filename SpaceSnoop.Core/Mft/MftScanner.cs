@@ -1,26 +1,85 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using SpaceSnoop.Core.Domain;
-using System.Runtime;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 
 namespace SpaceSnoop.Core.Mft;
 
-public sealed class MftScanner(ILogger<MftScanner>? logger = null)
+internal delegate bool MftUsnSourceOpener(
+    char letter,
+    out IMftUsnSource? source,
+    out MftUsnErrorKind error,
+    out int win32Error);
+
+public sealed class MftScanner
 {
-    private const int NoGcRegionMinRecords = 500_000;
-    private const long NoGcMinHeadroomMultiplier = 3;
+    private const int MaterializeThreadCeiling = 8;
+    private const int ParallelBfsLevelThreshold = 256;
+    private const int MaxCachedUsnVolumes = 2;
 
-    private static readonly Lock NoGcRegionGate = new();
-    private static long _nextNoGcToken;
-    private static long _noGcOwnerToken;
+    private readonly ILogger _log;
+    private readonly MftUsnSourceOpener _usnSourceOpener;
+    private readonly int _maxUsnDeltaRecords;
+    private readonly Lock _usnCacheLock = new();
+    private readonly List<CachedUsnSession> _usnCache = new(MaxCachedUsnVolumes);
 
-    private readonly ILogger _log = logger ?? NullLogger<MftScanner>.Instance;
+    public MftScanner(ILogger<MftScanner>? logger = null)
+        : this(logger, TryOpenNativeUsnSource, MftUsnVolumeIndex.DefaultMaxDeltaRecords)
+    {
+    }
+
+    internal MftScanner(
+        ILogger<MftScanner>? logger,
+        MftUsnSourceOpener? usnSourceOpener,
+        int maxUsnDeltaRecords = MftUsnVolumeIndex.DefaultMaxDeltaRecords)
+    {
+        _log = logger ?? NullLogger<MftScanner>.Instance;
+        _usnSourceOpener = usnSourceOpener ?? TryOpenNativeUsnSource;
+        _maxUsnDeltaRecords = maxUsnDeltaRecords;
+    }
 
     public static MftAvailability Probe(string path)
     {
         return MftReader.Probe(path);
+    }
+
+    public void InvalidateUsnCache(string? path = null)
+    {
+        lock (_usnCacheLock)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                _usnCache.Clear();
+                return;
+            }
+
+            var letter = MftReader.VolumeLetter(path);
+
+            if (letter is null)
+            {
+                return;
+            }
+
+            RemoveCachedSessionLocked(char.ToUpperInvariant(letter.Value));
+        }
+    }
+
+    public bool HasUsnCacheFor(string path)
+    {
+        var letter = MftReader.VolumeLetter(path);
+
+        if (letter is null)
+        {
+            return false;
+        }
+
+        var upper = char.ToUpperInvariant(letter.Value);
+
+        lock (_usnCacheLock)
+        {
+            return FindCachedSessionIndexLocked(upper) >= 0;
+        }
     }
 
     // TODO: $MFT читается целиком независимо от цели скана, поэтому на подкаталоге движок проигрывает
@@ -39,6 +98,11 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
     {
         var letter = MftReader.VolumeLetter(directory.FullName)
             ?? throw new InvalidOperationException($"Путь {directory.FullName} не лежит на локальном томе с буквой");
+
+        if (TryRefreshFromUsnCache(directory, letter, progress, cancel, out var cachedResult))
+        {
+            return cachedResult!;
+        }
 
         using var volume = MftFileVolume.Open(letter);
         return CalculateWithFallback(
@@ -61,6 +125,15 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
         MftReadMode mode = MftReadMode.Volume,
         CancellationToken cancel = default)
     {
+        var letterOnly = MftReader.VolumeLetter(directory.FullName);
+
+        if (letterOnly is not null
+            && TryRefreshFromUsnCache(directory, letterOnly.Value, progress, cancel, out var cachedResult))
+        {
+            availability = MftAvailability.Available;
+            return cachedResult;
+        }
+
         availability = MftReader.TryOpenVolume(directory.FullName, out var letter, out var volume, out var boot);
 
         if (availability != MftAvailability.Available || volume is null || boot is null)
@@ -111,163 +184,6 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
         return CalculateWithFallback(volume, prefetchedBoot: null, directory, letter, threads, blockBytes, progress, mode, rawDiskOpener, cancel);
     }
 
-    internal static void ComputeMaterializeNoGcBudgets(
-        long recordsInUse,
-        long extensions,
-        int totalRecords,
-        out long totalBudget,
-        out long lohBudget)
-    {
-        var baseRecords = recordsInUse > extensions
-            ? recordsInUse - extensions
-            : Math.Max(1L, totalRecords);
-
-        lohBudget = Math.Clamp((baseRecords * 32L) + (24L * 1024 * 1024), 48L * 1024 * 1024, 304L * 1024 * 1024);
-        var sohBudget = Math.Clamp((baseRecords * 24L) + (16L * 1024 * 1024), 48L * 1024 * 1024, 208L * 1024 * 1024);
-        totalBudget = sohBudget + lohBudget;
-    }
-
-    private MftScanResult CalculateWithFallback(
-        IMftVolume volume,
-        byte[]? prefetchedBoot,
-        DirectoryInfo directory,
-        char letter,
-        int threads,
-        int blockBytes,
-        ScanProgress? progress,
-        MftReadMode mode,
-        Func<byte[], MftRawDiskAttempt>? rawDiskOpener,
-        CancellationToken cancel)
-    {
-        var requestedMode = mode == MftReadMode.RawDisk ? MftReadMode.RawDisk : MftReadMode.Volume;
-        var actualMode = requestedMode;
-        string? fallbackReason = null;
-        MftTable? table = null;
-
-        if (requestedMode == MftReadMode.RawDisk)
-        {
-            cancel.ThrowIfCancellationRequested();
-
-            if (prefetchedBoot is null)
-            {
-                prefetchedBoot = new byte[MftRawDiskGuard.BootSectorBytes];
-                volume.ReadAt(0, prefetchedBoot);
-            }
-
-            var attempt = rawDiskOpener is null
-                ? MftRawDiskProbe.Open(letter, prefetchedBoot)
-                : rawDiskOpener(prefetchedBoot);
-
-            if (attempt.Volume is null)
-            {
-                fallbackReason = string.IsNullOrWhiteSpace(attempt.FailureReason)
-                    ? "проверка физического диска не пройдена"
-                    : attempt.FailureReason;
-            }
-            else
-            {
-                try
-                {
-                    using (attempt.Volume)
-                    {
-                        table = MftReader.Read(
-                            attempt.Volume,
-                            letter,
-                            threads,
-                            blockBytes,
-                            progress,
-                            prefetchedBoot,
-                            attempt.ExtentLength > 0 ? attempt.ExtentLength : null,
-                            cancel,
-                            attempt.MftValidDataLength > 0 ? attempt.MftValidDataLength : null);
-                    }
-
-                    if (table.Statistics.Damaged > 0 || table.Statistics.Partial > 0)
-                    {
-                        fallbackReason = $"несогласованные записи $MFT на диске (повреждено {table.Statistics.Damaged:N0}, неполных {table.Statistics.Partial:N0})";
-                        table = null;
-                    }
-                }
-                catch (Exception exception) when (exception is UnauthorizedAccessException or IOException or InvalidDataException)
-                {
-                    fallbackReason = exception.Message;
-                    table = null;
-                }
-            }
-
-            if (table is null)
-            {
-                progress?.Reset();
-                actualMode = MftReadMode.Volume;
-            }
-        }
-
-        table ??= MftReader.Read(volume, letter, threads, blockBytes, progress, prefetchedBoot, partitionExtentLength: null, cancel);
-
-        progress?.Announce($"Разбор связей тома {letter}:");
-
-        var links = MftLinks.Build(table, cancel);
-        var start = Locate(table, links, directory, letter);
-
-        if (start < 0)
-        {
-            throw new DirectoryNotFoundException($"Каталог {directory.FullName} не найден в $MFT тома {letter}:");
-        }
-
-        links.Rehome(table, start, cancel);
-        ulong[]? reachable = null;
-
-        if (start == MftLayout.RootRecord)
-        {
-            reachable = new ulong[(table.Entries.Length + 63) >> 6];
-
-            if (table.Entries.Length > MftLayout.RootRecord)
-            {
-                MftLinks.SetReachable(reachable, MftLayout.RootRecord);
-            }
-        }
-        else
-        {
-            links.DropUnreachable(table, cancel);
-        }
-
-        var totals = new MftSubtreeTotals();
-        var root = Materialize(table, links, start, directory, totals, reachable, progress, cancel);
-
-        if (reachable is not null)
-        {
-            links.FinishUnreachable(table, reachable, cancel);
-        }
-
-        root.FixAbsolutePath(directory);
-
-        var statistics = table.Statistics;
-
-        var result = new MftScanResult(
-            root,
-            totals.ExtraNames,
-            totals.ExtraNameBytes,
-            totals.UnknownSizeFiles,
-            statistics.SkippedLinks,
-            statistics.Detached,
-            statistics.OrphanFiles,
-            statistics.OrphanBytes,
-            statistics.Nameless,
-            statistics.NamelessBytes,
-            statistics.Damaged,
-            statistics.Partial,
-            statistics.StaleParents,
-            statistics.Rehomed,
-            threads,
-            FormatReport(statistics, totals.UnknownSizeFiles),
-            actualMode,
-            fallbackReason);
-
-        _log.MftScanCompleted(directory.FullName, table.Entries.Length, result.ExtraNames, result.ExtraNameBytes, result.Report);
-
-        return result;
-    }
-
     internal static string FormatReport(MftStatistics statistics, long unknownSizeFiles)
     {
         var report =
@@ -284,7 +200,7 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
 
         if (statistics.DetachedSamples.Count > 0)
         {
-            report += $" (примеры: {string.Join(", ", statistics.DetachedSamples.Select(static sample => sample.Text))})";
+            report += $" (примеры: {string.Join(", ", statistics.DetachedSamples.Select(static x => x.Text))})";
         }
 
         return report;
@@ -361,8 +277,6 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
         return current;
     }
 
-    private const int MaterializeThreadCeiling = 8;
-
     internal static DirectorySpace Materialize(
         MftTable table,
         MftLinks links,
@@ -371,70 +285,168 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
         MftSubtreeTotals totals,
         ulong[]? reachable,
         ScanProgress? progress,
-        CancellationToken cancel)
+        CancellationToken cancel,
+        MftUsnMaterializeCapture? usnCapture = null)
     {
+        cancel.ThrowIfCancellationRequested();
+
         var entries = table.Entries;
+        var firstChild = links.FirstChild;
+        var nextSibling = links.NextSibling;
         var reuseStore = start == MftLayout.RootRecord;
         var store = reuseStore ? table.Store : new ScanTreeStore(16, singleWriter: false);
-        var rootCache = reuseStore ? default : LocalNameCache.Create();
-        var rootWriter = new FileSlabWriter(store);
-        var root = new DirectorySpace(
-            store,
-            store.Names.Intern(directory.Name),
-            null,
-            TimestampEncoding.FromMftFileTime(entries[start].CreationFileTime),
-            TimestampEncoding.FromMftFileTime(entries[start].LastAccessFileTime),
-            FileEntry.UtcFileTimeFlag);
+        var rootNameId = store.Names.Intern(directory.Name);
 
         if (reuseStore)
         {
             store.Names.Freeze();
         }
 
-        var noGcOwner = TryEnterMaterializeNoGcRegion(table, reuseStore);
-
-        try
+        var rootIndex = store.AllocateDirectorySlot();
+        store.GetDirectoryRef(rootIndex) = new()
         {
-            var files = new List<FileEntry>();
-            var branches = new List<(int Record, DirectorySpace Node)>();
-            FillDirectory(table, links, start, root, store, reuseStore, rootCache, rootWriter, totals, branches, files, reachable);
+            CreationRaw = TimestampEncoding.FromMftFileTime(entries[start].CreationFileTime),
+            LastAccessRaw = TimestampEncoding.FromMftFileTime(entries[start].LastAccessFileTime),
+            NameId = rootNameId,
+            ParentIndex = -1,
+            FirstChildDir = -1,
+            NextSiblingDir = -1,
+            TotalFileCount = -1,
+            TotalDirCount = -1,
+            State = SpaceState.Added,
+            Flags = FileEntry.UtcFileTimeFlag,
+        };
 
-            progress?.SetTopLevelTotal(branches.Count);
-            progress?.AddBatch(1, files.Count, root.Size, directory.FullName);
+        if (usnCapture is not null)
+        {
+            usnCapture.FrnLocation[start] = rootIndex;
+            usnCapture.FrnNameId[start] = rootNameId;
+            usnCapture.FrnSequence[start] = entries[start].Sequence;
+        }
 
-            if (branches.Count > 0)
+        var estimatedDirs = reuseStore ? Math.Max(1024, (int)(table.Statistics.RecordsInUse / 5)) : 1024;
+        var dirRecords = new int[estimatedDirs];
+        dirRecords[0] = start;
+        var dirCount = 1;
+        store.EnsureDirectoryCapacity(1);
+
+        var workerCount = Math.Min(MaterializeThreadCeiling, Math.Max(1, Environment.ProcessorCount));
+        var head = 0;
+        var topLevelReported = false;
+        var rootCache = reuseStore ? default : LocalNameCache.Create();
+
+        while (head < dirCount)
+        {
+            cancel.ThrowIfCancellationRequested();
+            var levelEnd = dirCount;
+            var levelSize = levelEnd - head;
+
+            if (levelSize < ParallelBfsLevelThreshold || workerCount == 1)
             {
-                var workerCount = Math.Min(MaterializeThreadCeiling, Math.Max(1, Environment.ProcessorCount));
-                var targetQueue = workerCount * 2;
-                var maxChunksPerSplit = workerCount * 2;
-                var queue = new Queue<MaterializeChunk>(branches.Count);
-                var gate = new object();
-
-                for (var i = 0; i < branches.Count; i++)
+                for (var idx = head; idx < levelEnd; idx++)
                 {
-                    queue.Enqueue(new([branches[i].Node], [branches[i].Record], 0, 1, null));
+                    if ((idx & 1023) == 0)
+                    {
+                        cancel.ThrowIfCancellationRequested();
+                    }
+
+                    var rec = dirRecords[idx];
+                    var firstSub = -1;
+                    var lastSub = -1;
+                    var subCount = 0;
+                    var fileCount = 0;
+
+                    for (var child = firstChild[rec]; child >= 0; child = nextSibling[child])
+                    {
+                        ref readonly var e = ref entries[child];
+
+                        if (!e.IsDirectory)
+                        {
+                            fileCount++;
+                            continue;
+                        }
+
+                        if (reachable is not null && !MftLinks.TryMarkReachable(reachable, child))
+                        {
+                            continue;
+                        }
+
+                        var childIdx = dirCount++;
+
+                        if (childIdx >= dirRecords.Length)
+                        {
+                            Array.Resize(ref dirRecords, dirRecords.Length * 2);
+                        }
+
+                        store.EnsureDirectoryCapacity(dirCount);
+
+                        dirRecords[childIdx] = child;
+                        var nameId = reuseStore ? e.NameId : rootCache.Intern(store.Names, table.Names.GetUtf8(e.NameId));
+                        store.GetDirectoryRef(childIdx) = new()
+                        {
+                            CreationRaw = TimestampEncoding.FromMftFileTime(e.CreationFileTime),
+                            LastAccessRaw = TimestampEncoding.FromMftFileTime(e.LastAccessFileTime),
+                            NameId = nameId,
+                            ParentIndex = idx,
+                            FirstChildDir = -1,
+                            NextSiblingDir = -1,
+                            TotalFileCount = -1,
+                            TotalDirCount = -1,
+                            State = SpaceState.Added,
+                            Flags = FileEntry.UtcFileTimeFlag,
+                        };
+
+                        if (firstSub < 0)
+                        {
+                            firstSub = childIdx;
+                        }
+                        else
+                        {
+                            store.GetDirectoryRef(lastSub).NextSiblingDir = childIdx;
+                        }
+
+                        lastSub = childIdx;
+                        subCount++;
+
+                        var names = Math.Max(1, (int)e.Names);
+
+                        if (names > 1)
+                        {
+                            totals.ExtraNames += names - 1;
+                            totals.ExtraNameBytes += e.Size * (names - 1);
+                        }
+
+                        if (usnCapture is not null)
+                        {
+                            usnCapture.FrnLocation[child] = childIdx;
+                            usnCapture.FrnNameId[child] = nameId;
+                            usnCapture.FrnSequence[child] = e.Sequence;
+                        }
+                    }
+
+                    ref var parentEntry = ref store.GetDirectoryRef(idx);
+                    parentEntry.FirstChildDir = firstSub;
+                    parentEntry.SubDirCount = subCount;
+                    parentEntry.FileCount = fileCount;
+
+                    if (!topLevelReported)
+                    {
+                        topLevelReported = true;
+                        progress?.SetTopLevelTotal(subCount);
+                    }
                 }
 
-                var queuedCount = branches.Count;
-                var outstanding = branches.Count;
-                var waitingWorkers = 0;
-                var aborted = false;
-                var workerTotals = new MftSubtreeTotals[workerCount];
+                store.SetDirectoryCount(dirCount);
+            }
+            else
+            {
+                var subCounts = new int[levelSize];
+                var fileCounts = new int[levelSize];
                 var options = new ParallelOptions
                 {
                     CancellationToken = cancel,
                     MaxDegreeOfParallelism = workerCount,
                 };
-
-                using var cancelRegistration = cancel.Register(
-                    () =>
-                    {
-                        lock (gate)
-                        {
-                            aborted = true;
-                            Monitor.PulseAll(gate);
-                        }
-                    });
 
                 try
                 {
@@ -444,270 +456,37 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
                         options,
                         x =>
                         {
-                            var writer = new FileSlabWriter(store);
-                            var workerCache = reuseStore ? default : LocalNameCache.Create();
-                            var localTotals = new MftSubtreeTotals();
-                            workerTotals[x] = localTotals;
-                            var stack = new List<MaterializeFrame>(64);
-                            var children = new List<(int Record, DirectorySpace Node)>();
-                            var workerFiles = new List<FileEntry>();
-                            var newChunks = new List<MaterializeChunk>(maxChunksPerSplit + 8);
-                            var paths = progress is null ? null : new MftProgressPath(root, directory.FullName);
-                            var batchDirs = 0;
-                            var batchFiles = 0;
-                            var batchBytes = 0L;
-                            var nextFlushTick = Environment.TickCount64 + 40;
+                            var s = (int)((long)levelSize * x / workerCount);
+                            var eIdx = (int)((long)levelSize * (x + 1) / workerCount);
 
-                            try
+                            for (var i = s; i < eIdx; i++)
                             {
-                                var stop = false;
-
-                                while (!stop)
+                                if ((i & 1023) == 0)
                                 {
-                                    MaterializeChunk chunk = default;
+                                    cancel.ThrowIfCancellationRequested();
+                                }
 
-                                    lock (gate)
+                                var rec = dirRecords[head + i];
+                                var sc = 0;
+                                var fc = 0;
+
+                                for (var child = firstChild[rec]; child >= 0; child = nextSibling[child])
+                                {
+                                    if (entries[child].IsDirectory)
                                     {
-                                        while (queue.Count == 0)
+                                        if (reachable is null || !MftLinks.IsReachable(reachable, child))
                                         {
-                                            if (outstanding == 0 || aborted)
-                                            {
-                                                stop = true;
-                                                break;
-                                            }
-
-                                            waitingWorkers++;
-                                            Monitor.Wait(gate);
-                                            waitingWorkers--;
-                                        }
-
-                                        if (stop || aborted)
-                                        {
-                                            stop = true;
-                                            break;
-                                        }
-
-                                        chunk = queue.Dequeue();
-                                        Volatile.Write(ref queuedCount, queue.Count);
-                                    }
-
-                                    var promoted = false;
-
-                                    for (var idx = 0; idx < chunk.Count; idx++)
-                                    {
-                                        cancel.ThrowIfCancellationRequested();
-
-                                        var itemPos = chunk.Start + idx;
-                                        stack.Clear();
-                                        stack.Add(new(chunk.Records[itemPos], chunk.Nodes[itemPos], false));
-                                        var unvisitedOnStack = 1;
-
-                                        while (stack.Count > 0)
-                                        {
-                                            cancel.ThrowIfCancellationRequested();
-
-                                            var frame = stack[^1];
-                                            stack.RemoveAt(stack.Count - 1);
-
-                                            if (frame.Ascending)
-                                            {
-                                                RollupTotals(frame.Node);
-                                                continue;
-                                            }
-
-                                            unvisitedOnStack--;
-                                            FillDirectory(table, links, frame.Record, frame.Node, store, reuseStore, workerCache, writer, localTotals, children, workerFiles, reachable);
-                                            batchDirs++;
-                                            batchFiles += workerFiles.Count;
-                                            batchBytes += frame.Node.Size;
-
-                                            if (paths is not null && (batchDirs >= 256 || Environment.TickCount64 >= nextFlushTick))
-                                            {
-                                                progress!.AddBatch(batchDirs, batchFiles, batchBytes, paths.For(frame.Node));
-                                                batchDirs = 0;
-                                                batchFiles = 0;
-                                                batchBytes = 0;
-                                                nextFlushTick = Environment.TickCount64 + 40;
-                                            }
-
-                                            if (children.Count == 0)
-                                            {
-                                                frame.Node.SetAggregatedTotals(frame.Node.Size, workerFiles.Count, 0);
-                                                continue;
-                                            }
-
-                                            var remainingInChunk = chunk.Count - (idx + 1);
-                                            var canSplit = (children.Count >= 2 || unvisitedOnStack > 0 || remainingInChunk > 0)
-                                                && (Volatile.Read(ref waitingWorkers) > 0 || Volatile.Read(ref queuedCount) < targetQueue);
-
-                                            if (!canSplit)
-                                            {
-                                                stack.Add(new(frame.Record, frame.Node, true));
-
-                                                for (var j = 0; j < children.Count; j++)
-                                                {
-                                                    if ((j & 1023) == 0)
-                                                    {
-                                                        cancel.ThrowIfCancellationRequested();
-                                                    }
-
-                                                    stack.Add(new(children[j].Record, children[j].Node, false));
-                                                }
-
-                                                unvisitedOnStack += children.Count;
-                                                continue;
-                                            }
-
-                                            cancel.ThrowIfCancellationRequested();
-                                            newChunks.Clear();
-                                            var splitRemainder = remainingInChunk > 0 && chunk.ParentSplit is not null;
-
-                                            if (splitRemainder)
-                                            {
-                                                newChunks.Add(new(chunk.Nodes, chunk.Records, itemPos + 1, remainingInChunk, chunk.ParentSplit));
-                                            }
-
-                                            var currentParent = chunk.ParentSplit;
-                                            var pos = 0;
-
-                                            while (pos < stack.Count)
-                                            {
-                                                cancel.ThrowIfCancellationRequested();
-                                                var ascNode = stack[pos].Node;
-                                                pos++;
-                                                var sibStart = pos;
-
-                                                while (pos < stack.Count && !stack[pos].Ascending)
-                                                {
-                                                    pos++;
-                                                }
-
-                                                var sibCount = pos - sibStart;
-
-                                                if (sibCount == 0)
-                                                {
-                                                    currentParent = new(ascNode, currentParent, 1);
-                                                }
-                                                else
-                                                {
-                                                    var sibNodes = new DirectorySpace[sibCount];
-                                                    var sibRecords = new int[sibCount];
-
-                                                    for (var k = 0; k < sibCount; k++)
-                                                    {
-                                                        if ((k & 1023) == 0)
-                                                        {
-                                                            cancel.ThrowIfCancellationRequested();
-                                                        }
-
-                                                        sibNodes[k] = stack[sibStart + k].Node;
-                                                        sibRecords[k] = stack[sibStart + k].Record;
-                                                    }
-
-                                                    var sibChunkCount = Math.Min(sibCount, maxChunksPerSplit);
-                                                    var split = new MaterializeSplit(ascNode, currentParent, sibChunkCount + 1);
-                                                    AddPartitionedChunks(newChunks, sibNodes, sibRecords, sibChunkCount, split);
-                                                    currentParent = split;
-                                                }
-                                            }
-
-                                            var childNodes = frame.Node.SubDirectoriesArray;
-                                            var childRecords = new int[children.Count];
-
-                                            for (var k = 0; k < children.Count; k++)
-                                            {
-                                                if ((k & 1023) == 0)
-                                                {
-                                                    cancel.ThrowIfCancellationRequested();
-                                                }
-
-                                                childRecords[k] = children[k].Record;
-                                            }
-
-                                            var childChunkCount = Math.Min(children.Count, maxChunksPerSplit);
-                                            var nodeSplit = new MaterializeSplit(frame.Node, currentParent, childChunkCount);
-                                            AddPartitionedChunks(newChunks, childNodes, childRecords, childChunkCount, nodeSplit);
-
-                                            stack.Clear();
-
-                                            lock (gate)
-                                            {
-                                                if (aborted || cancel.IsCancellationRequested)
-                                                {
-                                                    aborted = true;
-                                                    Monitor.PulseAll(gate);
-                                                    stop = true;
-                                                }
-                                                else
-                                                {
-                                                    if (splitRemainder)
-                                                    {
-                                                        Interlocked.Increment(ref chunk.ParentSplit!.Remaining);
-                                                    }
-
-                                                    outstanding += newChunks.Count - 1;
-
-                                                    for (var k = 0; k < newChunks.Count; k++)
-                                                    {
-                                                        queue.Enqueue(newChunks[k]);
-                                                    }
-
-                                                    Volatile.Write(ref queuedCount, queue.Count);
-
-                                                    if (waitingWorkers > 0)
-                                                    {
-                                                        Monitor.PulseAll(gate);
-                                                    }
-                                                }
-                                            }
-
-                                            promoted = true;
-                                            break;
-                                        }
-
-                                        if (promoted || stop)
-                                        {
-                                            break;
+                                            sc++;
                                         }
                                     }
-
-                                    if (stop)
+                                    else
                                     {
-                                        break;
-                                    }
-
-                                    if (!promoted)
-                                    {
-                                        CompleteSplitChain(chunk.ParentSplit, progress);
-
-                                        lock (gate)
-                                        {
-                                            outstanding--;
-
-                                            if (outstanding == 0)
-                                            {
-                                                Monitor.PulseAll(gate);
-                                            }
-                                        }
+                                        fc++;
                                     }
                                 }
 
-                                cancel.ThrowIfCancellationRequested();
-
-                                if (progress is not null && (batchDirs > 0 || batchFiles > 0 || batchBytes > 0))
-                                {
-                                    progress.AddBatch(batchDirs, batchFiles, batchBytes, null);
-                                }
-                            }
-                            catch
-                            {
-                                lock (gate)
-                                {
-                                    aborted = true;
-                                    Monitor.PulseAll(gate);
-                                }
-
-                                throw;
+                                subCounts[i] = sc;
+                                fileCounts[i] = fc;
                             }
                         });
                 }
@@ -716,17 +495,323 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
                     ExceptionDispatchInfo.Capture(exception.Flatten().InnerExceptions[0]).Throw();
                 }
 
-                for (var i = 0; i < workerTotals.Length; i++)
+                var subOffsets = new int[levelSize];
+                var nextDirBase = dirCount;
+
+                for (var i = 0; i < levelSize; i++)
                 {
-                    totals.Add(workerTotals[i]);
+                    subOffsets[i] = nextDirBase;
+                    var sc = subCounts[i];
+                    ref var d = ref store.GetDirectoryRef(head + i);
+                    d.SubDirCount = sc;
+                    d.FileCount = fileCounts[i];
+                    nextDirBase += sc;
+                }
+
+                if (nextDirBase > dirRecords.Length)
+                {
+                    var nextCap = dirRecords.Length;
+
+                    while (nextCap < nextDirBase)
+                    {
+                        nextCap *= 2;
+                    }
+
+                    Array.Resize(ref dirRecords, nextCap);
+                }
+
+                store.EnsureDirectoryCapacity(nextDirBase);
+
+                store.SetDirectoryCount(nextDirBase);
+                var workerTotals = new MftSubtreeTotals[workerCount];
+
+                try
+                {
+                    Parallel.For(
+                        0,
+                        workerCount,
+                        options,
+                        x =>
+                        {
+                            var localTotals = new MftSubtreeTotals();
+                            workerTotals[x] = localTotals;
+                            var workerCache = reuseStore ? default : LocalNameCache.Create();
+                            var s = (int)((long)levelSize * x / workerCount);
+                            var eIdx = (int)((long)levelSize * (x + 1) / workerCount);
+
+                            for (var i = s; i < eIdx; i++)
+                            {
+                                if ((i & 1023) == 0)
+                                {
+                                    cancel.ThrowIfCancellationRequested();
+                                }
+
+                                var parentIdx = head + i;
+                                var sc = store.GetDirectoryRef(parentIdx).SubDirCount;
+
+                                if (sc == 0)
+                                {
+                                    store.GetDirectoryRef(parentIdx).FirstChildDir = -1;
+                                    continue;
+                                }
+
+                                var writePos = subOffsets[i];
+                                var firstSub = -1;
+                                var lastSub = -1;
+                                var actualCount = 0;
+                                var rec = dirRecords[parentIdx];
+
+                                for (var child = firstChild[rec]; child >= 0; child = nextSibling[child])
+                                {
+                                    ref readonly var e = ref entries[child];
+
+                                    if (!e.IsDirectory)
+                                    {
+                                        continue;
+                                    }
+
+                                    if (reachable is not null && !MftLinks.TryMarkReachable(reachable, child))
+                                    {
+                                        continue;
+                                    }
+
+                                    var childIdx = writePos++;
+                                    dirRecords[childIdx] = child;
+                                    var nameId = reuseStore
+                                        ? e.NameId
+                                        : workerCache.Intern(store.Names, table.Names.GetUtf8(e.NameId));
+
+                                    store.GetDirectoryRef(childIdx) = new()
+                                    {
+                                        CreationRaw = TimestampEncoding.FromMftFileTime(e.CreationFileTime),
+                                        LastAccessRaw = TimestampEncoding.FromMftFileTime(e.LastAccessFileTime),
+                                        NameId = nameId,
+                                        ParentIndex = parentIdx,
+                                        FirstChildDir = -1,
+                                        NextSiblingDir = -1,
+                                        TotalFileCount = -1,
+                                        TotalDirCount = -1,
+                                        State = SpaceState.Added,
+                                        Flags = FileEntry.UtcFileTimeFlag,
+                                    };
+
+                                    if (firstSub < 0)
+                                    {
+                                        firstSub = childIdx;
+                                    }
+                                    else
+                                    {
+                                        store.GetDirectoryRef(lastSub).NextSiblingDir = childIdx;
+                                    }
+
+                                    lastSub = childIdx;
+                                    actualCount++;
+
+                                    var names = Math.Max(1, (int)e.Names);
+
+                                    if (names > 1)
+                                    {
+                                        localTotals.ExtraNames += names - 1;
+                                        localTotals.ExtraNameBytes += e.Size * (names - 1);
+                                    }
+
+                                    if (usnCapture is not null)
+                                    {
+                                        usnCapture.FrnLocation[child] = childIdx;
+                                        usnCapture.FrnNameId[child] = nameId;
+                                        usnCapture.FrnSequence[child] = e.Sequence;
+                                    }
+                                }
+
+                                ref var parentEntry = ref store.GetDirectoryRef(parentIdx);
+                                parentEntry.FirstChildDir = firstSub;
+                                parentEntry.SubDirCount = actualCount;
+                            }
+                        });
+                }
+                catch (AggregateException exception)
+                {
+                    ExceptionDispatchInfo.Capture(exception.Flatten().InnerExceptions[0]).Throw();
+                }
+
+                for (var w = 0; w < workerTotals.Length; w++)
+                {
+                    totals.Add(workerTotals[w]);
+                }
+
+                dirCount = nextDirBase;
+            }
+
+            head = levelEnd;
+        }
+
+        AssignPackedFileSlices(store, dirCount);
+
+        if (dirCount < ParallelBfsLevelThreshold || workerCount == 1)
+        {
+            var paths = progress is null ? null : new MftProgressPath(store, directory.FullName);
+            var batchDirs = 0;
+            var batchFiles = 0;
+            var batchBytes = 0L;
+            var nextFlushTick = Environment.TickCount64 + 40;
+
+            for (var idx = 0; idx < dirCount; idx++)
+            {
+                if ((idx & 255) == 0)
+                {
+                    cancel.ThrowIfCancellationRequested();
+                }
+
+                var ownSize = FillDirectoryFiles(
+                    table,
+                    entries,
+                    firstChild,
+                    nextSibling,
+                    dirRecords[idx],
+                    idx,
+                    store,
+                    reuseStore,
+                    rootCache,
+                    totals,
+                    reachable,
+                    usnCapture,
+                    out var writtenFiles);
+
+                batchDirs++;
+                batchFiles += writtenFiles;
+                batchBytes += ownSize;
+
+                if (paths is not null && (batchDirs >= 256 || Environment.TickCount64 >= nextFlushTick))
+                {
+                    progress!.AddBatch(batchDirs, batchFiles, batchBytes, paths.For(idx));
+                    batchDirs = 0;
+                    batchFiles = 0;
+                    batchBytes = 0;
+                    nextFlushTick = Environment.TickCount64 + 40;
                 }
             }
 
-            RollupTotals(root);
+            if (progress is not null && (batchDirs > 0 || batchFiles > 0 || batchBytes > 0))
+            {
+                progress.AddBatch(batchDirs, batchFiles, batchBytes, directory.FullName);
+            }
         }
-        finally
+        else
         {
-            TryExitMaterializeNoGcRegion(noGcOwner);
+            var workerTotals = new MftSubtreeTotals[workerCount];
+            var options = new ParallelOptions
+            {
+                CancellationToken = cancel,
+                MaxDegreeOfParallelism = workerCount,
+            };
+
+            try
+            {
+                Parallel.For(
+                    0,
+                    workerCount,
+                    options,
+                    x =>
+                    {
+                        var workerCache = reuseStore ? default : LocalNameCache.Create();
+                        var localTotals = new MftSubtreeTotals();
+                        workerTotals[x] = localTotals;
+                        var paths = progress is null ? null : new MftProgressPath(store, directory.FullName);
+                        var batchDirs = 0;
+                        var batchFiles = 0;
+                        var batchBytes = 0L;
+                        var nextFlushTick = Environment.TickCount64 + 40;
+
+                        var s = (int)((long)dirCount * x / workerCount);
+                        var eIdx = (int)((long)dirCount * (x + 1) / workerCount);
+
+                        for (var idx = s; idx < eIdx; idx++)
+                        {
+                            if ((idx & 255) == 0)
+                            {
+                                cancel.ThrowIfCancellationRequested();
+                            }
+
+                            var ownSize = FillDirectoryFiles(
+                                table,
+                                entries,
+                                firstChild,
+                                nextSibling,
+                                dirRecords[idx],
+                                idx,
+                                store,
+                                reuseStore,
+                                workerCache,
+                                localTotals,
+                                reachable,
+                                usnCapture,
+                                out var writtenFiles);
+
+                            batchDirs++;
+                            batchFiles += writtenFiles;
+                            batchBytes += ownSize;
+
+                            if (paths is not null && (batchDirs >= 256 || Environment.TickCount64 >= nextFlushTick))
+                            {
+                                progress!.AddBatch(batchDirs, batchFiles, batchBytes, paths.For(idx));
+                                batchDirs = 0;
+                                batchFiles = 0;
+                                batchBytes = 0;
+                                nextFlushTick = Environment.TickCount64 + 40;
+                            }
+                        }
+
+                        if (progress is not null && (batchDirs > 0 || batchFiles > 0 || batchBytes > 0))
+                        {
+                            progress.AddBatch(batchDirs, batchFiles, batchBytes, null);
+                        }
+                    });
+            }
+            catch (AggregateException exception)
+            {
+                ExceptionDispatchInfo.Capture(exception.Flatten().InnerExceptions[0]).Throw();
+            }
+
+            for (var w = 0; w < workerTotals.Length; w++)
+            {
+                totals.Add(workerTotals[w]);
+            }
+        }
+
+        for (var idx = dirCount - 1; idx >= 0; idx--)
+        {
+            if ((idx & 0xFFFF) == 0)
+            {
+                cancel.ThrowIfCancellationRequested();
+            }
+
+            ref var d = ref store.GetDirectoryRef(idx);
+            var totalSize = d.Size;
+            var totalFiles = d.FileCount;
+            var totalDirs = d.SubDirCount;
+
+            for (var child = d.FirstChildDir; child >= 0;)
+            {
+                ref readonly var childEntry = ref store.GetDirectoryRef(child);
+                totalSize += childEntry.TotalSize;
+                totalFiles += childEntry.TotalFileCount;
+                totalDirs += childEntry.TotalDirCount;
+                child = childEntry.NextSiblingDir;
+            }
+
+            d.TotalSize = totalSize;
+            d.TotalFileCount = totalFiles;
+            d.TotalDirCount = totalDirs;
+        }
+
+        if (progress is not null)
+        {
+            var topLevelCount = store.GetDirectoryRef(rootIndex).SubDirCount;
+
+            for (var i = 0; i < topLevelCount; i++)
+            {
+                progress.CompleteTopLevel();
+            }
         }
 
         if (!reuseStore)
@@ -734,175 +819,453 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
             store.Names.Freeze();
         }
 
-        return root;
+        return store.GetOrCreateDirectoryFacade(rootIndex);
     }
 
-    private static long TryEnterMaterializeNoGcRegion(MftTable table, bool reuseStore)
+    private MftScanResult CalculateWithFallback(
+        IMftVolume volume,
+        byte[]? prefetchedBoot,
+        DirectoryInfo directory,
+        char letter,
+        int threads,
+        int blockBytes,
+        ScanProgress? progress,
+        MftReadMode mode,
+        Func<byte[], MftRawDiskAttempt>? rawDiskOpener,
+        CancellationToken cancel)
     {
-        if (!reuseStore || table.Entries.Length < NoGcRegionMinRecords)
+        if (TryRefreshFromUsnCache(directory, letter, progress, cancel, out var cachedResult))
         {
-            return 0;
+            return cachedResult!;
         }
 
-        ComputeMaterializeNoGcBudgets(
-            table.Statistics.RecordsInUse,
-            table.Statistics.Extensions,
-            table.Entries.Length,
-            out var totalBudget,
-            out var lohBudget);
+        var requestedMode = mode == MftReadMode.RawDisk ? MftReadMode.RawDisk : MftReadMode.Volume;
+        var actualMode = requestedMode;
+        string? fallbackReason = null;
+        MftTable? table = null;
+        IMftUsnSource? usnSource = null;
+        MftUsnJournalInfo? journalBefore = null;
 
-        var memory = GC.GetGCMemoryInfo();
-
-        if (memory.TotalAvailableMemoryBytes <= 0
-            || memory.TotalAvailableMemoryBytes - memory.MemoryLoadBytes <= totalBudget * NoGcMinHeadroomMultiplier)
+        try
         {
-            return 0;
-        }
-
-        lock (NoGcRegionGate)
-        {
-            if (_noGcOwnerToken != 0 || GCSettings.LatencyMode == GCLatencyMode.NoGCRegion)
+            if (_usnSourceOpener(char.ToUpperInvariant(letter), out var openedUsn, out _, out _) && openedUsn is not null)
             {
-                return 0;
-            }
-
-            try
-            {
-                if (!GC.TryStartNoGCRegion(totalBudget, lohBudget, disallowFullBlockingGC: true))
+                if (openedUsn.TryQueryJournal(out var journalInfo, out _, out _))
                 {
-                    return 0;
+                    usnSource = openedUsn;
+                    journalBefore = journalInfo;
+                }
+                else
+                {
+                    openedUsn.Dispose();
                 }
             }
-            catch (Exception exception) when (exception is InvalidOperationException or ArgumentOutOfRangeException)
+
+            if (requestedMode == MftReadMode.RawDisk)
             {
-                return 0;
+                cancel.ThrowIfCancellationRequested();
+
+                if (prefetchedBoot is null)
+                {
+                    prefetchedBoot = new byte[MftRawDiskGuard.BootSectorBytes];
+                    volume.ReadAt(0, prefetchedBoot);
+                }
+
+                var attempt = rawDiskOpener is null
+                    ? MftRawDiskProbe.Open(letter, prefetchedBoot)
+                    : rawDiskOpener(prefetchedBoot);
+
+                if (attempt.Volume is null)
+                {
+                    fallbackReason = string.IsNullOrWhiteSpace(attempt.FailureReason)
+                        ? "проверка физического диска не пройдена"
+                        : attempt.FailureReason;
+                }
+                else
+                {
+                    try
+                    {
+                        using (attempt.Volume)
+                        {
+                            table = MftReader.Read(
+                                attempt.Volume,
+                                letter,
+                                threads,
+                                blockBytes,
+                                progress,
+                                prefetchedBoot,
+                                attempt.ExtentLength > 0 ? attempt.ExtentLength : null,
+                                cancel,
+                                attempt.MftValidDataLength > 0 ? attempt.MftValidDataLength : null);
+                        }
+
+                        if (table.Statistics.Damaged > 0 || table.Statistics.Partial > 0)
+                        {
+                            fallbackReason = $"несогласованные записи $MFT на диске (повреждено {table.Statistics.Damaged:N0}, неполных {table.Statistics.Partial:N0})";
+                            table = null;
+                        }
+                    }
+                    catch (Exception exception) when (exception is UnauthorizedAccessException or IOException or InvalidDataException)
+                    {
+                        fallbackReason = exception.Message;
+                        table = null;
+                    }
+                }
+
+                if (table is null)
+                {
+                    progress?.Reset();
+                    actualMode = MftReadMode.Volume;
+                }
             }
 
-            var token = ++_nextNoGcToken;
-            _noGcOwnerToken = token;
-            return token;
+            table ??= MftReader.Read(volume, letter, threads, blockBytes, progress, prefetchedBoot, partitionExtentLength: null, cancel);
+
+            progress?.Announce($"Разбор связей тома {letter}:");
+
+            var links = MftLinks.Build(table, cancel);
+            var start = Locate(table, links, directory, letter);
+
+            if (start < 0)
+            {
+                throw new DirectoryNotFoundException($"Каталог {directory.FullName} не найден в $MFT тома {letter}:");
+            }
+
+            links.Rehome(table, start, cancel);
+            ulong[]? reachable = null;
+
+            if (start == MftLayout.RootRecord)
+            {
+                reachable = new ulong[(table.Entries.Length + 63) >> 6];
+
+                if (table.Entries.Length > MftLayout.RootRecord)
+                {
+                    MftLinks.SetReachable(reachable, MftLayout.RootRecord);
+                }
+            }
+            else
+            {
+                links.DropUnreachable(table, cancel);
+            }
+
+            var captureUsn = start == MftLayout.RootRecord && usnSource is not null && journalBefore is not null;
+            var usnCapture = captureUsn ? new MftUsnMaterializeCapture(table.Entries.Length) : null;
+
+            var totals = new MftSubtreeTotals();
+            var root = Materialize(table, links, start, directory, totals, reachable, progress, cancel, usnCapture);
+
+            if (reachable is not null)
+            {
+                links.FinishUnreachable(table, reachable, cancel);
+            }
+
+            root.FixAbsolutePath(directory);
+
+            var statistics = table.Statistics;
+
+            var result = new MftScanResult(
+                root,
+                totals.ExtraNames,
+                totals.ExtraNameBytes,
+                totals.UnknownSizeFiles,
+                statistics.SkippedLinks,
+                statistics.Detached,
+                statistics.OrphanFiles,
+                statistics.OrphanBytes,
+                statistics.Nameless,
+                statistics.NamelessBytes,
+                statistics.Damaged,
+                statistics.Partial,
+                statistics.StaleParents,
+                statistics.Rehomed,
+                threads,
+                FormatReport(statistics, totals.UnknownSizeFiles),
+                actualMode,
+                fallbackReason);
+
+            if (captureUsn)
+            {
+                var usnIndex = new MftUsnVolumeIndex(root.Store!, journalBefore!.Value, table, usnCapture!, _maxUsnDeltaRecords);
+
+                if (usnIndex.TryRefresh(usnSource!, out var catchupSummary, cancel))
+                {
+                    result = result with
+                    {
+                        ExtraNames = usnIndex.ExtraNames,
+                        ExtraNameBytes = usnIndex.ExtraNameBytes,
+                    };
+                    CacheUsnSession(char.ToUpperInvariant(letter), usnIndex, result);
+                }
+                else
+                {
+                    _log.MftUsnFallback(
+                        char.ToUpperInvariant(letter),
+                        catchupSummary.FailureReason ?? catchupSummary.ErrorKind.ToString(),
+                        catchupSummary.Win32Error);
+                }
+            }
+
+            _log.MftScanCompleted(directory.FullName, table.Entries.Length, result.ExtraNames, result.ExtraNameBytes, result.Report);
+
+            return result;
+        }
+        finally
+        {
+            usnSource?.Dispose();
         }
     }
 
-    private static void TryExitMaterializeNoGcRegion(long ownerToken)
+    private static bool TryOpenNativeUsnSource(
+        char letter,
+        out IMftUsnSource? source,
+        out MftUsnErrorKind error,
+        out int win32Error)
     {
-        if (ownerToken == 0)
-        {
-            return;
-        }
-
-        lock (NoGcRegionGate)
-        {
-            if (_noGcOwnerToken != ownerToken)
-            {
-                return;
-            }
-
-            _noGcOwnerToken = 0;
-
-            if (GCSettings.LatencyMode != GCLatencyMode.NoGCRegion)
-            {
-                return;
-            }
-
-            try
-            {
-                GC.EndNoGCRegion();
-            }
-            catch (InvalidOperationException)
-            {
-                return;
-            }
-        }
+        var opened = MftUsnNativeSource.TryOpen(letter, out var nativeSource, out error, out win32Error);
+        source = nativeSource;
+        return opened;
     }
 
-    private static void AddPartitionedChunks(
-        List<MaterializeChunk> destination,
-        DirectorySpace[] nodes,
-        int[] records,
-        int chunkCount,
-        MaterializeSplit parent)
+    private bool TryRefreshFromUsnCache(
+        DirectoryInfo directory,
+        char letter,
+        ScanProgress? progress,
+        CancellationToken cancel,
+        out MftScanResult? result)
     {
-        var total = nodes.Length;
-        var offset = 0;
+        var upper = char.ToUpperInvariant(letter);
+        CachedUsnSession? session;
 
-        for (var i = 0; i < chunkCount; i++)
+        lock (_usnCacheLock)
         {
-            var take = (total - offset + (chunkCount - i) - 1) / (chunkCount - i);
-            destination.Add(new(nodes, records, offset, take, parent));
-            offset += take;
-        }
-    }
+            var idx = FindCachedSessionIndexLocked(upper);
 
-    private static void CompleteSplitChain(MaterializeSplit? split, ScanProgress? progress)
-    {
-        if (split is null)
-        {
-            progress?.CompleteTopLevel();
-            return;
-        }
-
-        for (var current = split; current is not null; current = current.Parent)
-        {
-            if (Interlocked.Decrement(ref current.Remaining) != 0)
+            if (idx < 0)
             {
-                return;
+                result = null;
+                return false;
             }
 
-            RollupTotals(current.Node);
+            session = _usnCache[idx];
+        }
 
-            if (current.Parent is null)
+        lock (session.SyncLock)
+        {
+            if (!_usnSourceOpener(upper, out var source, out var openErr, out var openWin32) || source is null)
             {
-                progress?.CompleteTopLevel();
+                source?.Dispose();
+                InvalidateUsnSession(upper, session);
+                _log.MftUsnFallback(upper, $"не удалось открыть USN-источник ({openErr})", openWin32);
+                result = null;
+                return false;
+            }
+
+            MftUsnRefreshSummary summary;
+
+            using (source)
+            {
+                if (!session.Index.TryRefresh(source, out summary, cancel))
+                {
+                    InvalidateUsnSession(upper, session);
+                    _log.MftUsnFallback(upper, summary.FailureReason ?? summary.ErrorKind.ToString(), summary.Win32Error);
+                    result = null;
+                    return false;
+                }
+            }
+
+            if (!session.Index.TryResolveDirectory(directory, out var dirIndex))
+            {
+                InvalidateUsnSession(upper, session);
+                _log.MftUsnFallback(upper, $"каталог «{directory.FullName}» не найден в USN-индексе", 0);
+                result = null;
+                return false;
+            }
+
+            var root = session.Index.Store.GetOrCreateDirectoryFacade(dirIndex);
+            root.FixAbsolutePath(directory);
+
+            if (progress is not null)
+            {
+                progress.NotifyVolumeReady();
+                var subCount = session.Index.Store.GetDirectoryRef(dirIndex).SubDirCount;
+                progress.SetTopLevelTotal(subCount);
+                progress.AddBatch(root.TotalDirectoryCount + 1, root.TotalFileCount, root.TotalSize, directory.FullName);
+
+                for (var i = 0; i < subCount; i++)
+                {
+                    progress.CompleteTopLevel();
+                }
+            }
+
+            PromoteCachedSession(upper, session);
+
+            _log.MftUsnRefreshed(upper, summary.UniqueRecords, summary.EventsRead, summary.OpenDirtyCount, summary.ElapsedMs);
+
+            result = session.BaseResult with
+            {
+                Root = root,
+                ExtraNames = session.Index.ExtraNames,
+                ExtraNameBytes = session.Index.ExtraNameBytes,
+                ReadMode = session.BaseResult.ReadMode,
+                FallbackReason = null,
+                UsedUsn = true,
+                UsnLostMarks = summary.RemovedMarkedCount,
+            };
+            return true;
+        }
+    }
+
+    private void CacheUsnSession(char upperLetter, MftUsnVolumeIndex index, MftScanResult baseResult)
+    {
+        lock (_usnCacheLock)
+        {
+            RemoveCachedSessionLocked(upperLetter);
+
+            if (_usnCache.Count >= MaxCachedUsnVolumes)
+            {
+                _usnCache.RemoveAt(_usnCache.Count - 1);
+            }
+
+            _usnCache.Insert(0, new CachedUsnSession(upperLetter, index, baseResult));
+        }
+    }
+
+    private void PromoteCachedSession(char upperLetter, CachedUsnSession session)
+    {
+        lock (_usnCacheLock)
+        {
+            var idx = FindCachedSessionIndexLocked(upperLetter);
+
+            if (idx > 0 && ReferenceEquals(_usnCache[idx], session))
+            {
+                _usnCache.RemoveAt(idx);
+                _usnCache.Insert(0, session);
             }
         }
     }
 
-    private static void RollupTotals(DirectorySpace node)
+    private void InvalidateUsnSession(char upperLetter, CachedUsnSession session)
     {
-        var subs = node.SubDirectoriesArray;
-        var totalSize = node.Size;
-        var totalFiles = node.FileCount;
-        var totalDirs = subs.Length;
-
-        for (var i = 0; i < subs.Length; i++)
+        lock (_usnCacheLock)
         {
-            var sub = subs[i];
-            totalSize += sub.TotalSize;
-            totalFiles += sub.TotalFileCount;
-            totalDirs += sub.TotalDirectoryCount;
-        }
+            var idx = FindCachedSessionIndexLocked(upperLetter);
 
-        node.SetAggregatedTotals(totalSize, totalFiles, totalDirs);
+            if (idx >= 0 && ReferenceEquals(_usnCache[idx], session))
+            {
+                _usnCache.RemoveAt(idx);
+            }
+        }
     }
 
-    private static void FillDirectory(
+    private int FindCachedSessionIndexLocked(char upperLetter)
+    {
+        for (var i = 0; i < _usnCache.Count; i++)
+        {
+            if (_usnCache[i].Letter == upperLetter)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private void RemoveCachedSessionLocked(char upperLetter)
+    {
+        var idx = FindCachedSessionIndexLocked(upperLetter);
+
+        if (idx >= 0)
+        {
+            _usnCache.RemoveAt(idx);
+        }
+    }
+
+    private static void AssignPackedFileSlices(ScanTreeStore store, int dirCount)
+    {
+        var curChunk = 0;
+        var curOffset = 0;
+
+        for (var idx = 0; idx < dirCount; idx++)
+        {
+            ref var d = ref store.GetDirectoryRef(idx);
+            var fc = d.FileCount;
+
+            if (fc == 0)
+            {
+                d.FileStart = 0;
+                continue;
+            }
+
+            if (fc > ScanTreeStore.ChunkSize)
+            {
+                d.FileStart = store.AllocateLargeArray(fc, out _);
+                continue;
+            }
+
+            if (curOffset + fc > ScanTreeStore.ChunkSize)
+            {
+                curChunk++;
+                curOffset = 0;
+            }
+
+            if (curChunk >= ScanTreeStore.MaxRegularChunks)
+            {
+                d.FileStart = store.AllocateLargeArray(fc, out _);
+                continue;
+            }
+
+            d.FileStart = (curChunk << ScanTreeStore.ChunkShift) | curOffset;
+            curOffset += fc;
+        }
+
+        var regularChunks = curOffset > 0 ? curChunk + 1 : curChunk;
+        store.PreallocateFileChunks(regularChunks);
+    }
+
+    private static long FillDirectoryFiles(
         MftTable table,
-        MftLinks links,
+        MftEntry[] entries,
+        int[] firstChild,
+        int[] nextSibling,
         int record,
-        DirectorySpace node,
+        int dirIndex,
         ScanTreeStore store,
         bool reuseStore,
         LocalNameCache nameCache,
-        FileSlabWriter writer,
         MftSubtreeTotals totals,
-        List<(int Record, DirectorySpace Node)> children,
-        List<FileEntry> files,
-        ulong[]? reachable)
+        ulong[]? reachable,
+        MftUsnMaterializeCapture? usnCapture,
+        out int writtenFiles)
     {
-        var entries = table.Entries;
-        children.Clear();
-        files.Clear();
+        ref var d = ref store.GetDirectoryRef(dirIndex);
+        var expectedFiles = d.FileCount;
+
+        if (expectedFiles == 0)
+        {
+            d.FileStart = 0;
+            d.Size = 0;
+            writtenFiles = 0;
+            return 0L;
+        }
+
+        var span = store.GetWritableSpan(d.FileStart, expectedFiles);
+        var written = 0;
         var ownSize = 0L;
 
-        for (var child = links.FirstChild[record]; child >= 0; child = links.NextSibling[child])
+        for (var child = firstChild[record]; child >= 0; child = nextSibling[child])
         {
+            ref readonly var entry = ref entries[child];
+
+            if (entry.IsDirectory)
+            {
+                continue;
+            }
+
             if (reachable is not null && !MftLinks.TryMarkReachable(reachable, child))
             {
                 continue;
             }
 
-            ref var entry = ref entries[child];
             var names = Math.Max(1, (int)entry.Names);
 
             if (names > 1)
@@ -911,78 +1274,90 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
                 totals.ExtraNameBytes += entry.Size * (names - 1);
             }
 
-            var nameId = reuseStore ? entry.NameId : nameCache.Intern(store.Names, table.Names.GetUtf8(entry.NameId));
-
-            if (entry.IsDirectory)
-            {
-                children.Add(
-                    (child,
-                     new(
-                         store,
-                         nameId,
-                         node,
-                         TimestampEncoding.FromMftFileTime(entry.CreationFileTime),
-                         TimestampEncoding.FromMftFileTime(entry.LastAccessFileTime),
-                         FileEntry.UtcFileTimeFlag)));
-                continue;
-            }
-
             if (!entry.SizeKnown)
             {
                 totals.UnknownSizeFiles++;
             }
 
-            files.Add(
-                new()
-                {
-                    Size = entry.Size,
-                    CreationRaw = TimestampEncoding.FromMftFileTime(entry.CreationFileTime),
-                    LastAccessRaw = TimestampEncoding.FromMftFileTime(entry.LastAccessFileTime),
-                    NameId = nameId,
-                    State = SpaceState.Added,
-                    Flags = FileEntry.UtcFileTimeFlag,
-                });
+            var nameId = reuseStore ? entry.NameId : nameCache.Intern(store.Names, table.Names.GetUtf8(entry.NameId));
+            span[written++] = new()
+            {
+                Size = entry.Size,
+                CreationRaw = TimestampEncoding.FromMftFileTime(entry.CreationFileTime),
+                LastAccessRaw = TimestampEncoding.FromMftFileTime(entry.LastAccessFileTime),
+                NameId = nameId,
+                State = SpaceState.Added,
+                Flags = FileEntry.UtcFileTimeFlag,
+            };
             ownSize += entry.Size;
+
+            if (usnCapture is not null)
+            {
+                usnCapture.FrnLocation[child] = ~dirIndex;
+                usnCapture.FrnNameId[child] = nameId;
+                usnCapture.FrnSequence[child] = entry.Sequence;
+            }
         }
 
-        var subDirectories = children.Count == 0 ? [] : new DirectorySpace[children.Count];
-
-        for (var i = 0; i < subDirectories.Length; i++)
-        {
-            subDirectories[i] = children[i].Node;
-        }
-
-        writer.WriteFiles(CollectionsMarshal.AsSpan(files), out var fileStart);
-        node.SetScanned(store, fileStart, files.Count, ownSize, subDirectories);
+        d.FileCount = written;
+        d.Size = ownSize;
+        writtenFiles = written;
+        return ownSize;
     }
 
-    private readonly record struct MaterializeFrame(int Record, DirectorySpace Node, bool Ascending);
-
-    private readonly record struct MaterializeChunk(
-        DirectorySpace[] Nodes,
-        int[] Records,
-        int Start,
-        int Count,
-        MaterializeSplit? ParentSplit);
-
-    private sealed class MaterializeSplit(DirectorySpace node, MaterializeSplit? parent, int remaining)
+    private sealed class CachedUsnSession(char letter, MftUsnVolumeIndex index, MftScanResult baseResult)
     {
-        public int Remaining = remaining;
+        public Lock SyncLock { get; } = new();
 
-        public DirectorySpace Node { get; } = node;
+        public char Letter { get; } = letter;
 
-        public MaterializeSplit? Parent { get; } = parent;
+        public MftUsnVolumeIndex Index { get; } = index;
+
+        public MftScanResult BaseResult { get; } = baseResult;
     }
 }
 
-internal sealed class MftProgressPath(DirectorySpace root, string rootPath)
+internal sealed class MftUsnMaterializeCapture
+{
+    public int[] FrnLocation { get; }
+
+    public int[] FrnNameId { get; }
+
+    public ushort[] FrnSequence { get; }
+
+    public MftUsnMaterializeCapture(int recordCount)
+    {
+        FrnLocation = GC.AllocateUninitializedArray<int>(recordCount);
+        Array.Fill(FrnLocation, int.MinValue);
+        FrnNameId = GC.AllocateUninitializedArray<int>(recordCount);
+        FrnSequence = GC.AllocateUninitializedArray<ushort>(recordCount);
+    }
+}
+
+internal sealed class MftProgressPath
 {
     private const long RefreshMilliseconds = 50;
 
+    private readonly DirectorySpace? _root;
+    private readonly ScanTreeStore? _store;
     private readonly List<string?> _segments = [];
-    private readonly string _rootPath = rootPath;
-    private string _current = rootPath;
+    private readonly string _rootPath;
+    private string _current;
     private long _due;
+
+    public MftProgressPath(DirectorySpace root, string rootPath)
+    {
+        _root = root;
+        _rootPath = rootPath;
+        _current = rootPath;
+    }
+
+    public MftProgressPath(ScanTreeStore store, string rootPath)
+    {
+        _store = store;
+        _rootPath = rootPath;
+        _current = rootPath;
+    }
 
     public string For(DirectorySpace node)
     {
@@ -998,13 +1373,48 @@ internal sealed class MftProgressPath(DirectorySpace root, string rootPath)
         return _current;
     }
 
+    public string For(int dirIndex)
+    {
+        var now = Environment.TickCount64;
+
+        if (now < _due)
+        {
+            return _current;
+        }
+
+        _due = now + RefreshMilliseconds;
+        _current = Build(dirIndex);
+        return _current;
+    }
+
     private string Build(DirectorySpace node)
     {
         _segments.Clear();
 
-        for (SpaceBase? current = node; current is not null && !ReferenceEquals(current, root); current = current.Parent)
+        for (SpaceBase? current = node; current is not null && !ReferenceEquals(current, _root); current = current.Parent)
         {
             _segments.Add(current.Name);
+        }
+
+        if (_segments.Count == 0)
+        {
+            return _rootPath;
+        }
+
+        _segments.Add(_rootPath);
+        _segments.Reverse();
+
+        return Path.Join(CollectionsMarshal.AsSpan(_segments));
+    }
+
+    private string Build(int dirIndex)
+    {
+        var store = _store!;
+        _segments.Clear();
+
+        for (var cur = dirIndex; cur > 0; cur = store.GetDirectoryRef(cur).ParentIndex)
+        {
+            _segments.Add(store.Names.GetString(store.GetDirectoryRef(cur).NameId));
         }
 
         if (_segments.Count == 0)
@@ -1053,7 +1463,9 @@ public sealed record MftScanResult(
     int Threads,
     string Report,
     MftReadMode ReadMode = MftReadMode.Volume,
-    string? FallbackReason = null)
+    string? FallbackReason = null,
+    bool UsedUsn = false,
+    int UsnLostMarks = 0)
 {
     public long DroppedObjects => DetachedRecords + NamelessRecords + DamagedRecords;
 
