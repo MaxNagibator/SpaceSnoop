@@ -32,6 +32,28 @@ public sealed partial class ScanNodeViewModel
 
     internal IEnumerable<ScanNodeViewModel> RealizedChildren => _children?.Where(static child => !ReferenceEquals(child, Dummy)) ?? [];
 
+    internal void SyncUnloadedChildren()
+    {
+        if (_loaded)
+        {
+            return;
+        }
+
+        _previewTiles = null;
+
+        if (HasChildren)
+        {
+            if (_children is null || _children.Count == 0)
+            {
+                Children.Add(Dummy);
+            }
+        }
+        else if (_children is { Count: > 0 })
+        {
+            _children.Clear();
+        }
+    }
+
     internal static bool IsAttachedToRoot(SpaceBase root, SpaceBase candidate)
     {
         for (var current = candidate; !ReferenceEquals(current, root); current = current.Parent)

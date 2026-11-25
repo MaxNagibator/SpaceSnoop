@@ -256,6 +256,7 @@ public sealed partial class ScanMarksViewModel : ObservableObject
         _nodeFactory.MarksPresent = count > 0;
         MarkedCount = count;
         MarkedSizeText = count > 0 ? SizeFormatter.Format(bytes) : string.Empty;
+        _treemap?.RefreshMarks();
     }
 
     private bool CanDeleteMarked()

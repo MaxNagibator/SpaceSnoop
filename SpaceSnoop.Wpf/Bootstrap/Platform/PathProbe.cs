@@ -16,6 +16,8 @@ public enum PathProbeStatus
 
 public readonly record struct PathProbeResult(PathProbeStatus Status, string NormalizedPath);
 
+internal readonly record struct PathRefusalProbeResult(PathProbeStatus Status, string NormalizedPath, string? Refusal);
+
 public static class PathProbe
 {
     private static readonly Lock Gate = new();
@@ -33,9 +35,20 @@ public static class PathProbe
         return CheckAsync(path, DirectoryExists, timeoutMs, cancellationToken);
     }
 
-    internal static Task<PathProbeResult> CheckAsync(
+    internal static async Task<PathProbeResult> CheckAsync(
         string? path,
         Func<string, bool> probe,
+        int timeoutMs,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await CheckWithRefusalAsync(path, probe, null, timeoutMs, cancellationToken).ConfigureAwait(false);
+        return new(result.Status, result.NormalizedPath);
+    }
+
+    internal static Task<PathRefusalProbeResult> CheckWithRefusalAsync(
+        string? path,
+        Func<string, bool> probe,
+        Func<string?>? refusalProbe,
         int timeoutMs,
         CancellationToken cancellationToken = default)
     {
@@ -45,17 +58,17 @@ public static class PathProbe
 
         if (cancellationToken.IsCancellationRequested)
         {
-            return Task.FromResult(new PathProbeResult(PathProbeStatus.Cancelled, trimmed));
+            return Task.FromResult(new PathRefusalProbeResult(PathProbeStatus.Cancelled, trimmed, null));
         }
 
         if (trimmed.Length == 0)
         {
-            return Task.FromResult(new PathProbeResult(PathProbeStatus.Empty, string.Empty));
+            return Task.FromResult(new PathRefusalProbeResult(PathProbeStatus.Empty, string.Empty, null));
         }
 
         if (UncPath.IsIncompleteUnc(trimmed))
         {
-            return Task.FromResult(new PathProbeResult(PathProbeStatus.IncompleteUnc, trimmed));
+            return Task.FromResult(new PathRefusalProbeResult(PathProbeStatus.IncompleteUnc, trimmed, null));
         }
 
         var root = RootKey(trimmed);
@@ -65,7 +78,7 @@ public static class PathProbe
         {
             if (!InFlight.TryGetValue(root, out var slot) || slot.Running.IsCompleted)
             {
-                request = new(trimmed, probe, new(TaskCreationOptions.RunContinuationsAsynchronously));
+                request = new(trimmed, probe, refusalProbe, new(TaskCreationOptions.RunContinuationsAsynchronously));
                 var queue = new Queue<PendingProbe>();
                 var running = Task.Run(() => RunProbeLoop(root, request), CancellationToken.None);
                 InFlight[root] = new(running, queue);
@@ -73,7 +86,7 @@ public static class PathProbe
             else
             {
                 PruneAbandoned(slot.Queue);
-                request = new(trimmed, probe, new(TaskCreationOptions.RunContinuationsAsynchronously));
+                request = new(trimmed, probe, refusalProbe, new(TaskCreationOptions.RunContinuationsAsynchronously));
                 slot.Queue.Enqueue(request);
             }
         }
@@ -98,7 +111,7 @@ public static class PathProbe
         }
     }
 
-    private static async Task<PathProbeResult> WaitResultAsync(
+    private static async Task<PathRefusalProbeResult> WaitResultAsync(
         PendingProbe request,
         int timeoutMs,
         CancellationToken cancellationToken)
@@ -111,12 +124,12 @@ public static class PathProbe
         catch (TimeoutException)
         {
             request.MarkAbandoned();
-            return new(PathProbeStatus.TimedOut, request.Path);
+            return new(PathProbeStatus.TimedOut, request.Path, null);
         }
         catch (OperationCanceledException)
         {
             request.MarkAbandoned();
-            return new(PathProbeStatus.Cancelled, request.Path);
+            return new(PathProbeStatus.Cancelled, request.Path, null);
         }
     }
 
@@ -128,14 +141,37 @@ public static class PathProbe
         {
             if (current.IsAbandoned)
             {
-                current.Completion.TrySetResult(new(PathProbeStatus.Cancelled, current.Path));
+                current.Completion.TrySetResult(new(PathProbeStatus.Cancelled, current.Path, null));
             }
             else
             {
-                var status = SafeProbe(current.Probe, current.Path)
-                    ? PathProbeStatus.Exists
-                    : PathProbeStatus.Missing;
-                current.Completion.TrySetResult(new(status, current.Path));
+                try
+                {
+                    if (!SafeProbe(current.Probe, current.Path))
+                    {
+                        current.Completion.TrySetResult(new(PathProbeStatus.Missing, current.Path, null));
+                    }
+                    else if (current.IsAbandoned)
+                    {
+                        current.Completion.TrySetResult(new(PathProbeStatus.Cancelled, current.Path, null));
+                    }
+                    else
+                    {
+                        var refusal = current.RefusalProbe?.Invoke();
+                        current.Completion.TrySetResult(new(PathProbeStatus.Exists, current.Path, refusal));
+                    }
+                }
+                catch (Exception exception)
+                {
+                    if (current.IsAbandoned)
+                    {
+                        current.Completion.TrySetResult(new(PathProbeStatus.Cancelled, current.Path, null));
+                    }
+                    else
+                    {
+                        current.Completion.TrySetException(exception);
+                    }
+                }
             }
 
             current = DequeueNext(root);
@@ -158,7 +194,7 @@ public static class PathProbe
                     return next;
                 }
 
-                next.Completion.TrySetResult(new(PathProbeStatus.Cancelled, next.Path));
+                next.Completion.TrySetResult(new(PathProbeStatus.Cancelled, next.Path, null));
             }
 
             InFlight.Remove(root);
@@ -196,7 +232,8 @@ public static class PathProbe
     private sealed class PendingProbe(
         string path,
         Func<string, bool> probe,
-        TaskCompletionSource<PathProbeResult> completion)
+        Func<string?>? refusalProbe,
+        TaskCompletionSource<PathRefusalProbeResult> completion)
     {
         private int _abandoned;
 
@@ -204,7 +241,9 @@ public static class PathProbe
 
         public Func<string, bool> Probe { get; } = probe;
 
-        public TaskCompletionSource<PathProbeResult> Completion { get; } = completion;
+        public Func<string?>? RefusalProbe { get; } = refusalProbe;
+
+        public TaskCompletionSource<PathRefusalProbeResult> Completion { get; } = completion;
 
         public bool IsAbandoned => Volatile.Read(ref _abandoned) != 0;
 

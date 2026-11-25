@@ -20,6 +20,25 @@ internal static class ScanTargetProbe
         return PathProbe.CheckAsync(path, DirectoryExists, timeoutMs, cancellationToken);
     }
 
+    internal static Task<PathRefusalProbeResult> CheckForScanAsync(
+        string path,
+        DirectoryInfo directory,
+        CancellationToken cancellationToken)
+    {
+        return CheckForScanAsync(path, directory, AppDefaults.PathProbeTimeoutMs, cancellationToken);
+    }
+
+    internal static Task<PathRefusalProbeResult> CheckForScanAsync(
+        string path,
+        DirectoryInfo directory,
+        int timeoutMs,
+        CancellationToken cancellationToken)
+    {
+        var exists = DirectoryExists;
+        var refusal = RootRefusal;
+        return PathProbe.CheckWithRefusalAsync(path, exists, () => refusal(directory), timeoutMs, cancellationToken);
+    }
+
     public static async Task<string> DescribeMissingAsync(string path, CancellationToken cancellationToken)
     {
         if (UncPath.IsUnc(path) && ReferenceEquals(DirectoryExists, DefaultDirectoryExists))

@@ -102,7 +102,15 @@ public sealed partial class ScanViewModel : IScanAutomation
         node.IsExpanded = true;
 
         Roots.Insert(0, node);
-        Treemap.SetRoot(node);
+
+        if (ViewMode == ScanViewMode.Treemap)
+        {
+            Treemap.SetRoot(node);
+        }
+        else
+        {
+            Treemap.Reset();
+        }
 
         LastScanElapsed = elapsed;
         LastScanParallelism = Math.Max(1, notes.Parallelism);

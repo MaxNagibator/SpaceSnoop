@@ -145,6 +145,8 @@ public sealed partial class ScanNodeViewModel : ObservableObject
 
     public IReadOnlyList<ScanNodeViewModel> PreviewTiles => _previewTiles ??= BuildPreviewTiles();
 
+    internal bool IsLoaded => _loaded;
+
     internal bool HasIgnoredItems => _factory?.Visibility.Count > 0;
 
     private long OwnSize => Space is DirectorySpace dir
@@ -423,10 +425,14 @@ public sealed partial class ScanNodeViewModel : ObservableObject
         return max;
     }
 
+    internal ScanNodeViewModel[] SelectTopChildNodes(int limit, out int positiveCount)
+    {
+        return ScanTopSelector.SelectTopChildNodes(this, _sort, _factory, limit, out positiveCount);
+    }
+
     private IReadOnlyList<ScanNodeViewModel> BuildPreviewTiles()
     {
-        EnsureLoaded();
-        return ScanTopSelector.SelectTopWeightedNodes(Children, AppDefaults.TreemapPreviewLimit, out _);
+        return SelectTopChildNodes(AppDefaults.TreemapPreviewLimit, out _);
     }
 
     partial void OnIsExpandedChanged(bool value)

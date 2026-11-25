@@ -146,7 +146,14 @@ internal static partial class ScanTreeEditor
             return;
         }
 
-        var hasDeletedChild = node.Children.Any(c => c.Space is not null && deletedSet.Contains(c.Space));
+        if (!node.IsLoaded)
+        {
+            node.SyncUnloadedChildren();
+            node.NotifyPropertiesChanged();
+            return;
+        }
+
+        var hasDeletedChild = node.RealizedChildren.Any(c => c.Space is not null && deletedSet.Contains(c.Space));
 
         if (hasDeletedChild)
         {
@@ -155,7 +162,7 @@ internal static partial class ScanTreeEditor
             return;
         }
 
-        foreach (var child in node.Children)
+        foreach (var child in node.RealizedChildren)
         {
             RefreshNodeAfterDeletion(child, deletedSet);
         }
@@ -228,6 +235,11 @@ internal static partial class ScanTreeEditor
 
     internal static bool RefreshNodeAfterAddition(ScanNodeViewModel node, DirectorySpace parent)
     {
+        if (node.Space is null)
+        {
+            return false;
+        }
+
         if (ReferenceEquals(node.Space, parent))
         {
             node.ReloadChildren();
@@ -235,16 +247,21 @@ internal static partial class ScanTreeEditor
             return true;
         }
 
-        foreach (var child in node.Children)
+        if (IsAncestorOf(node.Space, parent))
         {
-            if (RefreshNodeAfterAddition(child, parent))
+            if (node.IsLoaded)
             {
-                node.NotifyPropertiesChanged();
-                return true;
+                _ = node.RealizedChildren.Any(child => RefreshNodeAfterAddition(child, parent));
             }
+            else
+            {
+                node.SyncUnloadedChildren();
+            }
+
+            node.NotifyPropertiesChanged();
+            return true;
         }
 
-        node.NotifyPropertiesChanged();
         return false;
     }
 

@@ -65,7 +65,7 @@ public sealed partial class ScanViewModel
                     token);
             }
 
-            var probe = await ScanTargetProbe.CheckAsync(targetPath, token);
+            var probe = await ScanTargetProbe.CheckForScanAsync(targetPath, directory, token);
 
             if (probe.Status == PathProbeStatus.Cancelled)
             {
@@ -85,25 +85,12 @@ public sealed partial class ScanViewModel
                 return false;
             }
 
-            string? refusal;
-
-            try
-            {
-                refusal = await Task.Run(() => ScanTargetProbe.RootRefusal(directory), token)
-                    .WaitAsync(TimeSpan.FromMilliseconds(AppDefaults.PathProbeTimeoutMs), token);
-            }
-            catch (TimeoutException)
-            {
-                _uiDispatcher.Invoke(() => _dialogs.Warning("Сканирование", ScanTargetProbe.FormatTimeoutMessage(targetPath)));
-                return false;
-            }
-
             token.ThrowIfCancellationRequested();
 
-            if (refusal is not null)
+            if (probe.Refusal is not null)
             {
                 _logger.ScanRootLinkRejected(targetPath);
-                _uiDispatcher.Invoke(() => _dialogs.Warning("Сканирование", refusal));
+                _uiDispatcher.Invoke(() => _dialogs.Warning("Сканирование", probe.Refusal));
                 return false;
             }
 
@@ -137,11 +124,12 @@ public sealed partial class ScanViewModel
                 && (!Preferences.MftRootOnly || ScanRunner.IsVolumeRoot(directory));
             var waitForMftFrame = willUseMft && !Preferences.MftRawDisk;
 
+            var customVolumeEstimate = ScanProgressViewModel.HasCustomVolumeUsedReader;
             var flushTask = lastDriveChanged
                 ? Task.Run(() => Persist(_settings.Flush), CancellationToken.None)
                 : Task.CompletedTask;
             var parallelismTask = Preferences.ResolveParallelismAsync(targetPath).WaitAsync(token);
-            var estimateTask = willUseMft
+            var estimateTask = willUseMft && customVolumeEstimate
                 ? ScanProgressViewModel.EstimateTotalBytesAsync(directory, token)
                 : Task.FromResult<long?>(null);
             var capacityTask = ReadCapacityAsync(directory.FullName, token);
@@ -153,8 +141,17 @@ public sealed partial class ScanViewModel
             token.ThrowIfCancellationRequested();
 
             var parallelism = await parallelismTask;
-            var estimatedBytes = await estimateTask;
             var prefetchedCapacity = await capacityTask;
+            long? estimatedBytes = null;
+
+            if (customVolumeEstimate)
+            {
+                estimatedBytes = await estimateTask;
+            }
+            else if (ScanProgressViewModel.TryGetVolumeRoot(directory, out _) && prefetchedCapacity is { UsedBytes: > 0 } capacity)
+            {
+                estimatedBytes = capacity.UsedBytes;
+            }
 
             var progress = Progress.Begin(
                 directory,
@@ -162,7 +159,7 @@ public sealed partial class ScanViewModel
                 parallelism,
                 estimatedBytes,
                 deferTimer: willUseMft,
-                probeEstimate: !willUseMft);
+                probeEstimate: customVolumeEstimate && !willUseMft);
 
             if (parallelism == 1 && Preferences.UseMultithreading && Preferences.MaxParallelism > 1)
             {

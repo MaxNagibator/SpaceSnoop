@@ -146,6 +146,7 @@ public class ScanReleaseTests
     [Test]
     public void Игнорирование_всех_детей_даёт_пустую_карту_и_сохраняет_узлы_дерева()
     {
+        _scan.ViewMode = ScanViewMode.Treemap;
         var root = ArrangeDisplayTree();
         foreach (var child in root.Children.ToArray())
         {
@@ -305,6 +306,7 @@ public class ScanReleaseTests
     [Test]
     public void Игнорирование_файла_пересчитывает_дерево_карту_и_инспектор_без_изменения_скана()
     {
+        _scan.ViewMode = ScanViewMode.Treemap;
         var root = ArrangeDisplayTree();
         var branch = root.Children.Single(static node => node.Name == "branch");
         branch.IsExpanded = true;

@@ -77,7 +77,11 @@ public sealed partial class ScanProgressViewModel : ObservableObject
 
     public double ProgressMax => 1;
 
-    internal static Func<string, long?> VolumeUsedReader { get; set; } = ReadVolumeUsedBytes;
+    private static readonly Func<string, long?> DefaultVolumeUsedReader = ReadVolumeUsedBytes;
+
+    internal static Func<string, long?> VolumeUsedReader { get; set; } = DefaultVolumeUsedReader;
+
+    internal static bool HasCustomVolumeUsedReader => !ReferenceEquals(VolumeUsedReader, DefaultVolumeUsedReader);
 
     internal Task PendingEstimate { get; private set; } = Task.CompletedTask;
 
@@ -266,7 +270,7 @@ public sealed partial class ScanProgressViewModel : ObservableObject
         return _operations.ReleaseAfterRenderAsync(reported);
     }
 
-    private static bool TryGetVolumeRoot(DirectoryInfo directory, out string volumeRoot)
+    internal static bool TryGetVolumeRoot(DirectoryInfo directory, out string volumeRoot)
     {
         volumeRoot = string.Empty;
 
