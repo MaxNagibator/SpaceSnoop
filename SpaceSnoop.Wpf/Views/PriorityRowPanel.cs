@@ -2,8 +2,6 @@
 
 public sealed class PriorityRowPanel : Panel
 {
-    private const int InlineOptionalLimit = 64;
-
     private double _tailNatural;
     private bool _hasCachedPlan;
     private double _cachedAvailable;
@@ -152,49 +150,25 @@ public sealed class PriorityRowPanel : Panel
             used += children[i].DesiredSize.Width;
         }
 
-        if (optionalCount <= InlineOptionalLimit)
-        {
-            var keptMask = optionalCount switch
-            {
-                0 => 0UL,
-                InlineOptionalLimit => ulong.MaxValue,
-                _ => (1UL << optionalCount) - 1,
-            };
-
-            for (var i = 0; i < optionalCount && (fillMin + used + tailMax) > available; i++)
-            {
-                keptMask &= ~(1UL << i);
-                used -= children[i + 1].DesiredSize.Width;
-            }
-
-            var tailWidth = Math.Min(Math.Clamp(available - used - fillMin, tailMin, tailMax), Math.Max(0, available));
-            var fillWidth = Math.Max(0, available - used - tailWidth);
-
-            return new(fillWidth, keptMask, null, tailWidth);
-        }
-
-        var overflowKept = new bool[optionalCount];
-        Array.Fill(overflowKept, true);
+        var firstKept = 0;
 
         for (var i = 0; i < optionalCount && (fillMin + used + tailMax) > available; i++)
         {
-            overflowKept[i] = false;
+            firstKept = i + 1;
             used -= children[i + 1].DesiredSize.Width;
         }
 
-        var overflowTail = Math.Min(Math.Clamp(available - used - fillMin, tailMin, tailMax), Math.Max(0, available));
-        var overflowFill = Math.Max(0, available - used - overflowTail);
+        var tailWidth = Math.Min(Math.Clamp(available - used - fillMin, tailMin, tailMax), Math.Max(0, available));
+        var fillWidth = Math.Max(0, available - used - tailWidth);
 
-        return new(overflowFill, 0, overflowKept, overflowTail);
+        return new(fillWidth, firstKept, tailWidth);
     }
 
-    private readonly record struct RowPlan(double FillWidth, ulong KeptMask, bool[]? OverflowKept, double TailWidth)
+    private readonly record struct RowPlan(double FillWidth, int FirstKeptIndex, double TailWidth)
     {
         public bool IsKept(int index)
         {
-            return OverflowKept is not null
-                ? OverflowKept[index]
-                : (KeptMask & (1UL << index)) != 0;
+            return index >= FirstKeptIndex;
         }
     }
 }

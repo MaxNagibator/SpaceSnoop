@@ -93,6 +93,17 @@ public class Wave2UiOptimizationTests
 
         Assert.That(trimmedNative.Text, Is.EqualTo(veryLongName));
 
+        trimmedNative.TextTrimming = TextTrimming.None;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(trimmedNative.Text, Does.Contain("…"));
+            Assert.That(trimmedNative.Text.Length, Is.LessThan(veryLongName.Length));
+        }
+
+        trimmedNative.TextTrimming = TextTrimming.CharacterEllipsis;
+        Assert.That(trimmedNative.Text, Is.EqualTo(veryLongName));
+
         var manualTrim = new TextBlock
         {
             Width = 60,
@@ -253,6 +264,7 @@ public class Wave2UiOptimizationTests
             var treemap = new ScanTreemapViewModel([root]);
             treemap.SetRoot(root);
 
+            var mutableBrush = new SolidColorBrush(Colors.Coral);
             var view = new TreemapView
             {
                 ItemsSource = treemap.TreemapTiles,
@@ -260,6 +272,7 @@ public class Wave2UiOptimizationTests
                 Width = 400,
                 Height = 240,
             };
+            view.Resources["Fg.Primary"] = mutableBrush;
 
             using var host = VisualTestHost.Show(
                 new()
@@ -270,6 +283,8 @@ public class Wave2UiOptimizationTests
                 260);
 
             host.Settle();
+            Assert.That(mutableBrush.IsFrozen, Is.False);
+            mutableBrush.Color = Colors.Teal;
             view.InvalidateVisual();
             host.Settle();
 

@@ -14,28 +14,15 @@ internal static partial class SyncRowsProjector
             return null;
         }
 
-        var span = relativePath.AsSpan();
-
-        while (true)
+        if (folders is string[] array)
         {
-            var separator = span.IndexOfAny('/', '\\');
-            var segment = separator >= 0 ? span[..separator] : span;
-
-            foreach (var folder in folders)
-            {
-                if (segment.Equals(folder, StringComparison.OrdinalIgnoreCase))
-                {
-                    return folder;
-                }
-            }
-
-            if (separator < 0)
-            {
-                return null;
-            }
-
-            span = span[(separator + 1)..];
+            var index = GroupedFolderIndex(relativePath, array);
+            return index >= 0 ? array[index] : null;
         }
+
+        var copy = folders as IReadOnlyList<string> ?? [.. folders];
+        var matched = GroupedFolderIndex(relativePath, copy);
+        return matched >= 0 ? copy[matched] : null;
     }
 
     internal static bool IsGroupedPath(string relativePath, IReadOnlyCollection<string> folders)
@@ -194,16 +181,17 @@ internal static partial class SyncRowsProjector
         return [.. unique];
     }
 
-    private static int GroupedFolderIndex(string relativePath, string[] folders)
+    private static int GroupedFolderIndex(string relativePath, IReadOnlyList<string> folders)
     {
         var span = relativePath.AsSpan();
+        var count = folders.Count;
 
         while (true)
         {
             var separator = span.IndexOfAny('/', '\\');
             var segment = separator >= 0 ? span[..separator] : span;
 
-            for (var i = 0; i < folders.Length; i++)
+            for (var i = 0; i < count; i++)
             {
                 if (segment.Equals(folders[i], StringComparison.OrdinalIgnoreCase))
                 {

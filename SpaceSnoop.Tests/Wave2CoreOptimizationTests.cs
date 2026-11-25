@@ -222,6 +222,40 @@ public class Wave2CoreOptimizationTests
             Assert.That(totals.GetProperty("errors").GetInt32(), Is.Zero);
             Assert.That(progressValues[^1], Is.EqualTo(7));
         }
+
+        var now = DateTime.UtcNow;
+        var rFile = Path.Combine(_tempDir, "r.bin");
+        var nFile = Path.Combine(_tempDir, "n.bin");
+        File.WriteAllBytes(rFile, new byte[10]);
+        File.WriteAllBytes(nFile, new byte[20]);
+        var syntheticRoot = new DirectorySpace("root", null, now, now);
+        var alphaNode = new DirectorySpace("alpha", syntheticRoot, now, now);
+        var rooted = new DirectorySpace(@"C:\other", alphaNode, now, now);
+        rooted.AddFile(new(rFile));
+        var normal = new DirectorySpace("normal", alphaNode, now, now);
+        normal.AddFile(new(nFile));
+        alphaNode.Add(rooted);
+        alphaNode.Add(normal);
+        syntheticRoot.Add(alphaNode);
+        syntheticRoot.AggregateTotals();
+
+        using var syntheticStream = new MemoryStream();
+        FullScanExport.WriteJson(syntheticStream, syntheticRoot, "root", new(ScanExport.DefaultDepth, true, 4), "2.8.90", null, null, CancellationToken.None);
+        using var syntheticDoc = JsonDocument.Parse(Encoding.UTF8.GetString(syntheticStream.ToArray()));
+        var syntheticDirs = syntheticDoc.RootElement.GetProperty("directories").EnumerateArray().Select(static x => x.GetProperty("path").GetString()!).ToArray();
+        var syntheticFiles = syntheticDoc.RootElement.GetProperty("files").EnumerateArray().Select(static x => x.GetProperty("path").GetString()!).ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(syntheticDirs, Is.EqualTo(new[] { "alpha", @"C:\other", @"alpha\normal" }));
+            Assert.That(syntheticFiles, Is.EqualTo(new[] { @"C:\other\r.bin", @"alpha\normal\n.bin" }));
+        }
+
+        var emptyRoot = new DirectorySpace("empty", null, now, now);
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        using var cancelStream = new MemoryStream();
+        Assert.Throws<OperationCanceledException>(() => FullScanExport.WriteJson(cancelStream, emptyRoot, "empty", new(ScanExport.DefaultDepth, true, 4), "2.8.90", null, null, cancelled.Token));
     }
 
     [Test]

@@ -529,6 +529,7 @@ public class MftOptimizationTests
 
         var scratch = new byte[16384];
         volume.ReadAt(513, scratch);
+        Assert.That(volume.IsBuffered, Is.False);
 
         var before = GC.GetAllocatedBytesForCurrentThread();
 
@@ -541,6 +542,7 @@ public class MftOptimizationTests
 
         using (Assert.EnterMultipleScope())
         {
+            Assert.That(volume.IsBuffered, Is.False);
             Assert.That(table.GetName(20), Is.EqualTo("малый-кластер.bin"));
             Assert.That(table.Entries[20].Size, Is.EqualTo(42));
             Assert.That(table.GetName(31), Is.EqualTo("хвост.bin"));
@@ -603,6 +605,24 @@ public class MftOptimizationTests
                     table.Alternates[20].Select(x => table.Names.GetString(x.NameId)),
                     Is.EqualTo(new[] { "same_record_link.dll", "ext1.dll", "ext2.dll" }));
             }
+        }
+
+        var displacedOrder = new MftRecordBuilder()
+            .FileName(MftLayout.RootRecord, 1, "first_ns3.txt", space: 3)
+            .FileName(MftLayout.RootRecord, 1, "second_ns3.txt", space: 3)
+            .FileName(MftLayout.RootRecord, 1, "winner_ns1.txt", space: 1)
+            .ResidentData(64)
+            .Build();
+        var orderPending = new MftPending();
+        var orderEntries = new MftEntry[4];
+        MftReader.Parse(displacedOrder, 512, 2, orderEntries, orderPending, new MftStatistics(), names);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(names.GetString(orderEntries[2].NameId), Is.EqualTo("winner_ns1.txt"));
+            Assert.That(
+                orderPending.Alternates[2].Select(x => names.GetString(x.NameId)),
+                Is.EqualTo(new[] { "first_ns3.txt", "second_ns3.txt" }));
         }
     }
 

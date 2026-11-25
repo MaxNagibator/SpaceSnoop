@@ -567,6 +567,7 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
         private long _bytes;
         private long _nextReportTick;
         private int _lastReportedExamined;
+        private long _lastReportedBytes = -1;
         private string? _lastPath;
 
         public ConcurrentQueue<string> Errors { get; } = new();
@@ -593,8 +594,10 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
 
             if (now >= next && Interlocked.CompareExchange(ref _nextReportTick, now + ReportIntervalMs, next) == next)
             {
+                var bytes = Interlocked.Read(ref _bytes);
                 Volatile.Write(ref _lastReportedExamined, completed);
-                progress.Report(new(completed, path, Interlocked.Read(ref _bytes)));
+                Volatile.Write(ref _lastReportedBytes, bytes);
+                progress.Report(new(completed, path, bytes));
             }
         }
 
@@ -606,10 +609,15 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
             }
 
             var examined = Volatile.Read(ref _examined);
+            var bytes = Interlocked.Read(ref _bytes);
 
-            if (examined > 0 && Volatile.Read(ref _lastReportedExamined) != examined)
+            if (examined > 0
+                && (Volatile.Read(ref _lastReportedExamined) != examined
+                    || Volatile.Read(ref _lastReportedBytes) != bytes))
             {
-                progress.Report(new(examined, _lastPath ?? string.Empty, Interlocked.Read(ref _bytes)));
+                Volatile.Write(ref _lastReportedExamined, examined);
+                Volatile.Write(ref _lastReportedBytes, bytes);
+                progress.Report(new(examined, _lastPath ?? string.Empty, bytes));
             }
         }
 

@@ -843,7 +843,12 @@ public sealed class TreemapView : FrameworkElement
         {
             cachedBrush = brush;
             var pen = new Pen(brush, thickness);
-            pen.Freeze();
+
+            if (brush.IsFrozen)
+            {
+                pen.Freeze();
+            }
+
             cachedPen = pen;
         }
 

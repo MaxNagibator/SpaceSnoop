@@ -628,6 +628,8 @@ internal static class MftReader
         };
 
         var bestNamespace = int.MaxValue;
+        var altStart = target.GetAlternateCount(index);
+        var mainAltSlot = altStart;
         var position = (int)BinaryPrimitives.ReadUInt16LittleEndian(record[0x14..]);
 
         while ((position + 8) <= record.Length)
@@ -657,7 +659,7 @@ internal static class MftReader
 
             if (!nonResident)
             {
-                ReadResident(attribute, type, index, ref entry, ref bestNamespace, target, nameTable, cache);
+                ReadResident(attribute, type, index, ref entry, ref bestNamespace, altStart, ref mainAltSlot, target, nameTable, cache);
             }
 
             if (type == MftLayout.AttributeData && attribute[0x09] == 0 && !entry.SizeKnown)
@@ -837,6 +839,8 @@ internal static class MftReader
         int index,
         ref MftEntry entry,
         ref int bestNamespace,
+        int altStart,
+        ref int mainAltSlot,
         MftPendingTarget target,
         NameTable nameTable,
         LocalNameCache cache)
@@ -881,13 +885,15 @@ internal static class MftReader
                         && entry.Parent >= 0
                         && (entry.Parent != nextParent || entry.NameId != nameId))
                     {
-                        target.AddAlternate(index, index, new(entry.Parent, entry.ParentSequence, entry.NameId, entry.Sequence));
+                        target.InsertAlternate(index, index, mainAltSlot, new(entry.Parent, entry.ParentSequence, entry.NameId, entry.Sequence));
                     }
 
+                    target.RemoveAlternateMatches(index, altStart, nextParent, nameId);
                     bestNamespace = candidateNamespace;
                     entry.Parent = nextParent;
                     entry.ParentSequence = parentSequence;
                     entry.SetName(nameId);
+                    mainAltSlot = target.GetAlternateCount(index);
                 }
                 else if (record <= int.MaxValue && (entry.Parent != (int)record || entry.NameId != nameId))
                 {
@@ -1309,6 +1315,16 @@ internal readonly struct MftPendingTarget(MftPart? part, MftPending? pending)
         pending!.Sizes[targetRecord] = size;
     }
 
+    public int GetAlternateCount(int targetRecord)
+    {
+        if (part is not null)
+        {
+            return part.Alternates.Count;
+        }
+
+        return pending!.Alternates.TryGetValue(targetRecord, out var existing) ? existing.Count : 0;
+    }
+
     public void AddAlternate(int targetRecord, int sourceRecord, MftName name)
     {
         if (part is not null)
@@ -1321,6 +1337,55 @@ internal readonly struct MftPendingTarget(MftPart? part, MftPending? pending)
             ? existing
             : pending.Alternates[targetRecord] = [];
         alternates.Add(name);
+    }
+
+    public void InsertAlternate(int targetRecord, int sourceRecord, int position, MftName name)
+    {
+        if (part is not null)
+        {
+            part.Alternates.Insert(position, new(targetRecord, sourceRecord, name));
+            return;
+        }
+
+        var alternates = pending!.Alternates.TryGetValue(targetRecord, out var existing)
+            ? existing
+            : pending.Alternates[targetRecord] = [];
+        alternates.Insert(position, name);
+    }
+
+    public void RemoveAlternateMatches(int targetRecord, int startPosition, int parent, int nameId)
+    {
+        if (part is not null)
+        {
+            var list = part.Alternates;
+
+            for (var i = list.Count - 1; i >= startPosition; i--)
+            {
+                var candidate = list[i].Name;
+
+                if (candidate.Parent == parent && candidate.NameId == nameId)
+                {
+                    list.RemoveAt(i);
+                }
+            }
+
+            return;
+        }
+
+        if (!pending!.Alternates.TryGetValue(targetRecord, out var alternates))
+        {
+            return;
+        }
+
+        for (var i = alternates.Count - 1; i >= startPosition; i--)
+        {
+            var candidate = alternates[i];
+
+            if (candidate.Parent == parent && candidate.NameId == nameId)
+            {
+                alternates.RemoveAt(i);
+            }
+        }
     }
 }
 

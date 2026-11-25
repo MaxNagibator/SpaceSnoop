@@ -1,4 +1,5 @@
 ﻿using System.Buffers;
+using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -12,6 +13,7 @@ public static class PathTrimmer
 
     private static readonly char[] PathSeparators = [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar];
     private static readonly SearchValues<char> PathSeparatorSearch = SearchValues.Create(PathSeparators);
+    private static readonly DependencyPropertyDescriptor? TextTrimmingDescriptor = DependencyPropertyDescriptor.FromProperty(TextBlock.TextTrimmingProperty, typeof(TextBlock));
     private static readonly ConditionalWeakTable<TextBlock, TrimState> States = new();
 
     public static readonly DependencyProperty FullPathProperty = DependencyProperty.RegisterAttached(
@@ -38,6 +40,60 @@ public static class PathTrimmer
         }
     }
 
+    private static void OnTextTrimmingChanged(object? sender, EventArgs e)
+    {
+        if (sender is TextBlock textBlock)
+        {
+            Apply(textBlock);
+        }
+    }
+
+    private static void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBlock textBlock)
+        {
+            WatchTextTrimming(textBlock);
+            Apply(textBlock);
+        }
+    }
+
+    private static void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBlock textBlock)
+        {
+            UnwatchTextTrimming(textBlock);
+        }
+    }
+
+    private static void WatchTextTrimming(TextBlock textBlock)
+    {
+        if (TextTrimmingDescriptor is null)
+        {
+            return;
+        }
+
+        var state = States.GetOrCreateValue(textBlock);
+
+        if (state.WatchingTextTrimming)
+        {
+            return;
+        }
+
+        TextTrimmingDescriptor.AddValueChanged(textBlock, OnTextTrimmingChanged);
+        state.WatchingTextTrimming = true;
+    }
+
+    private static void UnwatchTextTrimming(TextBlock textBlock)
+    {
+        if (TextTrimmingDescriptor is null || !States.TryGetValue(textBlock, out var state) || !state.WatchingTextTrimming)
+        {
+            return;
+        }
+
+        TextTrimmingDescriptor.RemoveValueChanged(textBlock, OnTextTrimmingChanged);
+        state.WatchingTextTrimming = false;
+    }
+
     private static void OnFullPathChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (d is not TextBlock textBlock)
@@ -46,7 +102,20 @@ public static class PathTrimmer
         }
 
         textBlock.SizeChanged -= OnSizeChanged;
-        textBlock.SizeChanged += OnSizeChanged;
+        textBlock.Loaded -= OnLoaded;
+        textBlock.Unloaded -= OnUnloaded;
+
+        if (!string.IsNullOrEmpty(e.NewValue as string))
+        {
+            textBlock.SizeChanged += OnSizeChanged;
+            textBlock.Loaded += OnLoaded;
+            textBlock.Unloaded += OnUnloaded;
+            WatchTextTrimming(textBlock);
+        }
+        else
+        {
+            UnwatchTextTrimming(textBlock);
+        }
 
         Apply(textBlock);
     }
@@ -218,6 +287,8 @@ public static class PathTrimmer
         private double _pixelsPerDip;
 
         public string? Result { get; private set; }
+
+        public bool WatchingTextTrimming { get; set; }
 
         public bool Matches(
             string full,

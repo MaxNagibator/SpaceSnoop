@@ -5,6 +5,8 @@ namespace SpaceSnoop.Core.Export;
 
 public static class FullScanExport
 {
+    private const int InitialPathBufferCapacity = 1024;
+
     public static void WriteJson(
         Stream output,
         DirectorySpace root,
@@ -85,59 +87,105 @@ public static class FullScanExport
         CancellationToken cancel)
     {
         writer.WriteStartArray("directories"u8);
+        WriteSubtreeDirectories(writer, root, 0, 1, ref pathBuffer, ref errors, ref completed, total, progress, cancel);
+        writer.WriteEndArray();
+    }
 
-        if (root.SubDirectoriesArray.Length > 0)
+    private static void WriteSubtreeDirectories(
+        Utf8JsonWriter writer,
+        DirectorySpace start,
+        int startPathLen,
+        int startDepth,
+        ref char[] pathBuffer,
+        ref int errors,
+        ref int completed,
+        int total,
+        IProgress<int>? progress,
+        CancellationToken cancel)
+    {
+        if (start.SubDirectoriesArray.Length == 0)
         {
-            var stack = new Stack<TraversalFrame>();
-            stack.Push(new(root, 0, 1));
-
-            while (stack.Count > 0)
-            {
-                cancel.ThrowIfCancellationRequested();
-
-                var frame = stack.Pop();
-                var subs = frame.Directory.SubDirectoriesArray;
-
-                if (frame.ChildIndex >= subs.Length)
-                {
-                    continue;
-                }
-
-                var child = subs[frame.ChildIndex];
-
-                if (frame.ChildIndex + 1 < subs.Length)
-                {
-                    stack.Push(frame with { ChildIndex = frame.ChildIndex + 1 });
-                }
-
-                var childPathLen = AppendPathSegment(ref pathBuffer, frame.PathLength, child.Name);
-
-                if (child.State == SpaceState.Error)
-                {
-                    errors++;
-                }
-
-                writer.WriteStartObject();
-                writer.WriteString("path"u8, pathBuffer.AsSpan(0, childPathLen));
-                writer.WriteNumber("depth"u8, frame.Depth);
-                writer.WriteNumber("totalBytes"u8, child.TotalSize);
-                writer.WriteNumber("ownBytes"u8, child.Size);
-                writer.WriteNumber("fileCount"u8, child.TotalFileCount);
-                writer.WriteNumber("directoryCount"u8, child.TotalDirectoryCount);
-                writer.WriteBoolean("error"u8, child.State == SpaceState.Error);
-                writer.WriteEndObject();
-
-                completed++;
-                ReportProgress(progress, completed, total);
-
-                if (child.SubDirectoriesArray.Length > 0)
-                {
-                    stack.Push(new(child, childPathLen, frame.Depth + 1));
-                }
-            }
+            return;
         }
 
-        writer.WriteEndArray();
+        var stack = new Stack<TraversalFrame>();
+        stack.Push(new(start, startPathLen, startDepth));
+
+        while (stack.Count > 0)
+        {
+            cancel.ThrowIfCancellationRequested();
+
+            var frame = stack.Pop();
+            var subs = frame.Directory.SubDirectoriesArray;
+
+            if (frame.ChildIndex >= subs.Length)
+            {
+                continue;
+            }
+
+            var child = subs[frame.ChildIndex];
+
+            if (frame.ChildIndex + 1 < subs.Length)
+            {
+                stack.Push(frame with { ChildIndex = frame.ChildIndex + 1 });
+            }
+
+            if (frame.PathLength > 0 && Path.IsPathRooted(child.Name))
+            {
+                var combined = Path.Combine(new string(pathBuffer, 0, frame.PathLength), child.Name);
+                var isolated = ArrayPool<char>.Shared.Rent(Math.Max(InitialPathBufferCapacity, combined.Length + 64));
+
+                try
+                {
+                    combined.CopyTo(isolated);
+                    WriteDirectoryObject(writer, child, isolated.AsSpan(0, combined.Length), frame.Depth, ref errors, ref completed, total, progress);
+                    WriteSubtreeDirectories(writer, child, combined.Length, frame.Depth + 1, ref isolated, ref errors, ref completed, total, progress, cancel);
+                }
+                finally
+                {
+                    ArrayPool<char>.Shared.Return(isolated);
+                }
+
+                continue;
+            }
+
+            var childPathLen = AppendPathSegment(ref pathBuffer, frame.PathLength, child.Name);
+            WriteDirectoryObject(writer, child, pathBuffer.AsSpan(0, childPathLen), frame.Depth, ref errors, ref completed, total, progress);
+
+            if (child.SubDirectoriesArray.Length > 0)
+            {
+                stack.Push(new(child, childPathLen, frame.Depth + 1));
+            }
+        }
+    }
+
+    private static void WriteDirectoryObject(
+        Utf8JsonWriter writer,
+        DirectorySpace child,
+        ReadOnlySpan<char> path,
+        int depth,
+        ref int errors,
+        ref int completed,
+        int total,
+        IProgress<int>? progress)
+    {
+        if (child.State == SpaceState.Error)
+        {
+            errors++;
+        }
+
+        writer.WriteStartObject();
+        writer.WriteString("path"u8, path);
+        writer.WriteNumber("depth"u8, depth);
+        writer.WriteNumber("totalBytes"u8, child.TotalSize);
+        writer.WriteNumber("ownBytes"u8, child.Size);
+        writer.WriteNumber("fileCount"u8, child.TotalFileCount);
+        writer.WriteNumber("directoryCount"u8, child.TotalDirectoryCount);
+        writer.WriteBoolean("error"u8, child.State == SpaceState.Error);
+        writer.WriteEndObject();
+
+        completed++;
+        ReportProgress(progress, completed, total);
     }
 
     private static void WriteFilesSection(
@@ -149,45 +197,79 @@ public static class FullScanExport
         IProgress<int>? progress,
         CancellationToken cancel)
     {
+        cancel.ThrowIfCancellationRequested();
         writer.WriteStartArray("files"u8);
 
-        WriteDirectoryFiles(writer, root, 0, ref pathBuffer, ref completed, total, progress, cancel);
-
-        if (root.SubDirectoriesArray.Length > 0)
-        {
-            var stack = new Stack<TraversalFrame>();
-            stack.Push(new(root, 0, 1));
-
-            while (stack.Count > 0)
-            {
-                cancel.ThrowIfCancellationRequested();
-
-                var frame = stack.Pop();
-                var subs = frame.Directory.SubDirectoriesArray;
-
-                if (frame.ChildIndex >= subs.Length)
-                {
-                    continue;
-                }
-
-                var child = subs[frame.ChildIndex];
-
-                if (frame.ChildIndex + 1 < subs.Length)
-                {
-                    stack.Push(frame with { ChildIndex = frame.ChildIndex + 1 });
-                }
-
-                var childPathLen = AppendPathSegment(ref pathBuffer, frame.PathLength, child.Name);
-                WriteDirectoryFiles(writer, child, childPathLen, ref pathBuffer, ref completed, total, progress, cancel);
-
-                if (child.SubDirectoriesArray.Length > 0)
-                {
-                    stack.Push(new(child, childPathLen, frame.Depth + 1));
-                }
-            }
-        }
+        WriteSubtreeFiles(writer, root, 0, ref pathBuffer, ref completed, total, progress, cancel);
 
         writer.WriteEndArray();
+    }
+
+    private static void WriteSubtreeFiles(
+        Utf8JsonWriter writer,
+        DirectorySpace start,
+        int startPathLen,
+        ref char[] pathBuffer,
+        ref int completed,
+        int total,
+        IProgress<int>? progress,
+        CancellationToken cancel)
+    {
+        WriteDirectoryFiles(writer, start, startPathLen, ref pathBuffer, ref completed, total, progress, cancel);
+
+        if (start.SubDirectoriesArray.Length == 0)
+        {
+            return;
+        }
+
+        var stack = new Stack<TraversalFrame>();
+        stack.Push(new(start, startPathLen, 1));
+
+        while (stack.Count > 0)
+        {
+            cancel.ThrowIfCancellationRequested();
+
+            var frame = stack.Pop();
+            var subs = frame.Directory.SubDirectoriesArray;
+
+            if (frame.ChildIndex >= subs.Length)
+            {
+                continue;
+            }
+
+            var child = subs[frame.ChildIndex];
+
+            if (frame.ChildIndex + 1 < subs.Length)
+            {
+                stack.Push(frame with { ChildIndex = frame.ChildIndex + 1 });
+            }
+
+            if (frame.PathLength > 0 && Path.IsPathRooted(child.Name))
+            {
+                var combined = Path.Combine(new string(pathBuffer, 0, frame.PathLength), child.Name);
+                var isolated = ArrayPool<char>.Shared.Rent(Math.Max(InitialPathBufferCapacity, combined.Length + 64));
+
+                try
+                {
+                    combined.CopyTo(isolated);
+                    WriteSubtreeFiles(writer, child, combined.Length, ref isolated, ref completed, total, progress, cancel);
+                }
+                finally
+                {
+                    ArrayPool<char>.Shared.Return(isolated);
+                }
+
+                continue;
+            }
+
+            var childPathLen = AppendPathSegment(ref pathBuffer, frame.PathLength, child.Name);
+            WriteDirectoryFiles(writer, child, childPathLen, ref pathBuffer, ref completed, total, progress, cancel);
+
+            if (child.SubDirectoriesArray.Length > 0)
+            {
+                stack.Push(new(child, childPathLen, frame.Depth + 1));
+            }
+        }
     }
 
     private static void WriteDirectoryFiles(

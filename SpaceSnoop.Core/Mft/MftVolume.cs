@@ -50,6 +50,8 @@ internal sealed class MftFileVolume : IMftVolume
         _name = name;
     }
 
+    internal bool IsBuffered => Volatile.Read(ref _buffered) is not null;
+
     public static MftFileVolume Open(char letter)
     {
         return Open($@"\\.\{letter}:", $"{letter}:");
@@ -105,7 +107,7 @@ internal sealed class MftFileVolume : IMftVolume
             return;
         }
 
-        if (!TryReadAligned(offset, buffer.Span))
+        if (!await TryReadAlignedAsync(offset, buffer, cancel).ConfigureAwait(false))
         {
             await ReadAsync(Downgrade(), offset, buffer, buffer.Length, cancel).ConfigureAwait(false);
         }
@@ -233,6 +235,36 @@ internal sealed class MftFileVolume : IMftVolume
             }
 
             aligned.Slice(skip, buffer.Length).CopyTo(buffer);
+            return true;
+        }
+        finally
+        {
+            ReturnBounce(bounce);
+        }
+    }
+
+    private async ValueTask<bool> TryReadAlignedAsync(long offset, Memory<byte> buffer, CancellationToken cancel)
+    {
+        var start = offset - (offset % Alignment);
+        var skip = (int)(offset - start);
+        var length = (skip + buffer.Length + Alignment - 1) / Alignment * Alignment;
+        var bounce = RentBounce(length + Alignment);
+
+        try
+        {
+            var shift = (int)((Alignment - (Marshal.UnsafeAddrOfPinnedArrayElement(bounce, 0).ToInt64() % Alignment)) % Alignment);
+            var aligned = bounce.AsMemory(shift, length);
+
+            try
+            {
+                await ReadAsync(_unbuffered, start, aligned, skip + buffer.Length, cancel).ConfigureAwait(false);
+            }
+            catch (IOException exception) when (exception.HResult == InvalidParameterResult)
+            {
+                return false;
+            }
+
+            bounce.AsSpan(shift + skip, buffer.Length).CopyTo(buffer.Span);
             return true;
         }
         finally

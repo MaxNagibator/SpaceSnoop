@@ -400,7 +400,7 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
             {
                 var (level2Record, level2Node) = level2Children[j];
 
-                if (!HasAtLeastSubdirectories(entries, links, level2Record, reachable, Level2SplitThreshold))
+                if (!HasAtLeastSubdirectories(entries, links, level2Record, reachable, Level2SplitThreshold, cancel))
                 {
                     workItems.Add((level2Record, level2Node, i, -1));
                     continue;
@@ -583,12 +583,19 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
         MftLinks links,
         int record,
         ulong[]? reachable,
-        int threshold)
+        int threshold,
+        CancellationToken cancel)
     {
         var count = 0;
+        var scanned = 0;
 
         for (var child = links.FirstChild[record]; child >= 0; child = links.NextSibling[child])
         {
+            if ((scanned++ & 4095) == 0)
+            {
+                cancel.ThrowIfCancellationRequested();
+            }
+
             if (reachable is not null && MftLinks.IsReachable(reachable, child))
             {
                 continue;
