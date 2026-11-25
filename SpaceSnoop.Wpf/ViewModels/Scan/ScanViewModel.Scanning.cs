@@ -35,9 +35,11 @@ public sealed partial class ScanViewModel
         }
 
         var targetPath = Path.TrimEndingDirectorySeparator(directory.FullName);
-        _cts = new();
-        using var runCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, external);
-        _scanVersion++;
+        CancelPendingMemoryReturn();
+        using var scanCts = new CancellationTokenSource();
+        _cts = scanCts;
+        using var runCts = CancellationTokenSource.CreateLinkedTokenSource(scanCts.Token, external);
+        Interlocked.Increment(ref _scanVersion);
         var token = runCts.Token;
         IsPickerOpen = false;
         IsScanning = true;
@@ -48,6 +50,8 @@ public sealed partial class ScanViewModel
         SelectedNode = null;
         var released = false;
         var resultApplied = false;
+        var progressFinished = false;
+        Task? measurement = null;
 
         try
         {
@@ -129,22 +133,28 @@ public sealed partial class ScanViewModel
                 return changed;
             });
 
-            if (lastDriveChanged)
-            {
-                await Task.Run(() => Persist(_settings.Flush), CancellationToken.None);
-                token.ThrowIfCancellationRequested();
-            }
-            var parallelism = await Preferences.ResolveParallelismAsync(targetPath).WaitAsync(token);
             var willUseMft = Preferences.MftEnabled
                 && (!Preferences.MftRootOnly || ScanRunner.IsVolumeRoot(directory));
-            var estimatedBytes = willUseMft
-                ? await ScanProgressViewModel.EstimateTotalBytesAsync(directory, token)
-                : null;
+            var waitForMftFrame = willUseMft && !Preferences.MftRawDisk;
 
-            if (willUseMft)
-            {
-                await _performance.WaitForRenderedFrameAsync(token);
-            }
+            var flushTask = lastDriveChanged
+                ? Task.Run(() => Persist(_settings.Flush), CancellationToken.None)
+                : Task.CompletedTask;
+            var parallelismTask = Preferences.ResolveParallelismAsync(targetPath).WaitAsync(token);
+            var estimateTask = willUseMft
+                ? ScanProgressViewModel.EstimateTotalBytesAsync(directory, token)
+                : Task.FromResult<long?>(null);
+            var capacityTask = ReadCapacityAsync(directory.FullName, token);
+            var frameTask = waitForMftFrame
+                ? _performance.WaitForRenderedFrameAsync(token)
+                : Task.CompletedTask;
+
+            await Task.WhenAll(flushTask, parallelismTask, estimateTask, capacityTask, frameTask);
+            token.ThrowIfCancellationRequested();
+
+            var parallelism = await parallelismTask;
+            var estimatedBytes = await estimateTask;
+            var prefetchedCapacity = await capacityTask;
 
             var progress = Progress.Begin(
                 directory,
@@ -165,21 +175,30 @@ public sealed partial class ScanViewModel
             token.ThrowIfCancellationRequested();
 
             var elapsed = Progress.Finish(releaseMeasurement: false);
-            var driveCapacity = await ReadCapacityAsync(outcome.Root.AbsolutePath, token);
+            progressFinished = true;
+            var driveCapacity = string.Equals(
+                Path.TrimEndingDirectorySeparator(outcome.Root.AbsolutePath),
+                targetPath,
+                StringComparison.OrdinalIgnoreCase)
+                ? prefetchedCapacity
+                : await ReadCapacityAsync(outcome.Root.AbsolutePath, token);
             var applied = Stopwatch.StartNew();
 
             Progress.ReportPhase("Показ результата сканирования");
             _uiDispatcher.Invoke(() =>
             {
                 ApplyScanResult(outcome.Root, elapsed, Progress.Traversal, outcome.Notes, driveCapacity);
+                var appliedVersion = Volatile.Read(ref _scanVersion);
                 resultApplied = true;
+                measurement = Progress.CompleteMeasurementAsync();
+                ScheduleReturnScanMemory(outcome.Root, outcome.Notes.UsedMft, appliedVersion);
+                Interlocked.CompareExchange(ref _cts, null, scanCts);
+                IsScanning = false;
+                StatusCaption = null;
+                _notifier.Notify($"Сканирование завершено: {outcome.Root.AbsolutePath} · {outcome.Root.TotalSizeText}", StatusSeverity.Success);
             });
 
             _logger.ScanPhases((long)elapsed.TotalMilliseconds, (long)applied.Elapsed.TotalMilliseconds);
-
-            await ReturnScanMemoryAsync(outcome.Root, outcome.Notes.UsedMft, Progress.ReportPhase, token);
-
-            _uiDispatcher.Invoke(() => _notifier.Notify($"Сканирование завершено: {outcome.Root.AbsolutePath} · {outcome.Root.TotalSizeText}", StatusSeverity.Success));
             return true;
         }
         catch (OperationCanceledException)
@@ -204,20 +223,20 @@ public sealed partial class ScanViewModel
         }
         finally
         {
-            if (resultApplied)
+            Interlocked.CompareExchange(ref _cts, null, scanCts);
+
+            if (!progressFinished)
             {
-                Progress.ReportPhase("Показ результата сканирования");
+                Progress.Finish(releaseMeasurement: false);
             }
 
-            Progress.Finish(releaseMeasurement: false);
+            measurement ??= Progress.CompleteMeasurementAsync();
 
-            var measurement = Progress.CompleteMeasurementAsync();
-
-            IsScanning = false;
-            StatusCaption = null;
-
-            _cts?.Dispose();
-            _cts = null;
+            if (!resultApplied)
+            {
+                IsScanning = false;
+                StatusCaption = null;
+            }
 
             await measurement;
         }

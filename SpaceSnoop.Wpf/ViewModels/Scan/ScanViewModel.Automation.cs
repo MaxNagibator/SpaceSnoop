@@ -93,7 +93,8 @@ public sealed partial class ScanViewModel : IScanAutomation
         ScanNotes notes,
         DriveCapacity? driveCapacity)
     {
-        _scanVersion++;
+        Interlocked.Increment(ref _scanVersion);
+        CancelPendingMemoryReturn();
         var previous = ScanTreeEditor.RemoveRoot(Roots, result.AbsolutePath);
         var (transferred, lost) = ScanTreeEditor.TransferMarks(previous, result, Marks.HasMarked);
 

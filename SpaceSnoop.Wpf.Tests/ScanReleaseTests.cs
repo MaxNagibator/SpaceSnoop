@@ -611,6 +611,52 @@ public class ScanReleaseTests
         Assert.That(_scan.HasIgnoredItems, Is.False);
     }
 
+    [Test]
+    public async Task Отложенный_возврат_памяти_отменяется_повторным_планированием_результатом_и_новым_сканом()
+    {
+        var large = new DirectorySpace(Path.Combine(_root, "target"), null, DateTime.Today, DateTime.Today);
+        large.SetAggregatedTotals(1_000_000, (int)AppDefaults.ScanMemoryReturnMinNodes, 1);
+
+        _scan.Preferences.ReturnMemoryAfterScan = true;
+        var first = _scan.ScheduleReturnScanMemory(large, usedMft: true);
+        Assert.That(first.IsCompleted, Is.False);
+
+        var second = _scan.ScheduleReturnScanMemory(large, usedMft: true);
+        Assert.That(second.IsCompleted, Is.False);
+        Assert.That(await first.WaitAsync(TimeSpan.FromSeconds(5)), Is.EqualTo(ScanMemoryReturnOutcome.Cancelled));
+
+        _scan.ApplyScanResult(Tree(Path.Combine(_root, "other"), "branch"), TimeSpan.FromSeconds(1), null, ScanNotes.ForTraversal(1));
+        Assert.That(await second.WaitAsync(TimeSpan.FromSeconds(5)), Is.EqualTo(ScanMemoryReturnOutcome.Cancelled));
+
+        var stale = _scan.ScheduleReturnScanMemory(large, usedMft: true, expectedVersion: -1);
+        Assert.That(stale.IsCompleted, Is.True);
+        Assert.That(await stale, Is.EqualTo(ScanMemoryReturnOutcome.Cancelled));
+
+        var third = _scan.ScheduleReturnScanMemory(large, usedMft: true);
+        Assert.That(third.IsCompleted, Is.False);
+
+        var scanningTransitions = new List<bool>();
+        _scan.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ScanViewModel.IsScanning))
+            {
+                scanningTransitions.Add(_scan.IsScanning);
+            }
+        };
+
+        var otherDir = Path.Combine(_root, "other");
+        await File.WriteAllBytesAsync(Path.Combine(otherDir, "sample.bin"), new byte[128]);
+        await _scan.ScanFromAutomationAsync(otherDir, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(await third.WaitAsync(TimeSpan.FromSeconds(5)), Is.EqualTo(ScanMemoryReturnOutcome.Cancelled));
+            Assert.That(_scan.IsScanning, Is.False);
+            Assert.That(_scan.HasResult, Is.True);
+            Assert.That(scanningTransitions, Is.EqualTo(new[] { true, false }));
+        }
+    }
+
     private async Task SettleDriveLabelsAsync()
     {
         await Task.WhenAll(_scan.Drives.Items.Select(static drive => drive.LoadAsync()));
