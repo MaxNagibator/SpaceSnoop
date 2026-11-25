@@ -137,6 +137,8 @@ internal sealed class NameTable
         private const int MultiShardInitialSlotCapacity = 256;
         private const int FreezeTrimChunkThreshold = 4096;
         private const int FreezeTrimOffsetThreshold = 1024;
+        private const int FrozenInitialChunkSize = 512;
+        private const int FrozenOffsetGrowStep = 256;
 
         private readonly Lock _lock = new();
         private readonly int _shardShift;
@@ -189,6 +191,7 @@ internal sealed class NameTable
             {
                 _slots = null;
                 _singleWriter = false;
+                _nextChunkSize = FrozenInitialChunkSize;
 
                 if (_chunkCount > 0)
                 {
@@ -370,7 +373,17 @@ internal sealed class NameTable
                     Volatile.Write(ref _offsets, nextOffsets);
                 }
 
-                var blockCapacity = blockIndex == 0 ? _initialOffsetCapacity : OffsetBlockSize;
+                int blockCapacity;
+
+                if (blockIndex == 0)
+                {
+                    blockCapacity = _initialOffsetCapacity;
+                }
+                else
+                {
+                    blockCapacity = _slots is null ? FrozenOffsetGrowStep : OffsetBlockSize;
+                }
+
                 Volatile.Write(ref _offsets[blockIndex], new int[blockCapacity]);
                 _offsetBlockCount = blockIndex + 1;
                 return;
@@ -380,7 +393,11 @@ internal sealed class NameTable
 
             if (indexInBlock >= currentBlock.Length)
             {
-                var nextLength = Math.Min(OffsetBlockSize, Math.Max(indexInBlock + 1, currentBlock.Length * 2));
+                var doubled = currentBlock.Length * 2;
+                var targetLength = _slots is null
+                    ? Math.Min(doubled, currentBlock.Length + FrozenOffsetGrowStep)
+                    : doubled;
+                var nextLength = Math.Min(OffsetBlockSize, Math.Max(indexInBlock + 1, targetLength));
                 var nextBlock = new int[nextLength];
                 Array.Copy(currentBlock, nextBlock, currentBlock.Length);
                 Volatile.Write(ref _offsets[blockIndex], nextBlock);

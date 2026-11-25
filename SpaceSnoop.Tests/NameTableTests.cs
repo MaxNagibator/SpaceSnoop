@@ -302,4 +302,80 @@ public class NameTableTests
         var probeId = table.Intern(probe, probeHash);
         Assert.That(table.GetUtf8(probeId).SequenceEqual(probe), Is.True);
     }
+
+    [Test]
+    public void Freeze_PostFreezeAppendGrowsCompactlyWithoutMaxChunkInflation()
+    {
+        var table = new NameTable(64);
+        const int preCount = 40_000;
+        var preIds = new int[preCount];
+
+        for (var i = 0; i < preCount; i++)
+        {
+            preIds[i] = table.Intern($"pre_freeze_long_segment_name_{i:D6}_payload.dat");
+        }
+
+        table.Freeze();
+        var bytesBefore = MeasureNameTableArrayBytes(table);
+
+        const int postCount = 256;
+        var postIds = new int[postCount];
+
+        for (var i = 0; i < postCount; i++)
+        {
+            postIds[i] = table.Intern($"usn_catchup_name_{i:D4}.tmp");
+        }
+
+        var bytesAfter = MeasureNameTableArrayBytes(table);
+        var deltaBytes = bytesAfter - bytesBefore;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(deltaBytes, Is.LessThan(512 * 1024), $"Expected < 512 KiB post-freeze growth, got {deltaBytes:N0} B");
+            Assert.That(table.GetString(preIds[0]), Is.EqualTo("pre_freeze_long_segment_name_000000_payload.dat"));
+            Assert.That(table.GetString(preIds[^1]), Is.EqualTo($"pre_freeze_long_segment_name_{preCount - 1:D6}_payload.dat"));
+            Assert.That(table.GetString(postIds[0]), Is.EqualTo("usn_catchup_name_0000.tmp"));
+            Assert.That(table.GetString(postIds[^1]), Is.EqualTo($"usn_catchup_name_{postCount - 1:D4}.tmp"));
+        }
+    }
+
+    private static long MeasureNameTableArrayBytes(NameTable table)
+    {
+        const System.Reflection.BindingFlags Flags =
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        var shards = (Array)typeof(NameTable).GetField("_shards", Flags)!.GetValue(table)!;
+        var total = 0L;
+
+        foreach (var shard in shards)
+        {
+            var shardType = shard.GetType();
+            var chunks = (byte[][]?)shardType.GetField("_chunks", Flags)!.GetValue(shard);
+
+            if (chunks is not null)
+            {
+                for (var i = 0; i < chunks.Length; i++)
+                {
+                    if (chunks[i] is not null)
+                    {
+                        total += chunks[i].Length;
+                    }
+                }
+            }
+
+            var offsets = (int[][]?)shardType.GetField("_offsets", Flags)!.GetValue(shard);
+
+            if (offsets is not null)
+            {
+                for (var i = 0; i < offsets.Length; i++)
+                {
+                    if (offsets[i] is not null)
+                    {
+                        total += offsets[i].Length * (long)sizeof(int);
+                    }
+                }
+            }
+        }
+
+        return total;
+    }
 }
