@@ -693,6 +693,22 @@ public class MftOptimizationTests
             () => scanner.Calculate(new MftMemoryVolume(image), new DirectoryInfo(@"T:\"), 'T', 4, 4096, null, cts.Token));
     }
 
+    [TestCase(500_000L, 5_000L, 600_000)]
+    [TestCase(8_400_000L, 67_000L, 8_870_000)]
+    [TestCase(50_000_000L, 200_000L, 52_000_000)]
+    public void MftScanner_ComputeMaterializeNoGcBudgets_StaysWithinSafeCaps(long inUse, long extensions, int totalRecords)
+    {
+        MftScanner.ComputeMaterializeNoGcBudgets(inUse, extensions, totalRecords, out var totalBudget, out var lohBudget);
+        var sohBudget = totalBudget - lohBudget;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(lohBudget, Is.InRange(48L * 1024 * 1024, 304L * 1024 * 1024));
+            Assert.That(sohBudget, Is.InRange(48L * 1024 * 1024, 208L * 1024 * 1024));
+            Assert.That(totalBudget, Is.EqualTo(sohBudget + lohBudget));
+        }
+    }
+
     private sealed class AsyncTestMftVolume(byte[] image, Func<int, long, int, CancellationToken, Task> onAsyncRead) : IMftVolume
     {
         private readonly MftMemoryVolume _inner = new(image);

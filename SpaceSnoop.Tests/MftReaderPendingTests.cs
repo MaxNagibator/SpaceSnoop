@@ -109,6 +109,33 @@ public class MftReaderPendingTests
         }
     }
 
+    [TestCase(1)]
+    [TestCase(2)]
+    public void Чтение_образа_учитывает_безымянные_записи_и_расширения_через_кандидатов(int threads)
+    {
+        var image = new MftVolumeBuilder()
+            .Record(MftLayout.RootRecord, new MftRecordBuilder().AsDirectory().FileName(MftLayout.RootRecord, 1, "."))
+            .Record(24, new MftRecordBuilder().WithSequence(3).NonResidentData(1200))
+            .Record(25, new MftRecordBuilder().WithSequence(4))
+            .Record(26, new MftRecordBuilder().WithSequence(5).ResidentData(300))
+            .Record(27, new MftRecordBuilder().ExtensionOf(25, 4).NonResidentData(4500))
+            .Record(28, new MftRecordBuilder().ExtensionOf(26, 5).FileName(MftLayout.RootRecord, 1, "спасён.bin"))
+            .Record(29, new MftRecordBuilder().AsDirectory().WithSequence(6).NonResidentData(900))
+            .Build(32);
+
+        var table = MftReader.Read(new MftMemoryVolume(image), 'T', threads, 4096, null, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(table.Statistics.Nameless, Is.EqualTo(3));
+            Assert.That(table.Statistics.NamelessBytes, Is.EqualTo(5700));
+            Assert.That(table.Entries[26].HasName, Is.True);
+            Assert.That(table.Entries[26].Size, Is.EqualTo(300));
+            Assert.That(table.Entries[25].HasName, Is.False);
+            Assert.That(table.Entries[25].Size, Is.EqualTo(4500));
+        }
+    }
+
     private static MftEntry[] Entries(NameTable names, string? name)
     {
         var entries = new MftEntry[64];

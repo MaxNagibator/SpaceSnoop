@@ -212,7 +212,9 @@ internal static class MftReader
         var self = new byte[recordSize];
         volume.ReadAt(mftCluster * bytesPerCluster, self);
 
-        if (partitionExtentLength is null)
+        var deferVolumeReady = partitionExtentLength is not null || minMftBytes is not null;
+
+        if (!deferVolumeReady)
         {
             progress?.NotifyVolumeReady();
         }
@@ -224,18 +226,19 @@ internal static class MftReader
 
         var (runs, mftBytes) = ReadSelfRuns(self, volume, bytesPerCluster, recordSize, bytesPerSector, letter);
 
-        if (partitionExtentLength is { } extentLength)
+        if (minMftBytes is { } expectedBytes && mftBytes < expectedBytes)
         {
-            if (minMftBytes is { } expectedBytes && mftBytes < expectedBytes)
-            {
-                throw new InvalidDataException($"Том {letter}: размер $MFT на диске ({mftBytes:N0} Б) меньше длины NTFS ({expectedBytes:N0} Б)");
-            }
+            throw new InvalidDataException($"Том {letter}: размер $MFT на диске ({mftBytes:N0} Б) меньше длины NTFS ({expectedBytes:N0} Б)");
+        }
 
-            if (!MftRawDiskGuard.ValidateRunsWithinPartition(runs, extentLength, bytesPerCluster, out var runReason))
-            {
-                throw new InvalidDataException($"Том {letter}: {runReason}");
-            }
+        if (partitionExtentLength is { } extentLength
+            && !MftRawDiskGuard.ValidateRunsWithinPartition(runs, extentLength, bytesPerCluster, out var runReason))
+        {
+            throw new InvalidDataException($"Том {letter}: {runReason}");
+        }
 
+        if (deferVolumeReady)
+        {
             progress?.NotifyVolumeReady();
         }
 
@@ -268,9 +271,9 @@ internal static class MftReader
 
         const int nameTableShards = 64;
         var initialNameSlotsPerShard = Math.Clamp(
-            (int)BitOperations.RoundUpToPowerOf2((uint)Math.Max(256, records / nameTableShards)),
+            (int)BitOperations.RoundUpToPowerOf2((uint)Math.Max(256, records / (nameTableShards * 2))),
             256,
-            1 << 17);
+            1 << 16);
         var store = ScanTreeStore.CreateWithNameSlots(nameTableShards, singleWriter: false, initialNameSlotsPerShard);
         var entries = GC.AllocateUninitializedArray<MftEntry>(records);
         var blockRecords = Math.Max(1, blockBytes / recordSize);
@@ -364,9 +367,10 @@ internal static class MftReader
 
         var pending = new MftPending();
         var statistics = new MftStatistics();
+        var namelessCandidates = new List<int>();
 
-        Merge(parts, pending, statistics);
-        ApplyPending(entries, pending, statistics);
+        Merge(parts, pending, statistics, namelessCandidates);
+        ApplyPending(entries, pending, statistics, namelessCandidates);
 
         return new(entries, statistics, pending.Alternates, store);
     }
@@ -459,7 +463,11 @@ internal static class MftReader
         }
     }
 
-    internal static void ApplyPending(MftEntry[] entries, MftPending pending, MftStatistics statistics)
+    internal static void ApplyPending(
+        MftEntry[] entries,
+        MftPending pending,
+        MftStatistics statistics,
+        List<int>? namelessCandidates = null)
     {
         foreach (var (index, size) in pending.Sizes)
         {
@@ -514,19 +522,41 @@ internal static class MftReader
             }
         }
 
+        if (namelessCandidates is not null)
+        {
+            for (var i = 0; i < namelessCandidates.Count; i++)
+            {
+                CountNamelessRecord(entries, namelessCandidates[i], statistics);
+            }
+
+            return;
+        }
+
         for (var index = MftLayout.FirstUserRecord; index < entries.Length; index++)
         {
-            if (!entries[index].Present || entries[index].HasName)
-            {
-                continue;
-            }
+            CountNamelessRecord(entries, index, statistics);
+        }
+    }
 
-            statistics.Nameless++;
+    private static void CountNamelessRecord(MftEntry[] entries, int index, MftStatistics statistics)
+    {
+        if (index < MftLayout.FirstUserRecord || index >= entries.Length)
+        {
+            return;
+        }
 
-            if (!entries[index].IsDirectory)
-            {
-                statistics.NamelessBytes += entries[index].Size;
-            }
+        ref var entry = ref entries[index];
+
+        if (!entry.Present || entry.HasName)
+        {
+            return;
+        }
+
+        statistics.Nameless++;
+
+        if (!entry.IsDirectory)
+        {
+            statistics.NamelessBytes += entry.Size;
         }
     }
 
@@ -671,6 +701,11 @@ internal static class MftReader
         }
 
         entries[index] = entry;
+
+        if (index >= MftLayout.FirstUserRecord && !entry.HasName)
+        {
+            target.AddNamelessCandidate(index);
+        }
     }
 
     private static bool DropStaleNames(List<MftName> names, ushort sequence)
@@ -698,11 +733,12 @@ internal static class MftReader
         return dropped;
     }
 
-    private static void Merge(MftPart[] parts, MftPending pending, MftStatistics statistics)
+    private static void Merge(MftPart[] parts, MftPending pending, MftStatistics statistics, List<int> namelessCandidates)
     {
         for (var i = 0; i < parts.Length; i++)
         {
             statistics.Add(parts[i].Statistics);
+            namelessCandidates.AddRange(parts[i].NamelessCandidates);
         }
 
         if (parts.Length == 1)
@@ -1353,6 +1389,11 @@ internal readonly struct MftPendingTarget(MftPart? part, MftPending? pending)
         alternates.Insert(position, name);
     }
 
+    public void AddNamelessCandidate(int record)
+    {
+        part?.NamelessCandidates.Add(record);
+    }
+
     public void RemoveAlternateMatches(int targetRecord, int startPosition, int parent, int nameId)
     {
         if (part is not null)
@@ -1394,6 +1435,8 @@ internal sealed class MftPart
     public List<MftPendingSizeEntry> Sizes { get; } = [];
 
     public List<MftPendingAlternateEntry> Alternates { get; } = [];
+
+    public List<int> NamelessCandidates { get; } = [];
 
     public MftStatistics Statistics { get; } = new();
 }

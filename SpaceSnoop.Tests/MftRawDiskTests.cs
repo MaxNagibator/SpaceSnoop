@@ -497,6 +497,72 @@ public class MftRawDiskTests
         }
     }
 
+    [Test]
+    public void MftMarkHandleInfo_HasExpectedNativeLayoutSize()
+    {
+        var expectedBytes = IntPtr.Size == 8 ? 24 : 12;
+        Assert.That(System.Runtime.InteropServices.Marshal.SizeOf<MftMarkHandleInfo>(), Is.EqualTo(expectedBytes));
+    }
+
+    [Test]
+    public void ValidateNtfsVolumeHeader_AcceptsValidVolumeWithoutSingleExtent()
+    {
+        var boot = new MftBootInfo(512, 4096, 4, 1024);
+        var buffer = new byte[96];
+        BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(0x28), 512u);
+        BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(0x2C), 4096u);
+        BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(0x30), 1024u);
+        BinaryPrimitives.WriteInt64LittleEndian(buffer.AsSpan(0x38), 65536L);
+        BinaryPrimitives.WriteInt64LittleEndian(buffer.AsSpan(0x40), 4L);
+
+        var ok = MftRawDiskGuard.ValidateNtfsVolumeHeader(buffer, 96, boot, out var validDataLength, out var reason);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(ok, Is.True);
+            Assert.That(validDataLength, Is.EqualTo(65536L));
+            Assert.That(reason, Is.Null);
+        }
+    }
+
+    [Test]
+    public void MftScanner_RawDisk_NoFlushVolumeWithZeroExtentChecksValidDataLengthAndSucceeds()
+    {
+        var image = BuildSampleImage();
+        var scanner = new MftScanner();
+        var expectedMftBytes = (long)Records * 1024;
+
+        var okResult = scanner.Calculate(
+            new MftMemoryVolume(image),
+            new DirectoryInfo(@"T:\"),
+            Letter,
+            1,
+            4096,
+            null,
+            MftReadMode.RawDisk,
+            _ => MftRawDiskAttempt.Success(new MftMemoryVolume(image), extentLength: 0, mftValidDataLength: expectedMftBytes));
+
+        var shortResult = scanner.Calculate(
+            new MftMemoryVolume(image),
+            new DirectoryInfo(@"T:\"),
+            Letter,
+            1,
+            4096,
+            null,
+            MftReadMode.RawDisk,
+            _ => MftRawDiskAttempt.Success(new MftMemoryVolume(image), extentLength: 0, mftValidDataLength: expectedMftBytes + 4096));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(okResult.ReadMode, Is.EqualTo(MftReadMode.RawDisk));
+            Assert.That(okResult.FallbackReason, Is.Null);
+            Assert.That(okResult.Root.TotalSize, Is.EqualTo(1500));
+            Assert.That(shortResult.ReadMode, Is.EqualTo(MftReadMode.Volume));
+            Assert.That(shortResult.FallbackReason, Does.Contain("меньше длины NTFS"));
+            Assert.That(shortResult.Root.TotalSize, Is.EqualTo(1500));
+        }
+    }
+
     private static byte[] BuildSampleImage()
     {
         return new MftVolumeBuilder()

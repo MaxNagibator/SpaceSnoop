@@ -27,10 +27,14 @@ internal sealed class MftFileVolume : IMftVolume
     private const uint OpenExisting = 3;
     private const uint NoBuffering = 0x20000000;
     private const uint Overlapped = 0x40000000;
+    private const uint FsctlMarkHandle = 0x000900FCu;
+    private const uint FsctlGetNtfsVolumeData = 0x00090064u;
+    private const uint MarkHandleSuppressVolumeOpenFlush = 0x00008000u;
     private const int Alignment = 4096;
     private const int MinSectorBytes = 512;
     private const int MaxPooledBounces = 8;
     private const int ErrorAccessDenied = 5;
+    private const int ErrorIoPending = 997;
     private const int InvalidParameterResult = unchecked((int)0x80070057);
 
     private readonly Lock _gate = new();
@@ -39,15 +43,17 @@ internal sealed class MftFileVolume : IMftVolume
     private readonly string _path;
     private readonly string _name;
     private readonly SafeFileHandle _unbuffered;
+    private readonly bool _suppressFlush;
 
     private SafeFileHandle? _buffered;
     private volatile int _sectorAlignment = Alignment;
 
-    private MftFileVolume(SafeFileHandle unbuffered, string path, string name)
+    private MftFileVolume(SafeFileHandle unbuffered, string path, string name, bool suppressFlush = false)
     {
         _unbuffered = unbuffered;
         _path = path;
         _name = name;
+        _suppressFlush = suppressFlush;
     }
 
     internal bool IsBuffered => Volatile.Read(ref _buffered) is not null;
@@ -139,6 +145,49 @@ internal sealed class MftFileVolume : IMftVolume
         throw error == ErrorAccessDenied
             ? new UnauthorizedAccessException($"Чтение $MFT тома {name} требует прав администратора")
             : new IOException($"Не удалось открыть том {name}, код {error}");
+    }
+
+    internal bool TryQueryNtfsVolumeData(byte[] buffer, out int bytesReturned)
+    {
+        var pinned = GCHandle.Alloc(buffer, GCHandleType.Pinned);
+
+        try
+        {
+            var ok = TryDeviceIoControlOverlapped(
+                _unbuffered,
+                FsctlGetNtfsVolumeData,
+                IntPtr.Zero,
+                0,
+                pinned.AddrOfPinnedObject(),
+                buffer.Length,
+                out var returned);
+            bytesReturned = ok ? (int)returned : 0;
+            return ok;
+        }
+        finally
+        {
+            pinned.Free();
+        }
+    }
+
+    internal static MftFileVolume? TryOpenNoFlush(char letter)
+    {
+        var path = $@"\\.\{letter}:";
+        var handle = OpenHandle(path, NoBuffering | Overlapped);
+
+        if (handle.IsInvalid)
+        {
+            handle.Dispose();
+            return null;
+        }
+
+        if (!TrySuppressVolumeOpenFlush(handle))
+        {
+            handle.Dispose();
+            return null;
+        }
+
+        return new(handle, path, $"{letter}:", suppressFlush: true);
     }
 
     internal static SafeFileHandle OpenHandle(string path, uint flags)
@@ -319,8 +368,87 @@ internal sealed class MftFileVolume : IMftVolume
                 throw new IOException($"Не удалось переоткрыть том {_name} буферизованным, код {error}");
             }
 
+            if (_suppressFlush && !TrySuppressVolumeOpenFlush(handle))
+            {
+                handle.Dispose();
+                throw new IOException($"Не удалось подавить сброс тома {_name} при буферизованном переоткрытии");
+            }
+
             Volatile.Write(ref _buffered, handle);
             return handle;
+        }
+    }
+
+    private static bool TrySuppressVolumeOpenFlush(SafeFileHandle handle)
+    {
+        var info = new MftMarkHandleInfo
+        {
+            UsnSourceInfo = 0,
+            VolumeHandle = IntPtr.Zero,
+            HandleInfo = MarkHandleSuppressVolumeOpenFlush,
+        };
+
+        var size = Marshal.SizeOf<MftMarkHandleInfo>();
+        var buffer = Marshal.AllocHGlobal(size);
+
+        try
+        {
+            Marshal.StructureToPtr(info, buffer, false);
+            return TryDeviceIoControlOverlapped(handle, FsctlMarkHandle, buffer, size, IntPtr.Zero, 0, out _);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    private static bool TryDeviceIoControlOverlapped(
+        SafeFileHandle handle,
+        uint ioControlCode,
+        IntPtr inBuffer,
+        int inBufferSize,
+        IntPtr outBuffer,
+        int outBufferSize,
+        out uint bytesReturned)
+    {
+        bytesReturned = 0;
+        var eventHandle = CreateEventW(IntPtr.Zero, true, false, null);
+
+        if (eventHandle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        try
+        {
+            var overlapped = new NativeOverlapped
+            {
+                EventHandle = eventHandle,
+            };
+
+            if (DeviceIoControl(
+                    handle,
+                    ioControlCode,
+                    inBuffer,
+                    inBufferSize,
+                    outBuffer,
+                    outBufferSize,
+                    out bytesReturned,
+                    ref overlapped))
+            {
+                return true;
+            }
+
+            if (Marshal.GetLastWin32Error() != ErrorIoPending)
+            {
+                return false;
+            }
+
+            return GetOverlappedResult(handle, ref overlapped, out bytesReturned, true);
+        }
+        finally
+        {
+            CloseHandle(eventHandle);
         }
     }
 
@@ -333,4 +461,43 @@ internal sealed class MftFileVolume : IMftVolume
         uint disposition,
         uint flags,
         IntPtr template);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DeviceIoControl(
+        SafeFileHandle device,
+        uint ioControlCode,
+        IntPtr inBuffer,
+        int inBufferSize,
+        IntPtr outBuffer,
+        int outBufferSize,
+        out uint bytesReturned,
+        ref NativeOverlapped overlapped);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetOverlappedResult(
+        SafeFileHandle file,
+        ref NativeOverlapped overlapped,
+        out uint bytesTransferred,
+        [MarshalAs(UnmanagedType.Bool)] bool wait);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr CreateEventW(
+        IntPtr attributes,
+        [MarshalAs(UnmanagedType.Bool)] bool manualReset,
+        [MarshalAs(UnmanagedType.Bool)] bool initialState,
+        string? name);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CloseHandle(IntPtr handle);
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct MftMarkHandleInfo
+{
+    public uint UsnSourceInfo;
+    public IntPtr VolumeHandle;
+    public uint HandleInfo;
 }

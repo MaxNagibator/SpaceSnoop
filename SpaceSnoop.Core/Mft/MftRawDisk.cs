@@ -143,21 +143,10 @@ internal static class MftRawDiskGuard
         return true;
     }
 
-    public static bool ValidateNtfsVolumeData(
+    public static bool ValidateNtfsVolumeHeader(
         ReadOnlySpan<byte> buffer,
         int bytesReturned,
         MftBootInfo boot,
-        long extentLength,
-        out string? reason)
-    {
-        return ValidateNtfsVolumeData(buffer, bytesReturned, boot, extentLength, out _, out reason);
-    }
-
-    public static bool ValidateNtfsVolumeData(
-        ReadOnlySpan<byte> buffer,
-        int bytesReturned,
-        MftBootInfo boot,
-        long extentLength,
         out long mftValidDataLength,
         out string? reason)
     {
@@ -189,6 +178,38 @@ internal static class MftRawDiskGuard
             reason = $"недопустимая длина $MFT ({validDataLength:N0})";
             return false;
         }
+
+        mftValidDataLength = validDataLength;
+        reason = null;
+        return true;
+    }
+
+    public static bool ValidateNtfsVolumeData(
+        ReadOnlySpan<byte> buffer,
+        int bytesReturned,
+        MftBootInfo boot,
+        long extentLength,
+        out string? reason)
+    {
+        return ValidateNtfsVolumeData(buffer, bytesReturned, boot, extentLength, out _, out reason);
+    }
+
+    public static bool ValidateNtfsVolumeData(
+        ReadOnlySpan<byte> buffer,
+        int bytesReturned,
+        MftBootInfo boot,
+        long extentLength,
+        out long mftValidDataLength,
+        out string? reason)
+    {
+        if (!ValidateNtfsVolumeHeader(buffer, bytesReturned, boot, out var validDataLength, out reason))
+        {
+            mftValidDataLength = 0;
+            return false;
+        }
+
+        mftValidDataLength = 0;
+        var mftStartLcn = BinaryPrimitives.ReadInt64LittleEndian(buffer[0x40..]);
 
         if (boot.BytesPerCluster <= 0
             || extentLength <= 0
@@ -268,7 +289,7 @@ internal static class MftRawDiskProbe
     private const uint FsctlGetNtfsVolumeData = 0x00090064u;
     private const int ErrorMoreData = 234;
 
-    // TODO: предел – чтение PhysicalDrive минует кэш NTFS последних секунд; триггер апгрейда – жалобы на потерю недавних записей при IsComplete (добавить сброс или VSS).
+    // TODO: предел – чтение без сброса (FSCTL_MARK_HANDLE / PhysicalDrive) минует кэш NTFS последних секунд; триггер апгрейда – жалобы на потерю недавних записей при IsComplete (добавить сброс или VSS).
     public static MftRawDiskAttempt Open(char letter, ReadOnlySpan<byte> volumeBoot)
     {
         MftBootInfo boot;
@@ -282,12 +303,60 @@ internal static class MftRawDiskProbe
             return MftRawDiskAttempt.Fail(exception.Message);
         }
 
+        if (MftFileVolume.TryOpenNoFlush(letter) is { } noFlushVolume)
+        {
+            try
+            {
+                var noFlushNtfs = new byte[96];
+
+                if (noFlushVolume.TryQueryNtfsVolumeData(noFlushNtfs, out var noFlushNtfsBytes)
+                    && MftRawDiskGuard.ValidateNtfsVolumeHeader(noFlushNtfs, noFlushNtfsBytes, boot, out var noFlushValidLength, out _))
+                {
+                    var noFlushBoot = new byte[MftRawDiskGuard.BootSectorBytes];
+                    noFlushVolume.ReadAt(0, noFlushBoot);
+
+                    if (MftRawDiskGuard.ValidateBootSectorMatch(noFlushBoot, volumeBoot, out _))
+                    {
+                        return MftRawDiskAttempt.Success(noFlushVolume, 0, noFlushValidLength);
+                    }
+                }
+            }
+            catch (Exception exception) when (exception is UnauthorizedAccessException or IOException or InvalidDataException)
+            {
+                noFlushVolume.Dispose();
+                noFlushVolume = null;
+            }
+
+            noFlushVolume?.Dispose();
+        }
+
         using var metadataHandle = MftFileVolume.OpenHandle($@"\\.\{letter}:", 0u);
 
         if (metadataHandle.IsInvalid)
         {
             var error = Marshal.GetLastWin32Error();
-            return MftRawDiskAttempt.Fail($"не удалось открыть том {letter}: для проверки экстентов (код {error})");
+            return MftRawDiskAttempt.Fail($"не удалось открыть том {letter}: для проверки параметров NTFS (код {error})");
+        }
+
+        var ntfsBuffer = new byte[96];
+
+        if (!DeviceIoControl(
+                metadataHandle,
+                FsctlGetNtfsVolumeData,
+                IntPtr.Zero,
+                0,
+                ntfsBuffer,
+                (uint)ntfsBuffer.Length,
+                out var ntfsBytes,
+                IntPtr.Zero))
+        {
+            var error = Marshal.GetLastWin32Error();
+            return MftRawDiskAttempt.Fail($"не удалось получить параметры NTFS тома {letter}: (код {error})");
+        }
+
+        if (!MftRawDiskGuard.ValidateNtfsVolumeHeader(ntfsBuffer, (int)ntfsBytes, boot, out var mftValidDataLength, out var headerReason))
+        {
+            return MftRawDiskAttempt.Fail(headerReason!);
         }
 
         var extentBuffer = new byte[256];
@@ -314,23 +383,7 @@ internal static class MftRawDiskProbe
             return MftRawDiskAttempt.Fail(extentReason!);
         }
 
-        var ntfsBuffer = new byte[96];
-
-        if (!DeviceIoControl(
-                metadataHandle,
-                FsctlGetNtfsVolumeData,
-                IntPtr.Zero,
-                0,
-                ntfsBuffer,
-                (uint)ntfsBuffer.Length,
-                out var ntfsBytes,
-                IntPtr.Zero))
-        {
-            var error = Marshal.GetLastWin32Error();
-            return MftRawDiskAttempt.Fail($"не удалось получить параметры NTFS тома {letter}: (код {error})");
-        }
-
-        if (!MftRawDiskGuard.ValidateNtfsVolumeData(ntfsBuffer, (int)ntfsBytes, boot, extent.ExtentLength, out var mftValidDataLength, out var ntfsReason))
+        if (!MftRawDiskGuard.ValidateNtfsVolumeData(ntfsBuffer, (int)ntfsBytes, boot, extent.ExtentLength, out mftValidDataLength, out var ntfsReason))
         {
             return MftRawDiskAttempt.Fail(ntfsReason!);
         }
