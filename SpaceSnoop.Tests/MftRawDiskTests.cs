@@ -441,6 +441,62 @@ public class MftRawDiskTests
         }
     }
 
+    [Test]
+    public void MftScanner_RawDisk_FallsBackToVolumeWhenRawMftShorterThanNtfsValidDataLength()
+    {
+        var image = BuildSampleImage();
+        var scanner = new MftScanner();
+        var expectedMftBytes = (long)Records * 1024;
+
+        var result = scanner.Calculate(
+            new MftMemoryVolume(image),
+            new DirectoryInfo(@"T:\"),
+            Letter,
+            1,
+            4096,
+            null,
+            MftReadMode.RawDisk,
+            _ => MftRawDiskAttempt.Success(
+                new MftMemoryVolume(image),
+                image.Length,
+                mftValidDataLength: expectedMftBytes + 4096));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.ReadMode, Is.EqualTo(MftReadMode.Volume));
+            Assert.That(result.FallbackReason, Does.Contain("меньше длины NTFS"));
+            Assert.That(result.Root.TotalSize, Is.EqualTo(1500));
+            Assert.That(result.IsComplete, Is.True);
+        }
+    }
+
+    [Test]
+    public void MftScanner_SubdirectoryScan_UsesCompactStoreAndDeterministicCaseInsensitiveLocate()
+    {
+        var image = new MftVolumeBuilder()
+            .Record(MftLayout.RootRecord, new MftRecordBuilder().AsDirectory().FileName(MftLayout.RootRecord, 1, "."))
+            .Record(20, new MftRecordBuilder().AsDirectory().FileName(MftLayout.RootRecord, 1, "Alpha"))
+            .Record(21, new MftRecordBuilder().AsDirectory().FileName(MftLayout.RootRecord, 1, "alpha"))
+            .Record(22, new MftRecordBuilder().FileName(20, 1, "first.bin").ResidentData(111))
+            .Record(23, new MftRecordBuilder().FileName(21, 1, "second.bin").ResidentData(222))
+            .Build(Records);
+
+        var table = MftReader.Read(new MftMemoryVolume(image), Letter, 1, 4096, null, CancellationToken.None);
+        var links = MftLinks.Build(table, CancellationToken.None);
+        var located = MftScanner.Locate(table, links, new DirectoryInfo(@"T:\ALPHA"), Letter);
+        var totals = new MftSubtreeTotals();
+        var subRoot = MftScanner.Materialize(table, links, 20, new DirectoryInfo(@"T:\Alpha"), totals, reachable: null, null, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(located, Is.EqualTo(20));
+            Assert.That(subRoot.Store, Is.Not.Null);
+            Assert.That(subRoot.Store, Is.Not.SameAs(table.Store));
+            Assert.That(subRoot.TotalSize, Is.EqualTo(111));
+            Assert.That(subRoot.Files.Single().Name, Is.EqualTo("first.bin"));
+        }
+    }
+
     private static byte[] BuildSampleImage()
     {
         return new MftVolumeBuilder()

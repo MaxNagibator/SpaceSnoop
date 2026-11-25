@@ -184,7 +184,8 @@ internal static class MftReader
         ScanProgress? progress,
         byte[]? prefetchedBoot,
         long? partitionExtentLength,
-        CancellationToken cancel)
+        CancellationToken cancel,
+        long? minMftBytes = null)
     {
         cancel.ThrowIfCancellationRequested();
 
@@ -223,6 +224,11 @@ internal static class MftReader
 
         if (partitionExtentLength is { } extentLength)
         {
+            if (minMftBytes is { } expectedBytes && mftBytes < expectedBytes)
+            {
+                throw new InvalidDataException($"Том {letter}: размер $MFT на диске ({mftBytes:N0} Б) меньше длины NTFS ({expectedBytes:N0} Б)");
+            }
+
             if (!MftRawDiskGuard.ValidateRunsWithinPartition(runs, extentLength, bytesPerCluster, out var runReason))
             {
                 throw new InvalidDataException($"Том {letter}: {runReason}");
@@ -258,12 +264,12 @@ internal static class MftReader
             throw new InvalidDataException($"Том {letter}: отрезки $MFT покрывают {map.Length:N0} Б из {needed:N0} Б, разметка неполна");
         }
 
-        var shardCount = records >= 16_384 ? 64 : 16;
+        const int nameTableShards = 64;
         var initialNameSlotsPerShard = Math.Clamp(
-            (int)BitOperations.RoundUpToPowerOf2((uint)Math.Max(256, records / shardCount)),
+            (int)BitOperations.RoundUpToPowerOf2((uint)Math.Max(256, records / nameTableShards)),
             256,
             1 << 17);
-        var store = new ScanTreeStore(shardCount, singleWriter: false, initialNameSlotsPerShard);
+        var store = ScanTreeStore.CreateWithNameSlots(nameTableShards, singleWriter: false, initialNameSlotsPerShard);
         var entries = GC.AllocateUninitializedArray<MftEntry>(records);
         var blockRecords = Math.Max(1, blockBytes / recordSize);
         var blocks = (records + blockRecords - 1) / blockRecords;

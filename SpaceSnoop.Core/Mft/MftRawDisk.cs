@@ -8,11 +8,15 @@ internal readonly record struct MftBootInfo(int BytesPerSector, int BytesPerClus
 
 internal readonly record struct MftDiskExtent(uint DiskNumber, long StartingOffset, long ExtentLength);
 
-internal readonly record struct MftRawDiskAttempt(IMftVolume? Volume, long ExtentLength, string? FailureReason)
+internal readonly record struct MftRawDiskAttempt(
+    IMftVolume? Volume,
+    long ExtentLength,
+    string? FailureReason,
+    long MftValidDataLength = 0)
 {
-    public static MftRawDiskAttempt Success(IMftVolume volume, long extentLength)
+    public static MftRawDiskAttempt Success(IMftVolume volume, long extentLength, long mftValidDataLength = 0)
     {
-        return new(volume, extentLength, null);
+        return new(volume, extentLength, null, mftValidDataLength);
     }
 
     public static MftRawDiskAttempt Fail(string reason)
@@ -135,6 +139,19 @@ internal static class MftRawDiskGuard
         long extentLength,
         out string? reason)
     {
+        return ValidateNtfsVolumeData(buffer, bytesReturned, boot, extentLength, out _, out reason);
+    }
+
+    public static bool ValidateNtfsVolumeData(
+        ReadOnlySpan<byte> buffer,
+        int bytesReturned,
+        MftBootInfo boot,
+        long extentLength,
+        out long mftValidDataLength,
+        out string? reason)
+    {
+        mftValidDataLength = 0;
+
         if (bytesReturned < MinNtfsVolumeDataBytes || buffer.Length < MinNtfsVolumeDataBytes)
         {
             reason = "ответ NTFS_VOLUME_DATA короче ожидаемого";
@@ -144,7 +161,7 @@ internal static class MftRawDiskGuard
         var bytesPerSector = BinaryPrimitives.ReadUInt32LittleEndian(buffer[0x28..]);
         var bytesPerCluster = BinaryPrimitives.ReadUInt32LittleEndian(buffer[0x2C..]);
         var recordSize = BinaryPrimitives.ReadUInt32LittleEndian(buffer[0x30..]);
-        var mftValidDataLength = BinaryPrimitives.ReadInt64LittleEndian(buffer[0x38..]);
+        var validDataLength = BinaryPrimitives.ReadInt64LittleEndian(buffer[0x38..]);
         var mftStartLcn = BinaryPrimitives.ReadInt64LittleEndian(buffer[0x40..]);
 
         if (bytesPerSector != (uint)boot.BytesPerSector
@@ -156,9 +173,9 @@ internal static class MftRawDiskGuard
             return false;
         }
 
-        if (mftValidDataLength <= 0)
+        if (validDataLength <= 0)
         {
-            reason = $"недопустимая длина $MFT ({mftValidDataLength:N0})";
+            reason = $"недопустимая длина $MFT ({validDataLength:N0})";
             return false;
         }
 
@@ -179,6 +196,7 @@ internal static class MftRawDiskGuard
             return false;
         }
 
+        mftValidDataLength = validDataLength;
         reason = null;
         return true;
     }
@@ -301,7 +319,7 @@ internal static class MftRawDiskProbe
             return MftRawDiskAttempt.Fail($"не удалось получить параметры NTFS тома {letter}: (код {error})");
         }
 
-        if (!MftRawDiskGuard.ValidateNtfsVolumeData(ntfsBuffer, (int)ntfsBytes, boot, extent.ExtentLength, out var ntfsReason))
+        if (!MftRawDiskGuard.ValidateNtfsVolumeData(ntfsBuffer, (int)ntfsBytes, boot, extent.ExtentLength, out var mftValidDataLength, out var ntfsReason))
         {
             return MftRawDiskAttempt.Fail(ntfsReason!);
         }
@@ -322,7 +340,7 @@ internal static class MftRawDiskProbe
 
             var opened = rawVolume;
             rawVolume = null;
-            return MftRawDiskAttempt.Success(opened, extent.ExtentLength);
+            return MftRawDiskAttempt.Success(opened, extent.ExtentLength, mftValidDataLength);
         }
         catch (Exception exception) when (exception is UnauthorizedAccessException or IOException or InvalidDataException)
         {

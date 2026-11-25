@@ -154,7 +154,8 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
                             progress,
                             prefetchedBoot,
                             attempt.ExtentLength,
-                            cancel);
+                            cancel,
+                            attempt.MftValidDataLength > 0 ? attempt.MftValidDataLength : null);
                     }
 
                     if (table.Statistics.Damaged > 0 || table.Statistics.Partial > 0)
@@ -174,7 +175,6 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
             {
                 progress?.Reset();
                 actualMode = MftReadMode.Volume;
-                _log.MftRawDiskFallback(directory.FullName, fallbackReason!);
             }
         }
 
@@ -319,7 +319,7 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
                 }
 
                 if (!caseSensitive
-                    && found < 0
+                    && (found < 0 || child < found)
                     && table.Names.Equals(entries[child].NameId, segment, StringComparison.OrdinalIgnoreCase))
                 {
                     found = child;
@@ -348,7 +348,9 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
         CancellationToken cancel)
     {
         var entries = table.Entries;
-        var store = table.Store;
+        var reuseStore = start == MftLayout.RootRecord;
+        var store = reuseStore ? table.Store : new ScanTreeStore(16, singleWriter: false);
+        var rootCache = reuseStore ? default : LocalNameCache.Create();
         var rootWriter = new FileSlabWriter(store);
         var root = new DirectorySpace(
             store,
@@ -360,7 +362,7 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
 
         var files = new List<FileEntry>();
         var branches = new List<(int Record, DirectorySpace Node)>();
-        FillDirectory(table, links, start, root, store, rootWriter, totals, branches, files, reachable);
+        FillDirectory(table, links, start, root, store, reuseStore, rootCache, rootWriter, totals, branches, files, reachable);
 
         progress?.SetTopLevelTotal(branches.Count);
 
@@ -376,7 +378,7 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
             cancel.ThrowIfCancellationRequested();
 
             var (branchRecord, branchNode) = branches[i];
-            FillDirectory(table, links, branchRecord, branchNode, store, rootWriter, totals, level2Children, files, reachable);
+            FillDirectory(table, links, branchRecord, branchNode, store, reuseStore, rootCache, rootWriter, totals, level2Children, files, reachable);
             rootFiles += files.Count;
             rootBytes += branchNode.Size;
             branchRemaining[i] = level2Children.Count;
@@ -416,6 +418,7 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
                     x =>
                     {
                         var writer = new FileSlabWriter(store);
+                        var workerCache = reuseStore ? default : LocalNameCache.Create();
                         var localTotals = new MftSubtreeTotals();
                         workerTotals[x] = localTotals;
                         var stack = new Stack<(int Record, DirectorySpace Node, bool Ascending)>();
@@ -452,7 +455,7 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
                                     continue;
                                 }
 
-                                FillDirectory(table, links, record, node, store, writer, localTotals, children, workerFiles, reachable);
+                                FillDirectory(table, links, record, node, store, reuseStore, workerCache, writer, localTotals, children, workerFiles, reachable);
                                 batchDirs++;
                                 batchFiles += workerFiles.Count;
                                 batchBytes += node.Size;
@@ -542,6 +545,8 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
         int record,
         DirectorySpace node,
         ScanTreeStore store,
+        bool reuseStore,
+        LocalNameCache nameCache,
         FileSlabWriter writer,
         MftSubtreeTotals totals,
         List<(int Record, DirectorySpace Node)> children,
@@ -574,7 +579,7 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
                 totals.ExtraNameBytes += entry.Size * (names - 1);
             }
 
-            var nameId = entry.NameId;
+            var nameId = reuseStore ? entry.NameId : nameCache.Intern(store.Names, table.Names.GetUtf8(entry.NameId));
 
             if (entry.IsDirectory)
             {
@@ -625,6 +630,7 @@ internal sealed class MftProgressPath(DirectorySpace root, string rootPath)
     private const long RefreshMilliseconds = 50;
 
     private readonly List<string?> _segments = [];
+    private readonly string _rootPath = rootPath;
     private string _current = rootPath;
     private long _due;
 
@@ -653,10 +659,10 @@ internal sealed class MftProgressPath(DirectorySpace root, string rootPath)
 
         if (_segments.Count == 0)
         {
-            return rootPath;
+            return _rootPath;
         }
 
-        _segments.Add(rootPath);
+        _segments.Add(_rootPath);
         _segments.Reverse();
 
         return Path.Join(CollectionsMarshal.AsSpan(_segments));
