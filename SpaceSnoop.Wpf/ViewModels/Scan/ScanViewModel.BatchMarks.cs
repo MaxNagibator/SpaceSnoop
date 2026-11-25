@@ -1,7 +1,46 @@
-﻿namespace SpaceSnoop.Wpf.ViewModels.Scan;
+﻿using System.Runtime.CompilerServices;
+
+namespace SpaceSnoop.Wpf.ViewModels.Scan;
 
 public sealed partial class ScanViewModel
 {
+    private readonly ConditionalWeakTable<SpaceBase, Dictionary<long, List<SpaceBase>>> _undoFacadePins = new();
+    private readonly Lock _undoPinLock = new();
+    private long _nextUndoPinId;
+
+    internal int UndoFacadePinCount(SpaceBase root)
+    {
+        lock (_undoPinLock)
+        {
+            return _undoFacadePins.TryGetValue(root, out var pins) ? pins.Count : 0;
+        }
+    }
+
+    private void ReleaseUndoPin(long pinId)
+    {
+        lock (_undoPinLock)
+        {
+            foreach (var (_, pins) in _undoFacadePins)
+            {
+                pins.Remove(pinId);
+            }
+        }
+    }
+
+    private sealed class UndoPinToken(ScanViewModel owner, long id)
+    {
+        public void Release()
+        {
+            owner.ReleaseUndoPin(id);
+            GC.SuppressFinalize(this);
+        }
+
+        ~UndoPinToken()
+        {
+            owner.ReleaseUndoPin(id);
+        }
+    }
+
     [RelayCommand]
     public void MarkSelectedDeleted()
     {
@@ -43,15 +82,41 @@ public sealed partial class ScanViewModel
 
         var beforeSnapshot = new ScanMarkSnapshot(topScopes.Select(item => Marks.CaptureScopeMarks(item.Root, item.Scope)).ToList());
 
-        var previousByTarget = targets
-            .Select(node => (
-                Root: new WeakReference<SpaceBase>(node.Root ?? node.Space!),
-                Target: new WeakReference<SpaceBase>(node.Space!),
-                Marked: (_nodeFactory.MarksPresent || node.Space!.IsDeleted
-                    ? ScanTreeEditor.CollectMarked(node.Space!)
-                    : []).Select(static m => new WeakReference<SpaceBase>(m))
-                .ToList()))
-            .ToList();
+        var pinId = Interlocked.Increment(ref _nextUndoPinId);
+        var pinToken = new UndoPinToken(this, pinId);
+        var pinnedByRoot = new Dictionary<SpaceBase, List<SpaceBase>>(ReferenceEqualityComparer.Instance);
+        var previousByTarget = new List<(WeakReference<SpaceBase> Root, WeakReference<SpaceBase> Target, List<WeakReference<SpaceBase>> Marked)>(targets.Count);
+
+        foreach (var node in targets)
+        {
+            var root = node.Root ?? node.Space!;
+            var target = node.Space!;
+            var marked = _nodeFactory.MarksPresent || target.IsDeleted
+                ? ScanTreeEditor.CollectMarked(target)
+                : [];
+
+            if (!pinnedByRoot.TryGetValue(root, out var pinned))
+            {
+                pinned = [];
+                pinnedByRoot.Add(root, pinned);
+            }
+
+            pinned.Add(target);
+            pinned.AddRange(marked);
+
+            previousByTarget.Add((
+                new WeakReference<SpaceBase>(root),
+                new WeakReference<SpaceBase>(target),
+                marked.Select(static m => new WeakReference<SpaceBase>(m)).ToList()));
+        }
+
+        lock (_undoPinLock)
+        {
+            foreach (var (root, pinned) in pinnedByRoot)
+            {
+                _undoFacadePins.GetOrCreateValue(root)[pinId] = pinned;
+            }
+        }
 
         foreach (var space in targets.Select(static node => node.Space!))
         {
@@ -73,12 +138,13 @@ public sealed partial class ScanViewModel
         _notifier.Notify(
             $"{verb}: {count:N0} {Plural.Word(count, "объект", "объекта", "объектов")} ({SizeFormatter.Format(bytes)})",
             StatusSeverity.Info,
-            () => UndoBatchMark(markDeleted, previousByTarget));
+            () => UndoBatchMark(markDeleted, previousByTarget, pinToken));
     }
 
     private void UndoBatchMark(
         bool markDeleted,
-        List<(WeakReference<SpaceBase> Root, WeakReference<SpaceBase> Target, List<WeakReference<SpaceBase>> Marked)> previousByTarget)
+        List<(WeakReference<SpaceBase> Root, WeakReference<SpaceBase> Target, List<WeakReference<SpaceBase>> Marked)> previousByTarget,
+        UndoPinToken pinToken)
     {
         var activeRoots = ActiveRootSpaces();
         var activeTargets = new List<(SpaceBase Root, SpaceBase Target, List<SpaceBase> Marked)>();
@@ -101,6 +167,9 @@ public sealed partial class ScanViewModel
 
             activeTargets.Add((root, target, validMarked));
         }
+
+        GC.KeepAlive(pinToken);
+        pinToken.Release();
 
         if (activeTargets.Count == 0)
         {

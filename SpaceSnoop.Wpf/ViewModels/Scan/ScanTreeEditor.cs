@@ -9,37 +9,7 @@ internal static partial class ScanTreeEditor
 
     internal static bool HasMarkedSelfOrChild(SpaceBase space)
     {
-        if (space.IsDeleted)
-        {
-            return true;
-        }
-
-        if (space is not DirectorySpace dir)
-        {
-            return false;
-        }
-
-        var subs = dir.SubDirectoriesArray;
-
-        for (var i = 0; i < subs.Length; i++)
-        {
-            if (HasMarkedSelfOrChild(subs[i]))
-            {
-                return true;
-            }
-        }
-
-        var files = dir.FileEntries;
-
-        for (var i = 0; i < files.Length; i++)
-        {
-            if (files[i].IsDeleted)
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return space is DirectorySpace dir ? dir.HasMarkedSelfOrChild() : space.IsDeleted;
     }
 
     internal static List<SpaceBase> CollectMarked(IEnumerable<ScanNodeViewModel> roots, ScanNodeViewModel? unmarkedRoot = null)
@@ -68,31 +38,7 @@ internal static partial class ScanTreeEditor
 
     internal static void CollectMarked(DirectorySpace dir, List<SpaceBase> list)
     {
-        var subs = dir.SubDirectoriesArray;
-
-        for (var i = 0; i < subs.Length; i++)
-        {
-            var sub = subs[i];
-
-            if (sub.IsDeleted)
-            {
-                list.Add(sub);
-            }
-            else
-            {
-                CollectMarked(sub, list);
-            }
-        }
-
-        var files = dir.FileEntries;
-
-        for (var i = 0; i < files.Length; i++)
-        {
-            if (files[i].IsDeleted)
-            {
-                list.Add(dir.GetFile(i));
-            }
-        }
+        dir.CollectMarked(list);
     }
 
     internal static List<SpaceBase> CollectMarked(SpaceBase space)

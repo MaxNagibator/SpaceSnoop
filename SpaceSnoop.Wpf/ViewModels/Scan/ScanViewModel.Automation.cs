@@ -96,7 +96,7 @@ public sealed partial class ScanViewModel : IScanAutomation
         Interlocked.Increment(ref _scanVersion);
         CancelPendingMemoryReturn();
         var previous = ScanTreeEditor.RemoveRoot(Roots, result.AbsolutePath);
-        var (transferred, lost) = ScanTreeEditor.TransferMarks(previous, result, Marks.HasMarked);
+        var (transferred, lost) = ScanTreeEditor.TransferMarks(previous, result, Marks.HasMarked, notes.UsnLostMarks);
 
         var node = _nodeFactory.CreateRoot(result, Sort.State, driveCapacity);
         node.IsExpanded = true;

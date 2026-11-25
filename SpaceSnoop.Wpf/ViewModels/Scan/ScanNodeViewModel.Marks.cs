@@ -82,82 +82,26 @@ public sealed partial class ScanNodeViewModel
 
     internal static void RestoreRecursive(SpaceBase space)
     {
-        if (space.IsDeleted)
+        if (space is DirectorySpace dir)
         {
-            space.Restore();
-        }
-
-        if (space is not DirectorySpace dir)
-        {
+            dir.RestoreRecursive();
             return;
         }
 
-        var subs = dir.SubDirectoriesArray;
-
-        for (var i = 0; i < subs.Length; i++)
+        if (space.IsDeleted)
         {
-            RestoreRecursive(subs[i]);
-        }
-
-        var files = dir.FileEntries;
-
-        for (var i = 0; i < files.Length; i++)
-        {
-            if (files[i].IsDeleted)
-            {
-                dir.GetFile(i).Restore();
-            }
+            space.Restore();
         }
     }
 
     private static bool HasAddedChild(DirectorySpace dir)
     {
-        var subs = dir.SubDirectoriesArray;
-
-        for (var i = 0; i < subs.Length; i++)
-        {
-            if (subs[i].State == SpaceState.Added)
-            {
-                return true;
-            }
-        }
-
-        var files = dir.FileEntries;
-
-        for (var i = 0; i < files.Length; i++)
-        {
-            if (files[i].State == SpaceState.Added)
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return dir.HasAddedChild();
     }
 
     private static bool HasMarkedChild(DirectorySpace dir)
     {
-        var subs = dir.SubDirectoriesArray;
-
-        for (var i = 0; i < subs.Length; i++)
-        {
-            if (ScanTreeEditor.HasMarkedSelfOrChild(subs[i]))
-            {
-                return true;
-            }
-        }
-
-        var files = dir.FileEntries;
-
-        for (var i = 0; i < files.Length; i++)
-        {
-            if (files[i].IsDeleted)
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return dir.HasMarkedChild();
     }
 
     internal void RefreshOwnMarks()

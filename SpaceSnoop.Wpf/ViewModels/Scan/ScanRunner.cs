@@ -29,6 +29,16 @@ public sealed class ScanRunner(
         return directory.Parent is null;
     }
 
+    internal bool HasUsnCacheFor(string path)
+    {
+        return mftScanner.HasUsnCacheFor(path);
+    }
+
+    internal void InvalidateUsnCache(string? path = null)
+    {
+        mftScanner.InvalidateUsnCache(path);
+    }
+
     internal ScanOutcome? TryReadMft(DirectoryInfo directory, ScanProgress progress, CancellationToken cancel)
     {
         if (preferences.MftRootOnly && !IsVolumeRoot(directory))
@@ -74,7 +84,9 @@ public sealed class ScanRunner(
                     scan.DroppedObjects,
                     scan.DroppedBytes,
                     scan.UnknownSizeFiles,
-                    scan.PartialRecords));
+                    scan.PartialRecords,
+                    scan.UsedUsn,
+                    scan.UsnLostMarks));
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -94,7 +106,9 @@ public readonly record struct ScanNotes(
     long DroppedObjects,
     long DroppedBytes,
     long UnknownSizeFiles,
-    long PartialRecords)
+    long PartialRecords,
+    bool UsedUsn = false,
+    int UsnLostMarks = 0)
 {
     public bool HasDrops => DroppedObjects > 0 || UnknownSizeFiles > 0 || PartialRecords > 0;
 

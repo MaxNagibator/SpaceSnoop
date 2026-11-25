@@ -124,7 +124,7 @@ internal sealed partial class McpScanTools(
                 phases.ApplyMs = stopwatch.ElapsedMilliseconds;
 
                 await operations.FlushFramesAsync().ConfigureAwait(false);
-                await McpDispatch.Run(() => scan.ReturnScanMemoryAsync(tree, notes.UsedMft, probe.ReportPhase, cancellationToken)).ConfigureAwait(false);
+                await McpDispatch.Run(() => scan.ReturnScanMemoryAsync(tree, notes.UsedMft && !notes.UsedUsn, probe.ReportPhase, cancellationToken)).ConfigureAwait(false);
             }
 
             probe.ReportPhase("Сериализация сканирования");

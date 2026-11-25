@@ -188,7 +188,7 @@ public sealed partial class ScanViewModel
                 var appliedVersion = Volatile.Read(ref _scanVersion);
                 resultApplied = true;
                 measurement = Progress.CompleteMeasurementAsync();
-                ScheduleReturnScanMemory(outcome.Root, outcome.Notes.UsedMft, appliedVersion);
+                ScheduleReturnScanMemory(outcome.Root, outcome.Notes.UsedMft, appliedVersion, outcome.Notes.UsedUsn);
                 Interlocked.CompareExchange(ref _cts, null, scanCts);
                 IsScanning = false;
                 StatusCaption = null;

@@ -178,6 +178,11 @@ public sealed partial class ScanViewModel
             return false;
         }
 
+        if (_runner.HasUsnCacheFor(directory.FullName))
+        {
+            return true;
+        }
+
         var collect = Stopwatch.StartNew();
         GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, false, false);
         _logger.ScanPreviousReleased(directory.FullName, collect.ElapsedMilliseconds);
@@ -228,7 +233,16 @@ public sealed partial class ScanViewModel
         return ScheduleReturnScanMemory(result, usedMft, Volatile.Read(ref _scanVersion));
     }
 
-    internal Task<ScanMemoryReturnOutcome> ScheduleReturnScanMemory(DirectorySpace result, bool usedMft, int expectedVersion)
+    internal Task<ScanMemoryReturnOutcome> ScheduleReturnScanMemory(DirectorySpace result, bool usedMft, bool usedUsn)
+    {
+        return ScheduleReturnScanMemory(result, usedMft, Volatile.Read(ref _scanVersion), usedUsn);
+    }
+
+    internal Task<ScanMemoryReturnOutcome> ScheduleReturnScanMemory(
+        DirectorySpace result,
+        bool usedMft,
+        int expectedVersion,
+        bool usedUsn = false)
     {
         if (expectedVersion != Volatile.Read(ref _scanVersion))
         {
@@ -244,9 +258,10 @@ public sealed partial class ScanViewModel
             return skipped;
         }
 
+        var reclaimMft = usedMft && !usedUsn;
         var returnMemoryAfterScan = Preferences.ReturnMemoryAfterScan;
 
-        if (!returnMemoryAfterScan && !usedMft)
+        if (!returnMemoryAfterScan && !reclaimMft)
         {
             var skipped = Task.FromResult(ScanMemoryReturnOutcome.Skipped);
             PendingMemoryReturn = skipped;
@@ -267,7 +282,7 @@ public sealed partial class ScanViewModel
             return Task.FromResult(ScanMemoryReturnOutcome.Cancelled);
         }
 
-        var task = RunDeferredReturnScanMemoryAsync(result, usedMft, expectedVersion, handle);
+        var task = RunDeferredReturnScanMemoryAsync(result, reclaimMft, expectedVersion, handle);
         PendingMemoryReturn = task;
         return task;
     }
@@ -308,16 +323,18 @@ public sealed partial class ScanViewModel
         bool usedMft,
         int expectedVersion,
         Action<string>? reportPhase,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool usedUsn = false)
     {
         if (((long)result.TotalFileCount + result.TotalDirectoryCount) < AppDefaults.ScanMemoryReturnMinNodes)
         {
             return ScanMemoryReturnOutcome.Skipped;
         }
 
+        var reclaimMft = usedMft && !usedUsn;
         var returnMemoryAfterScan = Preferences.ReturnMemoryAfterScan;
 
-        if (!returnMemoryAfterScan && !usedMft)
+        if (!returnMemoryAfterScan && !reclaimMft)
         {
             return ScanMemoryReturnOutcome.Skipped;
         }
@@ -325,7 +342,7 @@ public sealed partial class ScanViewModel
         var pressure = GC.GetGCMemoryInfo();
         var action = SelectScanMemoryAction(
             returnMemoryAfterScan,
-            usedMft,
+            reclaimMft,
             pressure.MemoryLoadBytes,
             pressure.HighMemoryLoadThresholdBytes);
 
@@ -369,7 +386,7 @@ public sealed partial class ScanViewModel
         {
             if (action == ScanMemoryAction.Compact)
             {
-                if (!usedMft)
+                if (!reclaimMft)
                 {
                     pressure = GC.GetGCMemoryInfo();
 

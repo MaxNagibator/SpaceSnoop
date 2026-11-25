@@ -5,7 +5,8 @@ internal static partial class ScanTreeEditor
     internal static (List<SpaceBase> Transferred, int Lost) TransferMarks(
         IEnumerable<ScanNodeViewModel> previousRoots,
         DirectorySpace fresh,
-        bool marksPresent)
+        bool marksPresent,
+        int usnLostMarks = 0)
     {
         var transferred = new List<SpaceBase>();
         var lost = 0;
@@ -15,7 +16,8 @@ internal static partial class ScanTreeEditor
             return (transferred, lost);
         }
 
-        var lookups = new TransferLookups();
+        TransferLookups? lookups = null;
+        var collectedFresh = false;
 
         foreach (var root in previousRoots)
         {
@@ -24,6 +26,27 @@ internal static partial class ScanTreeEditor
                 continue;
             }
 
+            if (ReferenceEquals(previous, fresh))
+            {
+                if (!collectedFresh)
+                {
+                    collectedFresh = true;
+                    lost += usnLostMarks;
+
+                    if (fresh.IsDeleted)
+                    {
+                        transferred.Add(fresh);
+                    }
+                    else
+                    {
+                        CollectMarked(fresh, transferred);
+                    }
+                }
+
+                continue;
+            }
+
+            lookups ??= new();
             var marked = new List<SpaceBase>();
 
             if (previous.IsDeleted)
