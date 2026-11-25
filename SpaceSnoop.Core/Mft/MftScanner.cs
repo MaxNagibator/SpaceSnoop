@@ -191,15 +191,15 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
         }
 
         links.Rehome(table, start, cancel);
-        bool[]? reachable = null;
+        ulong[]? reachable = null;
 
         if (start == MftLayout.RootRecord)
         {
-            reachable = new bool[table.Entries.Length];
+            reachable = new ulong[(table.Entries.Length + 63) >> 6];
 
-            if (reachable.Length > MftLayout.RootRecord)
+            if (table.Entries.Length > MftLayout.RootRecord)
             {
-                reachable[MftLayout.RootRecord] = true;
+                MftLinks.SetReachable(reachable, MftLayout.RootRecord);
             }
         }
         else
@@ -337,13 +337,15 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
         return current;
     }
 
+    private const int Level2SplitThreshold = 16;
+
     internal static DirectorySpace Materialize(
         MftTable table,
         MftLinks links,
         int start,
         DirectoryInfo directory,
         MftSubtreeTotals totals,
-        bool[]? reachable,
+        ulong[]? reachable,
         ScanProgress? progress,
         CancellationToken cancel)
     {
@@ -369,9 +371,12 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
         var rootDirs = 1 + branches.Count;
         var rootFiles = files.Count;
         var rootBytes = root.Size;
-        var branchRemaining = new int[branches.Count];
-        var workItems = new List<(int Record, DirectorySpace Node, int BranchIndex)>();
+        var branchRemaining = new PaddedCounter[branches.Count];
+        var workItems = new List<(int Record, DirectorySpace Node, int BranchIndex, int SubBranchIndex)>();
         var level2Children = new List<(int Record, DirectorySpace Node)>();
+        var level3Children = new List<(int Record, DirectorySpace Node)>();
+        var subBranchNodes = new List<DirectorySpace>();
+        var subBranchCounts = new List<int>();
 
         for (var i = 0; i < branches.Count; i++)
         {
@@ -381,7 +386,6 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
             FillDirectory(table, links, branchRecord, branchNode, store, reuseStore, rootCache, rootWriter, totals, level2Children, files, reachable);
             rootFiles += files.Count;
             rootBytes += branchNode.Size;
-            branchRemaining[i] = level2Children.Count;
 
             if (level2Children.Count == 0)
             {
@@ -390,9 +394,43 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
                 continue;
             }
 
+            branchRemaining[i].Remaining = level2Children.Count;
+
             for (var j = 0; j < level2Children.Count; j++)
             {
-                workItems.Add((level2Children[j].Record, level2Children[j].Node, i));
+                var (level2Record, level2Node) = level2Children[j];
+
+                if (!HasAtLeastSubdirectories(entries, links, level2Record, reachable, Level2SplitThreshold))
+                {
+                    workItems.Add((level2Record, level2Node, i, -1));
+                    continue;
+                }
+
+                FillDirectory(table, links, level2Record, level2Node, store, reuseStore, rootCache, rootWriter, totals, level3Children, files, reachable);
+                rootDirs++;
+                rootFiles += files.Count;
+                rootBytes += level2Node.Size;
+
+                if (level3Children.Count == 0)
+                {
+                    level2Node.SetAggregatedTotals(level2Node.Size, files.Count, 0);
+
+                    if (--branchRemaining[i].Remaining == 0)
+                    {
+                        progress?.CompleteTopLevel();
+                    }
+
+                    continue;
+                }
+
+                var subIndex = subBranchNodes.Count;
+                subBranchNodes.Add(level2Node);
+                subBranchCounts.Add(level3Children.Count);
+
+                for (var k = 0; k < level3Children.Count; k++)
+                {
+                    workItems.Add((level3Children[k].Record, level3Children[k].Node, i, subIndex));
+                }
             }
         }
 
@@ -400,6 +438,13 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
 
         if (workItems.Count > 0)
         {
+            var subRemaining = subBranchCounts.Count == 0 ? [] : new PaddedCounter[subBranchCounts.Count];
+
+            for (var i = 0; i < subBranchCounts.Count; i++)
+            {
+                subRemaining[i].Remaining = subBranchCounts[i];
+            }
+
             var workerCount = Math.Min(workItems.Count, Math.Min(8, Math.Max(1, Environment.ProcessorCount)));
             var nextWork = -1;
             var workerTotals = new MftSubtreeTotals[workerCount];
@@ -440,7 +485,7 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
                                 break;
                             }
 
-                            var (workRecord, workNode, branchIndex) = workItems[workIndex];
+                            var (workRecord, workNode, branchIndex, subBranchIndex) = workItems[workIndex];
                             stack.Push((workRecord, workNode, false));
 
                             while (stack.Count > 0)
@@ -483,7 +528,19 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
                                 }
                             }
 
-                            if (Interlocked.Decrement(ref branchRemaining[branchIndex]) == 0)
+                            if (subBranchIndex >= 0)
+                            {
+                                if (Interlocked.Decrement(ref subRemaining[subBranchIndex].Remaining) == 0)
+                                {
+                                    RollupTotals(subBranchNodes[subBranchIndex]);
+
+                                    if (Interlocked.Decrement(ref branchRemaining[branchIndex].Remaining) == 0)
+                                    {
+                                        progress?.CompleteTopLevel();
+                                    }
+                                }
+                            }
+                            else if (Interlocked.Decrement(ref branchRemaining[branchIndex].Remaining) == 0)
                             {
                                 progress?.CompleteTopLevel();
                             }
@@ -504,21 +561,46 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
             {
                 totals.Add(workerTotals[i]);
             }
+        }
 
-            for (var i = 0; i < branches.Count; i++)
+        for (var i = 0; i < branches.Count; i++)
+        {
+            var branchNode = branches[i].Node;
+
+            if (branchNode.SubDirectoriesArray.Length > 0)
             {
-                var branchNode = branches[i].Node;
-
-                if (branchNode.SubDirectoriesArray.Length > 0)
-                {
-                    RollupTotals(branchNode);
-                }
+                RollupTotals(branchNode);
             }
         }
 
         RollupTotals(root);
         store.Freeze();
         return root;
+    }
+
+    private static bool HasAtLeastSubdirectories(
+        MftEntry[] entries,
+        MftLinks links,
+        int record,
+        ulong[]? reachable,
+        int threshold)
+    {
+        var count = 0;
+
+        for (var child = links.FirstChild[record]; child >= 0; child = links.NextSibling[child])
+        {
+            if (reachable is not null && MftLinks.IsReachable(reachable, child))
+            {
+                continue;
+            }
+
+            if (entries[child].IsDirectory && ++count >= threshold)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static void RollupTotals(DirectorySpace node)
@@ -551,7 +633,7 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
         MftSubtreeTotals totals,
         List<(int Record, DirectorySpace Node)> children,
         List<FileEntry> files,
-        bool[]? reachable)
+        ulong[]? reachable)
     {
         var entries = table.Entries;
         children.Clear();
@@ -560,14 +642,9 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
 
         for (var child = links.FirstChild[record]; child >= 0; child = links.NextSibling[child])
         {
-            if (reachable is not null)
+            if (reachable is not null && !MftLinks.TryMarkReachable(reachable, child))
             {
-                if (reachable[child])
-                {
-                    continue;
-                }
-
-                reachable[child] = true;
+                continue;
             }
 
             ref var entry = ref entries[child];
@@ -622,6 +699,13 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
 
         writer.WriteFiles(CollectionsMarshal.AsSpan(files), out var fileStart);
         node.SetScanned(store, fileStart, files.Count, ownSize, subDirectories);
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 64)]
+    private struct PaddedCounter
+    {
+        [FieldOffset(0)]
+        public int Remaining;
     }
 }
 

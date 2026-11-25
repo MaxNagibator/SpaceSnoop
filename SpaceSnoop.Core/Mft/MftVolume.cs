@@ -1,4 +1,5 @@
 ﻿using Microsoft.Win32.SafeHandles;
+using System.Numerics;
 using System.Runtime.InteropServices;
 
 namespace SpaceSnoop.Core.Mft;
@@ -6,6 +7,17 @@ namespace SpaceSnoop.Core.Mft;
 internal interface IMftVolume : IDisposable
 {
     void ReadAt(long offset, Span<byte> buffer);
+
+    void SetSectorSize(int bytesPerSector)
+    {
+    }
+
+    ValueTask ReadAtAsync(long offset, Memory<byte> buffer, CancellationToken cancel)
+    {
+        cancel.ThrowIfCancellationRequested();
+        ReadAt(offset, buffer.Span);
+        return ValueTask.CompletedTask;
+    }
 }
 
 internal sealed class MftFileVolume : IMftVolume
@@ -16,15 +28,20 @@ internal sealed class MftFileVolume : IMftVolume
     private const uint NoBuffering = 0x20000000;
     private const uint Overlapped = 0x40000000;
     private const int Alignment = 4096;
+    private const int MinSectorBytes = 512;
+    private const int MaxPooledBounces = 8;
     private const int ErrorAccessDenied = 5;
     private const int InvalidParameterResult = unchecked((int)0x80070057);
 
     private readonly Lock _gate = new();
+    private readonly Lock _bounceGate = new();
+    private readonly Stack<byte[]> _bouncePool = new();
     private readonly string _path;
     private readonly string _name;
     private readonly SafeFileHandle _unbuffered;
 
     private SafeFileHandle? _buffered;
+    private volatile int _sectorAlignment = Alignment;
 
     private MftFileVolume(SafeFileHandle unbuffered, string path, string name)
     {
@@ -38,6 +55,14 @@ internal sealed class MftFileVolume : IMftVolume
         return Open($@"\\.\{letter}:", $"{letter}:");
     }
 
+    public void SetSectorSize(int bytesPerSector)
+    {
+        if (bytesPerSector is >= MinSectorBytes and <= Alignment && BitOperations.IsPow2(bytesPerSector))
+        {
+            _sectorAlignment = bytesPerSector;
+        }
+    }
+
     public void ReadAt(long offset, Span<byte> buffer)
     {
         var buffered = Volatile.Read(ref _buffered);
@@ -48,10 +73,9 @@ internal sealed class MftFileVolume : IMftVolume
             return;
         }
 
-        // TODO: прямое чтение ждёт кратности 4 КБ, а не сектору: на томе с кластером меньше 4 КБ блоки таблицы
-        // идут через промежуточный буфер с копией. Триггер – замер такого тома, где фаза чтения $MFT заметно
-        // медленнее, чем на кластере 4 КБ; лечение – кратность по размеру сектора из загрузочного сектора.
-        if (offset % Alignment == 0 && buffer.Length % Alignment == 0 && TryReadDirect(offset, buffer))
+        var alignment = _sectorAlignment;
+
+        if (offset % alignment == 0 && buffer.Length % alignment == 0 && TryReadDirect(offset, buffer))
         {
             return;
         }
@@ -62,10 +86,40 @@ internal sealed class MftFileVolume : IMftVolume
         }
     }
 
+    public async ValueTask ReadAtAsync(long offset, Memory<byte> buffer, CancellationToken cancel)
+    {
+        cancel.ThrowIfCancellationRequested();
+
+        var buffered = Volatile.Read(ref _buffered);
+
+        if (buffered is not null)
+        {
+            await ReadAsync(buffered, offset, buffer, buffer.Length, cancel).ConfigureAwait(false);
+            return;
+        }
+
+        var alignment = _sectorAlignment;
+
+        if (offset % alignment == 0 && buffer.Length % alignment == 0 && await TryReadDirectAsync(offset, buffer, cancel).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        if (!TryReadAligned(offset, buffer.Span))
+        {
+            await ReadAsync(Downgrade(), offset, buffer, buffer.Length, cancel).ConfigureAwait(false);
+        }
+    }
+
     public void Dispose()
     {
         _unbuffered.Dispose();
         _buffered?.Dispose();
+
+        lock (_bounceGate)
+        {
+            _bouncePool.Clear();
+        }
     }
 
     internal static MftFileVolume Open(string path, string name)
@@ -114,6 +168,23 @@ internal sealed class MftFileVolume : IMftVolume
         }
     }
 
+    private static async ValueTask ReadAsync(SafeFileHandle handle, long offset, Memory<byte> buffer, int required, CancellationToken cancel)
+    {
+        var read = 0;
+
+        while (read < required)
+        {
+            var more = await RandomAccess.ReadAsync(handle, buffer[read..], offset + read, cancel).ConfigureAwait(false);
+
+            if (more == 0)
+            {
+                throw new EndOfStreamException($"Чтение тома оборвалось на смещении {offset + read}");
+            }
+
+            read += more;
+        }
+    }
+
     private bool TryReadDirect(long offset, Span<byte> buffer)
     {
         try
@@ -127,26 +198,74 @@ internal sealed class MftFileVolume : IMftVolume
         }
     }
 
-    private bool TryReadAligned(long offset, Span<byte> buffer)
+    private async ValueTask<bool> TryReadDirectAsync(long offset, Memory<byte> buffer, CancellationToken cancel)
     {
-        var start = offset - (offset % Alignment);
-        var skip = (int)(offset - start);
-        var length = (skip + buffer.Length + Alignment - 1) / Alignment * Alignment;
-        var bounce = GC.AllocateUninitializedArray<byte>(length + Alignment, true);
-        var shift = (int)((Alignment - (Marshal.UnsafeAddrOfPinnedArrayElement(bounce, 0).ToInt64() % Alignment)) % Alignment);
-        var aligned = bounce.AsSpan(shift, length);
-
         try
         {
-            Read(_unbuffered, start, aligned, skip + buffer.Length);
+            await ReadAsync(_unbuffered, offset, buffer, buffer.Length, cancel).ConfigureAwait(false);
+            return true;
         }
         catch (IOException exception) when (exception.HResult == InvalidParameterResult)
         {
             return false;
         }
+    }
 
-        aligned.Slice(skip, buffer.Length).CopyTo(buffer);
-        return true;
+    private bool TryReadAligned(long offset, Span<byte> buffer)
+    {
+        var start = offset - (offset % Alignment);
+        var skip = (int)(offset - start);
+        var length = (skip + buffer.Length + Alignment - 1) / Alignment * Alignment;
+        var bounce = RentBounce(length + Alignment);
+
+        try
+        {
+            var shift = (int)((Alignment - (Marshal.UnsafeAddrOfPinnedArrayElement(bounce, 0).ToInt64() % Alignment)) % Alignment);
+            var aligned = bounce.AsSpan(shift, length);
+
+            try
+            {
+                Read(_unbuffered, start, aligned, skip + buffer.Length);
+            }
+            catch (IOException exception) when (exception.HResult == InvalidParameterResult)
+            {
+                return false;
+            }
+
+            aligned.Slice(skip, buffer.Length).CopyTo(buffer);
+            return true;
+        }
+        finally
+        {
+            ReturnBounce(bounce);
+        }
+    }
+
+    private byte[] RentBounce(int minimumBytes)
+    {
+        lock (_bounceGate)
+        {
+            while (_bouncePool.TryPop(out var candidate))
+            {
+                if (candidate.Length >= minimumBytes)
+                {
+                    return candidate;
+                }
+            }
+        }
+
+        return GC.AllocateUninitializedArray<byte>(minimumBytes, pinned: true);
+    }
+
+    private void ReturnBounce(byte[] bounce)
+    {
+        lock (_bounceGate)
+        {
+            if (_bouncePool.Count < MaxPooledBounces)
+            {
+                _bouncePool.Push(bounce);
+            }
+        }
     }
 
     private SafeFileHandle Downgrade()

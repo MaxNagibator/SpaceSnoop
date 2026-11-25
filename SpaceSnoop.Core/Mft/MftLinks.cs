@@ -206,12 +206,12 @@ internal sealed class MftLinks(int[] firstChild, int[] nextSibling)
     public void DropUnreachable(MftTable table, CancellationToken cancel)
     {
         var entries = table.Entries;
-        var reachable = new bool[entries.Length];
+        var reachable = new ulong[(entries.Length + 63) >> 6];
         var stack = new Stack<int>();
 
         if (entries.Length > MftLayout.RootRecord)
         {
-            reachable[MftLayout.RootRecord] = true;
+            SetReachable(reachable, MftLayout.RootRecord);
             stack.Push(MftLayout.RootRecord);
         }
 
@@ -220,7 +220,26 @@ internal sealed class MftLinks(int[] firstChild, int[] nextSibling)
         SweepUnreachable(table, reachable, cancel);
     }
 
-    internal void FinishUnreachable(MftTable table, bool[] reachable, CancellationToken cancel)
+    internal static bool IsReachable(ulong[] reachable, int index)
+    {
+        return (reachable[index >> 6] & (1UL << (index & 63))) != 0;
+    }
+
+    internal static void SetReachable(ulong[] reachable, int index)
+    {
+        reachable[index >> 6] |= 1UL << (index & 63);
+    }
+
+    internal static bool TryMarkReachable(ulong[] reachable, int index)
+    {
+        var word = index >> 6;
+        var mask = 1UL << (index & 63);
+
+        return (Volatile.Read(ref reachable[word]) & mask) == 0
+            && (Interlocked.Or(ref reachable[word], mask) & mask) == 0;
+    }
+
+    internal void FinishUnreachable(MftTable table, ulong[] reachable, CancellationToken cancel)
     {
         var entries = table.Entries;
         var stack = new Stack<int>();
@@ -230,7 +249,7 @@ internal sealed class MftLinks(int[] firstChild, int[] nextSibling)
         SweepUnreachable(table, reachable, cancel);
     }
 
-    private static void SeedSystemDirectories(MftEntry[] entries, bool[] reachable, Stack<int> stack)
+    private static void SeedSystemDirectories(MftEntry[] entries, ulong[] reachable, Stack<int> stack)
     {
         var limit = Math.Min(entries.Length, MftLayout.FirstUserRecord);
 
@@ -240,15 +259,15 @@ internal sealed class MftLinks(int[] firstChild, int[] nextSibling)
                 && entries[index].Exists
                 && entries[index].IsDirectory
                 && !entries[index].IsLink
-                && !reachable[index])
+                && !IsReachable(reachable, index))
             {
-                reachable[index] = true;
+                SetReachable(reachable, index);
                 stack.Push(index);
             }
         }
     }
 
-    private void MarkReachable(Stack<int> stack, bool[] reachable, CancellationToken cancel)
+    private void MarkReachable(Stack<int> stack, ulong[] reachable, CancellationToken cancel)
     {
         while (stack.Count > 0)
         {
@@ -256,12 +275,12 @@ internal sealed class MftLinks(int[] firstChild, int[] nextSibling)
 
             for (var child = FirstChild[stack.Pop()]; child >= 0; child = NextSibling[child])
             {
-                if (reachable[child])
+                if (IsReachable(reachable, child))
                 {
                     continue;
                 }
 
-                reachable[child] = true;
+                SetReachable(reachable, child);
 
                 if (FirstChild[child] >= 0)
                 {
@@ -271,7 +290,7 @@ internal sealed class MftLinks(int[] firstChild, int[] nextSibling)
         }
     }
 
-    private static void SweepUnreachable(MftTable table, bool[] reachable, CancellationToken cancel)
+    private static void SweepUnreachable(MftTable table, ulong[] reachable, CancellationToken cancel)
     {
         var entries = table.Entries;
 
@@ -286,7 +305,7 @@ internal sealed class MftLinks(int[] firstChild, int[] nextSibling)
 
                 ref var entry = ref entries[index];
 
-                if (!entry.Exists || reachable[index])
+                if (!entry.Exists || IsReachable(reachable, index))
                 {
                     continue;
                 }
@@ -336,7 +355,7 @@ internal sealed class MftLinks(int[] firstChild, int[] nextSibling)
 
                     ref var entry = ref entries[index];
 
-                    if (!entry.Exists || reachable[index])
+                    if (!entry.Exists || IsReachable(reachable, index))
                     {
                         continue;
                     }

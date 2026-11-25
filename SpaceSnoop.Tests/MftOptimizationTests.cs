@@ -275,4 +275,356 @@ public class MftOptimizationTests
             Assert.That(subSnapshot.TopLevelCompleted, Is.EqualTo(2));
         }
     }
+
+    [Test]
+    public void MftScanner_AdaptiveLevel2Split_LargeSubtreeMatchesTotalsAndTopLevelProgress()
+    {
+        const int level3Count = 72;
+        var builder = new MftVolumeBuilder()
+            .Record(MftLayout.RootRecord, new MftRecordBuilder().AsDirectory().FileName(MftLayout.RootRecord, 1, "."))
+            .Record(20, new MftRecordBuilder().AsDirectory().FileName(MftLayout.RootRecord, 1, "Windows"))
+            .Record(21, new MftRecordBuilder().AsDirectory().FileName(MftLayout.RootRecord, 1, "Users"))
+            .Record(22, new MftRecordBuilder().AsDirectory().FileName(20, 1, "WinSxS"))
+            .Record(23, new MftRecordBuilder().AsDirectory().FileName(20, 1, "System32"))
+            .Record(24, new MftRecordBuilder().FileName(22, 1, "manifest.bin").ResidentData(111))
+            .Record(25, new MftRecordBuilder().FileName(23, 1, "kernel.dll").ResidentData(222))
+            .Record(26, new MftRecordBuilder().FileName(21, 1, "user.dat").ResidentData(333));
+
+        var expectedWinSxSSize = 111L;
+        var expectedWinSxSFiles = 1;
+        var expectedWinSxSDirs = level3Count;
+        var nextRecord = 30;
+
+        for (var i = 0; i < level3Count; i++)
+        {
+            var l3Dir = nextRecord++;
+            var l3File = nextRecord++;
+            var l3Size = 100 + i;
+
+            builder
+                .Record(l3Dir, new MftRecordBuilder().AsDirectory().FileName(22, 1, $"pkg_{i:D3}"))
+                .Record(l3File, new MftRecordBuilder().FileName(l3Dir, 1, $"f_{i:D3}.dll").ResidentData(l3Size));
+
+            expectedWinSxSSize += l3Size;
+            expectedWinSxSFiles++;
+
+            if (i % 10 == 0)
+            {
+                var l4Dir = nextRecord++;
+                var l4File = nextRecord++;
+                var l4Size = 50 + i;
+
+                builder
+                    .Record(l4Dir, new MftRecordBuilder().AsDirectory().FileName(l3Dir, 1, "nested"))
+                    .Record(l4File, new MftRecordBuilder().FileName(l4Dir, 1, "n.bin").ResidentData(l4Size));
+
+                expectedWinSxSSize += l4Size;
+                expectedWinSxSFiles++;
+                expectedWinSxSDirs++;
+            }
+        }
+
+        var image = builder.Build(nextRecord + 8);
+        var scanner = new MftScanner();
+        var rootProgress = new ScanProgress();
+        var rootResult = scanner.Calculate(new MftMemoryVolume(image), new DirectoryInfo(@"T:\"), 'T', 4, 4096, rootProgress);
+        var rootSnapshot = rootProgress.CreateSnapshot();
+
+        var subProgress = new ScanProgress();
+        var subResult = scanner.Calculate(new MftMemoryVolume(image), new DirectoryInfo(@"T:\Windows"), 'T', 4, 4096, subProgress);
+        var subSnapshot = subProgress.CreateSnapshot();
+
+        var windowsNode = rootResult.Root.SubDirectories.Single(static d => d.Name == "Windows");
+        var winSxSNode = windowsNode.SubDirectories.Single(static d => d.Name == "WinSxS");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(winSxSNode.TotalSize, Is.EqualTo(expectedWinSxSSize));
+            Assert.That(winSxSNode.TotalFileCount, Is.EqualTo(expectedWinSxSFiles));
+            Assert.That(winSxSNode.TotalDirectoryCount, Is.EqualTo(expectedWinSxSDirs));
+
+            Assert.That(windowsNode.TotalSize, Is.EqualTo(expectedWinSxSSize + 222));
+            Assert.That(windowsNode.TotalFileCount, Is.EqualTo(expectedWinSxSFiles + 1));
+            Assert.That(windowsNode.TotalDirectoryCount, Is.EqualTo(expectedWinSxSDirs + 2));
+
+            Assert.That(rootResult.Root.TotalSize, Is.EqualTo(expectedWinSxSSize + 222 + 333));
+            Assert.That(rootResult.Root.TotalFileCount, Is.EqualTo(expectedWinSxSFiles + 2));
+            Assert.That(rootResult.Root.TotalDirectoryCount, Is.EqualTo(expectedWinSxSDirs + 4));
+
+            Assert.That(rootSnapshot.TopLevelTotal, Is.EqualTo(2));
+            Assert.That(rootSnapshot.TopLevelCompleted, Is.EqualTo(2));
+            Assert.That(rootSnapshot.DirectoriesScanned, Is.EqualTo(rootResult.Root.TotalDirectoryCount + 1));
+            Assert.That(rootSnapshot.FilesScanned, Is.EqualTo(rootResult.Root.TotalFileCount));
+            Assert.That(rootSnapshot.BytesScanned, Is.EqualTo(rootResult.Root.TotalSize));
+
+            Assert.That(subResult.Root.TotalSize, Is.EqualTo(windowsNode.TotalSize));
+            Assert.That(subResult.Root.TotalFileCount, Is.EqualTo(windowsNode.TotalFileCount));
+            Assert.That(subResult.Root.TotalDirectoryCount, Is.EqualTo(windowsNode.TotalDirectoryCount));
+            Assert.That(subSnapshot.TopLevelTotal, Is.EqualTo(2));
+            Assert.That(subSnapshot.TopLevelCompleted, Is.EqualTo(2));
+        }
+    }
+
+    [Test]
+    public void MftReader_SingleThreadDoubleBuffered_ReadsAllBlocksAndAwaitsInflightOnCancelAndError()
+    {
+        const int records = 40;
+        var builder = new MftVolumeBuilder()
+            .Record(MftLayout.RootRecord, new MftRecordBuilder().AsDirectory().FileName(MftLayout.RootRecord, 1, "."));
+
+        for (var i = MftLayout.FirstUserRecord; i < records; i++)
+        {
+            builder.Record(i, new MftRecordBuilder().FileName(MftLayout.RootRecord, 1, $"item_{i}.bin").ResidentData(i * 10));
+        }
+
+        var image = builder.Build(records);
+        var asyncReads = 0;
+        var okVolume = new AsyncTestMftVolume(
+            image,
+            async (_, _, _, _) =>
+            {
+                Interlocked.Increment(ref asyncReads);
+                await Task.Yield();
+            });
+
+        var tableSingle = MftReader.Read(okVolume, 'T', threads: 1, blockBytes: 4096, progress: null, CancellationToken.None);
+        var tableMulti = MftReader.Read(new MftMemoryVolume(image), 'T', threads: 4, blockBytes: 4096, progress: null, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(asyncReads, Is.EqualTo(10));
+            Assert.That(tableSingle.Entries, Has.Length.EqualTo(tableMulti.Entries.Length));
+
+            for (var i = MftLayout.FirstUserRecord; i < records; i++)
+            {
+                Assert.That(tableSingle.GetName(i), Is.EqualTo(tableMulti.GetName(i)));
+                Assert.That(tableSingle.Entries[i].Size, Is.EqualTo(tableMulti.Entries[i].Size));
+            }
+        }
+
+        using var cancel = new CancellationTokenSource();
+        var secondReadStarted = false;
+        var secondReadDrained = false;
+        var cancelVolume = new AsyncTestMftVolume(
+            image,
+            async (callIndex, _, _, token) =>
+            {
+                if (callIndex == 2)
+                {
+                    secondReadStarted = true;
+                    var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    using var registration = token.Register(() => _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(15).ConfigureAwait(false);
+                        secondReadDrained = true;
+                        tcs.TrySetResult();
+                    }));
+                    cancel.Cancel();
+                    await tcs.Task.ConfigureAwait(false);
+                }
+            });
+
+        Assert.Catch<OperationCanceledException>(() => MftReader.Read(cancelVolume, 'T', threads: 1, blockBytes: 4096, null, cancel.Token));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(secondReadStarted, Is.True);
+            Assert.That(secondReadDrained, Is.True);
+        }
+
+        var errorVolume = new AsyncTestMftVolume(
+            image,
+            async (callIndex, _, _, _) =>
+            {
+                await Task.Yield();
+
+                if (callIndex == 3)
+                {
+                    throw new IOException("ошибка асинхронного чтения");
+                }
+            });
+
+        Assert.Throws<IOException>(() => MftReader.Read(errorVolume, 'T', threads: 1, blockBytes: 4096, null, CancellationToken.None));
+    }
+
+    [Test]
+    public void MftLinks_ReachableBitset_HandlesBoundaryIndicesAndConcurrentBitsInSameWord()
+    {
+        const int count = 130;
+        var reachable = new ulong[(count + 63) >> 6];
+        int[] boundaries = [0, 1, 5, 62, 63, 64, 65, 127, 128, 129];
+
+        foreach (var index in boundaries)
+        {
+            Assert.That(MftLinks.IsReachable(reachable, index), Is.False);
+            MftLinks.SetReachable(reachable, index);
+            Assert.That(MftLinks.IsReachable(reachable, index), Is.True);
+        }
+
+        Assert.That(MftLinks.IsReachable(reachable, 2), Is.False);
+        Assert.That(MftLinks.IsReachable(reachable, 61), Is.False);
+        Assert.That(MftLinks.IsReachable(reachable, 66), Is.False);
+
+        var concurrent = new ulong[(count + 63) >> 6];
+        var wins = new int[128];
+
+        Parallel.For(
+            0,
+            8,
+            _ =>
+            {
+                for (var bit = 0; bit < 128; bit++)
+                {
+                    if (MftLinks.TryMarkReachable(concurrent, bit))
+                    {
+                        Interlocked.Increment(ref wins[bit]);
+                    }
+                }
+            });
+
+        using (Assert.EnterMultipleScope())
+        {
+            for (var bit = 0; bit < 128; bit++)
+            {
+                Assert.That(wins[bit], Is.EqualTo(1));
+                Assert.That(MftLinks.IsReachable(concurrent, bit), Is.True);
+            }
+
+            Assert.That(MftLinks.IsReachable(concurrent, 128), Is.False);
+        }
+
+        var builder = new MftVolumeBuilder()
+            .Record(MftLayout.RootRecord, new MftRecordBuilder().AsDirectory().FileName(MftLayout.RootRecord, 1, "."))
+            .Record(63, new MftRecordBuilder().FileName(MftLayout.RootRecord, 1, "b63.bin").ResidentData(10))
+            .Record(64, new MftRecordBuilder().FileName(MftLayout.RootRecord, 1, "b64.bin").ResidentData(20))
+            .Record(65, new MftRecordBuilder().FileName(999, 1, "orphan65.bin").ResidentData(30))
+            .Record(128, new MftRecordBuilder().FileName(MftLayout.RootRecord, 1, "b128.bin").ResidentData(40));
+
+        var result = new MftScanner().Calculate(new MftMemoryVolume(builder.Build(136)), new DirectoryInfo(@"T:\"), 'T', 4, 4096, null);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Root.TotalSize, Is.EqualTo(70));
+            Assert.That(result.Root.TotalFileCount, Is.EqualTo(3));
+            Assert.That(result.DetachedRecords, Is.EqualTo(1));
+            Assert.That(result.OrphanBytes, Is.EqualTo(30));
+        }
+    }
+
+    [Test]
+    public void MftFileVolume_SectorAlignedReads_AvoidRepeatedBounceAllocationsAndSupportSmallClusters()
+    {
+        var image = new MftVolumeBuilder(sectorsPerCluster: 1)
+            .Fragment(33)
+            .Fragment(31)
+            .SplitSelf(1, 15, listOutside: false)
+            .Record(20, new MftRecordBuilder().FileName(MftLayout.RootRecord, 1, "малый-кластер.bin").ResidentData(42))
+            .Record(31, new MftRecordBuilder().FileName(MftLayout.RootRecord, 1, "хвост.bin").ResidentData(84))
+            .Build(32);
+
+        using var file = new MftImageFile(image);
+        using var volume = MftFileVolume.Open(file.Path, "T:");
+
+        var table = MftReader.Read(volume, 'T', 1, 1024, null, CancellationToken.None);
+
+        var scratch = new byte[16384];
+        volume.ReadAt(513, scratch);
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+
+        for (var i = 0; i < 16; i++)
+        {
+            volume.ReadAt(513 + (i % 17), scratch);
+        }
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(table.GetName(20), Is.EqualTo("малый-кластер.bin"));
+            Assert.That(table.Entries[20].Size, Is.EqualTo(42));
+            Assert.That(table.GetName(31), Is.EqualTo("хвост.bin"));
+            Assert.That(table.Entries[31].Size, Is.EqualTo(84));
+            Assert.That(table.Statistics.Damaged, Is.Zero);
+            Assert.That(allocated, Is.LessThan(4096));
+        }
+    }
+
+    [Test]
+    public void MftReader_SinglePassAlternates_SkipsDosAndCollectsHardLinksDeterministically()
+    {
+        var names = new NameTable(1);
+        var pending = new MftPending();
+        var entries = new MftEntry[4];
+
+        var dosAndBetterOrder = new MftRecordBuilder()
+            .FileName(MftLayout.RootRecord, 1, "PROGRA~1", MftLayout.NamespaceDos)
+            .FileName(MftLayout.RootRecord, 1, "CombinedName", space: 3)
+            .FileName(20, 2, "PosixPrimary", space: 0)
+            .FileName(30, 3, "Win32Link", space: 1)
+            .ResidentData(256)
+            .Build();
+
+        MftReader.Parse(dosAndBetterOrder, 512, 0, entries, pending, new(), names);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(names.GetString(entries[0].NameId), Is.EqualTo("PosixPrimary"));
+            Assert.That(entries[0].Parent, Is.EqualTo(20));
+            Assert.That(entries[0].ParentSequence, Is.EqualTo(2));
+            Assert.That(pending.Alternates[0], Has.Count.EqualTo(2));
+            Assert.That(
+                pending.Alternates[0].Select(x => names.GetString(x.NameId)),
+                Is.EqualTo(new[] { "CombinedName", "Win32Link" }));
+        }
+
+        var multiBlockImage = new MftVolumeBuilder()
+            .Record(MftLayout.RootRecord, new MftRecordBuilder().AsDirectory().FileName(MftLayout.RootRecord, 1, "."))
+            .Record(
+                20,
+                new MftRecordBuilder()
+                    .FileName(MftLayout.RootRecord, 1, "SHORT~1", MftLayout.NamespaceDos)
+                    .FileName(MftLayout.RootRecord, 1, "primary.dll", space: 1)
+                    .FileName(MftLayout.RootRecord, 1, "same_record_link.dll", space: 3)
+                    .ResidentData(512))
+            .Record(24, new MftRecordBuilder().ExtensionOf(20).FileName(MftLayout.RootRecord, 1, "ext1.dll"))
+            .Record(28, new MftRecordBuilder().ExtensionOf(20).FileName(MftLayout.RootRecord, 1, "ext2.dll"))
+            .Build(32);
+
+        for (var run = 0; run < 4; run++)
+        {
+            var table = MftReader.Read(new MftMemoryVolume(multiBlockImage), 'T', 4, 1024, null, CancellationToken.None);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(table.GetName(20), Is.EqualTo("primary.dll"));
+                Assert.That(table.Entries[20].Names, Is.EqualTo(4));
+                Assert.That(
+                    table.Alternates[20].Select(x => table.Names.GetString(x.NameId)),
+                    Is.EqualTo(new[] { "same_record_link.dll", "ext1.dll", "ext2.dll" }));
+            }
+        }
+    }
+
+    private sealed class AsyncTestMftVolume(byte[] image, Func<int, long, int, CancellationToken, Task> onAsyncRead) : IMftVolume
+    {
+        private readonly MftMemoryVolume _inner = new(image);
+        private int _asyncCalls;
+
+        public void ReadAt(long offset, Span<byte> buffer)
+        {
+            _inner.ReadAt(offset, buffer);
+        }
+
+        public async ValueTask ReadAtAsync(long offset, Memory<byte> buffer, CancellationToken cancel)
+        {
+            var call = Interlocked.Increment(ref _asyncCalls);
+            await onAsyncRead(call, offset, buffer.Length, cancel).ConfigureAwait(false);
+            _inner.ReadAt(offset, buffer.Span);
+        }
+
+        public void Dispose()
+        {
+        }
+    }
 }

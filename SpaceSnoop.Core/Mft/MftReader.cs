@@ -207,6 +207,8 @@ internal static class MftReader
         var mftCluster = info.MftCluster;
         var recordSize = info.RecordSize;
 
+        volume.SetSectorSize(bytesPerSector);
+
         var self = new byte[recordSize];
         volume.ReadAt(mftCluster * bytesPerCluster, self);
 
@@ -273,69 +275,91 @@ internal static class MftReader
         var entries = GC.AllocateUninitializedArray<MftEntry>(records);
         var blockRecords = Math.Max(1, blockBytes / recordSize);
         var blocks = (records + blockRecords - 1) / blockRecords;
-        var parts = new MftPart[blocks];
-        var nextBlock = -1;
-        var completed = 0;
         var alignment = Math.Max((int)bytesPerSector, BufferAlignment);
-        var workerCount = Math.Min(blocks, Math.Max(1, threads));
+        MftPart[] parts;
 
-        var options = new ParallelOptions
+        if (threads <= 1)
         {
-            CancellationToken = cancel,
-            MaxDegreeOfParallelism = workerCount,
-        };
-
-        try
-        {
-            Parallel.For(
-                0,
-                workerCount,
-                options,
-                () => new MftWorker(blockRecords * recordSize, alignment),
-                (_, _, worker) =>
-                {
-                    while (true)
-                    {
-                        cancel.ThrowIfCancellationRequested();
-                        var block = Interlocked.Increment(ref nextBlock);
-
-                        if (block >= blocks)
-                        {
-                            break;
-                        }
-
-                        var start = block * blockRecords;
-                        var count = Math.Min(blockRecords, records - start);
-                        entries.AsSpan(start, count).Clear();
-                        var part = new MftPart();
-                        var buffer = worker.Buffer(count * recordSize);
-
-                        map.Read(volume, (long)start * recordSize, buffer);
-
-                        for (var offset = 0; offset < count; offset++)
-                        {
-                            Parse(
-                                buffer.Slice(offset * recordSize, recordSize),
-                                bytesPerSector,
-                                start + offset,
-                                entries,
-                                part.Pending,
-                                part.Statistics,
-                                store.Names,
-                                worker.NameCache);
-                        }
-
-                        parts[block] = part;
-                        progress?.Announce($"Чтение $MFT тома {letter}: {Interlocked.Increment(ref completed) * 100L / blocks} %");
-                    }
-
-                    return worker;
-                },
-                static _ => { });
+            var singlePart = ReadSingleWorkerAsync(
+                volume,
+                map,
+                letter,
+                records,
+                blockRecords,
+                blocks,
+                recordSize,
+                bytesPerSector,
+                alignment,
+                entries,
+                store.Names,
+                progress,
+                cancel).GetAwaiter().GetResult();
+            parts = [singlePart];
         }
-        catch (AggregateException exception)
+        else
         {
-            ExceptionDispatchInfo.Capture(exception.Flatten().InnerExceptions[0]).Throw();
+            var workerCount = Math.Min(blocks, threads);
+            parts = new MftPart[workerCount];
+            var nextBlock = -1;
+            var completed = 0;
+            var options = new ParallelOptions
+            {
+                CancellationToken = cancel,
+                MaxDegreeOfParallelism = workerCount,
+            };
+
+            try
+            {
+                Parallel.For(
+                    0,
+                    workerCount,
+                    options,
+                    workerIndex =>
+                    {
+                        var part = new MftPart();
+                        parts[workerIndex] = part;
+                        var buffer = new MftAlignedBuffer(blockRecords * recordSize, alignment);
+                        var nameCache = LocalNameCache.Create();
+                        var target = new MftPendingTarget(part, null);
+
+                        while (true)
+                        {
+                            cancel.ThrowIfCancellationRequested();
+                            var block = Interlocked.Increment(ref nextBlock);
+
+                            if (block >= blocks)
+                            {
+                                break;
+                            }
+
+                            var start = block * blockRecords;
+                            var count = Math.Min(blockRecords, records - start);
+                            entries.AsSpan(start, count).Clear();
+                            var span = buffer.Span(count * recordSize);
+
+                            map.Read(volume, (long)start * recordSize, span);
+
+                            for (var offset = 0; offset < count; offset++)
+                            {
+                                ParseCore(
+                                    span.Slice(offset * recordSize, recordSize),
+                                    bytesPerSector,
+                                    start + offset,
+                                    entries,
+                                    target,
+                                    part.Statistics,
+                                    store.Names,
+                                    nameCache);
+                            }
+
+                            progress?.Announce($"Чтение $MFT тома {letter}: {Interlocked.Increment(ref completed) * 100L / blocks} %");
+                        }
+                    });
+            }
+            catch (AggregateException exception)
+            {
+                ExceptionDispatchInfo.Capture(exception.Flatten().InnerExceptions[0]).Throw();
+            }
         }
 
         var pending = new MftPending();
@@ -345,6 +369,94 @@ internal static class MftReader
         ApplyPending(entries, pending, statistics);
 
         return new(entries, statistics, pending.Alternates, store);
+    }
+
+    private static async Task<MftPart> ReadSingleWorkerAsync(
+        IMftVolume volume,
+        MftMap map,
+        char letter,
+        int records,
+        int blockRecords,
+        int blocks,
+        int recordSize,
+        int bytesPerSector,
+        int alignment,
+        MftEntry[] entries,
+        NameTable nameTable,
+        ScanProgress? progress,
+        CancellationToken cancel)
+    {
+        var part = new MftPart();
+        var nameCache = LocalNameCache.Create();
+        var target = new MftPendingTarget(part, null);
+        var bufferBytes = blockRecords * recordSize;
+        var buffers = new MftAlignedBuffer?[2];
+        buffers[0] = new MftAlignedBuffer(bufferBytes, alignment);
+        buffers[1] = blocks > 1 ? new MftAlignedBuffer(bufferBytes, alignment) : null;
+
+        using var readCts = CancellationTokenSource.CreateLinkedTokenSource(cancel);
+        Task? pendingRead = null;
+
+        try
+        {
+            var currentSlot = 0;
+            var initialCount = Math.Min(blockRecords, records);
+            pendingRead = map.ReadAsync(volume, 0, buffers[0]!.Memory(initialCount * recordSize), readCts.Token).AsTask();
+
+            for (var block = 0; block < blocks; block++)
+            {
+                cancel.ThrowIfCancellationRequested();
+
+                var ready = pendingRead;
+                pendingRead = null;
+                await ready!.ConfigureAwait(false);
+
+                var start = block * blockRecords;
+                var count = Math.Min(blockRecords, records - start);
+                var next = block + 1;
+                var nextSlot = currentSlot ^ 1;
+
+                if (next < blocks)
+                {
+                    var nextStart = next * blockRecords;
+                    var nextCount = Math.Min(blockRecords, records - nextStart);
+                    pendingRead = map.ReadAsync(
+                        volume,
+                        (long)nextStart * recordSize,
+                        buffers[nextSlot]!.Memory(nextCount * recordSize),
+                        readCts.Token).AsTask();
+                }
+
+                entries.AsSpan(start, count).Clear();
+                var span = buffers[currentSlot]!.Span(count * recordSize);
+
+                for (var offset = 0; offset < count; offset++)
+                {
+                    ParseCore(
+                        span.Slice(offset * recordSize, recordSize),
+                        bytesPerSector,
+                        start + offset,
+                        entries,
+                        target,
+                        part.Statistics,
+                        nameTable,
+                        nameCache);
+                }
+
+                progress?.Announce($"Чтение $MFT тома {letter}: {(block + 1L) * 100L / blocks} %");
+                currentSlot = nextSlot;
+            }
+
+            return part;
+        }
+        finally
+        {
+            if (pendingRead is not null)
+            {
+                readCts.Cancel();
+                await pendingRead.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            }
+        }
     }
 
     internal static void ApplyPending(MftEntry[] entries, MftPending pending, MftStatistics statistics)
@@ -440,6 +552,19 @@ internal static class MftReader
         NameTable nameTable,
         LocalNameCache cache)
     {
+        ParseCore(record, bytesPerSector, index, entries, new(null, pending), statistics, nameTable, cache);
+    }
+
+    private static void ParseCore(
+        Span<byte> record,
+        int bytesPerSector,
+        int index,
+        MftEntry[] entries,
+        MftPendingTarget target,
+        MftStatistics statistics,
+        NameTable nameTable,
+        LocalNameCache cache)
+    {
         statistics.RecordsScanned++;
 
         if (!"FILE"u8.SequenceEqual(record[..4]))
@@ -482,9 +607,10 @@ internal static class MftReader
 
             ParseExtension(
                 record,
+                index,
                 (int)baseReference,
                 (ushort)(reference >> MftLayout.ReferenceMaskBits),
-                pending,
+                target,
                 statistics,
                 nameTable,
                 cache);
@@ -501,8 +627,7 @@ internal static class MftReader
             Sequence = BinaryPrimitives.ReadUInt16LittleEndian(record[MftLayout.RecordSequenceOffset..]),
         };
 
-        var bestNamespace = byte.MaxValue;
-        var names = 0;
+        var bestNamespace = int.MaxValue;
         var position = (int)BinaryPrimitives.ReadUInt16LittleEndian(record[0x14..]);
 
         while ((position + 8) <= record.Length)
@@ -532,7 +657,7 @@ internal static class MftReader
 
             if (!nonResident)
             {
-                ReadResident(attribute, type, ref entry, ref bestNamespace, ref names, nameTable, cache);
+                ReadResident(attribute, type, index, ref entry, ref bestNamespace, target, nameTable, cache);
             }
 
             if (type == MftLayout.AttributeData && attribute[0x09] == 0 && !entry.SizeKnown)
@@ -541,11 +666,6 @@ internal static class MftReader
             }
 
             position += length;
-        }
-
-        if (names > 1 || !entry.Exists)
-        {
-            CollectAlternates(record, index, entry, pending, nameTable, cache);
         }
 
         entries[index] = entry;
@@ -578,26 +698,96 @@ internal static class MftReader
 
     private static void Merge(MftPart[] parts, MftPending pending, MftStatistics statistics)
     {
-        foreach (var part in parts)
+        for (var i = 0; i < parts.Length; i++)
         {
-            statistics.Add(part.Statistics);
+            statistics.Add(parts[i].Statistics);
+        }
 
-            foreach (var (index, size) in part.Pending.Sizes)
+        if (parts.Length == 1)
+        {
+            var single = parts[0];
+
+            for (var i = 0; i < single.Sizes.Count; i++)
             {
-                pending.Sizes[index] = size;
+                var item = single.Sizes[i];
+                pending.Sizes[item.TargetRecord] = item.Size;
             }
 
-            foreach (var (index, names) in part.Pending.Alternates)
+            for (var i = 0; i < single.Alternates.Count; i++)
             {
-                if (pending.Alternates.TryGetValue(index, out var existing))
+                var item = single.Alternates[i];
+                AddMergedAlternate(pending, item.TargetRecord, item.Name);
+            }
+
+            return;
+        }
+
+        var sizeCursors = new int[parts.Length];
+
+        while (true)
+        {
+            var bestPart = -1;
+            var bestSource = 0;
+
+            for (var i = 0; i < parts.Length; i++)
+            {
+                var cursor = sizeCursors[i];
+                var list = parts[i].Sizes;
+
+                if (cursor < list.Count && (bestPart < 0 || list[cursor].SourceRecord < bestSource))
                 {
-                    existing.AddRange(names);
-                }
-                else
-                {
-                    pending.Alternates[index] = names;
+                    bestSource = list[cursor].SourceRecord;
+                    bestPart = i;
                 }
             }
+
+            if (bestPart < 0)
+            {
+                break;
+            }
+
+            var item = parts[bestPart].Sizes[sizeCursors[bestPart]++];
+            pending.Sizes[item.TargetRecord] = item.Size;
+        }
+
+        var altCursors = new int[parts.Length];
+
+        while (true)
+        {
+            var bestPart = -1;
+            var bestSource = 0;
+
+            for (var i = 0; i < parts.Length; i++)
+            {
+                var cursor = altCursors[i];
+                var list = parts[i].Alternates;
+
+                if (cursor < list.Count && (bestPart < 0 || list[cursor].SourceRecord < bestSource))
+                {
+                    bestSource = list[cursor].SourceRecord;
+                    bestPart = i;
+                }
+            }
+
+            if (bestPart < 0)
+            {
+                break;
+            }
+
+            var item = parts[bestPart].Alternates[altCursors[bestPart]++];
+            AddMergedAlternate(pending, item.TargetRecord, item.Name);
+        }
+    }
+
+    private static void AddMergedAlternate(MftPending pending, int targetRecord, MftName name)
+    {
+        if (pending.Alternates.TryGetValue(targetRecord, out var existing))
+        {
+            existing.Add(name);
+        }
+        else
+        {
+            pending.Alternates[targetRecord] = [name];
         }
     }
 
@@ -644,9 +834,10 @@ internal static class MftReader
     private static void ReadResident(
         Span<byte> attribute,
         uint type,
+        int index,
         ref MftEntry entry,
-        ref byte bestNamespace,
-        ref int names,
+        ref int bestNamespace,
+        MftPendingTarget target,
         NameTable nameTable,
         LocalNameCache cache)
     {
@@ -677,17 +868,30 @@ internal static class MftReader
                     break;
                 }
 
-                names++;
+                var parent = BinaryPrimitives.ReadUInt64LittleEndian(value);
+                var record = (long)(parent & MftLayout.ReferenceMask);
+                var nextParent = record <= int.MaxValue ? (int)record : -1;
+                var parentSequence = (ushort)(parent >> MftLayout.ReferenceMaskBits);
+                var chars = MemoryMarshal.Cast<byte, char>(value.Slice(FileNameHeaderBytes, candidateLength * 2));
+                var nameId = cache.Intern(nameTable, chars);
 
                 if (candidateNamespace < bestNamespace)
                 {
+                    if (entry.HasName
+                        && entry.Parent >= 0
+                        && (entry.Parent != nextParent || entry.NameId != nameId))
+                    {
+                        target.AddAlternate(index, index, new(entry.Parent, entry.ParentSequence, entry.NameId, entry.Sequence));
+                    }
+
                     bestNamespace = candidateNamespace;
-                    var parent = BinaryPrimitives.ReadUInt64LittleEndian(value);
-                    var record = (long)(parent & MftLayout.ReferenceMask);
-                    entry.Parent = record <= int.MaxValue ? (int)record : -1;
-                    entry.ParentSequence = (ushort)(parent >> MftLayout.ReferenceMaskBits);
-                    var chars = MemoryMarshal.Cast<byte, char>(value.Slice(FileNameHeaderBytes, candidateLength * 2));
-                    entry.SetName(cache.Intern(nameTable, chars));
+                    entry.Parent = nextParent;
+                    entry.ParentSequence = parentSequence;
+                    entry.SetName(nameId);
+                }
+                else if (record <= int.MaxValue && (entry.Parent != (int)record || entry.NameId != nameId))
+                {
+                    target.AddAlternate(index, index, new((int)record, parentSequence, nameId, entry.Sequence));
                 }
 
                 break;
@@ -702,9 +906,10 @@ internal static class MftReader
 
     private static void ParseExtension(
         Span<byte> record,
+        int sourceRecord,
         int baseIndex,
         ushort baseSequence,
-        MftPending pending,
+        MftPendingTarget target,
         MftStatistics statistics,
         NameTable nameTable,
         LocalNameCache cache)
@@ -732,7 +937,7 @@ internal static class MftReader
 
             if (type == MftLayout.AttributeFileName && attribute[0x08] == 0)
             {
-                AddName(attribute, baseIndex, pending, baseSequence, nameTable, cache);
+                AddName(attribute, baseIndex, sourceRecord, target, baseSequence, nameTable, cache);
             }
             else if (type == MftLayout.AttributeData && attribute[0x09] == 0)
             {
@@ -741,45 +946,8 @@ internal static class MftReader
 
                 if (entry.SizeKnown)
                 {
-                    pending.Sizes[baseIndex] = new(entry.Size, baseSequence);
+                    target.AddSize(baseIndex, sourceRecord, new(entry.Size, baseSequence));
                 }
-            }
-
-            position += length;
-        }
-    }
-
-    private static void CollectAlternates(
-        Span<byte> record,
-        int index,
-        MftEntry entry,
-        MftPending pending,
-        NameTable nameTable,
-        LocalNameCache cache)
-    {
-        var position = (int)BinaryPrimitives.ReadUInt16LittleEndian(record[0x14..]);
-
-        while ((position + 8) <= record.Length)
-        {
-            var type = BinaryPrimitives.ReadUInt32LittleEndian(record[position..]);
-
-            if (type == MftLayout.AttributeEnd)
-            {
-                return;
-            }
-
-            var length = (int)BinaryPrimitives.ReadUInt32LittleEndian(record[(position + 4)..]);
-
-            if (length <= 0 || length > (record.Length - position) || length < ResidentHeaderBytes)
-            {
-                return;
-            }
-
-            var attribute = record.Slice(position, length);
-
-            if (type == MftLayout.AttributeFileName && attribute[0x08] == 0)
-            {
-                AddName(attribute, index, pending, entry.Sequence, nameTable, cache, entry);
             }
 
             position += length;
@@ -789,11 +957,11 @@ internal static class MftReader
     private static void AddName(
         Span<byte> attribute,
         int index,
-        MftPending pending,
+        int sourceRecord,
+        MftPendingTarget target,
         ushort baseSequence,
         NameTable nameTable,
-        LocalNameCache cache,
-        MftEntry chosen = default)
+        LocalNameCache cache)
     {
         var valueOffset = BinaryPrimitives.ReadUInt16LittleEndian(attribute[0x14..]);
 
@@ -827,13 +995,7 @@ internal static class MftReader
         var chars = MemoryMarshal.Cast<byte, char>(value.Slice(FileNameHeaderBytes, nameLength * 2));
         var nameId = cache.Intern(nameTable, chars);
 
-        if (chosen.Exists && chosen.Parent == (int)record && chosen.NameId == nameId)
-        {
-            return;
-        }
-
-        var alternates = pending.Alternates.TryGetValue(index, out var existing) ? existing : pending.Alternates[index] = [];
-        alternates.Add(new((int)record, (ushort)(reference >> MftLayout.ReferenceMaskBits), nameId, baseSequence));
+        target.AddAlternate(index, sourceRecord, new((int)record, (ushort)(reference >> MftLayout.ReferenceMaskBits), nameId, baseSequence));
     }
 
     private static MftSelfRuns ReadSelfRuns(
@@ -1130,29 +1292,66 @@ internal sealed class MftPending
     public Dictionary<int, List<MftName>> Alternates { get; } = [];
 }
 
+internal readonly record struct MftPendingSizeEntry(int TargetRecord, int SourceRecord, MftPendingSize Size);
+
+internal readonly record struct MftPendingAlternateEntry(int TargetRecord, int SourceRecord, MftName Name);
+
+internal readonly struct MftPendingTarget(MftPart? part, MftPending? pending)
+{
+    public void AddSize(int targetRecord, int sourceRecord, MftPendingSize size)
+    {
+        if (part is not null)
+        {
+            part.Sizes.Add(new(targetRecord, sourceRecord, size));
+            return;
+        }
+
+        pending!.Sizes[targetRecord] = size;
+    }
+
+    public void AddAlternate(int targetRecord, int sourceRecord, MftName name)
+    {
+        if (part is not null)
+        {
+            part.Alternates.Add(new(targetRecord, sourceRecord, name));
+            return;
+        }
+
+        var alternates = pending!.Alternates.TryGetValue(targetRecord, out var existing)
+            ? existing
+            : pending.Alternates[targetRecord] = [];
+        alternates.Add(name);
+    }
+}
+
 internal sealed class MftPart
 {
-    public MftPending Pending { get; } = new();
+    public List<MftPendingSizeEntry> Sizes { get; } = [];
+
+    public List<MftPendingAlternateEntry> Alternates { get; } = [];
 
     public MftStatistics Statistics { get; } = new();
 }
 
-internal sealed class MftWorker
+internal sealed class MftAlignedBuffer
 {
     private readonly byte[] _data;
     private readonly int _offset;
 
-    public LocalNameCache NameCache { get; } = LocalNameCache.Create();
-
-    public MftWorker(int bytes, int alignment)
+    public MftAlignedBuffer(int bytes, int alignment)
     {
         _data = GC.AllocateUninitializedArray<byte>(bytes + alignment, pinned: true);
         _offset = (int)((alignment - (Marshal.UnsafeAddrOfPinnedArrayElement(_data, 0).ToInt64() % alignment)) % alignment);
     }
 
-    public Span<byte> Buffer(int bytes)
+    public Span<byte> Span(int bytes)
     {
         return _data.AsSpan(_offset, bytes);
+    }
+
+    public Memory<byte> Memory(int bytes)
+    {
+        return _data.AsMemory(_offset, bytes);
     }
 }
 
@@ -1183,23 +1382,48 @@ internal sealed class MftMap
 
     public void Read(IMftVolume volume, long logical, Span<byte> buffer)
     {
-        if (logical < 0 || (logical + buffer.Length) > Length)
-        {
-            throw new EndOfStreamException($"Чтение $MFT вышло за разметку: {logical:N0} + {buffer.Length:N0} Б при длине {Length:N0} Б");
-        }
+        ValidateBounds(logical, buffer.Length);
 
         var written = 0;
 
         while (written < buffer.Length)
         {
-            var position = logical + written;
-            var index = Find(position);
-            var inside = position - _starts[index];
-            var take = (int)Math.Min(buffer.Length - written, (_runs[index].Count * _bytesPerCluster) - inside);
-
-            volume.ReadAt((_runs[index].Cluster * _bytesPerCluster) + inside, buffer.Slice(written, take));
+            var (physicalOffset, take) = NextChunk(logical, written, buffer.Length);
+            volume.ReadAt(physicalOffset, buffer.Slice(written, take));
             written += take;
         }
+    }
+
+    public async ValueTask ReadAsync(IMftVolume volume, long logical, Memory<byte> buffer, CancellationToken cancel)
+    {
+        ValidateBounds(logical, buffer.Length);
+
+        var written = 0;
+
+        while (written < buffer.Length)
+        {
+            var (physicalOffset, take) = NextChunk(logical, written, buffer.Length);
+            await volume.ReadAtAsync(physicalOffset, buffer.Slice(written, take), cancel).ConfigureAwait(false);
+            written += take;
+        }
+    }
+
+    private void ValidateBounds(long logical, int length)
+    {
+        if (logical < 0 || (logical + length) > Length)
+        {
+            throw new EndOfStreamException($"Чтение $MFT вышло за разметку: {logical:N0} + {length:N0} Б при длине {Length:N0} Б");
+        }
+    }
+
+    private (long PhysicalOffset, int Take) NextChunk(long logical, int written, int totalLength)
+    {
+        var position = logical + written;
+        var index = Find(position);
+        var inside = position - _starts[index];
+        var take = (int)Math.Min(totalLength - written, (_runs[index].Count * _bytesPerCluster) - inside);
+
+        return ((_runs[index].Cluster * _bytesPerCluster) + inside, take);
     }
 
     private int Find(long position)

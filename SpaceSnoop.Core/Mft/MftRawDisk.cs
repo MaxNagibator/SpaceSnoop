@@ -54,26 +54,37 @@ internal sealed class MftRawDiskVolume : IMftVolume
         return new(disk, baseOffset, extentLength);
     }
 
+    public void SetSectorSize(int bytesPerSector)
+    {
+        _disk.SetSectorSize(bytesPerSector);
+    }
+
     public void ReadAt(long offset, Span<byte> buffer)
     {
-        if (offset < 0 || offset > _extentLength || buffer.Length > _extentLength - offset)
+        _disk.ReadAt(TranslateOffset(offset, buffer.Length), buffer);
+    }
+
+    public ValueTask ReadAtAsync(long offset, Memory<byte> buffer, CancellationToken cancel)
+    {
+        return _disk.ReadAtAsync(TranslateOffset(offset, buffer.Length), buffer, cancel);
+    }
+
+    private long TranslateOffset(long offset, int length)
+    {
+        if (offset < 0 || offset > _extentLength || length > _extentLength - offset)
         {
             throw new InvalidDataException(
-                $"Чтение раздела через PhysicalDrive вышло за границы: смещение {offset:N0}, длина {buffer.Length:N0}, размер раздела {_extentLength:N0}");
+                $"Чтение раздела через PhysicalDrive вышло за границы: смещение {offset:N0}, длина {length:N0}, размер раздела {_extentLength:N0}");
         }
-
-        long physicalOffset;
 
         try
         {
-            physicalOffset = checked(_baseOffset + offset);
+            return checked(_baseOffset + offset);
         }
         catch (OverflowException exception)
         {
             throw new InvalidDataException($"Переполнение смещения на PhysicalDrive: {_baseOffset:N0} + {offset:N0}", exception);
         }
-
-        _disk.ReadAt(physicalOffset, buffer);
     }
 
     public void Dispose()
