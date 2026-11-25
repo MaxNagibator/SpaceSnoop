@@ -10,9 +10,9 @@
       },
       "KeepShell": {
         "type": "Direct",
-        "requested": "[0.1.323, )",
-        "resolved": "0.1.323",
-        "contentHash": "AZxFcdubUFdhWMHEz6Bh7GygOcd2l7CtruGZkxl6c8xVcWH2tezjTe7q1ADezuiLKtPXX6QIoZYGWUB5/PRhcA==",
+        "requested": "[0.1.329, )",
+        "resolved": "0.1.329",
+        "contentHash": "yxF3dHd353Hj/BTiCB6cQDpIj/1+k1NGN96ZNKg604AtWw1QqcWtY15uY+LAMIF8SnniyoexvBE1wp/LsWAyMg==",
         "dependencies": {
           "CommunityToolkit.Mvvm": "8.4.2",
           "MahApps.Metro.IconPacks.Lucide": "6.2.1",
@@ -26,20 +26,20 @@
       },
       "KeepShell.Agents": {
         "type": "Direct",
-        "requested": "[0.1.323, )",
-        "resolved": "0.1.323",
-        "contentHash": "mhB8jQL0Kl8LETJuTr89fsOfAKR5JUQOTQaqxTVGDX7VCOu7FytssnKN5Ll1hHMPXKz3iV7aRR01O30oKXbsxg==",
+        "requested": "[0.1.329, )",
+        "resolved": "0.1.329",
+        "contentHash": "d/m32MLZo5QZVJoOG7lXXKEA3JCfkKe4OEMW3J5MEUmACRm5ROzpaWor/PsqtXY18EHyrRSASjM0MFGRXFyi3A==",
         "dependencies": {
           "Microsoft.Extensions.Logging.Abstractions": "10.0.15"
         }
       },
       "KeepShell.Automation": {
         "type": "Direct",
-        "requested": "[0.1.323, )",
-        "resolved": "0.1.323",
-        "contentHash": "kgIE443I7rFWPBDOx02+P7C2NBpL32azwDQMnnJ3/x/nuJLtN0p+fiPNJGtYiZIK5ReRczl8mnPfjrocUhhBdw==",
+        "requested": "[0.1.329, )",
+        "resolved": "0.1.329",
+        "contentHash": "IdDZjNPXAjU2AdqZM6SoJoldD1r+0DYs/IYV3OIlodRjrcM1PlhXBKsKve28ypmtzljQU2gXs1lwQf5k6Ib3HQ==",
         "dependencies": {
-          "KeepShell": "0.1.323"
+          "KeepShell": "0.1.329"
         }
       },
       "MahApps.Metro.IconPacks.Lucide": {
