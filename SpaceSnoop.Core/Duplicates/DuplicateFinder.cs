@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.IO.Hashing;
+using System.Runtime.InteropServices;
 using System.Security;
 
 namespace SpaceSnoop.Core.Duplicates;
@@ -10,6 +11,7 @@ namespace SpaceSnoop.Core.Duplicates;
 public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
 {
     private const int BlockSize = 80 * 1024;
+    private const int MinHashBucketCount = 3;
     private const int HashThreshold = 8;
     private const int MaxReportedErrors = 50;
     private const int PrefixHashSize = 4 * 1024;
@@ -24,10 +26,19 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
 
     public DuplicateReport Find(DirectorySpace root, DuplicateOptions options, IProgress<OperationProgress>? progress, CancellationToken token)
     {
-        var bySize = new Dictionary<long, List<FileRef>>();
+        var bySize = new Dictionary<long, SizeBucket>();
         var unreadable = CollectRefs(root, Math.Max(1, options.MinSize), bySize, token);
 
-        var buckets = bySize.Values.Where(static x => x.Count > 1).ToList();
+        var buckets = new List<List<FileRef>>();
+
+        foreach (var entry in bySize.Values)
+        {
+            if (entry.Rest is not null)
+            {
+                buckets.Add(entry.Rest);
+            }
+        }
+
         var state = new FindState(progress);
         var found = new ConcurrentBag<DuplicateGroup>();
 
@@ -45,6 +56,8 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
                     found.Add(group);
                 }
             });
+
+        state.ReportFinal();
 
         var groups = found.OrderByDescending(static x => x.ReclaimableBytes)
             .ThenByDescending(static x => x.Size)
@@ -66,27 +79,33 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
 
     internal static int Collect(DirectorySpace root, long minSize, Dictionary<long, List<FileSpace>> bySize, CancellationToken token)
     {
-        var refsBySize = new Dictionary<long, List<FileRef>>();
+        var refsBySize = new Dictionary<long, SizeBucket>();
         var unreadable = CollectRefs(root, minSize, refsBySize, token);
 
         foreach (var (size, refs) in refsBySize)
         {
             if (!bySize.TryGetValue(size, out var bucket))
             {
-                bucket = new(refs.Count);
+                bucket = new(refs.Rest?.Count ?? 1);
                 bySize[size] = bucket;
             }
 
-            for (var i = 0; i < refs.Count; i++)
+            if (refs.Rest is null)
             {
-                bucket.Add(refs[i].Directory.GetFile(refs[i].Index));
+                bucket.Add(refs.First.Directory.GetFile(refs.First.Index));
+                continue;
+            }
+
+            for (var i = 0; i < refs.Rest.Count; i++)
+            {
+                bucket.Add(refs.Rest[i].Directory.GetFile(refs.Rest[i].Index));
             }
         }
 
         return unreadable;
     }
 
-    internal static int CollectRefs(DirectorySpace root, long minSize, Dictionary<long, List<FileRef>> bySize, CancellationToken token)
+    internal static int CollectRefs(DirectorySpace root, long minSize, Dictionary<long, SizeBucket> bySize, CancellationToken token)
     {
         var unreadable = 0;
         var stack = new Stack<DirectorySpace>();
@@ -114,13 +133,21 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
                     continue;
                 }
 
-                if (!bySize.TryGetValue(size, out var bucket))
-                {
-                    bucket = [];
-                    bySize[size] = bucket;
-                }
+                ref var bucket = ref CollectionsMarshal.GetValueRefOrAddDefault(bySize, size, out var exists);
+                var fileRef = new FileRef(directory, i);
 
-                bucket.Add(new(directory, i));
+                if (!exists)
+                {
+                    bucket.First = fileRef;
+                }
+                else if (bucket.Rest is null)
+                {
+                    bucket.Rest = [bucket.First, fileRef];
+                }
+                else
+                {
+                    bucket.Rest.Add(fileRef);
+                }
             }
 
             var subs = directory.SubDirectoriesArray;
@@ -294,10 +321,10 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
     private List<DuplicateGroup> Resolve(List<FileRef> bucket, DuplicateOptions options, FindState state, CancellationToken token)
     {
         var fileSize = bucket[0].Directory.FileEntries[bucket[0].Index].Size;
-        var withHash = bucket.Count > HashThreshold;
+        var withHash = bucket.Count >= MinHashBucketCount;
         var physical = ProbeBucket(bucket, withHash, state, token);
 
-        if (withHash)
+        if (withHash && physical.Count > HashThreshold)
         {
             Refine(physical, fileSize, state, token);
         }
@@ -398,19 +425,83 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
     {
         var clusters = new List<List<List<Probe>>>();
 
+        if (!withHash || physical.Count < MinHashBucketCount)
+        {
+            foreach (var links in physical)
+            {
+                token.ThrowIfCancellationRequested();
+
+                var matched = MatchCluster(clusters, links[0], withHash, state, out var failed, token);
+
+                if (matched is not null)
+                {
+                    matched.Add(links);
+                }
+                else if (!failed)
+                {
+                    clusters.Add([links]);
+                }
+            }
+
+            return clusters;
+        }
+
+        var byDigest = new Dictionary<UInt128, List<List<List<Probe>>>>();
+        List<List<List<Probe>>>? unhashed = null;
+
         foreach (var links in physical)
         {
             token.ThrowIfCancellationRequested();
 
-            var matched = MatchCluster(clusters, links[0], withHash, state, out var failed, token);
+            var candidate = links[0];
 
-            if (matched is not null)
+            if (candidate.Digest is { } digest)
             {
-                matched.Add(links);
+                List<List<Probe>>? matched = null;
+                var matchFailed = false;
+
+                if (byDigest.TryGetValue(digest, out var digestClusters))
+                {
+                    matched = MatchCluster(digestClusters, candidate, false, state, out matchFailed, token);
+                }
+
+                if (matched is null && !matchFailed && unhashed is not null)
+                {
+                    matched = MatchCluster(unhashed, candidate, false, state, out matchFailed, token);
+                }
+
+                if (matched is not null)
+                {
+                    matched.Add(links);
+                }
+                else if (!matchFailed)
+                {
+                    List<List<Probe>> created = [links];
+                    clusters.Add(created);
+
+                    if (digestClusters is null)
+                    {
+                        digestClusters = [];
+                        byDigest[digest] = digestClusters;
+                    }
+
+                    digestClusters.Add(created);
+                }
             }
-            else if (!failed)
+            else
             {
-                clusters.Add([links]);
+                var matched = MatchCluster(clusters, candidate, false, state, out var failed, token);
+
+                if (matched is not null)
+                {
+                    matched.Add(links);
+                }
+                else if (!failed)
+                {
+                    List<List<Probe>> created = [links];
+                    clusters.Add(created);
+                    (unhashed ??= []).Add(created);
+                }
             }
         }
 
@@ -460,12 +551,23 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
 
     internal readonly record struct FileRef(DirectorySpace Directory, int Index);
 
+    internal struct SizeBucket
+    {
+        public FileRef First;
+        public List<FileRef>? Rest;
+    }
+
     private readonly record struct Probe(FileRef File, string Path, FileIdentity? Identity, UInt128? Digest, bool Symbolic);
 
     private sealed class FindState(IProgress<OperationProgress>? progress)
     {
+        private const long ReportIntervalMs = 50;
+
         private int _examined;
         private long _bytes;
+        private long _nextReportTick;
+        private int _lastReportedExamined;
+        private string? _lastPath;
 
         public ConcurrentQueue<string> Errors { get; } = new();
 
@@ -478,8 +580,37 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
 
         public void Advance(string path)
         {
+            Volatile.Write(ref _lastPath, path);
             var completed = Interlocked.Increment(ref _examined);
-            progress?.Report(new(completed, path, Interlocked.Read(ref _bytes)));
+
+            if (progress is null)
+            {
+                return;
+            }
+
+            var now = Environment.TickCount64;
+            var next = Volatile.Read(ref _nextReportTick);
+
+            if (now >= next && Interlocked.CompareExchange(ref _nextReportTick, now + ReportIntervalMs, next) == next)
+            {
+                Volatile.Write(ref _lastReportedExamined, completed);
+                progress.Report(new(completed, path, Interlocked.Read(ref _bytes)));
+            }
+        }
+
+        public void ReportFinal()
+        {
+            if (progress is null)
+            {
+                return;
+            }
+
+            var examined = Volatile.Read(ref _examined);
+
+            if (examined > 0 && Volatile.Read(ref _lastReportedExamined) != examined)
+            {
+                progress.Report(new(examined, _lastPath ?? string.Empty, Interlocked.Read(ref _bytes)));
+            }
         }
 
         public void Fail(string path, Exception exception)

@@ -112,14 +112,33 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
         _progressPoller = new(uiDispatcher, OnProgressTick);
         _logger = logger;
         _unmark = unmark;
-        Items = new(items.Select(static item => new DeleteRowViewModel(item)));
-        SelectedItem = Items.FirstOrDefault();
-        _totalBytes = items.Sum(static item => item.TotalSize);
-        _diagnostics = new(effectivePermanent, Items.Count, _totalBytes, monitor, operations, preferences);
 
-        CountText = $"0 / {Items.Count}";
+        var count = items.Count;
+        var rows = new DeleteRowViewModel[count];
+        long totalBytes = 0;
+        var widestSizeText = string.Empty;
 
-        WidestSizeText = Items.Select(static row => row.SizeText).MaxBy(static text => text.Length) ?? string.Empty;
+        for (var i = 0; i < count; i++)
+        {
+            var item = items[i];
+            var row = new DeleteRowViewModel(item);
+            rows[i] = row;
+            totalBytes += item.TotalSize;
+
+            if (row.SizeText.Length > widestSizeText.Length)
+            {
+                widestSizeText = row.SizeText;
+            }
+        }
+
+        Items = new(rows);
+        SelectedItem = count > 0 ? Items[0] : null;
+        _totalBytes = totalBytes;
+        _diagnostics = new(effectivePermanent, count, totalBytes, monitor, operations, preferences);
+
+        CountText = $"0 / {count}";
+
+        WidestSizeText = widestSizeText;
         _freedText = SizeFormatter.Format(0);
     }
 

@@ -189,29 +189,13 @@ internal static class ReparsePoint
         public uint ReparseTag;
     }
 
-    [StructLayout(LayoutKind.Sequential)]
-    private struct FileTime
+    [StructLayout(LayoutKind.Explicit, Size = 592)]
+    internal struct Win32FindData
     {
-        public uint dwLowDateTime;
-        public uint dwHighDateTime;
-    }
-
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    private struct Win32FindData
-    {
+        [FieldOffset(0)]
         public uint dwFileAttributes;
-        public FileTime ftCreationTime;
-        public FileTime ftLastAccessTime;
-        public FileTime ftLastWriteTime;
-        public uint nFileSizeHigh;
-        public uint nFileSizeLow;
+
+        [FieldOffset(36)]
         public uint dwReserved0;
-        public uint dwReserved1;
-
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
-        public string cFileName;
-
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 14)]
-        public string cAlternateFileName;
     }
 }

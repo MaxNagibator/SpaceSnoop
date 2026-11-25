@@ -55,19 +55,6 @@ internal static partial class SyncRowsProjector
                 ? files.OrderByDescending(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
                 : files.OrderBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase),
         };
-
-        static long FileSize(FileComparison file)
-        {
-            return Math.Max(file.LeftSize ?? 0, file.RightSize ?? 0);
-        }
-
-        static DateTime FileModified(FileComparison file)
-        {
-            var left = file.LeftModified ?? DateTime.MinValue;
-            var right = file.RightModified ?? DateTime.MinValue;
-
-            return left > right ? left : right;
-        }
     }
 
     internal static IEnumerable<DirectoryComparison> CollectEmptyDirs(DirectoryComparison dir, bool hideApplied, IReadOnlyDictionary<object, SyncOutcome> outcomes)
@@ -215,7 +202,8 @@ internal static partial class SyncRowsProjector
     private static List<SyncNodeViewModel> BuildTreeRows(SyncRowsRequest request, ISyncRowHost host)
     {
         var root = request.Result.Root;
-        var buffer = new List<SyncNodeViewModel>();
+        var initialCapacity = Math.Max(16, root.SubDirectories.Count + root.Files.Count);
+        var buffer = new List<SyncNodeViewModel>(initialCapacity);
         var search = request.SearchText.Trim();
         HashSet<object>? searchHits = null;
 
@@ -225,7 +213,7 @@ internal static partial class SyncRowsProjector
             CollectSearchHits(root, search, searchHits);
         }
 
-        FlattenDirectory(root, 0, buffer, request, host, searchHits);
+        FlattenDirectory(root, 0, buffer, request, host, searchHits, search);
         return buffer;
     }
 
@@ -240,10 +228,11 @@ internal static partial class SyncRowsProjector
         List<SyncNodeViewModel> buffer,
         SyncRowsRequest request,
         ISyncRowHost host,
-        HashSet<object>? searchHits)
+        HashSet<object>? searchHits,
+        string search)
     {
-        AddVisibleDirectories(dir, indent, buffer, request, host, searchHits);
-        AddVisibleFiles(dir, indent, buffer, request, host, searchHits);
+        AddVisibleDirectories(dir, indent, buffer, request, host, searchHits, search);
+        AddVisibleFiles(dir, indent, buffer, request, host, searchHits, search);
     }
 
     private static void AddVisibleDirectories(
@@ -252,15 +241,41 @@ internal static partial class SyncRowsProjector
         List<SyncNodeViewModel> buffer,
         SyncRowsRequest request,
         ISyncRowHost host,
-        HashSet<object>? searchHits)
+        HashSet<object>? searchHits,
+        string search)
     {
-        foreach (var sub in SortDirectories(dir.SubDirectories, request))
-        {
-            if (!IsVisible(sub, request) || searchHits?.Contains(sub) == false)
-            {
-                continue;
-            }
+        var subs = dir.SubDirectories;
 
+        if (subs.Count == 0)
+        {
+            return;
+        }
+
+        var visible = new List<DirectoryComparison>(subs.Count);
+
+        for (var i = 0; i < subs.Count; i++)
+        {
+            var sub = subs[i];
+
+            if (IsVisible(sub, request) && (searchHits is null || searchHits.Contains(sub)))
+            {
+                visible.Add(sub);
+            }
+        }
+
+        if (visible.Count == 0)
+        {
+            return;
+        }
+
+        if (visible.Count > 1)
+        {
+            SortDirectoriesInPlace(visible, request);
+        }
+
+        for (var i = 0; i < visible.Count; i++)
+        {
+            var sub = visible[i];
             var outcome = request.Outcomes.GetValueOrDefault(sub);
             var expanded = searchHits is not null || !request.Collapsed.Contains(sub);
             var sizes = request.DirSizeCache?.GetValueOrDefault(sub);
@@ -272,7 +287,7 @@ internal static partial class SyncRowsProjector
 
             if (expanded)
             {
-                FlattenDirectory(sub, indent + 1, buffer, request, host, searchHits);
+                FlattenDirectory(sub, indent + 1, buffer, request, host, searchHits, search);
             }
         }
     }
@@ -283,17 +298,42 @@ internal static partial class SyncRowsProjector
         List<SyncNodeViewModel> buffer,
         SyncRowsRequest request,
         ISyncRowHost host,
-        HashSet<object>? searchHits)
+        HashSet<object>? searchHits,
+        string search)
     {
-        var search = searchHits is null ? null : request.SearchText.Trim();
+        var files = dir.Files;
 
-        foreach (var file in SortFiles(dir.Files, request.RowSort, request.RowSortDescending))
+        if (files.Count == 0)
         {
-            if (!IsVisible(file, request) || (search is not null && !Matches(file.RelativePath, search)))
-            {
-                continue;
-            }
+            return;
+        }
 
+        var visible = new List<FileComparison>(files.Count);
+        var hasSearch = searchHits is not null;
+
+        for (var i = 0; i < files.Count; i++)
+        {
+            var file = files[i];
+
+            if (IsVisible(file, request) && (!hasSearch || Matches(file.RelativePath, search)))
+            {
+                visible.Add(file);
+            }
+        }
+
+        if (visible.Count == 0)
+        {
+            return;
+        }
+
+        if (visible.Count > 1)
+        {
+            SortFilesInPlace(visible, request.RowSort, request.RowSortDescending);
+        }
+
+        for (var i = 0; i < visible.Count; i++)
+        {
+            var file = visible[i];
             var outcome = request.Outcomes.GetValueOrDefault(file);
             buffer.Add(
                 new(file, indent, host)
@@ -303,27 +343,97 @@ internal static partial class SyncRowsProjector
         }
     }
 
-    private static IEnumerable<DirectoryComparison> SortDirectories(IEnumerable<DirectoryComparison> dirs, SyncRowsRequest request)
+    private static readonly Comparison<DirectoryComparison> DirByNameAsc = static (left, right) => StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
+    private static readonly Comparison<DirectoryComparison> DirByNameDesc = static (left, right) => StringComparer.OrdinalIgnoreCase.Compare(right.Name, left.Name);
+    private static readonly Comparison<DirectoryComparison> DirByStatusAsc = static (left, right) =>
     {
-        return request.RowSort switch
+        var cmp = ((int)left.Status).CompareTo((int)right.Status);
+        return cmp != 0 ? cmp : StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
+    };
+    private static readonly Comparison<DirectoryComparison> DirByStatusDesc = static (left, right) =>
+    {
+        var cmp = ((int)right.Status).CompareTo((int)left.Status);
+        return cmp != 0 ? cmp : StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
+    };
+
+    private static readonly Comparison<FileComparison> FileByPathAsc = static (left, right) => StringComparer.OrdinalIgnoreCase.Compare(left.RelativePath, right.RelativePath);
+    private static readonly Comparison<FileComparison> FileByPathDesc = static (left, right) => StringComparer.OrdinalIgnoreCase.Compare(right.RelativePath, left.RelativePath);
+    private static readonly Comparison<FileComparison> FileBySizeAsc = static (left, right) => FileSize(left).CompareTo(FileSize(right));
+    private static readonly Comparison<FileComparison> FileBySizeDesc = static (left, right) => FileSize(right).CompareTo(FileSize(left));
+    private static readonly Comparison<FileComparison> FileByStatusAsc = static (left, right) =>
+    {
+        var cmp = ((int)left.Status).CompareTo((int)right.Status);
+        return cmp != 0 ? cmp : StringComparer.OrdinalIgnoreCase.Compare(left.RelativePath, right.RelativePath);
+    };
+    private static readonly Comparison<FileComparison> FileByStatusDesc = static (left, right) =>
+    {
+        var cmp = ((int)right.Status).CompareTo((int)left.Status);
+        return cmp != 0 ? cmp : StringComparer.OrdinalIgnoreCase.Compare(left.RelativePath, right.RelativePath);
+    };
+    private static readonly Comparison<FileComparison> FileByModifiedAsc = static (left, right) =>
+    {
+        var cmp = FileModified(left).CompareTo(FileModified(right));
+        return cmp != 0 ? cmp : StringComparer.OrdinalIgnoreCase.Compare(left.RelativePath, right.RelativePath);
+    };
+    private static readonly Comparison<FileComparison> FileByModifiedDesc = static (left, right) =>
+    {
+        var cmp = FileModified(right).CompareTo(FileModified(left));
+        return cmp != 0 ? cmp : StringComparer.OrdinalIgnoreCase.Compare(left.RelativePath, right.RelativePath);
+    };
+
+    private static long FileSize(FileComparison file)
+    {
+        return Math.Max(file.LeftSize ?? 0, file.RightSize ?? 0);
+    }
+
+    private static DateTime FileModified(FileComparison file)
+    {
+        var left = file.LeftModified ?? DateTime.MinValue;
+        var right = file.RightModified ?? DateTime.MinValue;
+
+        return left > right ? left : right;
+    }
+
+    private static void SortDirectoriesInPlace(List<DirectoryComparison> dirs, SyncRowsRequest request)
+    {
+        var descending = request.RowSortDescending;
+
+        switch (request.RowSort)
         {
-            SyncSortField.Size => request.RowSortDescending
-                ? dirs.OrderByDescending(DirSize)
-                : dirs.OrderBy(DirSize),
-            SyncSortField.Status => request.RowSortDescending
-                ? dirs.OrderByDescending(sub => (int)sub.Status).ThenBy(sub => sub.Name, StringComparer.OrdinalIgnoreCase)
-                : dirs.OrderBy(sub => (int)sub.Status).ThenBy(sub => sub.Name, StringComparer.OrdinalIgnoreCase),
-            _ => request.RowSortDescending
-                ? dirs.OrderByDescending(sub => sub.Name, StringComparer.OrdinalIgnoreCase)
-                : dirs.OrderBy(sub => sub.Name, StringComparer.OrdinalIgnoreCase),
+            case SyncSortField.Size:
+                var cache = request.DirSizeCache;
+                dirs.Sort((left, right) =>
+                {
+                    var leftSizes = cache?.GetValueOrDefault(left);
+                    var rightSizes = cache?.GetValueOrDefault(right);
+                    var leftSize = leftSizes is null ? 0L : Math.Max(leftSizes.Value.Left, leftSizes.Value.Right);
+                    var rightSize = rightSizes is null ? 0L : Math.Max(rightSizes.Value.Left, rightSizes.Value.Right);
+                    var cmp = leftSize.CompareTo(rightSize);
+                    return descending ? -cmp : cmp;
+                });
+                break;
+
+            case SyncSortField.Status:
+                dirs.Sort(descending ? DirByStatusDesc : DirByStatusAsc);
+                break;
+
+            default:
+                dirs.Sort(descending ? DirByNameDesc : DirByNameAsc);
+                break;
+        }
+    }
+
+    private static void SortFilesInPlace(List<FileComparison> files, SyncSortField field, bool descending)
+    {
+        var comparison = field switch
+        {
+            SyncSortField.Size => descending ? FileBySizeDesc : FileBySizeAsc,
+            SyncSortField.Status => descending ? FileByStatusDesc : FileByStatusAsc,
+            SyncSortField.Modified => descending ? FileByModifiedDesc : FileByModifiedAsc,
+            _ => descending ? FileByPathDesc : FileByPathAsc,
         };
 
-        long DirSize(DirectoryComparison sub)
-        {
-            var sizes = request.DirSizeCache?.GetValueOrDefault(sub);
-
-            return sizes is null ? 0 : Math.Max(sizes.Value.Left, sizes.Value.Right);
-        }
+        files.Sort(comparison);
     }
 
     private static bool IsVisible(DirectoryComparison dir, SyncRowsRequest request)

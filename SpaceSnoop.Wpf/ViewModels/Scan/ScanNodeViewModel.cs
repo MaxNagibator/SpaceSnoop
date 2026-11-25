@@ -207,31 +207,86 @@ public sealed partial class ScanNodeViewModel : ObservableObject
         _loaded = true;
 
         var subs = dir.SubDirectoriesArray;
-        var items = new List<SpaceBase>(subs.Length + dir.FileCount);
+        var fileCount = dir.FileCount;
+        var total = subs.Length + fileCount;
+
+        if (total == 0)
+        {
+            Children.ReplaceAll(Array.Empty<ScanNodeViewModel>());
+            _previewTiles = null;
+            return;
+        }
+
+        var items = new SpaceBase[total];
+        long localMax = 0;
+        var writeIndex = 0;
 
         for (var i = 0; i < subs.Length; i++)
         {
-            items.Add(subs[i]);
-        }
+            var sub = subs[i];
+            items[writeIndex++] = sub;
 
-        for (var i = 0; i < dir.FileCount; i++)
-        {
-            items.Add(dir.GetFile(i));
-        }
-
-        var localMax = items.Where(IsVisible).Select(VisibleSize).DefaultIfEmpty().Max();
-
-        var existing = Children.Where(static child => child.Space is not null).ToDictionary(static child => child.Space!);
-
-        var ordered = items
-            .OrderBy(static x => x, _sort)
-            .Select(item =>
+            if (IsVisible(sub))
             {
-                var child = existing.GetValueOrDefault(item) ?? _factory!.Create(item, localMax, Weight, Root!, _sort, this);
-                child.Fraction = localMax;
-                child.Share = Weight;
-                return child;
-            });
+                var size = VisibleSize(sub);
+
+                if (size > localMax)
+                {
+                    localMax = size;
+                }
+            }
+        }
+
+        for (var i = 0; i < fileCount; i++)
+        {
+            var file = dir.GetFile(i);
+            items[writeIndex++] = file;
+
+            if (IsVisible(file))
+            {
+                var size = VisibleSize(file);
+
+                if (size > localMax)
+                {
+                    localMax = size;
+                }
+            }
+        }
+
+        Array.Sort(items, _sort);
+
+        Dictionary<SpaceBase, ScanNodeViewModel>? existing = null;
+
+        if (_children is { Count: > 0 } current)
+        {
+            for (var i = 0; i < current.Count; i++)
+            {
+                var existingChild = current[i];
+
+                if (existingChild.Space is { } existingSpace)
+                {
+                    existing ??= new(current.Count);
+                    existing[existingSpace] = existingChild;
+                }
+            }
+        }
+
+        var parentWeight = Weight;
+        var root = Root!;
+        var factory = _factory!;
+        var ordered = new ScanNodeViewModel[total];
+
+        for (var i = 0; i < total; i++)
+        {
+            var item = items[i];
+            var child = existing is not null && existing.TryGetValue(item, out var reused)
+                ? reused
+                : factory.Create(item, localMax, parentWeight, root, _sort, this);
+
+            child.Fraction = localMax;
+            child.Share = parentWeight;
+            ordered[i] = child;
+        }
 
         Children.ReplaceAll(ordered);
         _previewTiles = null;

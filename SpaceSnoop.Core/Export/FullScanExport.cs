@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Buffers;
+using System.Text.Json;
 
 namespace SpaceSnoop.Core.Export;
 
@@ -26,94 +27,45 @@ public static class FullScanExport
         var errors = root.State == SpaceState.Error ? 1 : 0;
 
         writer.WriteStartObject();
-        writer.WriteString("tool", "SpaceSnoop");
-        writer.WriteNumber("schema", 2);
+        writer.WriteString("tool"u8, "SpaceSnoop"u8);
+        writer.WriteNumber("schema"u8, 2);
 
         if (version is not null)
         {
-            writer.WriteString("version", version);
+            writer.WriteString("version"u8, version);
         }
 
-        writer.WriteString("generatedAt", DateTimeOffset.Now);
-        writer.WriteString("path", rootPath);
-        writer.WriteBoolean("rootError", root.State == SpaceState.Error);
-        writer.WriteStartObject("scan");
-        writer.WriteString("engine", options.Engine);
-        writer.WriteBoolean("multithreaded", options.Multithreaded);
-        writer.WriteNumber("parallelism", options.Parallelism);
+        writer.WriteString("generatedAt"u8, DateTimeOffset.Now);
+        writer.WriteString("path"u8, rootPath);
+        writer.WriteBoolean("rootError"u8, root.State == SpaceState.Error);
+        writer.WriteStartObject("scan"u8);
+        writer.WriteString("engine"u8, options.Engine);
+        writer.WriteBoolean("multithreaded"u8, options.Multithreaded);
+        writer.WriteNumber("parallelism"u8, options.Parallelism);
         writer.WriteEndObject();
 
-        writer.WriteStartArray("directories");
-        var directories = new Stack<(DirectorySpace Directory, string Path, int Depth)>();
-        PushDirectories(root, string.Empty, 1, directories);
+        var pathBuffer = ArrayPool<char>.Shared.Rent(4096);
 
-        while (directories.TryPop(out var item))
+        try
         {
-            cancel.ThrowIfCancellationRequested();
-
-            if (item.Directory.State == SpaceState.Error)
-            {
-                errors++;
-            }
-
-            writer.WriteStartObject();
-            writer.WriteString("path", item.Path);
-            writer.WriteNumber("depth", item.Depth);
-            writer.WriteNumber("totalBytes", item.Directory.TotalSize);
-            writer.WriteNumber("ownBytes", item.Directory.Size);
-            writer.WriteNumber("fileCount", item.Directory.TotalFileCount);
-            writer.WriteNumber("directoryCount", item.Directory.TotalDirectoryCount);
-            writer.WriteBoolean("error", item.Directory.State == SpaceState.Error);
-            writer.WriteEndObject();
-
-            completed++;
-            ReportProgress(progress, completed, total);
-            PushDirectories(item.Directory, item.Path, item.Depth + 1, directories);
+            WriteDirectoriesSection(writer, root, ref pathBuffer, ref errors, ref completed, total, progress, cancel);
+            WriteFilesSection(writer, root, ref pathBuffer, ref completed, total, progress, cancel);
+        }
+        finally
+        {
+            ArrayPool<char>.Shared.Return(pathBuffer);
         }
 
-        writer.WriteEndArray();
-        writer.WriteStartArray("files");
-        var pending = new Stack<(DirectorySpace Directory, string Path)>();
-        pending.Push((root, string.Empty));
-
-        while (pending.TryPop(out var item))
-        {
-            cancel.ThrowIfCancellationRequested();
-
-            var fileEntries = item.Directory.FileEntries;
-
-            for (var i = 0; i < fileEntries.Length; i++)
-            {
-                if ((i & 1023) == 0)
-                {
-                    cancel.ThrowIfCancellationRequested();
-                }
-
-                var fileName = item.Directory.GetFileName(i);
-                var path = item.Path.Length == 0 ? fileName : Path.Combine(item.Path, fileName);
-                writer.WriteStartObject();
-                writer.WriteString("path", path);
-                writer.WriteNumber("bytes", fileEntries[i].Size);
-                writer.WriteEndObject();
-
-                completed++;
-                ReportProgress(progress, completed, total);
-            }
-
-            PushDirectories(item.Directory, item.Path, pending);
-        }
-
-        writer.WriteEndArray();
-        writer.WriteStartObject("totals");
-        writer.WriteNumber("bytes", root.TotalSize);
-        writer.WriteNumber("files", root.TotalFileCount);
-        writer.WriteNumber("directories", root.TotalDirectoryCount);
-        writer.WriteNumber("errors", errors);
+        writer.WriteStartObject("totals"u8);
+        writer.WriteNumber("bytes"u8, root.TotalSize);
+        writer.WriteNumber("files"u8, root.TotalFileCount);
+        writer.WriteNumber("directories"u8, root.TotalDirectoryCount);
+        writer.WriteNumber("errors"u8, errors);
         writer.WriteEndObject();
 
         if (notes is not null)
         {
-            writer.WritePropertyName("notes");
+            writer.WritePropertyName("notes"u8);
             JsonSerializer.Serialize(writer, notes, ExportJson.Options);
         }
 
@@ -122,35 +74,226 @@ public static class FullScanExport
         progress?.Report(total);
     }
 
-    private static void PushDirectories(
-        DirectorySpace parent,
-        string path,
-        int depth,
-        Stack<(DirectorySpace Directory, string Path, int Depth)> destination)
+    private static void WriteDirectoriesSection(
+        Utf8JsonWriter writer,
+        DirectorySpace root,
+        ref char[] pathBuffer,
+        ref int errors,
+        ref int completed,
+        int total,
+        IProgress<int>? progress,
+        CancellationToken cancel)
     {
-        var subs = parent.SubDirectoriesArray;
+        writer.WriteStartArray("directories"u8);
 
-        for (var index = subs.Length - 1; index >= 0; index--)
+        if (root.SubDirectoriesArray.Length > 0)
         {
-            var directory = subs[index];
-            var childPath = path.Length == 0 ? directory.Name : Path.Combine(path, directory.Name);
-            destination.Push((directory, childPath, depth));
+            var stack = new Stack<TraversalFrame>();
+            stack.Push(new(root, 0, 1));
+
+            while (stack.Count > 0)
+            {
+                cancel.ThrowIfCancellationRequested();
+
+                var frame = stack.Pop();
+                var subs = frame.Directory.SubDirectoriesArray;
+
+                if (frame.ChildIndex >= subs.Length)
+                {
+                    continue;
+                }
+
+                var child = subs[frame.ChildIndex];
+
+                if (frame.ChildIndex + 1 < subs.Length)
+                {
+                    stack.Push(frame with { ChildIndex = frame.ChildIndex + 1 });
+                }
+
+                var childPathLen = AppendPathSegment(ref pathBuffer, frame.PathLength, child.Name);
+
+                if (child.State == SpaceState.Error)
+                {
+                    errors++;
+                }
+
+                writer.WriteStartObject();
+                writer.WriteString("path"u8, pathBuffer.AsSpan(0, childPathLen));
+                writer.WriteNumber("depth"u8, frame.Depth);
+                writer.WriteNumber("totalBytes"u8, child.TotalSize);
+                writer.WriteNumber("ownBytes"u8, child.Size);
+                writer.WriteNumber("fileCount"u8, child.TotalFileCount);
+                writer.WriteNumber("directoryCount"u8, child.TotalDirectoryCount);
+                writer.WriteBoolean("error"u8, child.State == SpaceState.Error);
+                writer.WriteEndObject();
+
+                completed++;
+                ReportProgress(progress, completed, total);
+
+                if (child.SubDirectoriesArray.Length > 0)
+                {
+                    stack.Push(new(child, childPathLen, frame.Depth + 1));
+                }
+            }
+        }
+
+        writer.WriteEndArray();
+    }
+
+    private static void WriteFilesSection(
+        Utf8JsonWriter writer,
+        DirectorySpace root,
+        ref char[] pathBuffer,
+        ref int completed,
+        int total,
+        IProgress<int>? progress,
+        CancellationToken cancel)
+    {
+        writer.WriteStartArray("files"u8);
+
+        WriteDirectoryFiles(writer, root, 0, ref pathBuffer, ref completed, total, progress, cancel);
+
+        if (root.SubDirectoriesArray.Length > 0)
+        {
+            var stack = new Stack<TraversalFrame>();
+            stack.Push(new(root, 0, 1));
+
+            while (stack.Count > 0)
+            {
+                cancel.ThrowIfCancellationRequested();
+
+                var frame = stack.Pop();
+                var subs = frame.Directory.SubDirectoriesArray;
+
+                if (frame.ChildIndex >= subs.Length)
+                {
+                    continue;
+                }
+
+                var child = subs[frame.ChildIndex];
+
+                if (frame.ChildIndex + 1 < subs.Length)
+                {
+                    stack.Push(frame with { ChildIndex = frame.ChildIndex + 1 });
+                }
+
+                var childPathLen = AppendPathSegment(ref pathBuffer, frame.PathLength, child.Name);
+                WriteDirectoryFiles(writer, child, childPathLen, ref pathBuffer, ref completed, total, progress, cancel);
+
+                if (child.SubDirectoriesArray.Length > 0)
+                {
+                    stack.Push(new(child, childPathLen, frame.Depth + 1));
+                }
+            }
+        }
+
+        writer.WriteEndArray();
+    }
+
+    private static void WriteDirectoryFiles(
+        Utf8JsonWriter writer,
+        DirectorySpace directory,
+        int dirPathLen,
+        ref char[] pathBuffer,
+        ref int completed,
+        int total,
+        IProgress<int>? progress,
+        CancellationToken cancel)
+    {
+        var fileEntries = directory.FileEntries;
+
+        for (var i = 0; i < fileEntries.Length; i++)
+        {
+            if ((i & 1023) == 0)
+            {
+                cancel.ThrowIfCancellationRequested();
+            }
+
+            var fileUtf8 = directory.GetFileNameUtf8(i);
+            var fullLen = AppendUtf8Segment(ref pathBuffer, dirPathLen, fileUtf8);
+
+            writer.WriteStartObject();
+            writer.WriteString("path"u8, pathBuffer.AsSpan(0, fullLen));
+            writer.WriteNumber("bytes"u8, fileEntries[i].Size);
+            writer.WriteEndObject();
+
+            completed++;
+            ReportProgress(progress, completed, total);
         }
     }
 
-    private static void PushDirectories(
-        DirectorySpace parent,
-        string path,
-        Stack<(DirectorySpace Directory, string Path)> destination)
+    private static int AppendPathSegment(ref char[] buffer, int prefixLen, string name)
     {
-        var subs = parent.SubDirectoriesArray;
-
-        for (var index = subs.Length - 1; index >= 0; index--)
+        if (prefixLen == 0)
         {
-            var directory = subs[index];
-            var childPath = path.Length == 0 ? directory.Name : Path.Combine(path, directory.Name);
-            destination.Push((directory, childPath));
+            EnsureCapacity(ref buffer, name.Length);
+            name.CopyTo(buffer);
+            return name.Length;
         }
+
+        if (Path.IsPathRooted(name))
+        {
+            var combined = Path.Combine(new string(buffer, 0, prefixLen), name);
+            EnsureCapacity(ref buffer, combined.Length);
+            combined.CopyTo(buffer);
+            return combined.Length;
+        }
+
+        var needsSeparator = !IsDirectorySeparator(buffer[prefixLen - 1]);
+        var totalLen = prefixLen + (needsSeparator ? 1 : 0) + name.Length;
+        EnsureCapacity(ref buffer, totalLen);
+
+        var pos = prefixLen;
+
+        if (needsSeparator)
+        {
+            buffer[pos++] = Path.DirectorySeparatorChar;
+        }
+
+        name.CopyTo(buffer.AsSpan(pos));
+        return totalLen;
+    }
+
+    private static int AppendUtf8Segment(ref char[] buffer, int prefixLen, ReadOnlySpan<byte> utf8Name)
+    {
+        if (prefixLen == 0)
+        {
+            EnsureCapacity(ref buffer, utf8Name.Length);
+            return Wtf8.ToUtf16(utf8Name, buffer);
+        }
+
+        var needsSeparator = !IsDirectorySeparator(buffer[prefixLen - 1]);
+        var maxLen = prefixLen + (needsSeparator ? 1 : 0) + utf8Name.Length;
+        EnsureCapacity(ref buffer, maxLen);
+
+        var pos = prefixLen;
+
+        if (needsSeparator)
+        {
+            buffer[pos++] = Path.DirectorySeparatorChar;
+        }
+
+        var written = Wtf8.ToUtf16(utf8Name, buffer.AsSpan(pos));
+        return pos + written;
+    }
+
+    private static bool IsDirectorySeparator(char c)
+    {
+        return c == Path.DirectorySeparatorChar || c == Path.AltDirectorySeparatorChar;
+    }
+
+    private static void EnsureCapacity(ref char[] buffer, int required)
+    {
+        if (required <= buffer.Length)
+        {
+            return;
+        }
+
+        var nextSize = Math.Max(buffer.Length * 2, required);
+        var next = ArrayPool<char>.Shared.Rent(nextSize);
+        buffer.CopyTo(next, 0);
+        ArrayPool<char>.Shared.Return(buffer);
+        buffer = next;
     }
 
     private static void ReportProgress(IProgress<int>? progress, int completed, int total)
@@ -160,4 +303,6 @@ public static class FullScanExport
             progress?.Report(completed);
         }
     }
+
+    private readonly record struct TraversalFrame(DirectorySpace Directory, int PathLength, int Depth, int ChildIndex = 0);
 }
