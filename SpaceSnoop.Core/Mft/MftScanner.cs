@@ -20,11 +20,61 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
     // здесь по цели не решают. Триггер апгрейда: понадобится автоматика – решать по доле цели в томе.
     public MftScanResult Calculate(DirectoryInfo directory, ScanProgress? progress, CancellationToken cancel = default)
     {
+        return Calculate(directory, progress, MftReadMode.Volume, cancel);
+    }
+
+    public MftScanResult Calculate(
+        DirectoryInfo directory,
+        ScanProgress? progress,
+        MftReadMode mode,
+        CancellationToken cancel = default)
+    {
         var letter = MftReader.VolumeLetter(directory.FullName)
             ?? throw new InvalidOperationException($"Путь {directory.FullName} не лежит на локальном томе с буквой");
 
         using var volume = MftFileVolume.Open(letter);
-        return Calculate(volume, directory, letter, MftReader.ResolveThreads(letter), 4 * 1024 * 1024, progress, cancel);
+        return CalculateWithFallback(
+            volume,
+            prefetchedBoot: null,
+            directory,
+            letter,
+            MftReader.ResolveThreads(letter),
+            4 * 1024 * 1024,
+            progress,
+            mode,
+            rawDiskOpener: null,
+            cancel);
+    }
+
+    public MftScanResult? TryCalculate(
+        DirectoryInfo directory,
+        ScanProgress? progress,
+        out MftAvailability availability,
+        MftReadMode mode = MftReadMode.Volume,
+        CancellationToken cancel = default)
+    {
+        availability = MftReader.TryOpenVolume(directory.FullName, out var letter, out var volume, out var boot);
+
+        if (availability != MftAvailability.Available || volume is null || boot is null)
+        {
+            volume?.Dispose();
+            return null;
+        }
+
+        using (volume)
+        {
+            return CalculateWithFallback(
+                volume,
+                boot,
+                directory,
+                letter,
+                MftReader.ResolveThreads(letter),
+                4 * 1024 * 1024,
+                progress,
+                mode,
+                rawDiskOpener: null,
+                cancel);
+        }
     }
 
     internal MftScanResult Calculate(
@@ -36,7 +86,99 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
         ScanProgress? progress,
         CancellationToken cancel = default)
     {
-        var table = MftReader.Read(volume, letter, threads, blockBytes, progress, cancel);
+        return Calculate(volume, directory, letter, threads, blockBytes, progress, MftReadMode.Volume, rawDiskOpener: null, cancel);
+    }
+
+    internal MftScanResult Calculate(
+        IMftVolume volume,
+        DirectoryInfo directory,
+        char letter,
+        int threads,
+        int blockBytes,
+        ScanProgress? progress,
+        MftReadMode mode,
+        Func<byte[], MftRawDiskAttempt>? rawDiskOpener,
+        CancellationToken cancel = default)
+    {
+        return CalculateWithFallback(volume, prefetchedBoot: null, directory, letter, threads, blockBytes, progress, mode, rawDiskOpener, cancel);
+    }
+
+    private MftScanResult CalculateWithFallback(
+        IMftVolume volume,
+        byte[]? prefetchedBoot,
+        DirectoryInfo directory,
+        char letter,
+        int threads,
+        int blockBytes,
+        ScanProgress? progress,
+        MftReadMode mode,
+        Func<byte[], MftRawDiskAttempt>? rawDiskOpener,
+        CancellationToken cancel)
+    {
+        var requestedMode = mode == MftReadMode.RawDisk ? MftReadMode.RawDisk : MftReadMode.Volume;
+        var actualMode = requestedMode;
+        string? fallbackReason = null;
+        MftTable? table = null;
+
+        if (requestedMode == MftReadMode.RawDisk)
+        {
+            cancel.ThrowIfCancellationRequested();
+
+            if (prefetchedBoot is null)
+            {
+                prefetchedBoot = new byte[MftRawDiskGuard.BootSectorBytes];
+                volume.ReadAt(0, prefetchedBoot);
+            }
+
+            var attempt = rawDiskOpener is null
+                ? MftRawDiskProbe.Open(letter, prefetchedBoot)
+                : rawDiskOpener(prefetchedBoot);
+
+            if (attempt.Volume is null)
+            {
+                fallbackReason = string.IsNullOrWhiteSpace(attempt.FailureReason)
+                    ? "проверка физического диска не пройдена"
+                    : attempt.FailureReason;
+            }
+            else
+            {
+                try
+                {
+                    using (attempt.Volume)
+                    {
+                        table = MftReader.Read(
+                            attempt.Volume,
+                            letter,
+                            threads,
+                            blockBytes,
+                            progress,
+                            prefetchedBoot,
+                            attempt.ExtentLength,
+                            cancel);
+                    }
+
+                    if (table.Statistics.Damaged > 0 || table.Statistics.Partial > 0)
+                    {
+                        fallbackReason = $"несогласованные записи $MFT на диске (повреждено {table.Statistics.Damaged:N0}, неполных {table.Statistics.Partial:N0})";
+                        table = null;
+                    }
+                }
+                catch (Exception exception) when (exception is UnauthorizedAccessException or IOException or InvalidDataException)
+                {
+                    fallbackReason = exception.Message;
+                    table = null;
+                }
+            }
+
+            if (table is null)
+            {
+                progress?.Reset();
+                actualMode = MftReadMode.Volume;
+                _log.MftRawDiskFallback(directory.FullName, fallbackReason!);
+            }
+        }
+
+        table ??= MftReader.Read(volume, letter, threads, blockBytes, progress, prefetchedBoot, partitionExtentLength: null, cancel);
 
         progress?.Announce($"Разбор связей тома {letter}:");
 
@@ -93,7 +235,9 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
             statistics.StaleParents,
             statistics.Rehomed,
             threads,
-            FormatReport(statistics, totals.UnknownSizeFiles));
+            FormatReport(statistics, totals.UnknownSizeFiles),
+            actualMode,
+            fallbackReason);
 
         _log.MftScanCompleted(directory.FullName, table.Entries.Length, result.ExtraNames, result.ExtraNameBytes, result.Report);
 
@@ -551,7 +695,9 @@ public sealed record MftScanResult(
     long StaleParents,
     long Rehomed,
     int Threads,
-    string Report)
+    string Report,
+    MftReadMode ReadMode = MftReadMode.Volume,
+    string? FallbackReason = null)
 {
     public long DroppedObjects => DetachedRecords + NamelessRecords + DamagedRecords;
 

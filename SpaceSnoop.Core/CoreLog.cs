@@ -113,6 +113,12 @@ internal static partial class CoreLog
         long extraNameBytes,
         string report);
 
+    [LoggerMessage(
+        EventId = 1561,
+        Level = LogLevel.Warning,
+        Message = "Обход по $MFT: чтение PhysicalDrive для «{Path}» переключено на том ({Reason})")]
+    public static partial void MftRawDiskFallback(this ILogger logger, string path, string reason);
+
     [LoggerMessage(EventId = 1570, Level = LogLevel.Information, Message = "Сетевой диск {LocalName} переподключён в сеансе администратора: «{RemotePath}»")]
     public static partial void NetworkDriveRestored(this ILogger logger, string localName, string remotePath);
 

@@ -20,47 +20,9 @@ internal static class MftReader
 
     public static MftAvailability Probe(string path)
     {
-        if (!OperatingSystem.IsWindows())
-        {
-            return MftAvailability.NotNtfs;
-        }
-
-        var letter = VolumeLetter(path);
-
-        if (letter is null)
-        {
-            return MftAvailability.NotFixedVolume;
-        }
-
-        try
-        {
-            var drive = new DriveInfo(letter.Value.ToString());
-
-            if (drive.DriveType is DriveType.Network or DriveType.CDRom or DriveType.NoRootDirectory)
-            {
-                return MftAvailability.NotFixedVolume;
-            }
-        }
-        catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
-        {
-            return MftAvailability.NotFixedVolume;
-        }
-
-        try
-        {
-            using var volume = MftFileVolume.Open(letter.Value);
-            var boot = new byte[512];
-            volume.ReadAt(0, boot);
-            return MftLayout.IsNtfs(boot) ? MftAvailability.Available : MftAvailability.NotNtfs;
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return MftAvailability.AccessDenied;
-        }
-        catch (Exception exception) when (exception is IOException or InvalidDataException)
-        {
-            return MftAvailability.Failed;
-        }
+        var availability = TryOpenVolume(path, out _, out var volume, out _);
+        volume?.Dispose();
+        return availability;
     }
 
     public static char? VolumeLetter(string path)
@@ -92,23 +54,83 @@ internal static class MftReader
         return StorageMedia.LimitParallelism($@"{letter}:\", Math.Min(Environment.ProcessorCount, ReadThreadCeiling));
     }
 
-    internal static MftTable Read(
-        IMftVolume volume,
-        char letter,
-        int threads,
-        int blockBytes,
-        ScanProgress? progress,
-        CancellationToken cancel)
+    internal static MftAvailability TryOpenVolume(
+        string path,
+        out char letter,
+        out MftFileVolume? volume,
+        out byte[]? boot)
     {
-        var boot = new byte[512];
-        volume.ReadAt(0, boot);
+        letter = default;
+        volume = null;
+        boot = null;
 
-        if (!MftLayout.IsNtfs(boot))
+        if (!OperatingSystem.IsWindows())
+        {
+            return MftAvailability.NotNtfs;
+        }
+
+        var candidate = VolumeLetter(path);
+
+        if (candidate is null)
+        {
+            return MftAvailability.NotFixedVolume;
+        }
+
+        letter = candidate.Value;
+
+        try
+        {
+            var drive = new DriveInfo(letter.ToString());
+
+            if (drive.DriveType is DriveType.Network or DriveType.CDRom or DriveType.NoRootDirectory)
+            {
+                return MftAvailability.NotFixedVolume;
+            }
+        }
+        catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
+        {
+            return MftAvailability.NotFixedVolume;
+        }
+
+        MftFileVolume? opened = null;
+
+        try
+        {
+            opened = MftFileVolume.Open(letter);
+            var sector = new byte[MftRawDiskGuard.BootSectorBytes];
+            opened.ReadAt(0, sector);
+
+            if (!MftLayout.IsNtfs(sector))
+            {
+                opened.Dispose();
+                return MftAvailability.NotNtfs;
+            }
+
+            volume = opened;
+            opened = null;
+            boot = sector;
+            return MftAvailability.Available;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            opened?.Dispose();
+            return MftAvailability.AccessDenied;
+        }
+        catch (Exception exception) when (exception is IOException or InvalidDataException)
+        {
+            opened?.Dispose();
+            return MftAvailability.Failed;
+        }
+    }
+
+    internal static MftBootInfo ParseBoot(ReadOnlySpan<byte> boot, char letter)
+    {
+        if (boot.Length < MftRawDiskGuard.BootSectorBytes || !MftLayout.IsNtfs(boot))
         {
             throw new InvalidDataException($"Том {letter}: не NTFS");
         }
 
-        var bytesPerSector = BinaryPrimitives.ReadUInt16LittleEndian(boot.AsSpan(0x0B));
+        var bytesPerSector = BinaryPrimitives.ReadUInt16LittleEndian(boot[0x0B..]);
         var sectorsPerCluster = boot[0x0D];
 
         if (bytesPerSector == 0 || sectorsPerCluster == 0)
@@ -117,9 +139,18 @@ internal static class MftReader
         }
 
         var bytesPerCluster = bytesPerSector * sectorsPerCluster;
-        var mftCluster = BinaryPrimitives.ReadInt64LittleEndian(boot.AsSpan(0x30));
+        var mftCluster = BinaryPrimitives.ReadInt64LittleEndian(boot[0x30..]);
         var recordSizeRaw = (sbyte)boot[0x40];
-        var recordSize = recordSizeRaw > 0 ? recordSizeRaw * bytesPerCluster : 1 << -recordSizeRaw;
+        var recordSize = 0;
+
+        if (recordSizeRaw > 0)
+        {
+            recordSize = recordSizeRaw * bytesPerCluster;
+        }
+        else if (recordSizeRaw >= -30)
+        {
+            recordSize = 1 << -recordSizeRaw;
+        }
 
         if (recordSize < bytesPerSector || recordSize > BlockBytes || recordSize % bytesPerSector != 0)
         {
@@ -131,9 +162,57 @@ internal static class MftReader
             throw new InvalidDataException($"Том {letter}: непригодное положение $MFT ({mftCluster})");
         }
 
+        return new(bytesPerSector, bytesPerCluster, mftCluster, recordSize);
+    }
+
+    internal static MftTable Read(
+        IMftVolume volume,
+        char letter,
+        int threads,
+        int blockBytes,
+        ScanProgress? progress,
+        CancellationToken cancel)
+    {
+        return Read(volume, letter, threads, blockBytes, progress, prefetchedBoot: null, partitionExtentLength: null, cancel);
+    }
+
+    internal static MftTable Read(
+        IMftVolume volume,
+        char letter,
+        int threads,
+        int blockBytes,
+        ScanProgress? progress,
+        byte[]? prefetchedBoot,
+        long? partitionExtentLength,
+        CancellationToken cancel)
+    {
+        cancel.ThrowIfCancellationRequested();
+
+        byte[] boot;
+
+        if (prefetchedBoot is null)
+        {
+            boot = new byte[MftRawDiskGuard.BootSectorBytes];
+            volume.ReadAt(0, boot);
+        }
+        else
+        {
+            boot = prefetchedBoot;
+        }
+
+        var info = ParseBoot(boot, letter);
+        var bytesPerSector = info.BytesPerSector;
+        var bytesPerCluster = info.BytesPerCluster;
+        var mftCluster = info.MftCluster;
+        var recordSize = info.RecordSize;
+
         var self = new byte[recordSize];
         volume.ReadAt(mftCluster * bytesPerCluster, self);
-        progress?.NotifyVolumeReady();
+
+        if (partitionExtentLength is null)
+        {
+            progress?.NotifyVolumeReady();
+        }
 
         if (!"FILE"u8.SequenceEqual(self.AsSpan(0, 4)) || !MftLayout.ApplyFixup(self, bytesPerSector))
         {
@@ -141,6 +220,16 @@ internal static class MftReader
         }
 
         var (runs, mftBytes) = ReadSelfRuns(self, volume, bytesPerCluster, recordSize, bytesPerSector, letter);
+
+        if (partitionExtentLength is { } extentLength)
+        {
+            if (!MftRawDiskGuard.ValidateRunsWithinPartition(runs, extentLength, bytesPerCluster, out var runReason))
+            {
+                throw new InvalidDataException($"Том {letter}: {runReason}");
+            }
+
+            progress?.NotifyVolumeReady();
+        }
 
         if (mftBytes <= 0)
         {

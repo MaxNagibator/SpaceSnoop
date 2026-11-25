@@ -85,7 +85,7 @@ internal sealed class MftFileVolume : IMftVolume
             : new IOException($"Не удалось открыть том {name}, код {error}");
     }
 
-    private static SafeFileHandle OpenHandle(string path, uint flags)
+    internal static SafeFileHandle OpenHandle(string path, uint flags)
     {
         return CreateFileW(
             path,
