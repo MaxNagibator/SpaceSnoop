@@ -337,7 +337,7 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
         return current;
     }
 
-    private const int Level2SplitThreshold = 16;
+    private const int MaterializeThreadCeiling = 8;
 
     internal static DirectorySpace Materialize(
         MftTable table,
@@ -367,92 +367,41 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
         FillDirectory(table, links, start, root, store, reuseStore, rootCache, rootWriter, totals, branches, files, reachable);
 
         progress?.SetTopLevelTotal(branches.Count);
+        progress?.AddBatch(1, files.Count, root.Size, directory.FullName);
 
-        var rootDirs = 1 + branches.Count;
-        var rootFiles = files.Count;
-        var rootBytes = root.Size;
-        var branchRemaining = new PaddedCounter[branches.Count];
-        var workItems = new List<(int Record, DirectorySpace Node, int BranchIndex, int SubBranchIndex)>();
-        var level2Children = new List<(int Record, DirectorySpace Node)>();
-        var level3Children = new List<(int Record, DirectorySpace Node)>();
-        var subBranchNodes = new List<DirectorySpace>();
-        var subBranchCounts = new List<int>();
-
-        for (var i = 0; i < branches.Count; i++)
+        if (branches.Count > 0)
         {
-            cancel.ThrowIfCancellationRequested();
+            var workerCount = Math.Min(MaterializeThreadCeiling, Math.Max(1, Environment.ProcessorCount));
+            var targetQueue = workerCount * 2;
+            var maxChunksPerSplit = workerCount * 2;
+            var queue = new Queue<MaterializeChunk>(branches.Count);
+            var gate = new object();
 
-            var (branchRecord, branchNode) = branches[i];
-            FillDirectory(table, links, branchRecord, branchNode, store, reuseStore, rootCache, rootWriter, totals, level2Children, files, reachable);
-            rootFiles += files.Count;
-            rootBytes += branchNode.Size;
-
-            if (level2Children.Count == 0)
+            for (var i = 0; i < branches.Count; i++)
             {
-                branchNode.SetAggregatedTotals(branchNode.Size, files.Count, 0);
-                progress?.CompleteTopLevel();
-                continue;
+                queue.Enqueue(new([branches[i].Node], [branches[i].Record], 0, 1, null));
             }
 
-            branchRemaining[i].Remaining = level2Children.Count;
-
-            for (var j = 0; j < level2Children.Count; j++)
-            {
-                var (level2Record, level2Node) = level2Children[j];
-
-                if (!HasAtLeastSubdirectories(entries, links, level2Record, reachable, Level2SplitThreshold, cancel))
-                {
-                    workItems.Add((level2Record, level2Node, i, -1));
-                    continue;
-                }
-
-                FillDirectory(table, links, level2Record, level2Node, store, reuseStore, rootCache, rootWriter, totals, level3Children, files, reachable);
-                rootDirs++;
-                rootFiles += files.Count;
-                rootBytes += level2Node.Size;
-
-                if (level3Children.Count == 0)
-                {
-                    level2Node.SetAggregatedTotals(level2Node.Size, files.Count, 0);
-
-                    if (--branchRemaining[i].Remaining == 0)
-                    {
-                        progress?.CompleteTopLevel();
-                    }
-
-                    continue;
-                }
-
-                var subIndex = subBranchNodes.Count;
-                subBranchNodes.Add(level2Node);
-                subBranchCounts.Add(level3Children.Count);
-
-                for (var k = 0; k < level3Children.Count; k++)
-                {
-                    workItems.Add((level3Children[k].Record, level3Children[k].Node, i, subIndex));
-                }
-            }
-        }
-
-        progress?.AddBatch(rootDirs, rootFiles, rootBytes, directory.FullName);
-
-        if (workItems.Count > 0)
-        {
-            var subRemaining = subBranchCounts.Count == 0 ? [] : new PaddedCounter[subBranchCounts.Count];
-
-            for (var i = 0; i < subBranchCounts.Count; i++)
-            {
-                subRemaining[i].Remaining = subBranchCounts[i];
-            }
-
-            var workerCount = Math.Min(workItems.Count, Math.Min(8, Math.Max(1, Environment.ProcessorCount)));
-            var nextWork = -1;
+            var queuedCount = branches.Count;
+            var outstanding = branches.Count;
+            var waitingWorkers = 0;
+            var aborted = false;
             var workerTotals = new MftSubtreeTotals[workerCount];
             var options = new ParallelOptions
             {
                 CancellationToken = cancel,
                 MaxDegreeOfParallelism = workerCount,
             };
+
+            using var cancelRegistration = cancel.Register(
+                () =>
+                {
+                    lock (gate)
+                    {
+                        aborted = true;
+                        Monitor.PulseAll(gate);
+                    }
+                });
 
             try
             {
@@ -466,89 +415,266 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
                         var workerCache = reuseStore ? default : LocalNameCache.Create();
                         var localTotals = new MftSubtreeTotals();
                         workerTotals[x] = localTotals;
-                        var stack = new Stack<(int Record, DirectorySpace Node, bool Ascending)>();
+                        var stack = new List<MaterializeFrame>(64);
                         var children = new List<(int Record, DirectorySpace Node)>();
                         var workerFiles = new List<FileEntry>();
+                        var newChunks = new List<MaterializeChunk>(maxChunksPerSplit + 8);
                         var paths = progress is null ? null : new MftProgressPath(root, directory.FullName);
                         var batchDirs = 0;
                         var batchFiles = 0;
                         var batchBytes = 0L;
                         var nextFlushTick = Environment.TickCount64 + 40;
 
-                        while (true)
+                        try
                         {
-                            cancel.ThrowIfCancellationRequested();
-                            var workIndex = Interlocked.Increment(ref nextWork);
+                            var stop = false;
 
-                            if (workIndex >= workItems.Count)
+                            while (!stop)
                             {
-                                break;
-                            }
+                                MaterializeChunk chunk = default;
 
-                            var (workRecord, workNode, branchIndex, subBranchIndex) = workItems[workIndex];
-                            stack.Push((workRecord, workNode, false));
-
-                            while (stack.Count > 0)
-                            {
-                                cancel.ThrowIfCancellationRequested();
-
-                                var (record, node, ascending) = stack.Pop();
-
-                                if (ascending)
+                                lock (gate)
                                 {
-                                    RollupTotals(node);
-                                    continue;
-                                }
-
-                                FillDirectory(table, links, record, node, store, reuseStore, workerCache, writer, localTotals, children, workerFiles, reachable);
-                                batchDirs++;
-                                batchFiles += workerFiles.Count;
-                                batchBytes += node.Size;
-
-                                if (paths is not null && (batchDirs >= 256 || Environment.TickCount64 >= nextFlushTick))
-                                {
-                                    progress!.AddBatch(batchDirs, batchFiles, batchBytes, paths.For(node));
-                                    batchDirs = 0;
-                                    batchFiles = 0;
-                                    batchBytes = 0;
-                                    nextFlushTick = Environment.TickCount64 + 40;
-                                }
-
-                                if (children.Count == 0)
-                                {
-                                    node.SetAggregatedTotals(node.Size, workerFiles.Count, 0);
-                                    continue;
-                                }
-
-                                stack.Push((record, node, true));
-
-                                for (var j = 0; j < children.Count; j++)
-                                {
-                                    stack.Push((children[j].Record, children[j].Node, false));
-                                }
-                            }
-
-                            if (subBranchIndex >= 0)
-                            {
-                                if (Interlocked.Decrement(ref subRemaining[subBranchIndex].Remaining) == 0)
-                                {
-                                    RollupTotals(subBranchNodes[subBranchIndex]);
-
-                                    if (Interlocked.Decrement(ref branchRemaining[branchIndex].Remaining) == 0)
+                                    while (queue.Count == 0)
                                     {
-                                        progress?.CompleteTopLevel();
+                                        if (outstanding == 0 || aborted)
+                                        {
+                                            stop = true;
+                                            break;
+                                        }
+
+                                        waitingWorkers++;
+                                        Monitor.Wait(gate);
+                                        waitingWorkers--;
+                                    }
+
+                                    if (stop || aborted)
+                                    {
+                                        stop = true;
+                                        break;
+                                    }
+
+                                    chunk = queue.Dequeue();
+                                    Volatile.Write(ref queuedCount, queue.Count);
+                                }
+
+                                var promoted = false;
+
+                                for (var idx = 0; idx < chunk.Count; idx++)
+                                {
+                                    cancel.ThrowIfCancellationRequested();
+
+                                    var itemPos = chunk.Start + idx;
+                                    stack.Clear();
+                                    stack.Add(new(chunk.Records[itemPos], chunk.Nodes[itemPos], false));
+                                    var unvisitedOnStack = 1;
+
+                                    while (stack.Count > 0)
+                                    {
+                                        cancel.ThrowIfCancellationRequested();
+
+                                        var frame = stack[^1];
+                                        stack.RemoveAt(stack.Count - 1);
+
+                                        if (frame.Ascending)
+                                        {
+                                            RollupTotals(frame.Node);
+                                            continue;
+                                        }
+
+                                        unvisitedOnStack--;
+                                        FillDirectory(table, links, frame.Record, frame.Node, store, reuseStore, workerCache, writer, localTotals, children, workerFiles, reachable);
+                                        batchDirs++;
+                                        batchFiles += workerFiles.Count;
+                                        batchBytes += frame.Node.Size;
+
+                                        if (paths is not null && (batchDirs >= 256 || Environment.TickCount64 >= nextFlushTick))
+                                        {
+                                            progress!.AddBatch(batchDirs, batchFiles, batchBytes, paths.For(frame.Node));
+                                            batchDirs = 0;
+                                            batchFiles = 0;
+                                            batchBytes = 0;
+                                            nextFlushTick = Environment.TickCount64 + 40;
+                                        }
+
+                                        if (children.Count == 0)
+                                        {
+                                            frame.Node.SetAggregatedTotals(frame.Node.Size, workerFiles.Count, 0);
+                                            continue;
+                                        }
+
+                                        var remainingInChunk = chunk.Count - (idx + 1);
+                                        var canSplit = (children.Count >= 2 || unvisitedOnStack > 0 || remainingInChunk > 0)
+                                            && (Volatile.Read(ref waitingWorkers) > 0 || Volatile.Read(ref queuedCount) < targetQueue);
+
+                                        if (!canSplit)
+                                        {
+                                            stack.Add(new(frame.Record, frame.Node, true));
+
+                                            for (var j = 0; j < children.Count; j++)
+                                            {
+                                                if ((j & 1023) == 0)
+                                                {
+                                                    cancel.ThrowIfCancellationRequested();
+                                                }
+
+                                                stack.Add(new(children[j].Record, children[j].Node, false));
+                                            }
+
+                                            unvisitedOnStack += children.Count;
+                                            continue;
+                                        }
+
+                                        cancel.ThrowIfCancellationRequested();
+                                        newChunks.Clear();
+                                        var splitRemainder = remainingInChunk > 0 && chunk.ParentSplit is not null;
+
+                                        if (splitRemainder)
+                                        {
+                                            newChunks.Add(new(chunk.Nodes, chunk.Records, itemPos + 1, remainingInChunk, chunk.ParentSplit));
+                                        }
+
+                                        var currentParent = chunk.ParentSplit;
+                                        var pos = 0;
+
+                                        while (pos < stack.Count)
+                                        {
+                                            cancel.ThrowIfCancellationRequested();
+                                            var ascNode = stack[pos].Node;
+                                            pos++;
+                                            var sibStart = pos;
+
+                                            while (pos < stack.Count && !stack[pos].Ascending)
+                                            {
+                                                pos++;
+                                            }
+
+                                            var sibCount = pos - sibStart;
+
+                                            if (sibCount == 0)
+                                            {
+                                                currentParent = new(ascNode, currentParent, 1);
+                                            }
+                                            else
+                                            {
+                                                var sibNodes = new DirectorySpace[sibCount];
+                                                var sibRecords = new int[sibCount];
+
+                                                for (var k = 0; k < sibCount; k++)
+                                                {
+                                                    if ((k & 1023) == 0)
+                                                    {
+                                                        cancel.ThrowIfCancellationRequested();
+                                                    }
+
+                                                    sibNodes[k] = stack[sibStart + k].Node;
+                                                    sibRecords[k] = stack[sibStart + k].Record;
+                                                }
+
+                                                var sibChunkCount = Math.Min(sibCount, maxChunksPerSplit);
+                                                var split = new MaterializeSplit(ascNode, currentParent, sibChunkCount + 1);
+                                                AddPartitionedChunks(newChunks, sibNodes, sibRecords, sibChunkCount, split);
+                                                currentParent = split;
+                                            }
+                                        }
+
+                                        var childNodes = frame.Node.SubDirectoriesArray;
+                                        var childRecords = new int[children.Count];
+
+                                        for (var k = 0; k < children.Count; k++)
+                                        {
+                                            if ((k & 1023) == 0)
+                                            {
+                                                cancel.ThrowIfCancellationRequested();
+                                            }
+
+                                            childRecords[k] = children[k].Record;
+                                        }
+
+                                        var childChunkCount = Math.Min(children.Count, maxChunksPerSplit);
+                                        var nodeSplit = new MaterializeSplit(frame.Node, currentParent, childChunkCount);
+                                        AddPartitionedChunks(newChunks, childNodes, childRecords, childChunkCount, nodeSplit);
+
+                                        stack.Clear();
+
+                                        lock (gate)
+                                        {
+                                            if (aborted || cancel.IsCancellationRequested)
+                                            {
+                                                aborted = true;
+                                                Monitor.PulseAll(gate);
+                                                stop = true;
+                                            }
+                                            else
+                                            {
+                                                if (splitRemainder)
+                                                {
+                                                    Interlocked.Increment(ref chunk.ParentSplit!.Remaining);
+                                                }
+
+                                                outstanding += newChunks.Count - 1;
+
+                                                for (var k = 0; k < newChunks.Count; k++)
+                                                {
+                                                    queue.Enqueue(newChunks[k]);
+                                                }
+
+                                                Volatile.Write(ref queuedCount, queue.Count);
+
+                                                if (waitingWorkers > 0)
+                                                {
+                                                    Monitor.PulseAll(gate);
+                                                }
+                                            }
+                                        }
+
+                                        promoted = true;
+                                        break;
+                                    }
+
+                                    if (promoted || stop)
+                                    {
+                                        break;
+                                    }
+                                }
+
+                                if (stop)
+                                {
+                                    break;
+                                }
+
+                                if (!promoted)
+                                {
+                                    CompleteSplitChain(chunk.ParentSplit, progress);
+
+                                    lock (gate)
+                                    {
+                                        outstanding--;
+
+                                        if (outstanding == 0)
+                                        {
+                                            Monitor.PulseAll(gate);
+                                        }
                                     }
                                 }
                             }
-                            else if (Interlocked.Decrement(ref branchRemaining[branchIndex].Remaining) == 0)
+
+                            cancel.ThrowIfCancellationRequested();
+
+                            if (progress is not null && (batchDirs > 0 || batchFiles > 0 || batchBytes > 0))
                             {
-                                progress?.CompleteTopLevel();
+                                progress.AddBatch(batchDirs, batchFiles, batchBytes, null);
                             }
                         }
-
-                        if (progress is not null && (batchDirs > 0 || batchFiles > 0 || batchBytes > 0))
+                        catch
                         {
-                            progress.AddBatch(batchDirs, batchFiles, batchBytes, null);
+                            lock (gate)
+                            {
+                                aborted = true;
+                                Monitor.PulseAll(gate);
+                            }
+
+                            throw;
                         }
                     });
             }
@@ -563,51 +689,51 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
             }
         }
 
-        for (var i = 0; i < branches.Count; i++)
-        {
-            var branchNode = branches[i].Node;
-
-            if (branchNode.SubDirectoriesArray.Length > 0)
-            {
-                RollupTotals(branchNode);
-            }
-        }
-
         RollupTotals(root);
         store.Freeze();
         return root;
     }
 
-    private static bool HasAtLeastSubdirectories(
-        MftEntry[] entries,
-        MftLinks links,
-        int record,
-        ulong[]? reachable,
-        int threshold,
-        CancellationToken cancel)
+    private static void AddPartitionedChunks(
+        List<MaterializeChunk> destination,
+        DirectorySpace[] nodes,
+        int[] records,
+        int chunkCount,
+        MaterializeSplit parent)
     {
-        var count = 0;
-        var scanned = 0;
+        var total = nodes.Length;
+        var offset = 0;
 
-        for (var child = links.FirstChild[record]; child >= 0; child = links.NextSibling[child])
+        for (var i = 0; i < chunkCount; i++)
         {
-            if ((scanned++ & 4095) == 0)
-            {
-                cancel.ThrowIfCancellationRequested();
-            }
+            var take = (total - offset + (chunkCount - i) - 1) / (chunkCount - i);
+            destination.Add(new(nodes, records, offset, take, parent));
+            offset += take;
+        }
+    }
 
-            if (reachable is not null && MftLinks.IsReachable(reachable, child))
-            {
-                continue;
-            }
-
-            if (entries[child].IsDirectory && ++count >= threshold)
-            {
-                return true;
-            }
+    private static void CompleteSplitChain(MaterializeSplit? split, ScanProgress? progress)
+    {
+        if (split is null)
+        {
+            progress?.CompleteTopLevel();
+            return;
         }
 
-        return false;
+        for (var current = split; current is not null; current = current.Parent)
+        {
+            if (Interlocked.Decrement(ref current.Remaining) != 0)
+            {
+                return;
+            }
+
+            RollupTotals(current.Node);
+
+            if (current.Parent is null)
+            {
+                progress?.CompleteTopLevel();
+            }
+        }
     }
 
     private static void RollupTotals(DirectorySpace node)
@@ -708,11 +834,22 @@ public sealed class MftScanner(ILogger<MftScanner>? logger = null)
         node.SetScanned(store, fileStart, files.Count, ownSize, subDirectories);
     }
 
-    [StructLayout(LayoutKind.Explicit, Size = 64)]
-    private struct PaddedCounter
+    private readonly record struct MaterializeFrame(int Record, DirectorySpace Node, bool Ascending);
+
+    private readonly record struct MaterializeChunk(
+        DirectorySpace[] Nodes,
+        int[] Records,
+        int Start,
+        int Count,
+        MaterializeSplit? ParentSplit);
+
+    private sealed class MaterializeSplit(DirectorySpace node, MaterializeSplit? parent, int remaining)
     {
-        [FieldOffset(0)]
-        public int Remaining;
+        public int Remaining = remaining;
+
+        public DirectorySpace Node { get; } = node;
+
+        public MaterializeSplit? Parent { get; } = parent;
     }
 }
 

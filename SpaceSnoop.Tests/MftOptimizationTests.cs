@@ -626,6 +626,73 @@ public class MftOptimizationTests
         }
     }
 
+    [Test]
+    public void MftScanner_DynamicMaterialize_DeepHeavySubtreeMatchesTotalsAndSupportsCancellation()
+    {
+        var builder = new MftVolumeBuilder()
+            .Record(MftLayout.RootRecord, new MftRecordBuilder().AsDirectory().FileName(MftLayout.RootRecord, 1, "."))
+            .Record(20, new MftRecordBuilder().AsDirectory().FileName(MftLayout.RootRecord, 1, "Sources"))
+            .Record(21, new MftRecordBuilder().AsDirectory().FileName(20, 1, "Org"))
+            .Record(22, new MftRecordBuilder().AsDirectory().FileName(21, 1, "Repo"))
+            .Record(23, new MftRecordBuilder().AsDirectory().FileName(22, 1, "Deep"))
+            .Record(24, new MftRecordBuilder().FileName(20, 1, "root_file.bin").ResidentData(100));
+
+        var expectedSize = 100L;
+        var expectedFiles = 1;
+        var expectedDirs = 4;
+        var nextRecord = 30;
+
+        for (var i = 0; i < 40; i++)
+        {
+            var l5Dir = nextRecord++;
+            builder.Record(l5Dir, new MftRecordBuilder().AsDirectory().FileName(23, 1, $"shard_{i:D2}"));
+            expectedDirs++;
+
+            for (var j = 0; j < 6; j++)
+            {
+                var l6Dir = nextRecord++;
+                var l6File = nextRecord++;
+                var size = (i + 1) * 10 + j;
+                builder
+                    .Record(l6Dir, new MftRecordBuilder().AsDirectory().FileName(l5Dir, 1, $"sub_{j}"))
+                    .Record(l6File, new MftRecordBuilder().FileName(l6Dir, 1, $"f_{j}.dat").ResidentData(size));
+                expectedDirs++;
+                expectedFiles++;
+                expectedSize += size;
+            }
+        }
+
+        var image = builder.Build(nextRecord + 8);
+        var scanner = new MftScanner();
+        var progress = new ScanProgress();
+        var result = scanner.Calculate(new MftMemoryVolume(image), new DirectoryInfo(@"T:\"), 'T', 4, 4096, progress);
+        var snapshot = progress.CreateSnapshot();
+
+        var sources = result.Root.SubDirectories.Single(static x => x.Name == "Sources");
+        var deep = sources.SubDirectories.Single().SubDirectories.Single().SubDirectories.Single();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Root.TotalSize, Is.EqualTo(expectedSize));
+            Assert.That(result.Root.TotalFileCount, Is.EqualTo(expectedFiles));
+            Assert.That(result.Root.TotalDirectoryCount, Is.EqualTo(expectedDirs));
+            Assert.That(sources.TotalSize, Is.EqualTo(expectedSize));
+            Assert.That(deep.TotalSize, Is.EqualTo(expectedSize - 100));
+            Assert.That(deep.TotalFileCount, Is.EqualTo(expectedFiles - 1));
+            Assert.That(deep.TotalDirectoryCount, Is.EqualTo(expectedDirs - 4));
+            Assert.That(snapshot.TopLevelTotal, Is.EqualTo(1));
+            Assert.That(snapshot.TopLevelCompleted, Is.EqualTo(1));
+            Assert.That(snapshot.DirectoriesScanned, Is.EqualTo(expectedDirs + 1));
+            Assert.That(snapshot.FilesScanned, Is.EqualTo(expectedFiles));
+            Assert.That(snapshot.BytesScanned, Is.EqualTo(expectedSize));
+        }
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        Assert.Catch<OperationCanceledException>(
+            () => scanner.Calculate(new MftMemoryVolume(image), new DirectoryInfo(@"T:\"), 'T', 4, 4096, null, cts.Token));
+    }
+
     private sealed class AsyncTestMftVolume(byte[] image, Func<int, long, int, CancellationToken, Task> onAsyncRead) : IMftVolume
     {
         private readonly MftMemoryVolume _inner = new(image);
