@@ -133,6 +133,8 @@ public partial class App : Application
 
         services.AddSingleton<ScanViewModel>();
         services.AddSingleton<IScanAutomation>(static provider => provider.GetRequiredService<ScanViewModel>());
+        services.AddSingleton(typeof(DeferredPage<>));
+        services.AddSingleton<Action<SyncProfileRun>>(provider => run => provider.GetRequiredService<OverviewViewModel>().ApplyProfileRun(run));
         services.AddSingleton<SyncViewModel>();
         services.AddSingleton<ISyncAutomation>(static provider => provider.GetRequiredService<SyncViewModel>());
         services.AddSingleton<OverviewViewModel>();

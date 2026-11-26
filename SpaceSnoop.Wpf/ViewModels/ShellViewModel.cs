@@ -25,11 +25,11 @@ public sealed partial class ShellViewModel : ShellViewModelBase, IAppNavigator
 
     private readonly ScanViewModel _scan;
 
-    private readonly CleanupPageViewModel _cleanup;
+    private readonly DeferredPage<CleanupPageViewModel> _cleanup;
 
-    private readonly SyncViewModel _sync;
+    private readonly DeferredPage<SyncViewModel> _sync;
 
-    private readonly ChatViewModel _chat;
+    private readonly DeferredPage<ChatViewModel> _chat;
 
     private readonly NavigationItem _scanItem;
 
@@ -58,15 +58,15 @@ public sealed partial class ShellViewModel : ShellViewModelBase, IAppNavigator
     public ShellViewModel(
         ThemeSelectionViewModel theme,
         ScanViewModel scan,
-        SyncViewModel sync,
-        OverviewViewModel overview,
-        ScheduleViewModel schedule,
-        CleanupPageViewModel cleanup,
-        ChatViewModel chat,
-        LogsViewModel logs,
-        DiagnosticsViewModel diagnostics,
-        AboutViewModel about,
-        SettingsViewModel settingsPage,
+        DeferredPage<SyncViewModel> sync,
+        DeferredPage<OverviewViewModel> overview,
+        DeferredPage<ScheduleViewModel> schedule,
+        DeferredPage<CleanupPageViewModel> cleanup,
+        DeferredPage<ChatViewModel> chat,
+        DeferredPage<LogsViewModel> logs,
+        DeferredPage<DiagnosticsViewModel> diagnostics,
+        DeferredPage<AboutViewModel> about,
+        DeferredPage<SettingsViewModel> settingsPage,
         ModalHostViewModel modal,
         AgentPreferences agent,
         ShellPreferences preferences,
@@ -130,8 +130,6 @@ public sealed partial class ShellViewModel : ShellViewModelBase, IAppNavigator
         _agent.PropertyChanged += OnAgentPreferencesChanged;
         ApplyChatSection();
 
-        sync.ProfileRunCompleted += overview.ApplyProfileRun;
-
         navigator.Attach(this);
 
         IsNavCollapsed = Preferences.NavCollapsed;
@@ -143,17 +141,17 @@ public sealed partial class ShellViewModel : ShellViewModelBase, IAppNavigator
 
     public bool TryNavigate(string sectionKey)
     {
+        if (IsNavigationLocked && !string.Equals(sectionKey, SectionKey.Scan, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
         if (!_sectionByKey.TryGetValue(ResolveAlias(sectionKey), out var item))
         {
             return false;
         }
 
         if (ReferenceEquals(item, _chatItem) && !Sections.Contains(_chatItem))
-        {
-            return false;
-        }
-
-        if (IsNavigationLocked && !ReferenceEquals(item, _scanItem))
         {
             return false;
         }
@@ -169,7 +167,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase, IAppNavigator
             return;
         }
 
-        _sync.ApplyProfile(profile, comparison);
+        _sync.Value.ApplyProfile(profile, comparison);
         Selected = _syncItem;
     }
 
@@ -181,7 +179,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase, IAppNavigator
         }
 
         Selected = _chatItem;
-        _chat.PrepareQuestion(question);
+        _chat.Value.PrepareQuestion(question);
     }
 
     protected override void OnSelectionChanged(NavigationItem? value)
@@ -190,6 +188,14 @@ public sealed partial class ShellViewModel : ShellViewModelBase, IAppNavigator
         {
             Selected = _scanItem;
             return;
+        }
+
+        if (value?.Content is DeferredPage deferred)
+        {
+            var page = deferred.Content;
+            CurrentPageStatus = page as IPageStatus;
+            CurrentPageHeader = page as IPageHeader;
+            CurrentPageRefresh = page as IPageRefresh;
         }
 
         StatusText = "Готов";
@@ -305,7 +311,7 @@ public sealed partial class ShellViewModel : ShellViewModelBase, IAppNavigator
             return key;
         }
 
-        _cleanup.ActivateDocker();
+        _cleanup.Value.ActivateDocker();
 
         return SectionKey.Cleanup;
     }
