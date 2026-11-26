@@ -5,9 +5,15 @@ using Microsoft.Extensions.DependencyInjection;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Bootstrap.Schedule;
 using SpaceSnoop.Wpf.Bootstrap.Storage;
+using SpaceSnoop.Wpf.Mcp;
 using SpaceSnoop.Wpf.ViewModels;
+using SpaceSnoop.Wpf.ViewModels.Chat;
 using SpaceSnoop.Wpf.ViewModels.Overview;
+using SpaceSnoop.Wpf.ViewModels.Settings;
 using SpaceSnoop.Wpf.ViewModels.Sync;
+using System.ComponentModel;
+using System.Net;
+using System.Net.Sockets;
 
 namespace SpaceSnoop.Wpf.Tests;
 
@@ -85,6 +91,62 @@ public class DeferredNavigationTests
         Assert.That(shell.TryNavigate(SectionKey.Overview), Is.True);
         var overview = _services.GetRequiredService<OverviewViewModel>();
         Assert.That(overview.Rows.Rows.Single().Comparison, Is.SameAs(sync.Operations.Result));
+    }
+
+    [Test]
+    public void Настройки_и_чат_запускают_сервер_только_при_включении_MCP()
+    {
+        var server = _services.GetRequiredService<McpServerController>();
+        server.Apply();
+        var settings = _services.GetRequiredService<SettingsViewModel>();
+        var chat = _services.GetRequiredService<ChatViewModel>();
+        var preferences = _services.GetRequiredService<McpPreferences>();
+        using (var listener = new TcpListener(IPAddress.Loopback, 0))
+        {
+            listener.Start();
+            preferences.Port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        }
+
+        preferences.RegenerateToken();
+        Assert.That(settings.McpServer, Is.SameAs(chat.Gates.McpServer));
+        Assert.That(settings.McpServer, Is.SameAs(server));
+        Assert.That(server.CreatedHost, Is.Null);
+        Assert.That(_services.GetRequiredService<Lazy<McpBridge>>().IsValueCreated, Is.False);
+
+        VisualTestHost.Run(async () =>
+        {
+            await ApplyAndWaitAsync(() => preferences.Enabled = true, () => server.IsRunning);
+            Assert.That(server.Endpoint, Is.EqualTo($"http://127.0.0.1:{preferences.Port}{AppDefaults.McpEndpointPath}"));
+            var host = server.CreatedHost;
+            await ApplyAndWaitAsync(() => preferences.Token = string.Empty, () => server.LastError is not null);
+            Assert.That(server.IsRunning, Is.False);
+            await ApplyAndWaitAsync(preferences.RegenerateToken, () => server.IsRunning && server.LastError is null);
+            await ApplyAndWaitAsync(() => preferences.Enabled = false, () => server.Endpoint is null);
+            Assert.That(server.CreatedHost, Is.SameAs(host));
+        });
+
+        async Task ApplyAndWaitAsync(Action change, Func<bool> reached)
+        {
+            var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            void OnChanged(object? sender, PropertyChangedEventArgs args)
+            {
+                if (reached())
+                {
+                    completed.TrySetResult();
+                }
+            }
+
+            server.PropertyChanged += OnChanged;
+            try
+            {
+                change();
+                await completed.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            }
+            finally
+            {
+                server.PropertyChanged -= OnChanged;
+            }
+        }
     }
 
     private sealed class TrackingProvider(IServiceProvider services) : IServiceProvider

@@ -2,7 +2,6 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
-using System.ComponentModel;
 using System.Net;
 
 namespace SpaceSnoop.Wpf.Mcp;
@@ -17,7 +16,7 @@ public sealed partial class McpServerHost : ObservableObject, IDisposable
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     private WebApplication? _app;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsRunning))]
@@ -35,7 +34,6 @@ public sealed partial class McpServerHost : ObservableObject, IDisposable
         _scan = scan;
         _captures = captures;
         _logger = logger;
-        _preferences.PropertyChanged += OnPreferencesChanged;
     }
 
     public void Apply()
@@ -56,7 +54,6 @@ public sealed partial class McpServerHost : ObservableObject, IDisposable
         }
 
         _disposed = true;
-        _preferences.PropertyChanged -= OnPreferencesChanged;
 
         try
         {
@@ -84,7 +81,7 @@ public sealed partial class McpServerHost : ObservableObject, IDisposable
         {
             await StopCoreAsync().ConfigureAwait(false);
 
-            if (!_preferences.Enabled)
+            if (_disposed || !_preferences.Enabled)
             {
                 LastError = null;
                 return;
@@ -206,14 +203,6 @@ public sealed partial class McpServerHost : ObservableObject, IDisposable
         {
             _app = null;
             Endpoint = null;
-        }
-    }
-
-    private void OnPreferencesChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName is nameof(McpPreferences.Enabled) or nameof(McpPreferences.Port) or nameof(McpPreferences.Token))
-        {
-            Apply();
         }
     }
 }

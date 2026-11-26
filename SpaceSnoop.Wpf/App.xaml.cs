@@ -168,7 +168,10 @@ public partial class App : Application
 
         services.AddSingleton<McpPreferences>();
         services.AddSingleton<McpBridge>();
+        services.AddSingleton(provider => new Lazy<McpBridge>(provider.GetRequiredService<McpBridge>));
         services.AddSingleton<McpServerHost>();
+        services.AddSingleton<Func<McpServerHost>>(provider => provider.GetRequiredService<McpServerHost>);
+        services.AddSingleton<McpServerController>();
 
         return services.BuildServiceProvider(
             new ServiceProviderOptions
@@ -314,7 +317,7 @@ public partial class App : Application
             networkDrives.Start(AdminElevation.IsElevated, _logging.CreateLogger<DriveCatalog>());
             _ = RestoreNetworkDrivesAsync(networkDrives, scan, uiDispatcher);
 
-            _services.GetRequiredService<McpServerHost>().Apply();
+            _services.GetRequiredService<McpServerController>().Apply();
             _services.GetRequiredService<SystemTheme>().Watch();
             monitor.Start();
 

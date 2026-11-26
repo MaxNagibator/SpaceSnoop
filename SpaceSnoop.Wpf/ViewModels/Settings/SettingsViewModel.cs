@@ -56,7 +56,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
 
     public McpPreferences Mcp { get; }
 
-    public McpServerHost McpServer { get; }
+    public McpServerController McpServer { get; }
 
     public AgentPreferences Agent { get; }
 
@@ -224,7 +224,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         UpdatePreferences update,
         AppUpdateViewModel updater,
         McpPreferences mcp,
-        McpServerHost mcpServer,
+        McpServerController mcpServer,
         AgentPreferences agent,
         AgentModelSelector agentModels,
         AgentBackends agentBackends,

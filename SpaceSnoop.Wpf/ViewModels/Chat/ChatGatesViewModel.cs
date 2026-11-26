@@ -36,7 +36,7 @@ public sealed partial class ChatGatesViewModel : ObservableObject
 
     public McpPreferences Mcp { get; }
 
-    public McpServerHost McpServer { get; }
+    public McpServerController McpServer { get; }
 
     public bool ShowCliMissingBanner => !IsDetectingCli && CliInfo is null;
 
@@ -118,7 +118,7 @@ public sealed partial class ChatGatesViewModel : ObservableObject
         AgentPreferences preferences,
         AgentModelSelector agentModel,
         McpPreferences mcp,
-        McpServerHost mcpServer,
+        McpServerController mcpServer,
         IUiDispatcher uiDispatcher,
         ILogger logger,
         ChatHistoryViewModel history,
