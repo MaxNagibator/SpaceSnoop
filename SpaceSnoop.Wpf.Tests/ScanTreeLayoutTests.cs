@@ -5,6 +5,7 @@ using SpaceSnoop.Core.Domain;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Bootstrap.Storage;
 using SpaceSnoop.Wpf.ViewModels.Scan;
+using SpaceSnoop.Wpf.Views;
 using SpaceSnoop.Wpf.Views.Scan;
 using System.ComponentModel;
 using System.Windows;
@@ -80,6 +81,61 @@ public class ScanTreeLayoutTests
         _scan.ViewMode = ScanViewMode.Tree;
         _scan.Marks.RecountMarked();
         _host.Settle();
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void Панели_создаются_при_первом_показе_и_сохраняются_после_выбора_диска(bool showScanProgress)
+    {
+        _scan.HasResult = false;
+        _scan.SelectSingle(null);
+        var view = new ScanView { DataContext = _scan };
+        using var host = VisualTestHost.Show(new() { Content = view }, 1000, 700);
+        host.Settle();
+        Assert.That(Descendants<ScanTargetPicker>(view).Single().IsVisible, Is.True);
+        Assert.That(Descendants<ScanStructurePanel>(view), Is.Empty);
+        Assert.That(Descendants<ScanInspectorPanel>(view), Is.Empty);
+
+        try
+        {
+            _scan.IsScanning = showScanProgress;
+            _scan.HasResult = !showScanProgress;
+            host.Settle();
+            var structure = Descendants<ScanStructurePanel>(view).Single();
+            var inspector = Descendants<ScanInspectorPanel>(view).Single();
+            Assert.That(structure.IsVisible && inspector.IsVisible, Is.True);
+            Assert.That(inspector.DataContext, Is.SameAs(_scan.Inspector));
+            Assert.That(Descendants<ScanInspectorDetails>(inspector), Is.Empty);
+
+            _scan.HasResult = true;
+            _scan.IsScanning = false;
+            var root = Build(2);
+            var node = _factory.Create(root, root.TotalSize, root.TotalSize, root, new());
+            _scan.Roots.Add(node);
+            node.IsExpanded = true;
+            host.Settle();
+            var row = Descendants<TreeViewItem>(structure).Single(item => item.DataContext == node);
+            row.IsSelected = true;
+            _scan.Inspector.IsInspectorCollapsed = false;
+            host.Settle();
+            var details = Descendants<ScanInspectorDetails>(inspector).Single();
+            Assert.That(details.IsVisible, Is.True);
+
+            _scan.OpenPickerCommand.Execute(null);
+            host.Settle();
+            Assert.That(structure.IsVisible || inspector.IsVisible, Is.False);
+            _scan.ClosePickerCommand.Execute(null);
+            host.Settle();
+            Assert.That(Descendants<ScanStructurePanel>(view).Single(), Is.SameAs(structure));
+            Assert.That(Descendants<ScanInspectorPanel>(view).Single(), Is.SameAs(inspector));
+            Assert.That(Descendants<ScanInspectorDetails>(inspector).Single(), Is.SameAs(details));
+            Assert.That(row.IsVisible && row.IsSelected && row.IsExpanded, Is.True);
+        }
+        finally
+        {
+            _scan.IsScanning = false;
+            _scan.IsPickerOpen = false;
+        }
     }
 
     [TestCase(1000)]

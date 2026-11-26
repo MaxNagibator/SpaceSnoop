@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+﻿using SpaceSnoop.Wpf.Views.Scan;
+using System.ComponentModel;
 using System.Windows.Controls.Primitives;
 using System.Windows.Threading;
 
@@ -19,6 +20,7 @@ public partial class ScanView : UserControl, IView<ScanViewModel>
         new(false));
 
     private ScanViewModel? _vm;
+    private ScanStructurePanel? _structure;
     private bool _hooked;
     private bool _fitting;
     private bool _fitQueued;
@@ -37,8 +39,26 @@ public partial class ScanView : UserControl, IView<ScanViewModel>
         Unloaded += OnUnloaded;
         DataContextChanged += OnDataContextChanged;
         ContentArea.IsVisibleChanged += (_, _) => QueueFit();
-        Structure.HeaderBar.SizeChanged += (_, _) => QueueFit();
     }
+
+    private void OnStructureLoaded(object sender, RoutedEventArgs e)
+    {
+        _structure = (ScanStructurePanel)sender;
+        _structure.HeaderBar.SizeChanged += OnStructureHeaderSizeChanged;
+        QueueFit();
+    }
+
+    private void OnStructureUnloaded(object sender, RoutedEventArgs e)
+    {
+        var structure = (ScanStructurePanel)sender;
+        structure.HeaderBar.SizeChanged -= OnStructureHeaderSizeChanged;
+        if (_structure == structure)
+        {
+            _structure = null;
+        }
+    }
+
+    private void OnStructureHeaderSizeChanged(object sender, SizeChangedEventArgs e) => QueueFit();
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
@@ -97,7 +117,7 @@ public partial class ScanView : UserControl, IView<ScanViewModel>
     {
         _fitQueued = false;
 
-        if (!IsLoaded || !ContentArea.IsVisible)
+        if (!IsLoaded || !ContentArea.IsVisible || _structure is not { } structure)
         {
             return;
         }
@@ -109,7 +129,7 @@ public partial class ScanView : UserControl, IView<ScanViewModel>
             IsCompact = false;
             UpdateLayout();
 
-            if (Structure.TreeRowCapacity() < MinTreeRows)
+            if (structure.TreeRowCapacity() < MinTreeRows)
             {
                 IsCompact = true;
                 UpdateLayout();

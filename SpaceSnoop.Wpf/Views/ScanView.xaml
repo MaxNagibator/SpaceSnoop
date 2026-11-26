@@ -143,7 +143,7 @@
             <Grid Grid.Row="5"
                   x:Name="ContentArea"
                   SizeChanged="OnContentAreaSizeChanged"
-                  Visibility="{Binding ShowScanResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Visible}">
+                  Visibility="{Binding ShowScanResult, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition x:Name="StructureColumn"
                                       Width="*"
@@ -155,8 +155,15 @@
                                       MinWidth="280" />
                 </Grid.ColumnDefinitions>
 
-                <controls:ScanStructurePanel Grid.Column="0"
-                                             x:Name="Structure" />
+                <ContentPresenter Grid.Column="0" Content="{Binding}">
+                    <ContentPresenter.ContentTemplate>
+                        <DataTemplate>
+                            <controls:ScanStructurePanel x:Name="Structure"
+                                                         Loaded="OnStructureLoaded"
+                                                         Unloaded="OnStructureUnloaded" />
+                        </DataTemplate>
+                    </ContentPresenter.ContentTemplate>
+                </ContentPresenter>
 
                 <GridSplitter Grid.Column="1"
                               x:Name="InspectorSplitter"
@@ -168,8 +175,13 @@
                               ToolTip="Перетащите, чтобы изменить ширину панели"
                               Visibility="{Binding Inspector.IsInspectorCollapsed, Converter={StaticResource InverseBoolToVisibility}}" />
 
-                <controls:ScanInspectorPanel Grid.Column="2"
-                                             DataContext="{Binding Inspector}" />
+                <ContentPresenter Grid.Column="2" Content="{Binding Inspector}">
+                    <ContentPresenter.ContentTemplate>
+                        <DataTemplate>
+                            <controls:ScanInspectorPanel />
+                        </DataTemplate>
+                    </ContentPresenter.ContentTemplate>
+                </ContentPresenter>
             </Grid>
         </Grid>
 
