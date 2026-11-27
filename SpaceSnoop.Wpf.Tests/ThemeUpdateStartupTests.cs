@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Collections.Concurrent;
+using System.Text.RegularExpressions;
 using KeepShell.Bootstrap;
 using KeepShell.Services;
 using KeepShell.Services.Platform;
@@ -249,6 +250,163 @@ public sealed class ThemeUpdateStartupTests
             Assert.That(restarted, Is.True);
             Assert.That(shell.Started, Is.EqualTo(new[] { @"C:\Program Files\SpaceSnoop\SpaceSnoop.exe" }));
             Assert.That(lifetime.ShutdownCalls, Is.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public async Task Неудавшийся_перезапуск_сохраняет_автосохранение_и_закрытие_настроек()
+    {
+        var tempDir = CreateTempDir();
+        try
+        {
+            var settingsPath = Path.Combine(tempDir, TomlSettingsFile.PrimaryFileName);
+            using var store = new SettingsStore(settingsPath);
+            var events = new ConcurrentQueue<string>();
+            var spy = new SpySettingsStore(store, events);
+            var shell = new TrackingShellLauncher(events) { Succeeds = false };
+            var dialogs = new NoopDialogs();
+            var lifetime = new FakeApplicationLifetime();
+
+            ISettingsStore settings = spy;
+            settings.SetInt(SettingsKeys.WindowLeft, 111);
+
+            var restarted = await ThemeUpdateStartup.RestartApplicationAsync(
+                () => Task.FromResult(true),
+                spy,
+                shell,
+                dialogs,
+                lifetime,
+                () => @"C:\Program Files\SpaceSnoop\SpaceSnoop.exe");
+
+            var afterFailedRestart = await File.ReadAllTextAsync(settingsPath);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(restarted, Is.False);
+                Assert.That(dialogs.LastErrorMessage, Is.Not.Null);
+                Assert.That(lifetime.ShutdownCalls, Is.Zero);
+                Assert.That(spy.FlushCalls, Is.EqualTo(1));
+                Assert.That(spy.CloseCalls, Is.Zero);
+                Assert.That(events.ToArray(), Is.EqualTo(new[] { "flush", "start" }));
+                Assert.That(afterFailedRestart, Does.Contain("111"));
+            }
+
+            settings.SetInt(SettingsKeys.WindowTop, 222);
+
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(3);
+            var afterDebounce = await ReadTextSafeAsync(settingsPath);
+            while (DateTime.UtcNow < deadline && !afterDebounce.Contains("222", StringComparison.Ordinal))
+            {
+                await Task.Delay(25);
+                afterDebounce = await ReadTextSafeAsync(settingsPath);
+            }
+
+            Assert.That(afterDebounce, Does.Contain("222"));
+
+            settings.SetInt(SettingsKeys.WindowWidth, 333);
+            store.Close();
+
+            Assert.That(await File.ReadAllTextAsync(settingsPath), Does.Contain("333"));
+        }
+        finally
+        {
+            TryDeleteDir(tempDir);
+        }
+    }
+
+    [Test]
+    public async Task Успешный_перезапуск_закрывает_хранилище_после_старта_процесса()
+    {
+        var events = new ConcurrentQueue<string>();
+        var spy = new SpySettingsStore(new MemorySettings(), events);
+        var shell = new TrackingShellLauncher(events) { Succeeds = true };
+        var dialogs = new NoopDialogs();
+        var lifetime = new FakeApplicationLifetime();
+
+        var restarted = await ThemeUpdateStartup.RestartApplicationAsync(
+            () => Task.FromResult(true),
+            spy,
+            shell,
+            dialogs,
+            lifetime,
+            () => @"C:\Program Files\SpaceSnoop\SpaceSnoop.exe");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(restarted, Is.True);
+            Assert.That(dialogs.LastErrorMessage, Is.Null);
+            Assert.That(lifetime.ShutdownCalls, Is.EqualTo(1));
+            Assert.That(spy.FlushCalls, Is.EqualTo(1));
+            Assert.That(spy.CloseCalls, Is.EqualTo(1));
+            Assert.That(events.ToArray(), Is.EqualTo(new[] { "flush", "start", "close" }));
+        }
+    }
+
+    private static async Task<string> ReadTextSafeAsync(string path)
+    {
+        try
+        {
+            return File.Exists(path) ? await File.ReadAllTextAsync(path) : string.Empty;
+        }
+        catch (IOException)
+        {
+            return string.Empty;
+        }
+    }
+
+    private sealed class SpySettingsStore(ISettingsStore inner, ConcurrentQueue<string> events) : ISettingsStore
+    {
+        private int _flushCalls;
+        private int _closeCalls;
+
+        public int FlushCalls => Volatile.Read(ref _flushCalls);
+
+        public int CloseCalls => Volatile.Read(ref _closeCalls);
+
+        public event EventHandler<string>? Changed
+        {
+            add => inner.Changed += value;
+            remove => inner.Changed -= value;
+        }
+
+        public event EventHandler<SettingsWriteFailedEventArgs>? WriteFailed
+        {
+            add => inner.WriteFailed += value;
+            remove => inner.WriteFailed -= value;
+        }
+
+        public string FilePath => inner.FilePath;
+
+        public string? GetStringValue(string key) => inner.GetStringValue(key);
+
+        public void SetValue(string key, string value) => inner.SetValue(key, value);
+
+        public void Flush()
+        {
+            Interlocked.Increment(ref _flushCalls);
+            events.Enqueue("flush");
+            inner.Flush();
+        }
+
+        public void Close()
+        {
+            Interlocked.Increment(ref _closeCalls);
+            events.Enqueue("close");
+            inner.Close();
+        }
+    }
+
+    private sealed class TrackingShellLauncher(ConcurrentQueue<string> events) : IShellLauncher
+    {
+        public bool Succeeds { get; init; } = true;
+
+        public bool Open(string pathOrUrl) => Succeeds;
+
+        public bool Reveal(string path) => Succeeds;
+
+        public bool Start(string executable, params string[] arguments)
+        {
+            events.Enqueue("start");
+            return Succeeds;
         }
     }
 

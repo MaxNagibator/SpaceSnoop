@@ -66,7 +66,6 @@ public sealed class ThemeUpdateStartup : IDisposable
         }
 
         settings.Flush();
-        settings.Close();
 
         var executable = resolveExecutable is not null ? resolveExecutable() : Environment.ProcessPath;
 
@@ -78,6 +77,7 @@ public sealed class ThemeUpdateStartup : IDisposable
             return false;
         }
 
+        settings.Close();
         lifetime.Shutdown();
         return true;
     }
