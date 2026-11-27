@@ -656,55 +656,101 @@ public sealed class SyncEngine
         var expectedSize = deleteLeft ? plan.LeftSize : plan.RightSize;
         var expectedModified = deleteLeft ? plan.LeftModified : plan.RightModified;
 
-        using var handle = OpenFileForVerifiedDelete(path);
+        var handle = OpenAndVerifyFileForDelete(
+            path,
+            DeleteAccess | FileReadAttributes,
+            expectedSize,
+            expectedModified,
+            out var attributes);
 
-        if (!GetFileInformationByHandle(handle, out var info))
+        try
         {
-            throw Win32Error(path, Marshal.GetLastWin32Error());
-        }
+            cancel.ThrowIfCancellationRequested();
 
-        if ((info.FileAttributes & ((uint)FileAttributes.Directory | (uint)FileAttributes.ReparsePoint)) != 0)
-        {
-            throw new IOException($"Файл «{path}» изменился после сравнения – безвозвратное удаление отменено.");
-        }
-
-        var actualSize = checked((long)(((ulong)info.FileSizeHigh << 32) | info.FileSizeLow));
-        var actualModified = DateTime.FromFileTime(checked((long)(((ulong)info.LastWriteTimeHigh << 32) | info.LastWriteTimeLow)));
-
-        if (actualSize != expectedSize || actualModified != expectedModified)
-        {
-            throw new IOException($"Файл «{path}» изменился после сравнения – безвозвратное удаление отменено.");
-        }
-
-        cancel.ThrowIfCancellationRequested();
-
-        if ((info.FileAttributes & (uint)FileAttributes.ReadOnly) != 0)
-        {
-            var cleared = info.FileAttributes & ~(uint)FileAttributes.ReadOnly;
-            var basic = new FileBasicInfo
+            if ((attributes & (uint)FileAttributes.ReadOnly) != 0)
             {
-                FileAttributes = cleared == 0 ? (uint)FileAttributes.Normal : cleared,
-            };
+                handle.Dispose();
+                handle = OpenAndVerifyFileForDelete(
+                    path,
+                    DeleteAccess | FileReadAttributes | FileWriteAttributes,
+                    expectedSize,
+                    expectedModified,
+                    out attributes);
 
-            if (!SetFileInformationByHandle(handle, FileBasicInfoClass, ref basic, (uint)Marshal.SizeOf<FileBasicInfo>()))
+                cancel.ThrowIfCancellationRequested();
+
+                if ((attributes & (uint)FileAttributes.ReadOnly) != 0)
+                {
+                    var cleared = attributes & ~(uint)FileAttributes.ReadOnly;
+                    var basic = new FileBasicInfo
+                    {
+                        FileAttributes = cleared == 0 ? (uint)FileAttributes.Normal : cleared,
+                    };
+
+                    if (!SetFileInformationByHandle(handle, FileBasicInfoClass, ref basic, (uint)Marshal.SizeOf<FileBasicInfo>()))
+                    {
+                        throw Win32Error(path, Marshal.GetLastWin32Error());
+                    }
+                }
+            }
+
+            byte deleteFlag = 1;
+
+            if (!SetFileInformationByHandle(handle, FileDispositionInfoClass, ref deleteFlag, 1))
             {
                 throw Win32Error(path, Marshal.GetLastWin32Error());
             }
         }
-
-        byte deleteFlag = 1;
-
-        if (!SetFileInformationByHandle(handle, FileDispositionInfoClass, ref deleteFlag, 1))
+        finally
         {
-            throw Win32Error(path, Marshal.GetLastWin32Error());
+            handle.Dispose();
         }
     }
 
-    private static SafeFileHandle OpenFileForVerifiedDelete(string path)
+    private static SafeFileHandle OpenAndVerifyFileForDelete(
+        string path,
+        uint desiredAccess,
+        long? expectedSize,
+        DateTime? expectedModified,
+        out uint attributes)
+    {
+        var handle = OpenFileForVerifiedDelete(path, desiredAccess);
+
+        try
+        {
+            if (!GetFileInformationByHandle(handle, out var info))
+            {
+                throw Win32Error(path, Marshal.GetLastWin32Error());
+            }
+
+            if ((info.FileAttributes & ((uint)FileAttributes.Directory | (uint)FileAttributes.ReparsePoint)) != 0)
+            {
+                throw new IOException($"Файл «{path}» изменился после сравнения – безвозвратное удаление отменено.");
+            }
+
+            var actualSize = checked((long)(((ulong)info.FileSizeHigh << 32) | info.FileSizeLow));
+            var actualModified = DateTime.FromFileTime(checked((long)(((ulong)info.LastWriteTimeHigh << 32) | info.LastWriteTimeLow)));
+
+            if (actualSize != expectedSize || actualModified != expectedModified)
+            {
+                throw new IOException($"Файл «{path}» изменился после сравнения – безвозвратное удаление отменено.");
+            }
+
+            attributes = info.FileAttributes;
+            return handle;
+        }
+        catch
+        {
+            handle.Dispose();
+            throw;
+        }
+    }
+
+    private static SafeFileHandle OpenFileForVerifiedDelete(string path, uint desiredAccess)
     {
         var handle = CreateFileW(
             ExtendedPath(path),
-            DeleteAccess | FileReadAttributes | FileWriteAttributes,
+            desiredAccess,
             0,
             IntPtr.Zero,
             OpenExisting,

@@ -243,6 +243,44 @@ public class RecycleBinSafetyTests
         }
     }
 
+    [TestCase(@"\dir\report.txt ", @"dir\report.txt ")]
+    [TestCase("/dir/report.txt\u00A0", @"dir\report.txt" + "\u00A0")]
+    public void DeleteSilent_и_SupportsRecycleBin_разворачивают_путь_от_корня_текущего_диска_не_от_рабочей_папки(
+        string rootedInput,
+        string expectedFromDriveRoot)
+    {
+        var driveRoot = Path.GetPathRoot(Environment.CurrentDirectory)!;
+        var expectedPath = Path.Combine(driveRoot, expectedFromDriveRoot);
+        string? checkedPath = null;
+        IReadOnlyList<string>? recycledPaths = null;
+
+        RecycleBin.DeleteSilent(
+            [rootedInput],
+            x =>
+            {
+                checkedPath = x;
+                return true;
+            },
+            x => recycledPaths = x);
+
+        var probedPaths = new List<string>();
+        RecycleBin.SupportsRecycleBin(
+            rootedInput,
+            static _ => DriveType.Fixed,
+            x =>
+            {
+                probedPaths.Add(x);
+                return null;
+            });
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(checkedPath, Is.EqualTo(expectedPath));
+            Assert.That(recycledPaths, Is.EqualTo(new[] { expectedPath }));
+            Assert.That(probedPaths, Is.EqualTo(new[] { expectedPath }));
+        }
+    }
+
     [Test]
     public void DeleteSilent_удаляет_файл_с_неразрывным_пробелом_и_не_трогает_соседний_без_пробела()
     {

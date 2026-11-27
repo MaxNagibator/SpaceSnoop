@@ -2,6 +2,8 @@
 using SpaceSnoop.Core;
 using SpaceSnoop.Core.Domain;
 using System.Diagnostics;
+using System.Security.AccessControl;
+using System.Security.Principal;
 
 namespace SpaceSnoop.Tests;
 
@@ -527,6 +529,67 @@ public class SyncEngineNetworkTests
             Assert.That(report.Applied, Has.Count.EqualTo(1));
             Assert.That(Directory.Exists(doomedDir), Is.True);
             Assert.That(Directory.Exists(sub1) != Directory.Exists(sub2), Is.True);
+        }
+    }
+
+    [Test]
+    public void Безвозвратное_удаление_обычного_файла_работает_без_права_WriteAttributes()
+    {
+        var file = Path.Combine(_rightDir, "no-write-attrs.txt");
+        File.WriteAllText(file, "payload");
+        var comparer = new DirectoryComparer(new(string.Empty), NullLogger<DirectoryComparer>.Instance);
+        var comparison = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
+        comparison.ApplyMode(SyncMode.LeftToRight, mirror: true);
+
+        var user = WindowsIdentity.GetCurrent().User!;
+        var denyRule = new FileSystemAccessRule(user, FileSystemRights.WriteAttributes, AccessControlType.Deny);
+        var info = new FileInfo(file);
+        var security = info.GetAccessControl();
+        security.AddAccessRule(denyRule);
+        info.SetAccessControl(security);
+
+        try
+        {
+            var writeDenied = false;
+
+            try
+            {
+                File.SetAttributes(file, FileAttributes.Archive);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                writeDenied = true;
+            }
+
+            if (!writeDenied)
+            {
+                Assert.Ignore("запрет WriteAttributes в этой среде не действует");
+            }
+
+            var engine = new SyncEngine(
+                NullLogger<SyncEngine>.Instance,
+                showDeleteUi: false,
+                recycleOverwritten: false,
+                allowPermanentNetworkDelete: true,
+                supportsRecycleBin: static _ => false);
+
+            var report = engine.Execute(comparison, CancellationToken.None);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(report.Errors, Is.Empty);
+                Assert.That(report.DeletedCount, Is.EqualTo(1));
+                Assert.That(File.Exists(file), Is.False);
+            }
+        }
+        finally
+        {
+            if (File.Exists(file))
+            {
+                var restore = info.GetAccessControl();
+                restore.RemoveAccessRuleAll(denyRule);
+                info.SetAccessControl(restore);
+            }
         }
     }
 

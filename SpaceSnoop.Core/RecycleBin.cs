@@ -417,6 +417,11 @@ public static class RecycleBin
             root = driveBase;
             remainder = path[2..];
         }
+        else if (Path.IsPathRooted(path))
+        {
+            root = Path.GetPathRoot(Environment.CurrentDirectory)!;
+            remainder = path[1..];
+        }
         else
         {
             root = Environment.CurrentDirectory;
@@ -453,11 +458,13 @@ public static class RecycleBin
         }
 
         var trailingSeparator = path.EndsWith('\\') || path.EndsWith('/');
-        var joined = segments.Count == 0
-            ? baseRoot
-            : baseRoot.EndsWith('\\')
-                ? baseRoot + string.Join('\\', segments)
-                : baseRoot + "\\" + string.Join('\\', segments);
+        var joined = baseRoot;
+
+        if (segments.Count > 0)
+        {
+            var suffix = string.Join('\\', segments);
+            joined = baseRoot.EndsWith('\\') ? baseRoot + suffix : baseRoot + "\\" + suffix;
+        }
 
         return trailingSeparator && !joined.EndsWith('\\') ? joined + "\\" : joined;
     }
