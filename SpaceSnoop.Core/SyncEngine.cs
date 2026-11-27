@@ -1,26 +1,156 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.VisualBasic.FileIO;
+using Microsoft.Win32.SafeHandles;
+using System.ComponentModel;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Security;
 
 namespace SpaceSnoop.Core;
 
-public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = true, bool recycleOverwritten = false)
+public sealed class SyncEngine
 {
     private const string TempSuffix = ".sstmp";
     private const int TempNameAttempts = 20;
+    private const uint DeleteAccess = 0x0001_0000;
+    private const uint FileReadAttributes = 0x0080;
+    private const uint FileWriteAttributes = 0x0100;
+    private const uint OpenExisting = 3;
+    private const uint FileFlagOpenReparsePoint = 0x0020_0000;
+    private const int FileBasicInfoClass = 0;
+    private const int FileDispositionInfoClass = 4;
+    private const int ErrorFileNotFound = 2;
+    private const int ErrorPathNotFound = 3;
+    private const int ShortPathLimit = 259;
+    private const string LongPrefix = @"\\?\";
+    private const string LongUncPrefix = @"\\?\UNC\";
+
+    private readonly ILogger<SyncEngine> _logger;
+    private readonly bool _showDeleteUi;
+    private readonly bool _recycleOverwritten;
+    private readonly bool _allowPermanentNetworkDelete;
+    private readonly Func<string, bool> _supportsRecycleBin;
+
+    public SyncEngine(
+        ILogger<SyncEngine> logger,
+        bool showDeleteUi = true,
+        bool recycleOverwritten = false,
+        bool allowPermanentNetworkDelete = false)
+        : this(logger, showDeleteUi, recycleOverwritten, allowPermanentNetworkDelete, RecycleBin.SupportsRecycleBin)
+    {
+    }
+
+    internal SyncEngine(
+        ILogger<SyncEngine> logger,
+        bool showDeleteUi,
+        bool recycleOverwritten,
+        bool allowPermanentNetworkDelete,
+        Func<string, bool> supportsRecycleBin)
+    {
+        _logger = logger;
+        _showDeleteUi = showDeleteUi;
+        _recycleOverwritten = recycleOverwritten;
+        _allowPermanentNetworkDelete = allowPermanentNetworkDelete;
+        _supportsRecycleBin = supportsRecycleBin;
+    }
 
     public SyncReport Execute(ComparisonResult comparisonResult, CancellationToken cancel, IProgress<OperationProgress>? progress = null)
     {
+        return Execute(comparisonResult, new SyncReport(), cancel, progress);
+    }
+
+    public SyncReport Execute(ComparisonResult comparisonResult, SyncReport report, CancellationToken cancel, IProgress<OperationProgress>? progress = null)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+
         // TODO: корни сверяются один раз до прогона – каталог, подменённый на junction во время прогона, пишется по новой цели;
         // при появлении недоверенного процесса с правом записи в корни – открывать корни дескриптором и писать относительно него
         SyncRoots.EnsureDisjoint(comparisonResult.LeftPath, comparisonResult.RightPath);
 
-        var report = new SyncReport();
-        var tracker = new TransferTracker(progress, report);
         var blocked = new Dictionary<(DirectoryComparison Directory, SyncAction Action), bool>();
+
+        if (!_allowPermanentNetworkDelete
+            && FindPermanentNetworkDeletePath(comparisonResult, _supportsRecycleBin, blocked) is { } noRecycleBinPath)
+        {
+            throw new RecycleBinUnavailableException(noRecycleBinPath);
+        }
+
+        var tracker = new TransferTracker(progress, report);
         ExecuteRecursive(comparisonResult.Root, comparisonResult.LeftPath, comparisonResult.RightPath, report, tracker, cancel, DeleteGate.Open, blocked);
         return report;
+    }
+
+    public static string? FindPermanentNetworkDeletePath(
+        ComparisonResult comparisonResult,
+        Func<string, bool> supportsRecycleBin)
+    {
+        return FindPermanentNetworkDeletePath(comparisonResult, supportsRecycleBin, new());
+    }
+
+    private static string? FindPermanentNetworkDeletePath(
+        ComparisonResult comparisonResult,
+        Func<string, bool> supportsRecycleBin,
+        Dictionary<(DirectoryComparison Directory, SyncAction Action), bool> blocked)
+    {
+        return FindPermanentNetworkDeleteRecursive(
+            comparisonResult.Root,
+            comparisonResult.LeftPath,
+            comparisonResult.RightPath,
+            supportsRecycleBin,
+            DeleteGate.Open,
+            blocked);
+    }
+
+    private static string? FindPermanentNetworkDeleteRecursive(
+        DirectoryComparison dir,
+        string leftBase,
+        string rightBase,
+        Func<string, bool> supportsRecycleBin,
+        DeleteGate gate,
+        Dictionary<(DirectoryComparison Directory, SyncAction Action), bool> blocked)
+    {
+        gate = gate.Inherit(dir);
+
+        if (dir.Action is SyncAction.DeleteLeft or SyncAction.DeleteRight
+            && !(gate.Blocks(dir.Action) || SubtreeBlocks(dir, dir.Action, blocked)))
+        {
+            var targetPath = TargetPath(dir.Action, leftBase, rightBase, dir.RelativePath);
+            return supportsRecycleBin(targetPath) ? null : targetPath;
+        }
+
+        foreach (var file in dir.Files)
+        {
+            if (!ShouldApply(file)
+                || gate.Blocks(file.Action, file.DeleteLeftBlocked, file.DeleteRightBlocked)
+                || file.TypeConflict != FileTypeConflict.None
+                || file.Action is not (SyncAction.DeleteLeft or SyncAction.DeleteRight))
+            {
+                continue;
+            }
+
+            var targetPath = TargetPath(file.Action, leftBase, rightBase, file.RelativePath);
+
+            if (!supportsRecycleBin(targetPath))
+            {
+                return targetPath;
+            }
+        }
+
+        foreach (var sub in dir.SubDirectories)
+        {
+            if (FindPermanentNetworkDeleteRecursive(sub, leftBase, rightBase, supportsRecycleBin, gate, blocked) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    private static string TargetPath(SyncAction action, string leftBase, string rightBase, string relativePath)
+    {
+        var basePath = action == SyncAction.DeleteLeft ? leftBase : rightBase;
+        return Path.Combine(basePath, relativePath);
     }
 
     public void Verify(SyncReport report, string leftBase, string rightBase, CancellationToken cancel)
@@ -199,7 +329,7 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         }
 
         report.Errors.Add(new(relativePath, action, "удаление отклонено: сторона-источник обойдена не полностью; остальные отказы в этой ветке не перечисляются"));
-        logger.SyncDeleteBlocked(action, relativePath);
+        _logger.SyncDeleteBlocked(action, relativePath);
 
         return true;
     }
@@ -216,7 +346,7 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         };
 
         report.Errors.Add(new(file.RelativePath, file.Action, $"действие отклонено: {reason}"));
-        logger.SyncTypeConflictBlocked(file.Action, file.RelativePath, file.TypeConflict);
+        _logger.SyncTypeConflictBlocked(file.Action, file.RelativePath, file.TypeConflict);
     }
 
     private static bool SubtreeBlocks(
@@ -272,19 +402,17 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
                 break;
 
             case SyncAction.DeleteLeft:
-                if (File.Exists(leftPath))
+                if (File.Exists(ExtendedPath(leftPath)))
                 {
-                    ClearReadOnly(leftPath);
-                    RecycleFile(leftPath);
+                    DeleteFile(leftPath, file, cancel);
                 }
 
                 break;
 
             case SyncAction.DeleteRight:
-                if (File.Exists(rightPath))
+                if (File.Exists(ExtendedPath(rightPath)))
                 {
-                    ClearReadOnly(rightPath);
-                    RecycleFile(rightPath);
+                    DeleteFile(rightPath, file, cancel);
                 }
 
                 break;
@@ -305,17 +433,35 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
 
     private void RecyclePrevious(string destination)
     {
-        if (!recycleOverwritten || !File.Exists(destination))
+        if (!_recycleOverwritten || !File.Exists(destination) || !_supportsRecycleBin(destination))
         {
             return;
         }
 
-        RecycleFile(destination);
+        RecycleLocalFile(destination);
     }
 
-    private void RecycleFile(string path)
+    private void DeleteFile(string path, FileComparison plan, CancellationToken cancel)
     {
-        if (showDeleteUi)
+        if (!_supportsRecycleBin(path))
+        {
+            if (!_allowPermanentNetworkDelete)
+            {
+                throw new RecycleBinUnavailableException(path);
+            }
+
+            DeleteVerifiedFile(path, plan, cancel);
+            _logger.SyncPermanentNetworkDelete("файл", path);
+            return;
+        }
+
+        ClearReadOnly(path);
+        RecycleLocalFile(path);
+    }
+
+    private void RecycleLocalFile(string path)
+    {
+        if (_showDeleteUi)
         {
             FileSystem.DeleteFile(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
         }
@@ -325,14 +471,26 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         }
     }
 
-    private void DeleteDirectory(string path)
+    private void DeleteDirectory(string path, DirectoryComparison dir, SyncReport report, TransferTracker tracker, CancellationToken cancel)
     {
-        if (!Directory.Exists(path))
+        if (!Directory.Exists(ExtendedPath(path)))
         {
             return;
         }
 
-        if (showDeleteUi)
+        if (!_supportsRecycleBin(path))
+        {
+            if (!_allowPermanentNetworkDelete)
+            {
+                throw new RecycleBinUnavailableException(path);
+            }
+
+            DeleteVerifiedDirectory(path, dir, report, tracker, cancel);
+            _logger.SyncPermanentNetworkDelete("каталог", path);
+            return;
+        }
+
+        if (_showDeleteUi)
         {
             FileSystem.DeleteDirectory(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
         }
@@ -342,7 +500,328 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         }
     }
 
-    private void ApplyDirectoryAction(DirectoryComparison dir, string leftBase, string rightBase, SyncReport report)
+    private void DeleteVerifiedDirectory(string rootPath, DirectoryComparison rootDir, SyncReport report, TransferTracker tracker, CancellationToken cancel)
+    {
+        if ((File.GetAttributes(ExtendedPath(rootPath)) & FileAttributes.ReparsePoint) != 0)
+        {
+            throw new IOException($"Каталог является ссылкой «{rootPath}» – безвозвратное удаление отменено.");
+        }
+
+        var expectedAction = rootDir.Action;
+        var options = new EnumerationOptions { AttributesToSkip = 0, IgnoreInaccessible = false };
+        var stack = new Stack<(string Path, DirectoryComparison Plan)>();
+        var directories = new List<(string Path, string RelativePath, SyncAction Action)>();
+        var files = new List<(string Path, FileComparison Plan)>();
+        stack.Push((rootPath, rootDir));
+
+        while (stack.Count > 0)
+        {
+            cancel.ThrowIfCancellationRequested();
+            var (currentPath, currentPlan) = stack.Pop();
+            directories.Add((currentPath, currentPlan.RelativePath, expectedAction));
+            var expectedFiles = new Dictionary<string, FileComparison>(currentPlan.Files.Count, StringComparer.Ordinal);
+
+            foreach (var file in currentPlan.Files)
+            {
+                if (!expectedFiles.TryAdd(file.Name, file))
+                {
+                    throw new IOException("Каталог изменился после сравнения – безвозвратное удаление отменено.");
+                }
+            }
+
+            var expectedDirs = new Dictionary<string, DirectoryComparison>(currentPlan.SubDirectories.Count, StringComparer.Ordinal);
+
+            foreach (var sub in currentPlan.SubDirectories)
+            {
+                if (!expectedDirs.TryAdd(sub.Name, sub))
+                {
+                    throw new IOException("Каталог изменился после сравнения – безвозвратное удаление отменено.");
+                }
+            }
+
+            foreach (var entry in new DirectoryInfo(ExtendedPath(currentPath)).EnumerateFileSystemInfos("*", options))
+            {
+                cancel.ThrowIfCancellationRequested();
+                if ((entry.Attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    throw new IOException($"В каталоге обнаружена ссылка «{entry.FullName}» – безвозвратное удаление отменено.");
+                }
+
+                if ((entry.Attributes & FileAttributes.Directory) != 0)
+                {
+                    if (!expectedDirs.TryGetValue(entry.Name, out var subPlan) || subPlan.Action != expectedAction)
+                    {
+                        throw new IOException("Каталог изменился после сравнения – безвозвратное удаление отменено.");
+                    }
+
+                    stack.Push((Path.Combine(currentPath, entry.Name), subPlan));
+                    continue;
+                }
+
+                if (entry is not FileInfo fileInfo
+                    || !expectedFiles.TryGetValue(entry.Name, out var filePlan)
+                    || filePlan.Action != expectedAction
+                    || filePlan.TypeConflict != FileTypeConflict.None)
+                {
+                    throw new IOException("Каталог изменился после сравнения – безвозвратное удаление отменено.");
+                }
+
+                VerifyFileMatchesPlan(fileInfo, filePlan);
+                files.Add((Path.Combine(currentPath, entry.Name), filePlan));
+            }
+        }
+
+        cancel.ThrowIfCancellationRequested();
+
+        var deletedFiles = new List<FileComparison>();
+        var deletedDirectories = new List<(string RelativePath, SyncAction Action)>();
+
+        try
+        {
+            foreach (var (path, plan) in files)
+            {
+                DeleteVerifiedFile(path, plan, cancel);
+                deletedFiles.Add(plan);
+                tracker.Report(plan.RelativePath);
+            }
+
+            for (var index = directories.Count - 1; index >= 0; index--)
+            {
+                cancel.ThrowIfCancellationRequested();
+                var (dirPath, dirRelativePath, dirAction) = directories[index];
+                var directory = new DirectoryInfo(ExtendedPath(dirPath));
+
+                if ((directory.Attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    throw new IOException($"Каталог является ссылкой «{dirPath}» – безвозвратное удаление отменено.");
+                }
+
+                if ((directory.Attributes & FileAttributes.ReadOnly) != 0)
+                {
+                    directory.Attributes &= ~FileAttributes.ReadOnly;
+                }
+
+                directory.Delete(recursive: false);
+                deletedDirectories.Add((dirRelativePath, dirAction));
+                tracker.Report(dirRelativePath);
+            }
+        }
+        catch
+        {
+            RecordPartialDirectoryDeletions(report, deletedFiles, deletedDirectories);
+            throw;
+        }
+    }
+
+    private void RecordPartialDirectoryDeletions(
+        SyncReport report,
+        List<FileComparison> deletedFiles,
+        List<(string RelativePath, SyncAction Action)> deletedDirectories)
+    {
+        foreach (var file in deletedFiles)
+        {
+            report.DeletedCount++;
+            report.AddApplied(file.Action, file.RelativePath, AppliedBytes(file));
+            _logger.SyncFileApplied(file.Action, file.RelativePath);
+        }
+
+        foreach (var (relativePath, action) in deletedDirectories)
+        {
+            report.DeletedCount++;
+            report.AddApplied(action, relativePath, 0);
+            _logger.SyncFileApplied(action, relativePath);
+        }
+    }
+
+    private static void VerifyFileMatchesPlan(FileInfo file, FileComparison plan)
+    {
+        var deleteLeft = plan.Action == SyncAction.DeleteLeft;
+        var size = deleteLeft ? plan.LeftSize : plan.RightSize;
+        var modified = deleteLeft ? plan.LeftModified : plan.RightModified;
+
+        if (!file.Exists
+            || (file.Attributes & FileAttributes.ReparsePoint) != 0
+            || file.Length != size
+            || file.LastWriteTime != modified)
+        {
+            throw new IOException($"Файл «{file.FullName}» изменился после сравнения – безвозвратное удаление отменено.");
+        }
+    }
+
+    private static void DeleteVerifiedFile(string path, FileComparison plan, CancellationToken cancel)
+    {
+        cancel.ThrowIfCancellationRequested();
+
+        var deleteLeft = plan.Action == SyncAction.DeleteLeft;
+        var expectedSize = deleteLeft ? plan.LeftSize : plan.RightSize;
+        var expectedModified = deleteLeft ? plan.LeftModified : plan.RightModified;
+
+        var handle = OpenAndVerifyFileForDelete(
+            path,
+            DeleteAccess | FileReadAttributes,
+            expectedSize,
+            expectedModified,
+            out var attributes);
+
+        try
+        {
+            cancel.ThrowIfCancellationRequested();
+
+            if ((attributes & (uint)FileAttributes.ReadOnly) != 0)
+            {
+                handle.Dispose();
+                handle = OpenAndVerifyFileForDelete(
+                    path,
+                    DeleteAccess | FileReadAttributes | FileWriteAttributes,
+                    expectedSize,
+                    expectedModified,
+                    out attributes);
+
+                cancel.ThrowIfCancellationRequested();
+
+                if ((attributes & (uint)FileAttributes.ReadOnly) != 0)
+                {
+                    var cleared = attributes & ~(uint)FileAttributes.ReadOnly;
+                    var basic = new FileBasicInfo
+                    {
+                        FileAttributes = cleared == 0 ? (uint)FileAttributes.Normal : cleared,
+                    };
+
+                    if (!SetFileInformationByHandle(handle, FileBasicInfoClass, ref basic, (uint)Marshal.SizeOf<FileBasicInfo>()))
+                    {
+                        throw Win32Error(path, Marshal.GetLastWin32Error());
+                    }
+                }
+            }
+
+            byte deleteFlag = 1;
+
+            if (!SetFileInformationByHandle(handle, FileDispositionInfoClass, ref deleteFlag, 1))
+            {
+                throw Win32Error(path, Marshal.GetLastWin32Error());
+            }
+        }
+        finally
+        {
+            handle.Dispose();
+        }
+    }
+
+    private static SafeFileHandle OpenAndVerifyFileForDelete(
+        string path,
+        uint desiredAccess,
+        long? expectedSize,
+        DateTime? expectedModified,
+        out uint attributes)
+    {
+        var handle = OpenFileForVerifiedDelete(path, desiredAccess);
+
+        try
+        {
+            if (!GetFileInformationByHandle(handle, out var info))
+            {
+                throw Win32Error(path, Marshal.GetLastWin32Error());
+            }
+
+            if ((info.FileAttributes & ((uint)FileAttributes.Directory | (uint)FileAttributes.ReparsePoint)) != 0)
+            {
+                throw new IOException($"Файл «{path}» изменился после сравнения – безвозвратное удаление отменено.");
+            }
+
+            var actualSize = checked((long)(((ulong)info.FileSizeHigh << 32) | info.FileSizeLow));
+            var actualModified = DateTime.FromFileTime(checked((long)(((ulong)info.LastWriteTimeHigh << 32) | info.LastWriteTimeLow)));
+
+            if (actualSize != expectedSize || actualModified != expectedModified)
+            {
+                throw new IOException($"Файл «{path}» изменился после сравнения – безвозвратное удаление отменено.");
+            }
+
+            attributes = info.FileAttributes;
+            return handle;
+        }
+        catch
+        {
+            handle.Dispose();
+            throw;
+        }
+    }
+
+    private static SafeFileHandle OpenFileForVerifiedDelete(string path, uint desiredAccess)
+    {
+        var handle = CreateFileW(
+            ExtendedPath(path),
+            desiredAccess,
+            0,
+            IntPtr.Zero,
+            OpenExisting,
+            FileFlagOpenReparsePoint,
+            IntPtr.Zero);
+
+        if (!handle.IsInvalid)
+        {
+            return handle;
+        }
+
+        var error = Marshal.GetLastWin32Error();
+        handle.Dispose();
+
+        if (error is ErrorFileNotFound or ErrorPathNotFound)
+        {
+            throw new IOException($"Файл «{path}» изменился после сравнения – безвозвратное удаление отменено.", new Win32Exception(error));
+        }
+
+        throw Win32Error(path, error);
+    }
+
+    private static IOException Win32Error(string path, int errorCode)
+    {
+        var error = new Win32Exception(errorCode);
+        return new($"«{path}»: {error.Message} (Win32: {error.NativeErrorCode}).", error);
+    }
+
+    private static string ExtendedPath(string path)
+    {
+        if (path.StartsWith(LongPrefix, StringComparison.Ordinal) || !Path.IsPathFullyQualified(path))
+        {
+            return path;
+        }
+
+        if (path.Length <= ShortPathLimit && !HasTrailingSpaceOrDotSegment(path))
+        {
+            return path;
+        }
+
+        return path.StartsWith(@"\\", StringComparison.Ordinal)
+            ? LongUncPrefix + path[2..]
+            : LongPrefix + path;
+    }
+
+    private static bool HasTrailingSpaceOrDotSegment(string path)
+    {
+        var span = path.AsSpan();
+
+        while (span.Length > 0)
+        {
+            var sep = span.IndexOfAny('\\', '/');
+            var segment = sep >= 0 ? span[..sep] : span;
+
+            if (segment.Length > 0 && segment is not "." and not ".." && (segment[^1] == ' ' || segment[^1] == '.'))
+            {
+                return true;
+            }
+
+            if (sep < 0)
+            {
+                break;
+            }
+
+            span = span[(sep + 1)..];
+        }
+
+        return false;
+    }
+
+    private void ApplyDirectoryAction(DirectoryComparison dir, string leftBase, string rightBase, SyncReport report, TransferTracker tracker, CancellationToken cancel)
     {
         try
         {
@@ -359,23 +838,23 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
                     break;
 
                 case SyncAction.DeleteLeft:
-                    DeleteDirectory(Path.Combine(leftBase, dir.RelativePath));
+                    DeleteDirectory(Path.Combine(leftBase, dir.RelativePath), dir, report, tracker, cancel);
                     report.DeletedCount++;
                     break;
 
                 case SyncAction.DeleteRight:
-                    DeleteDirectory(Path.Combine(rightBase, dir.RelativePath));
+                    DeleteDirectory(Path.Combine(rightBase, dir.RelativePath), dir, report, tracker, cancel);
                     report.DeletedCount++;
                     break;
             }
 
             report.AddApplied(dir.Action, dir.RelativePath, 0);
-            logger.SyncFileApplied(dir.Action, dir.RelativePath);
+            _logger.SyncFileApplied(dir.Action, dir.RelativePath);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             report.Errors.Add(new(dir.RelativePath, dir.Action, ex.Message));
-            logger.SyncFileFailed(ex, dir.Action, dir.RelativePath);
+            _logger.SyncFileFailed(ex, dir.Action, dir.RelativePath);
         }
     }
 
@@ -405,13 +884,13 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
             else
             {
                 cancel.ThrowIfCancellationRequested();
-                ApplyDirectoryActionAndReport(dir, leftBase, rightBase, report, tracker);
+                ApplyDirectoryActionAndReport(dir, leftBase, rightBase, report, tracker, cancel);
                 return;
             }
         }
         else if (dir.Action is SyncAction.CopyToRight or SyncAction.CopyToLeft)
         {
-            ApplyDirectoryActionAndReport(dir, leftBase, rightBase, report, tracker);
+            ApplyDirectoryActionAndReport(dir, leftBase, rightBase, report, tracker, cancel);
         }
 
         foreach (var file in dir.Files)
@@ -456,9 +935,10 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         string leftBase,
         string rightBase,
         SyncReport report,
-        TransferTracker tracker)
+        TransferTracker tracker,
+        CancellationToken cancel)
     {
-        ApplyDirectoryAction(dir, leftBase, rightBase, report);
+        ApplyDirectoryAction(dir, leftBase, rightBase, report, tracker, cancel);
         tracker.Report(dir.RelativePath);
     }
 
@@ -484,14 +964,44 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
             }
 
             report.AddApplied(file.Action, file.RelativePath, AppliedBytes(file));
-            logger.SyncFileApplied(file.Action, file.RelativePath);
+            _logger.SyncFileApplied(file.Action, file.RelativePath);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             report.Errors.Add(new(file.RelativePath, file.Action, ex.Message));
-            logger.SyncFileFailed(ex, file.Action, file.RelativePath);
+            _logger.SyncFileFailed(ex, file.Action, file.RelativePath);
         }
     }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern SafeFileHandle CreateFileW(
+        string path,
+        uint access,
+        uint share,
+        IntPtr security,
+        uint disposition,
+        uint flags,
+        IntPtr template);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetFileInformationByHandle(SafeFileHandle handle, out ByHandleFileInformation info);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetFileInformationByHandle(
+        SafeFileHandle handle,
+        int informationClass,
+        ref FileBasicInfo information,
+        uint size);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetFileInformationByHandle(
+        SafeFileHandle handle,
+        int informationClass,
+        ref byte information,
+        uint size);
 
     private readonly record struct DeleteGate(bool Left, bool Right, bool Reported)
     {
@@ -560,6 +1070,34 @@ public sealed class SyncEngine(ILogger<SyncEngine> logger, bool showDeleteUi = t
         {
             progress?.Report(new(report.SuccessCount + report.Errors.Count, relativePath, _appliedBytes + _currentBytes));
         }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ByHandleFileInformation
+    {
+        public uint FileAttributes;
+        public uint CreationTimeLow;
+        public uint CreationTimeHigh;
+        public uint LastAccessTimeLow;
+        public uint LastAccessTimeHigh;
+        public uint LastWriteTimeLow;
+        public uint LastWriteTimeHigh;
+        public uint VolumeSerialNumber;
+        public uint FileSizeHigh;
+        public uint FileSizeLow;
+        public uint NumberOfLinks;
+        public uint FileIndexHigh;
+        public uint FileIndexLow;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct FileBasicInfo
+    {
+        public long CreationTime;
+        public long LastAccessTime;
+        public long LastWriteTime;
+        public long ChangeTime;
+        public uint FileAttributes;
     }
 }
 

@@ -2,8 +2,6 @@
 
 internal static partial class SyncRowsProjector
 {
-    private static readonly char[] PathSeparators = ['/', '\\'];
-
     internal static string[] ParseGroupFolders(string folders)
     {
         return folders.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -16,18 +14,15 @@ internal static partial class SyncRowsProjector
             return null;
         }
 
-        foreach (var segment in relativePath.Split(PathSeparators))
+        if (folders is string[] array)
         {
-            foreach (var folder in folders)
-            {
-                if (string.Equals(segment, folder, StringComparison.OrdinalIgnoreCase))
-                {
-                    return folder;
-                }
-            }
+            var index = GroupedFolderIndex(relativePath, array);
+            return index >= 0 ? array[index] : null;
         }
 
-        return null;
+        var copy = folders as IReadOnlyList<string> ?? [.. folders];
+        var matched = GroupedFolderIndex(relativePath, copy);
+        return matched >= 0 ? copy[matched] : null;
     }
 
     internal static bool IsGroupedPath(string relativePath, IReadOnlyCollection<string> folders)
@@ -39,133 +34,303 @@ internal static partial class SyncRowsProjector
     {
         var root = request.Result.Root;
         var search = request.SearchText.Trim();
-        var files = FilterBySearch(CollectVisibleFiles(root, request.ShowIdentical, request.HideApplied, request.Outcomes), search, static file => file.RelativePath);
-        var sortedFiles = SortFiles(files, request.RowSort, request.RowSortDescending).ToList();
-        var dirs = FilterBySearch(CollectEmptyDirs(root, request.HideApplied, request.Outcomes), search, static dir => dir.RelativePath);
-        var sortedDirs = dirs.OrderBy(dir => dir.RelativePath, StringComparer.OrdinalIgnoreCase).ToList();
-        var groupFolders = ParseGroupFolders(request.GroupFolders);
-        var buffer = new List<SyncNodeViewModel>();
+        var files = new List<FileComparison>();
+        CollectVisibleFilesTo(root, request.ShowIdentical, request.HideApplied, request.Outcomes, search, files);
 
-        AddUngroupedRows(buffer, sortedFiles, sortedDirs, groupFolders, request, host);
-        AddGroupedRows(buffer, sortedFiles, sortedDirs, groupFolders, request, host);
-        return buffer;
-    }
-
-    private static IEnumerable<T> FilterBySearch<T>(IEnumerable<T> items, string search, Func<T, string> path)
-    {
-        return search.Length == 0
-            ? items
-            : items.Where(item => path(item).Contains(search, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static void AddUngroupedRows(
-        List<SyncNodeViewModel> buffer,
-        IReadOnlyList<FileComparison> files,
-        IReadOnlyList<DirectoryComparison> dirs,
-        IReadOnlyCollection<string> groupFolders,
-        SyncRowsRequest request,
-        ISyncRowHost host)
-    {
-        foreach (var file in files.Where(file => !IsGroupedPath(file.RelativePath, groupFolders)))
+        if (files.Count > 1)
         {
-            buffer.Add(
-                new(file, 0, host, true)
-                {
-                    Outcome = request.Outcomes.GetValueOrDefault(file),
-                });
+            SortFilesInPlace(files, request.RowSort, request.RowSortDescending);
         }
 
-        foreach (var dir in dirs.Where(dir => !IsGroupedPath(dir.RelativePath, groupFolders)))
-        {
-            buffer.Add(
-                new(dir, 0, false, 0, 0, host, true)
-                {
-                    Outcome = request.Outcomes.GetValueOrDefault(dir),
-                });
-        }
-    }
+        var dirs = new List<DirectoryComparison>();
+        CollectEmptyDirsTo(root, request.HideApplied, request.Outcomes, search, dirs);
 
-    private static void AddGroupedRows(
-        List<SyncNodeViewModel> buffer,
-        IReadOnlyList<FileComparison> files,
-        IReadOnlyList<DirectoryComparison> dirs,
-        IReadOnlyCollection<string> groupFolders,
-        SyncRowsRequest request,
-        ISyncRowHost host)
-    {
-        var groupedFiles = files.Where(file => IsGroupedPath(file.RelativePath, groupFolders)).ToList();
-        var groupedDirs = dirs.Where(dir => IsGroupedPath(dir.RelativePath, groupFolders)).ToList();
-        var total = groupedFiles.Count + groupedDirs.Count;
-
-        if (total == 0)
+        if (dirs.Count > 1)
         {
-            return;
+            dirs.Sort(static (left, right) => StringComparer.OrdinalIgnoreCase.Compare(left.RelativePath, right.RelativePath));
         }
 
-        buffer.Add(SyncNodeViewModel.CreateGroupHeader(total, request.GitGroupExpanded, host));
+        var groupFolders = DeduplicateFolders(ParseGroupFolders(request.GroupFolders));
+
+        if (groupFolders.Length == 0)
+        {
+            var simple = new List<SyncNodeViewModel>(files.Count + dirs.Count);
+            AppendFlatFiles(simple, files, 0, request.Outcomes, host);
+            AppendFlatDirs(simple, dirs, 0, request.Outcomes, host);
+            return simple;
+        }
+
+        var buffer = new List<SyncNodeViewModel>(files.Count + dirs.Count + 1 + groupFolders.Length);
+        var subFiles = new List<FileComparison>?[groupFolders.Length];
+        var subDirs = new List<DirectoryComparison>?[groupFolders.Length];
+        var groupedTotal = 0;
+
+        for (var i = 0; i < files.Count; i++)
+        {
+            var file = files[i];
+            var groupIndex = GroupedFolderIndex(file.RelativePath, groupFolders);
+
+            if (groupIndex < 0)
+            {
+                buffer.Add(
+                    new(file, 0, host, true)
+                    {
+                        Outcome = request.Outcomes.GetValueOrDefault(file),
+                    });
+            }
+            else
+            {
+                (subFiles[groupIndex] ??= []).Add(file);
+                groupedTotal++;
+            }
+        }
+
+        for (var i = 0; i < dirs.Count; i++)
+        {
+            var dir = dirs[i];
+            var groupIndex = GroupedFolderIndex(dir.RelativePath, groupFolders);
+
+            if (groupIndex < 0)
+            {
+                buffer.Add(
+                    new(dir, 0, false, 0, 0, host, true)
+                    {
+                        Outcome = request.Outcomes.GetValueOrDefault(dir),
+                    });
+            }
+            else
+            {
+                (subDirs[groupIndex] ??= []).Add(dir);
+                groupedTotal++;
+            }
+        }
+
+        if (groupedTotal == 0)
+        {
+            return buffer;
+        }
+
+        buffer.Add(SyncNodeViewModel.CreateGroupHeader(groupedTotal, request.GitGroupExpanded, host));
 
         if (!request.GitGroupExpanded)
         {
-            return;
+            return buffer;
         }
 
-        foreach (var folder in groupFolders.Distinct(StringComparer.OrdinalIgnoreCase))
+        for (var i = 0; i < groupFolders.Length; i++)
         {
-            AddGroup(buffer, folder, groupedFiles, groupedDirs, groupFolders, request, host);
+            var groupFiles = subFiles[i];
+            var groupDirs = subDirs[i];
+            var count = (groupFiles?.Count ?? 0) + (groupDirs?.Count ?? 0);
+
+            if (count == 0)
+            {
+                continue;
+            }
+
+            var folder = groupFolders[i];
+            var expanded = !request.CollapsedSubGroups.Contains(folder);
+            buffer.Add(SyncNodeViewModel.CreateSubGroupHeader(folder, count, expanded, host));
+
+            if (expanded)
+            {
+                if (groupFiles is not null)
+                {
+                    AppendFlatFiles(buffer, groupFiles, 2, request.Outcomes, host);
+                }
+
+                if (groupDirs is not null)
+                {
+                    AppendFlatDirs(buffer, groupDirs, 2, request.Outcomes, host);
+                }
+            }
+        }
+
+        return buffer;
+    }
+
+    private static string[] DeduplicateFolders(string[] folders)
+    {
+        if (folders.Length <= 1)
+        {
+            return folders;
+        }
+
+        var unique = new List<string>(folders.Length);
+
+        for (var i = 0; i < folders.Length; i++)
+        {
+            var candidate = folders[i];
+            var duplicate = false;
+
+            for (var j = 0; j < unique.Count; j++)
+            {
+                if (string.Equals(unique[j], candidate, StringComparison.OrdinalIgnoreCase))
+                {
+                    duplicate = true;
+                    break;
+                }
+            }
+
+            if (!duplicate)
+            {
+                unique.Add(candidate);
+            }
+        }
+
+        return [.. unique];
+    }
+
+    private static int GroupedFolderIndex(string relativePath, IReadOnlyList<string> folders)
+    {
+        var span = relativePath.AsSpan();
+        var count = folders.Count;
+
+        while (true)
+        {
+            var separator = span.IndexOfAny('/', '\\');
+            var segment = separator >= 0 ? span[..separator] : span;
+
+            for (var i = 0; i < count; i++)
+            {
+                if (segment.Equals(folders[i], StringComparison.OrdinalIgnoreCase))
+                {
+                    return i;
+                }
+            }
+
+            if (separator < 0)
+            {
+                return -1;
+            }
+
+            span = span[(separator + 1)..];
         }
     }
 
-    private static void AddGroup(
+    private static void CollectVisibleFilesTo(
+        DirectoryComparison dir,
+        bool showIdentical,
+        bool hideApplied,
+        IReadOnlyDictionary<object, SyncOutcome> outcomes,
+        string search,
+        List<FileComparison> target)
+    {
+        var subs = dir.SubDirectories;
+
+        for (var i = 0; i < subs.Count; i++)
+        {
+            CollectVisibleFilesTo(subs[i], showIdentical, hideApplied, outcomes, search, target);
+        }
+
+        var files = dir.Files;
+        var hasSearch = search.Length > 0;
+
+        for (var i = 0; i < files.Count; i++)
+        {
+            var file = files[i];
+
+            if (!showIdentical && file.Status == ComparisonStatus.Identical)
+            {
+                continue;
+            }
+
+            if (hideApplied && outcomes.GetValueOrDefault(file) == SyncOutcome.Applied)
+            {
+                continue;
+            }
+
+            if (hasSearch && !Matches(file.RelativePath, search))
+            {
+                continue;
+            }
+
+            target.Add(file);
+        }
+    }
+
+    private static void CollectEmptyDirsTo(
+        DirectoryComparison dir,
+        bool hideApplied,
+        IReadOnlyDictionary<object, SyncOutcome> outcomes,
+        string search,
+        List<DirectoryComparison> target)
+    {
+        var subs = dir.SubDirectories;
+        var hasSearch = search.Length > 0;
+
+        for (var i = 0; i < subs.Count; i++)
+        {
+            var sub = subs[i];
+
+            if (sub.Status is ComparisonStatus.LeftOnly or ComparisonStatus.RightOnly && SubtreeHasNoFiles(sub))
+            {
+                if ((!hideApplied || outcomes.GetValueOrDefault(sub) != SyncOutcome.Applied)
+                    && (!hasSearch || Matches(sub.RelativePath, search)))
+                {
+                    target.Add(sub);
+                }
+
+                continue;
+            }
+
+            CollectEmptyDirsTo(sub, hideApplied, outcomes, search, target);
+        }
+
+        static bool SubtreeHasNoFiles(DirectoryComparison node)
+        {
+            if (node.Files.Count > 0)
+            {
+                return false;
+            }
+
+            var nested = node.SubDirectories;
+
+            for (var i = 0; i < nested.Count; i++)
+            {
+                if (!SubtreeHasNoFiles(nested[i]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+    }
+
+    private static void AppendFlatFiles(
         List<SyncNodeViewModel> buffer,
-        string folder,
-        IReadOnlyList<FileComparison> files,
-        IReadOnlyList<DirectoryComparison> dirs,
-        IReadOnlyCollection<string> groupFolders,
-        SyncRowsRequest request,
+        List<FileComparison> files,
+        int indent,
+        IReadOnlyDictionary<object, SyncOutcome> outcomes,
         ISyncRowHost host)
     {
-        var subFiles = files.Where(file => string.Equals(GroupedKey(file.RelativePath, groupFolders), folder, StringComparison.OrdinalIgnoreCase)).ToList();
-        var subDirs = dirs.Where(dir => string.Equals(GroupedKey(dir.RelativePath, groupFolders), folder, StringComparison.OrdinalIgnoreCase)).ToList();
-        var total = subFiles.Count + subDirs.Count;
-
-        if (total == 0)
+        for (var i = 0; i < files.Count; i++)
         {
-            return;
-        }
-
-        var expanded = !request.CollapsedSubGroups.Contains(folder);
-        buffer.Add(SyncNodeViewModel.CreateSubGroupHeader(folder, total, expanded, host));
-
-        if (expanded)
-        {
-            AddGroupItems(buffer, subFiles, subDirs, request, host);
+            var file = files[i];
+            buffer.Add(
+                new(file, indent, host, true)
+                {
+                    Outcome = outcomes.GetValueOrDefault(file),
+                });
         }
     }
 
-    private static void AddGroupItems(
+    private static void AppendFlatDirs(
         List<SyncNodeViewModel> buffer,
-        IReadOnlyList<FileComparison> files,
-        IReadOnlyList<DirectoryComparison> dirs,
-        SyncRowsRequest request,
+        List<DirectoryComparison> dirs,
+        int indent,
+        IReadOnlyDictionary<object, SyncOutcome> outcomes,
         ISyncRowHost host)
     {
-        foreach (var file in files)
+        for (var i = 0; i < dirs.Count; i++)
         {
+            var dir = dirs[i];
             buffer.Add(
-                new(file, 2, host, true)
+                new(dir, indent, false, 0, 0, host, true)
                 {
-                    Outcome = request.Outcomes.GetValueOrDefault(file),
-                });
-        }
-
-        foreach (var dir in dirs)
-        {
-            buffer.Add(
-                new(dir, 2, false, 0, 0, host, true)
-                {
-                    Outcome = request.Outcomes.GetValueOrDefault(dir),
+                    Outcome = outcomes.GetValueOrDefault(dir),
                 });
         }
     }
-
 }

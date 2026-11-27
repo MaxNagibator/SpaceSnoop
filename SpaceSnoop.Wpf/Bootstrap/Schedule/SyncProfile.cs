@@ -11,6 +11,7 @@ public sealed class SyncProfile
     public string Right { get; set; } = string.Empty;
     public int Mode { get; set; }
     public bool Mirror { get; set; }
+    public string? PermanentNetworkDeleteTarget { get; set; }
     public SyncWinner Winner { get; set; } = SyncWinner.Newest;
     public string Exclusions { get; set; } = string.Empty;
     public ScheduleInterval Interval { get; set; } = ScheduleInterval.Daily;
@@ -77,5 +78,11 @@ public sealed class SyncProfile
             SyncMode.Bidirectional => !Directory.Exists(left) && !Directory.Exists(right),
             _ => !Directory.Exists(left),
         };
+    }
+
+    internal static string? MirrorTarget(SyncMode mode, SyncWinner winner, string left, string right)
+    {
+        var target = MirrorSource(mode, winner, right, left)?.Trim();
+        return string.IsNullOrEmpty(target) || UncPath.IsIncompleteUnc(target) ? null : target;
     }
 }

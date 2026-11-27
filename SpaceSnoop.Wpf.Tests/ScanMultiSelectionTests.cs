@@ -588,6 +588,347 @@ public class ScanMultiSelectionTests
         }
     }
 
+    [Test]
+    public void Пакетная_пометка_и_откат_работают_на_файлах_из_ScanTreeStore_после_сборки_мусора()
+    {
+        var (firstWeak, undo) = CreateStoreTreeAndMarkDeleted();
+
+        ForceFullGc();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(IsWeakTargetAlive(firstWeak), Is.True);
+            Assert.That(_scan.Marks.MarkedCount, Is.EqualTo(2));
+        }
+
+        ExecuteUndo(undo);
+        DropRootsAndSelection();
+
+        ForceFullGc();
+
+        Assert.That(IsWeakTargetAlive(firstWeak), Is.False);
+        GC.KeepAlive(undo);
+    }
+
+    [Test]
+    public void Пакетная_пометка_и_откат_сохраняют_слабые_фасады_несвернутых_каталогов_до_выполнения_отмены()
+    {
+        var (rootWeak, unexpandedFileWeak, undo) = CreateUnexpandedStoreTreeAndMarkDeleted();
+
+        ForceFullGc();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(IsWeakTargetAlive(rootWeak), Is.True);
+            Assert.That(IsWeakTargetAlive(unexpandedFileWeak), Is.True);
+            Assert.That(CountUndoPins(rootWeak), Is.EqualTo(1));
+        }
+
+        ExecuteUndoOnUnexpandedBranch(undo, rootWeak);
+        GC.KeepAlive(undo);
+    }
+
+    [Test]
+    public void Удаление_корня_при_активном_тосте_отмены_не_удерживает_корень_в_памяти()
+    {
+        var (rootWeak, undo) = CreateStoreTreeAndMarkBranchDeleted();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(IsWeakTargetAlive(rootWeak), Is.True);
+            Assert.That(CountUndoPins(rootWeak), Is.EqualTo(1));
+            Assert.That(_toasts.Toasts.Contains(undo), Is.True);
+        }
+
+        DropRootsAndSelection();
+        ForceFullGc();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(IsWeakTargetAlive(rootWeak), Is.False);
+            Assert.That(_toasts.Toasts.Contains(undo), Is.True);
+            Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
+        }
+
+        GC.KeepAlive(undo);
+    }
+
+    [Test]
+    public void Замена_или_закрытие_тоста_отмены_освобождает_пины_фасадов_при_живом_корне()
+    {
+        var rootWeak = CreateStoreTreeAndReplaceUndoToast();
+
+        ForceFullGc();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(IsWeakTargetAlive(rootWeak), Is.True);
+            Assert.That(CountUndoPins(rootWeak), Is.EqualTo(1));
+        }
+
+        ExecuteActiveUndoToastAndVerifyPinRelease(rootWeak);
+        ForceFullGc();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(IsWeakTargetAlive(rootWeak), Is.True);
+            Assert.That(CountUndoPins(rootWeak), Is.EqualTo(0));
+            Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ForceFullGc()
+    {
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+        GC.WaitForPendingFinalizers();
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static bool IsWeakTargetAlive(WeakReference<SpaceBase> weak)
+    {
+        return weak.TryGetTarget(out _);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static bool IsWeakTargetAlive(WeakReference<DirectorySpace> weak)
+    {
+        return weak.TryGetTarget(out _);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private int CountUndoPins(WeakReference<DirectorySpace> rootWeak)
+    {
+        return rootWeak.TryGetTarget(out var root) ? _scan.UndoFacadePinCount(root) : 0;
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void ExecuteUndoOnUnexpandedBranch(ToastViewModel undo, WeakReference<DirectorySpace> rootWeak)
+    {
+        undo.ActionCommand!.Execute(undo);
+        _host.Settle();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(CountUndoPins(rootWeak), Is.EqualTo(0));
+            Assert.That(_scan.Marks.MarkedCount, Is.EqualTo(1));
+            var branch = ((DirectorySpace)_scan.Roots[0].Space!).SubDirectories[0];
+            Assert.That(branch.State, Is.EqualTo(SpaceState.Added));
+            Assert.That(branch.FileEntries[0].State, Is.EqualTo(SpaceState.Deleted));
+            Assert.That(branch.FileEntries[1].State, Is.EqualTo(SpaceState.Added));
+            Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private (WeakReference<DirectorySpace> RootWeak, WeakReference<SpaceBase> UnexpandedFileWeak, ToastViewModel Undo)
+        CreateUnexpandedStoreTreeAndMarkDeleted()
+    {
+        var store = new ScanTreeStore();
+        var writer = new FileSlabWriter(store);
+        var caseDir = Path.Combine(_directory, Guid.NewGuid().ToString("N"));
+        var root = new DirectorySpace(store, store.Names.Intern(caseDir), null, 0, 0, 0);
+        var branch = new DirectorySpace(store, store.Names.Intern("branch"), root, 0, 0, 0);
+
+        writer.WriteFiles(
+            [
+                new FileEntry { Size = 64, NameId = store.Names.Intern("a.bin"), State = SpaceState.Deleted },
+                new FileEntry { Size = 128, NameId = store.Names.Intern("b.bin"), State = SpaceState.Added },
+            ],
+            out var branchStart);
+        branch.SetScanned(store, branchStart, 2, 192, []);
+
+        writer.WriteFiles(
+            [new FileEntry { Size = 16, NameId = store.Names.Intern("outside.bin"), State = SpaceState.Added }],
+            out var rootStart);
+        root.SetScanned(store, rootStart, 1, 16, [branch]);
+        store.Freeze();
+        root.AggregateTotals();
+
+        var rootNode = _factory.Create(root, root.TotalSize, root.TotalSize, root, new());
+        _scan.Roots.Add(rootNode);
+        rootNode.IsExpanded = true;
+        _host.Settle();
+
+        var branchNode = rootNode.Children.Single(static child => child.IsDirectory);
+        _scan.Marks.RecountMarked();
+        _scan.SelectSingle(branchNode);
+        _host.Settle();
+
+        _scan.MarkSelectedDeleted();
+        _host.Settle();
+
+        _scan.SelectSingle(null);
+        _host.Settle();
+
+        return (new(root), new(branch.GetFile(0)), UndoToast());
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private (WeakReference<DirectorySpace> RootWeak, ToastViewModel Undo) CreateStoreTreeAndMarkBranchDeleted()
+    {
+        var store = new ScanTreeStore();
+        var writer = new FileSlabWriter(store);
+        var caseDir = Path.Combine(_directory, Guid.NewGuid().ToString("N"));
+        var root = new DirectorySpace(store, store.Names.Intern(caseDir), null, 0, 0, 0);
+        var branch = new DirectorySpace(store, store.Names.Intern("branch"), root, 0, 0, 0);
+
+        writer.WriteFiles(
+            [new FileEntry { Size = 64, NameId = store.Names.Intern("a.bin"), State = SpaceState.Added }],
+            out var branchStart);
+        branch.SetScanned(store, branchStart, 1, 64, []);
+        root.SetScanned(store, 0, 0, 0, [branch]);
+        store.Freeze();
+        root.AggregateTotals();
+
+        var rootNode = _factory.Create(root, root.TotalSize, root.TotalSize, root, new());
+        _scan.Roots.Add(rootNode);
+        rootNode.IsExpanded = true;
+        _host.Settle();
+
+        var branchNode = rootNode.Children.Single(static child => child.IsDirectory);
+        _scan.SelectSingle(branchNode);
+        _host.Settle();
+
+        _scan.MarkSelectedDeleted();
+        _host.Settle();
+
+        _scan.SelectSingle(null);
+        _host.Settle();
+
+        return (new(root), UndoToast());
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private WeakReference<DirectorySpace> CreateStoreTreeAndReplaceUndoToast()
+    {
+        var store = new ScanTreeStore();
+        var writer = new FileSlabWriter(store);
+        var caseDir = Path.Combine(_directory, Guid.NewGuid().ToString("N"));
+        var root = new DirectorySpace(store, store.Names.Intern(caseDir), null, 0, 0, 0);
+        var branch = new DirectorySpace(store, store.Names.Intern("branch"), root, 0, 0, 0);
+
+        writer.WriteFiles(
+            [new FileEntry { Size = 64, NameId = store.Names.Intern("a.bin"), State = SpaceState.Added }],
+            out var branchStart);
+        branch.SetScanned(store, branchStart, 1, 64, []);
+
+        writer.WriteFiles(
+            [new FileEntry { Size = 16, NameId = store.Names.Intern("outside.bin"), State = SpaceState.Added }],
+            out var rootStart);
+        root.SetScanned(store, rootStart, 1, 16, [branch]);
+        store.Freeze();
+        root.AggregateTotals();
+
+        var rootNode = _factory.Create(root, root.TotalSize, root.TotalSize, root, new());
+        _scan.Roots.Add(rootNode);
+        rootNode.IsExpanded = true;
+        _host.Settle();
+
+        var branchNode = rootNode.Children.Single(static child => child.IsDirectory);
+        var outsideFile = rootNode.Children.Single(static child => !child.IsDirectory);
+
+        _scan.SelectSingle(branchNode);
+        _host.Settle();
+        _scan.MarkSelectedDeleted();
+        _host.Settle();
+
+        Assert.That(_scan.UndoFacadePinCount(root), Is.EqualTo(1));
+
+        _scan.SelectSingle(outsideFile);
+        _host.Settle();
+        _scan.MarkSelectedDeleted();
+        _host.Settle();
+
+        _scan.SelectSingle(null);
+        _host.Settle();
+
+        return new(root);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void ExecuteActiveUndoToastAndVerifyPinRelease(WeakReference<DirectorySpace> rootWeak)
+    {
+        var toast = UndoToast();
+        toast.ActionCommand!.Execute(toast);
+        _host.Settle();
+
+        Assert.That(CountUndoPins(rootWeak), Is.EqualTo(0));
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void ExecuteUndo(ToastViewModel undo)
+    {
+        undo.ActionCommand!.Execute(undo);
+        _host.Settle();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(_scan.Marks.MarkedCount, Is.EqualTo(0));
+            Assert.That(((DirectorySpace)_scan.Roots[0].Space!).SubDirectories[0].FileEntries[0].State, Is.EqualTo(SpaceState.Added));
+            Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private (WeakReference<SpaceBase> FirstWeak, ToastViewModel Undo) CreateStoreTreeAndMarkDeleted()
+    {
+        var store = new ScanTreeStore();
+        var writer = new FileSlabWriter(store);
+        var caseDir = Path.Combine(_directory, Guid.NewGuid().ToString("N"));
+        var root = new DirectorySpace(store, store.Names.Intern(caseDir), null, 0, 0, 0);
+        var branch = new DirectorySpace(store, store.Names.Intern("branch"), root, 0, 0, 0);
+
+        writer.WriteFiles(
+            [
+                new FileEntry { Size = 64, NameId = store.Names.Intern("a.bin"), State = SpaceState.Added },
+                new FileEntry { Size = 128, NameId = store.Names.Intern("b.bin"), State = SpaceState.Added },
+            ],
+            out var branchStart);
+        branch.SetScanned(store, branchStart, 2, 192, []);
+
+        writer.WriteFiles(
+            [new FileEntry { Size = 16, NameId = store.Names.Intern("outside.bin"), State = SpaceState.Added }],
+            out var rootStart);
+        root.SetScanned(store, rootStart, 1, 16, [branch]);
+        store.Freeze();
+        root.AggregateTotals();
+
+        var rootNode = _factory.Create(root, root.TotalSize, root.TotalSize, root, new());
+        _scan.Roots.Add(rootNode);
+        rootNode.IsExpanded = true;
+        _host.Settle();
+
+        var branchNode = rootNode.Children.Single(static child => child.IsDirectory);
+        branchNode.IsExpanded = true;
+        _host.Settle();
+
+        var firstFile = branchNode.Children.Single(static child => child.Name == "a.bin");
+        var outsideFile = rootNode.Children.Single(static child => !child.IsDirectory);
+        var firstWeak = new WeakReference<SpaceBase>(firstFile.Space!);
+
+        _scan.SelectSingle(firstFile);
+        _scan.ToggleSelection(outsideFile);
+        _host.Settle();
+
+        _scan.MarkSelectedDeleted();
+        _host.Settle();
+
+        _scan.SelectSingle(null);
+        _host.Settle();
+
+        return (firstWeak, UndoToast());
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void DropRootsAndSelection()
+    {
+        _scan.SelectSingle(null);
+        _scan.Roots.Clear();
+        _host.Settle();
+    }
+
     private (DirectorySpace RootSpace, ScanNodeViewModel RootNode, ScanNodeViewModel BranchNode, ScanNodeViewModel FirstFile, ScanNodeViewModel SecondFile, ScanNodeViewModel
         OutsideFile) PopulateTree()
     {

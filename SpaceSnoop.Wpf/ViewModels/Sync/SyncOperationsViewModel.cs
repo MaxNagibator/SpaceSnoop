@@ -154,7 +154,8 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
 
     internal Task<SyncRunResult?> SyncFromAutomationAsync(CancellationToken cancellationToken)
     {
-        return ExecuteSyncAsync(false, cancellationToken);
+        var recycleOverwritten = _settings.GetBool(SettingsKeys.SyncRecycleOverwritten, AppDefaults.SyncRecycleOverwrittenDefault);
+        return ExecuteSyncAsync(false, recycleOverwritten, false, cancellationToken);
     }
 
     internal async Task CompareContentAsync(FileComparison file)
@@ -176,7 +177,7 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
         catch (Exception ex)
         {
             _logger.ContentCompareFailed(ex, file.RelativePath);
-            _dialogs.Error("Сравнение содержимого", ex.Message);
+            _dialogs.Error("Сравнение содержимого", FormatUncError(ex, leftPath, rightPath));
             return;
         }
 
@@ -232,7 +233,8 @@ public sealed partial class SyncOperationsViewModel : ObservableObject
                 var compared = _compare.Execute(request, token, progress);
                 return new ComparePreparation(compared, SyncRowsProjector.BuildDirSizeCache(compared.Root));
             },
-            external: external);
+            external: external,
+            formatError: ex => FormatUncError(ex, left, right));
 
         stopwatch.Stop();
 

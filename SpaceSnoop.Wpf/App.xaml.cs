@@ -49,6 +49,26 @@ public partial class App : Application
         services.AddSingleton<ScanPreferences>();
         services.AddSingleton<UpdatePreferences>();
         services.AddSingleton<ThemeSelectionViewModel>();
+        services.AddSingleton(AppThemes.Packages);
+        services.AddSingleton(AppThemes.Catalog);
+        services.AddSingleton<ThemePackUpdateService>();
+        services.AddSingleton(static provider => new ThemePacksViewModel(
+            provider.GetRequiredService<ThemePackLoader>(),
+            provider.GetRequiredService<ThemeSelectionViewModel>(),
+            provider.GetRequiredService<IFilePicker>(),
+            provider.GetRequiredService<ILogger<ThemePacksViewModel>>(),
+            provider.GetRequiredService<ThemePackCatalog>(),
+            provider.GetRequiredService<IThemeCatalogWindowService>(),
+            provider.GetRequiredService<IDialogService>(),
+            provider.GetRequiredService<IClipboardService>(),
+            provider.GetRequiredService<ThemePackUpdateService>(),
+            ThemeUpdateStartup.CreateRestartCallback(provider)));
+        services.AddSingleton(static provider => new ThemeUpdateStartup(
+            provider.GetRequiredService<ThemePackUpdateService>(),
+            provider.GetRequiredService<ToastNotifier>(),
+            provider.GetRequiredService<ThemePacksViewModel>(),
+            ThemeUpdateStartup.CreateRestartCallback(provider),
+            provider.GetRequiredService<ILogger<ThemeUpdateStartup>>()));
         services.AddSingleton<SystemTheme>();
 
         services.AddSingleton(
@@ -113,6 +133,8 @@ public partial class App : Application
 
         services.AddSingleton<ScanViewModel>();
         services.AddSingleton<IScanAutomation>(static provider => provider.GetRequiredService<ScanViewModel>());
+        services.AddSingleton(typeof(DeferredPage<>));
+        services.AddSingleton<Action<SyncProfileRun>>(provider => run => provider.GetRequiredService<OverviewViewModel>().ApplyProfileRun(run));
         services.AddSingleton<SyncViewModel>();
         services.AddSingleton<ISyncAutomation>(static provider => provider.GetRequiredService<SyncViewModel>());
         services.AddSingleton<OverviewViewModel>();
@@ -146,7 +168,10 @@ public partial class App : Application
 
         services.AddSingleton<McpPreferences>();
         services.AddSingleton<McpBridge>();
+        services.AddSingleton(provider => new Lazy<McpBridge>(provider.GetRequiredService<McpBridge>));
         services.AddSingleton<McpServerHost>();
+        services.AddSingleton<Func<McpServerHost>>(provider => provider.GetRequiredService<McpServerHost>);
+        services.AddSingleton<McpServerController>();
 
         return services.BuildServiceProvider(
             new ServiceProviderOptions
@@ -253,6 +278,7 @@ public partial class App : Application
             AppThemes.Register(typeof(App).Assembly);
             ThemeManager.Apply(AppThemes.StartupKey(settings, freshProfile));
             FontScaleManager.Initialize(settings.GetDouble(SettingsKeys.FontScale, FontScaleManager.DefaultScale));
+            DirectWriteFontPin.PinSystemFonts();
 
             ViewLocator.InstallIntoApplication();
 
@@ -291,11 +317,12 @@ public partial class App : Application
             networkDrives.Start(AdminElevation.IsElevated, _logging.CreateLogger<DriveCatalog>());
             _ = RestoreNetworkDrivesAsync(networkDrives, scan, uiDispatcher);
 
-            _services.GetRequiredService<McpServerHost>().Apply();
+            _services.GetRequiredService<McpServerController>().Apply();
             _services.GetRequiredService<SystemTheme>().Watch();
             monitor.Start();
 
             _ = Task.Run(() => ScheduleReconciler.Reconcile(settings, _logging.CreateLogger<ScheduleViewModel>()));
+            _services.GetRequiredService<ThemeUpdateStartup>().Start();
 
             splash.Dispose();
             splash = null;
@@ -421,6 +448,7 @@ public partial class App : Application
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         AppThemes.Register(typeof(App).Assembly);
+        AppThemes.Packages.RegisterInstalled();
 
         var directory = Path.Combine(AppStorage.DataDirectory, GalleryRunner.FolderName);
         var options = GalleryOptions.Parse(args, directory);

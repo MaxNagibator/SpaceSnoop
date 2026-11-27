@@ -48,43 +48,17 @@
             Margin="0,0,0,16"
             AutomationProperties.Name="Первый запуск">
         <StackPanel>
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-
-                <StackPanel Grid.Column="0"
-                            Margin="0,2,12,0">
-                    <TextBlock Text="Добро пожаловать в SpaceSnoop"
-                               Style="{StaticResource TextBlock.Heading}"
-                               FontSize="{DynamicResource Font.Size.L}"
-                               TextWrapping="Wrap" />
-                    <TextBlock
-                        Text="Три настройки, от которых зависит результат. Поменять их можно и позже в «Настройках»."
-                        Style="{StaticResource Form.Hint}"
-                        TextWrapping="Wrap"
-                        Margin="0,2,0,0" />
-                </StackPanel>
-
-                <StackPanel Grid.Column="1"
-                            Orientation="Horizontal"
-                            VerticalAlignment="Top">
-                    <Button Style="{StaticResource Button.Primary}"
-                            Command="{Binding DismissCommand}"
-                            Margin="0,0,6,0"
-                            ToolTip="Сохранить выбор и скрыть карточку – она больше не появится"
-                            Content="Готово" />
-                    <Button Style="{StaticResource Button.Icon}"
-                            Command="{Binding DismissCommand}"
-                            ToolTip="Скрыть – карточка больше не появится"
-                            AutomationProperties.Name="Закрыть карточку первого запуска">
-                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.X}"
-                                                  Width="15"
-                                                  Height="15" />
-                    </Button>
-                </StackPanel>
-            </Grid>
+            <StackPanel>
+                <TextBlock Text="Добро пожаловать в SpaceSnoop"
+                           Style="{StaticResource TextBlock.Heading}"
+                           FontSize="{DynamicResource Font.Size.L}"
+                           TextWrapping="Wrap" />
+                <TextBlock
+                    Text="Четыре настройки, от которых зависит работа. Поменять их можно в любой момент в «Настройках»."
+                    Style="{StaticResource Form.Hint}"
+                    TextWrapping="Wrap"
+                    Margin="0,2,0,0" />
+            </StackPanel>
 
             <Grid Margin="0,12,0,0">
                 <Grid.ColumnDefinitions>
@@ -145,6 +119,34 @@
                 </Grid.ColumnDefinitions>
                 <Border Grid.Column="0"
                         Style="{StaticResource FirstRun.IconTile}">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Trash2}"
+                                              Style="{StaticResource FirstRun.Icon}" />
+                </Border>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="Удаление помеченных файлов"
+                               Style="{StaticResource Form.Label}"
+                               TextWrapping="Wrap" />
+                    <TextBlock
+                        Text="Корзина позволяет восстановить файлы, но работает медленно на больших папках. «Безвозвратно» удаляет сразу и быстрее – диалог подтверждения останется включённым."
+                        Style="{StaticResource Form.Hint}"
+                        TextWrapping="Wrap"
+                        Margin="0,2,0,0" />
+                    <ListBox Style="{StaticResource ListBox.Segmented}"
+                             ItemsSource="{Binding DeleteModeOptions}"
+                             SelectedItem="{Binding SelectedDeleteModeOption, Mode=TwoWay}"
+                             HorizontalAlignment="Left"
+                             Margin="0,8,0,0"
+                             AutomationProperties.Name="Стратегия удаления" />
+                </StackPanel>
+            </Grid>
+
+            <Grid Margin="0,12,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0"
+                        Style="{StaticResource FirstRun.IconTile}">
                     <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Palette}"
                                               Style="{StaticResource FirstRun.Icon}" />
                 </Border>
@@ -152,13 +154,13 @@
                     <TextBlock Text="Оформление"
                                Style="{StaticResource Form.Label}" />
                     <keepshell:ThemeSwitcher DataContext="{Binding Theme}"
-                                           ShowPreviews="True"
-                                           HorizontalAlignment="Left"
-                                           Margin="-8,4,0,-8" />
+                                             ShowPreviews="True"
+                                             HorizontalAlignment="Left"
+                                             Margin="0,8,0,0" />
                 </StackPanel>
             </Grid>
 
-            <Grid Margin="0,10,0,0">
+            <Grid Margin="0,4,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
@@ -180,6 +182,24 @@
                         TextWrapping="Wrap" />
                 </StackPanel>
             </Grid>
+
+            <Border BorderBrush="{DynamicResource Border.Subtle}"
+                    BorderThickness="0,1,0,0"
+                    Margin="0,16,0,0"
+                    Padding="0,12,0,0">
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Right">
+                    <Button Style="{StaticResource Button.Ghost}"
+                            Content="Пропустить"
+                            Command="{Binding SkipCommand}"
+                            Margin="0,0,8,0"
+                            ToolTip="Оставить настройки по умолчанию и перейти к выбору диска" />
+                    <Button Style="{StaticResource Button.Primary}"
+                            Content="Готово"
+                            Command="{Binding DismissCommand}"
+                            ToolTip="Сохранить выбор и перейти к выбору диска" />
+                </StackPanel>
+            </Border>
         </StackPanel>
     </Border>
 </UserControl>

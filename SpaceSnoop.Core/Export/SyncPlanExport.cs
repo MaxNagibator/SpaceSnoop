@@ -29,6 +29,7 @@ public sealed record SyncPlanExportModel
     public int OmittedEntries { get; init; }
     public ComparisonIncomplete? Incomplete { get; init; }
     public ComparisonSkippedLinks? SkippedLinks { get; init; }
+    public bool HasPermanentNetworkActions { get; init; }
 }
 
 public static class SyncPlanExport
@@ -51,6 +52,8 @@ public static class SyncPlanExport
             .Take(entryLimit)
             .ToList();
 
+        var hasPermanentNetworkActions = HasPermanentNetworkWork(result.LeftPath, result.RightPath, planned);
+
         return new()
         {
             Version = version,
@@ -67,12 +70,44 @@ public static class SyncPlanExport
             OmittedEntries = Math.Max(0, planned.Count - largest.Count),
             Incomplete = ComparisonExport.DescribeIncomplete(result),
             SkippedLinks = ComparisonExport.DescribeSkippedLinks(result),
+            HasPermanentNetworkActions = hasPermanentNetworkActions,
         };
     }
 
     public static string ToJson(SyncPlanExportModel model)
     {
         return JsonSerializer.Serialize(model, ExportJson.Options);
+    }
+
+    private static bool HasPermanentNetworkWork(string leftPath, string rightPath, List<SyncPlanEntry> planned)
+    {
+        if (planned.Count == 0)
+        {
+            return false;
+        }
+
+        var leftNoBin = !RecycleBin.SupportsRecycleBin(leftPath);
+        var rightNoBin = !RecycleBin.SupportsRecycleBin(rightPath);
+
+        if (!leftNoBin && !rightNoBin)
+        {
+            return false;
+        }
+
+        foreach (var entry in planned)
+        {
+            if (leftNoBin && (entry.Action == SyncAction.DeleteLeft || (entry.Action == SyncAction.CopyToLeft && entry.Status == ComparisonStatus.Modified)))
+            {
+                return true;
+            }
+
+            if (rightNoBin && (entry.Action == SyncAction.DeleteRight || (entry.Action == SyncAction.CopyToRight && entry.Status == ComparisonStatus.Modified)))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static void Collect(DirectoryComparison dir, List<SyncPlanEntry> entries)

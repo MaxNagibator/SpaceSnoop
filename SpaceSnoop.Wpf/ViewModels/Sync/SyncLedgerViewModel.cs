@@ -16,6 +16,7 @@ public sealed class SyncLedgerViewModel : ObservableObject
     private SyncPlanFreshnessState _planState = new(SyncPlanFreshness.Fresh);
     private (long? Left, long? Right) _free;
     private int _freeVersion;
+    private bool _permanentNetwork;
 
     public bool HasResult => _result is not null;
 
@@ -69,7 +70,12 @@ public sealed class SyncLedgerViewModel : ObservableObject
 
     public string PlanTrashText => SizeFormatter.Format(_plan.DeleteBytes);
 
-    public string PlanVolumeHint => ConfirmDialogViewModel.AsText(SyncPlanNarrative.BuildPlanLines(_plan, null, SyncPlanNarrative.BuildReceivers(_result, _plan, _free)));
+    public string PlanVolumeHint => ConfirmDialogViewModel.AsText(
+        SyncPlanNarrative.BuildPlanLines(
+            _plan,
+            null,
+            SyncPlanNarrative.BuildReceivers(_result, _plan, _free),
+            permanentNetwork: _result is not null && _permanentNetwork));
 
     public bool HasConflicts => ConflictCount > 0;
 
@@ -144,6 +150,7 @@ public sealed class SyncLedgerViewModel : ObservableObject
             _dirStats = SyncPlanNarrative.NewZeroStats();
             _freshness = default;
             _plan = PlannedActions.Empty;
+            _permanentNetwork = false;
             Total = 0;
         }
         else
@@ -154,6 +161,7 @@ public sealed class SyncLedgerViewModel : ObservableObject
             _dirStats = result.GetDirectoryStatistics();
             _freshness = SyncFreshness.Compute(result.Root);
             _plan = result.CountPlannedActions();
+            _permanentNetwork = SyncPlanNarrative.HasUncDeleteOrOverwrite(result, false);
             Total = stats.Values.Sum();
             RefreshFreeSpace(result, _plan);
         }
@@ -174,13 +182,24 @@ public sealed class SyncLedgerViewModel : ObservableObject
         Total = files.Values.Sum();
         _freshness = default;
         _plan = PlannedActions.Empty;
+        _free = default;
+        _freeVersion++;
+        _permanentNetwork = false;
         NotifyLedgerChanged();
     }
 
-    internal async Task<ConfirmDialogViewModel?> BuildSyncConfirmationAsync(ComparisonResult current, ConfirmChoice hashes)
+    internal async Task<(ConfirmDialogViewModel Dialog, bool WarnsPermanentNetworkDelete)?> BuildSyncConfirmationAsync(
+        ComparisonResult current,
+        ConfirmChoice hashes,
+        bool recycleOverwritten = true)
     {
         var before = current.CountPlannedActions();
-        var free = await ReadFreeAsync(current, before);
+        var freeTask = ReadFreeAsync(current, before);
+        var permanentNetworkTask = Task.Run(() => SyncPlanNarrative.HasNetworkDeleteOrOverwrite(current, recycleOverwritten));
+        await Task.WhenAll(freeTask, permanentNetworkTask);
+
+        var free = freeTask.Result;
+        var permanentNetwork = permanentNetworkTask.Result;
         var planned = current.CountPlannedActions();
 
         if (!ReferenceEquals(_result, current) || planned != before)
@@ -191,7 +210,12 @@ public sealed class SyncLedgerViewModel : ObservableObject
         var direction = _direction();
         var deletes = planned.Deletes + planned.DirDeletes;
         var offerHashes = planned.ModifiedCopies > 0 && !_hashesCompared;
-        var lines = SyncPlanNarrative.BuildPlanLines(planned, null, SyncPlanNarrative.BuildReceivers(current, planned, free), direction.BothWays);
+        var lines = SyncPlanNarrative.BuildPlanLines(
+            planned,
+            null,
+            SyncPlanNarrative.BuildReceivers(current, planned, free),
+            direction.BothWays,
+            permanentNetwork);
 
         if (offerHashes)
         {
@@ -214,11 +238,13 @@ public sealed class SyncLedgerViewModel : ObservableObject
 
         choices.Add(new("Синхронизировать", deletes > 0 ? ConfirmChoiceKind.Destructive : ConfirmChoiceKind.Primary));
 
-        return new($"Синхронизация {direction.Text}", direction.IconKind, lines, choices)
+        var dialog = new ConfirmDialogViewModel($"Синхронизация {direction.Text}", direction.IconKind, lines, choices)
         {
-            Summary = SyncPlanNarrative.DescribePlanVolume(planned),
-            Warning = BuildSyncWarning(current, deletes),
+            Summary = SyncPlanNarrative.DescribePlanVolume(planned, permanentNetwork),
+            Warning = BuildSyncWarning(current, deletes, permanentNetwork),
         };
+
+        return (dialog, permanentNetwork);
     }
 
     private void RefreshFreeSpace(ComparisonResult result, PlannedActions plan)
@@ -242,6 +268,23 @@ public sealed class SyncLedgerViewModel : ObservableObject
                 CancellationToken.None,
                 TaskContinuationOptions.OnlyOnRanToCompletion,
                 scheduler);
+
+        _ = Task.Run(() => SyncPlanNarrative.HasNetworkDeleteOrOverwrite(result, false))
+            .ContinueWith(
+                network =>
+                {
+                    if (version != _freeVersion)
+                    {
+                        return;
+                    }
+
+                    _permanentNetwork = network.Result;
+                    OnPropertyChanged(nameof(PlanVolumeHint));
+                    OnPropertyChanged(nameof(SyncCommandHint));
+                },
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnRanToCompletion,
+                scheduler);
     }
 
     private static async Task<(long? Left, long? Right)> ReadFreeAsync(ComparisonResult result, PlannedActions plan)
@@ -252,17 +295,18 @@ public sealed class SyncLedgerViewModel : ObservableObject
         return (await left, await right);
     }
 
-    private static string? BuildSyncWarning(ComparisonResult current, int deletes)
+    private static string? BuildSyncWarning(ComparisonResult current, int deletes, bool permanentNetwork)
     {
         var incomplete = SyncPlanNarrative.DescribeIncomplete(current);
         var links = current.SkippedLinks() is { Count: > 0 } skipped ? SyncPlanNarrative.DescribeSkippedLinks(skipped) : null;
         var recency = deletes > 0 ? SyncPlanNarrative.DescribeDeletionRecency(current) : null;
+        var network = permanentNetwork ? SyncPlanNarrative.NetworkDeleteWarning : null;
 
         return string.Join(
             ' ',
             new[]
             {
-                incomplete, links, recency,
+                network, incomplete, links, recency,
             }.OfType<string>()) is { Length: > 0 } warning
             ? warning
             : null;
@@ -281,12 +325,16 @@ public sealed class SyncLedgerViewModel : ObservableObject
         }
 
         var direction = _direction();
-        var lines = SyncPlanNarrative.BuildPlanLines(_plan, direction.Text, SyncPlanNarrative.BuildReceivers(_result, _plan, _free), direction.BothWays);
+        var permanentNetwork = _permanentNetwork;
+        var lines = SyncPlanNarrative.BuildPlanLines(_plan, direction.Text, SyncPlanNarrative.BuildReceivers(_result, _plan, _free), direction.BothWays, permanentNetwork);
 
         if (SyncIsDestructive)
         {
             lines.Add(new ConfirmGapLine());
-            lines.Add(new ConfirmTextLine("Удаление идёт в корзину, копирование перезаписывает файлы на приёмнике."));
+            lines.Add(new ConfirmTextLine(
+                permanentNetwork
+                    ? "Удаление на сетевом хранилище идёт безвозвратно, копирование перезаписывает файлы на приёмнике."
+                    : "Удаление идёт в корзину, копирование перезаписывает файлы на приёмнике."));
         }
 
         return ConfirmDialogViewModel.AsText(lines);

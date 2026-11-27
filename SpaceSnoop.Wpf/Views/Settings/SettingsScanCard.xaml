@@ -159,6 +159,32 @@
                            Text="На подкаталоге чтение тома целиком стоит дороже обхода, а числа неполноты в полосе итогов всё равно считаются по всему тому, а не по выбранной ветке. Выключите, если счёт жёстких ссылок один раз нужен и внутри каталога – например, в папке Windows, которая почти целиком из них состоит." />
             </Expander>
 
+            <Grid Margin="26,12,0,0"
+                  IsEnabled="{Binding Scan.MftEnabled}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Content="Читать физический диск напрямую"
+                          IsChecked="{Binding Scan.MftRawDisk, Mode=TwoWay}"
+                          VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
+                        DataContext="{Binding ResetFields[wpf.scan.mft.raw_disk]}"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="{Binding Hint}"
+                        AutomationProperties.Name="{Binding AutomationName}" />
+            </Grid>
+            <TextBlock Style="{StaticResource Form.CheckHint}"
+                       Margin="52,6,0,0"
+                       Text="Убирает стартовую паузу сброса кэша NTFS, но файлы, изменённые в последние секунды, могут не попасть в снимок. При шифровании или составном томе режим сам откатывается к обычному чтению." />
+            <Expander Style="{StaticResource Setting.Details}"
+                      Header="Когда стоит включать и как работает защита"
+                      Margin="26,2,0,0">
+                <TextBlock Style="{StaticResource Setting.DetailsBody}"
+                           Text="Обычное чтение таблицы NTFS просит систему сбросить накопленные изменения на диск, что добавляет до секунды на старте. Прямое чтение физического диска обходит эту паузу, но видит только уже записанные сектора. Перед запуском программа сверяет загрузочный сектор и границы раздела – для зашифрованных (например, BitLocker) и составных томов из нескольких разделов автоматически включается обычное чтение тома." />
+            </Expander>
+
             <Grid Margin="0,16,0,0"
                   settings:SettingsBlock.Key="memory">
                 <Grid.ColumnDefinitions>

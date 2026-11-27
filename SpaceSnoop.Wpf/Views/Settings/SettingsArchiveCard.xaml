@@ -25,34 +25,36 @@
                             keepshell:Form.ResetCommandParameter="archive"
                             keepshell:Form.ResetHint="{Binding ResetPlans[archive].Hint}">
         <StackPanel>
-            <keepshell:SettingRowPanel>
-                <StackPanel>
-                    <TextBlock Text="Уровень сжатия .zip"
-                               Style="{StaticResource Form.Label}"
-                               TextWrapping="Wrap" />
-                    <TextBlock Text="Применяется при «Упаковать в архив»."
-                               Style="{StaticResource Form.Hint}"
-                               Margin="0,2,0,0" />
-                    <Expander Style="{StaticResource Setting.Details}"
-                              Header="Когда сжатие не помогает">
-                        <TextBlock Style="{StaticResource Setting.DetailsBody}"
-                                   Text="Уже сжатые данные – видео, фото, архивы – почти не уменьшаются, для них выигрыш даёт только упаковка множества файлов в один." />
-                    </Expander>
-                </StackPanel>
-                <ComboBox Style="{StaticResource ComboBox.Form}"
-                          ItemsSource="{Binding CompressionOptions}"
-                          SelectedItem="{Binding SelectedCompressionOption}"
-                          DisplayMemberPath="Label"
-                          Width="{StaticResource Setting.ControlWidth}"
-                          Margin="16,0,0,0"
-                          VerticalAlignment="Top" />
-                <Button Style="{StaticResource Form.RowReset}"
-                        VerticalAlignment="Top"
+            <TextBlock Text="Уровень сжатия .zip"
+                       Style="{StaticResource Form.Label}" />
+            <TextBlock Text="Применяется при «Упаковать в архив»."
+                       Style="{StaticResource Form.Hint}"
+                       Margin="0,2,0,0" />
+            <Grid Margin="0,8,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ListBox Grid.Column="0"
+                         Style="{StaticResource ListBox.Segmented}"
+                         ItemsSource="{Binding CompressionOptions}"
+                         SelectedItem="{Binding SelectedCompressionOption}"
+                         HorizontalAlignment="Left"
+                         AutomationProperties.Name="Уровень сжатия .zip" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource Form.RowReset}"
                         DataContext="{Binding ResetFields[wpf.archive.compression]}"
                         Command="{Binding ResetCommand}"
                         ToolTip="{Binding Hint}"
-                        AutomationProperties.Name="{Binding AutomationName}" />
-            </keepshell:SettingRowPanel>
+                        AutomationProperties.Name="{Binding AutomationName}"
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center" />
+            </Grid>
+            <Expander Style="{StaticResource Setting.Details}"
+                      Header="Когда сжатие не помогает">
+                <TextBlock Style="{StaticResource Setting.DetailsBody}"
+                           Text="Уже сжатые данные – видео, фото, архивы – почти не уменьшаются, для них выигрыш даёт только упаковка множества файлов в один." />
+            </Expander>
 
             <Grid Margin="0,16,0,0">
                 <Grid.ColumnDefinitions>

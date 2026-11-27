@@ -5,8 +5,15 @@ using System.IO.Compression;
 
 namespace SpaceSnoop.Wpf.ViewModels.Settings;
 
-public sealed record EnumOption<T>(T Value, string Label) where T : struct, Enum
+public sealed record EnumOption<T>(
+    T Value,
+    string Label,
+    PackIconLucideKind Kind = PackIconLucideKind.Circle,
+    string? SegmentText = null,
+    string? Tooltip = null) where T : struct, Enum
 {
+    public string Text => SegmentText ?? Label;
+
     public override string ToString()
     {
         return Label;
@@ -35,6 +42,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
     public SettingsSectionList Sections { get; } = CreateSections();
 
     public ThemeSelectionViewModel Theme { get; }
+    public ThemePacksViewModel ThemePacks { get; }
 
     public ShellPreferences Shell { get; }
 
@@ -48,7 +56,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
 
     public McpPreferences Mcp { get; }
 
-    public McpServerHost McpServer { get; }
+    public McpServerController McpServer { get; }
 
     public AgentPreferences Agent { get; }
 
@@ -119,6 +127,12 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         get => StartupOptions.First(o => o.Value == Shell.StartupPage);
         set
         {
+            if (value is null)
+            {
+                OnPropertyChanged();
+                return;
+            }
+
             if (value.Value != Shell.StartupPage)
             {
                 Shell.StartupPage = value.Value;
@@ -132,6 +146,12 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         get => StartupAdminOptions.FirstOrDefault(o => o.Value == Shell.StartupAdmin) ?? StartupAdminOptions[0];
         set
         {
+            if (value is null)
+            {
+                OnPropertyChanged();
+                return;
+            }
+
             if (value.Value != Shell.StartupAdmin)
             {
                 Shell.StartupAdmin = value.Value;
@@ -145,6 +165,12 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         get => DeleteModeOptions.First(o => o.Value == Operations.DeleteMode);
         set
         {
+            if (value is null)
+            {
+                OnPropertyChanged();
+                return;
+            }
+
             if (value.Value != Operations.DeleteMode)
             {
                 Operations.DeleteMode = value.Value;
@@ -158,6 +184,12 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         get => CompressionOptions.First(o => o.Value == Operations.ArchiveCompression);
         set
         {
+            if (value is null)
+            {
+                OnPropertyChanged();
+                return;
+            }
+
             if (value.Value != Operations.ArchiveCompression)
             {
                 Operations.ArchiveCompression = value.Value;
@@ -171,6 +203,12 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         get => GitFolderOptions.First(o => o.Value == _settings.GetEnum(SettingsKeys.SyncGitFolders, GitFolderPromptChoice.Ask));
         set
         {
+            if (value is null)
+            {
+                OnPropertyChanged();
+                return;
+            }
+
             _settings.SetEnum(SettingsKeys.SyncGitFolders, value.Value);
             OnPropertyChanged();
             RefreshResetAvailability();
@@ -179,13 +217,14 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
 
     public SettingsViewModel(
         ThemeSelectionViewModel theme,
+        ThemePacksViewModel themePacks,
         ShellPreferences shell,
         OperationPreferences operations,
         ScanPreferences scan,
         UpdatePreferences update,
         AppUpdateViewModel updater,
         McpPreferences mcp,
-        McpServerHost mcpServer,
+        McpServerController mcpServer,
         AgentPreferences agent,
         AgentModelSelector agentModels,
         AgentBackends agentBackends,
@@ -201,6 +240,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
         AgentModel = agentModels;
         _agentBackends = agentBackends;
         Theme = theme;
+        ThemePacks = themePacks;
         Shell = shell;
         Operations = operations;
         Scan = scan;
@@ -252,7 +292,9 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
                 "appearance",
                 "Внешний вид",
                 PackIconLucideKind.Palette,
-                "тема оформления светлая тёмная tarkov как в системе windows масштаб шрифта размер текста показывать заголовок страницы показывать всплывающие уведомления тосты показывать производительность в строке состояния отклик память диагностика"),
+                "тема оформления темы светлая тёмная как в системе windows каталог zip пакет встроенная внешняя установить диск обновления автообновление автоскачивание перезапуск масштаб шрифта размер текста показывать заголовок страницы показывать всплывающие уведомления тосты показывать производительность в строке состояния отклик память диагностика",
+                [],
+                static () => string.Join(' ', ThemeManager.Themes.Select(static theme => $"{theme.Key} {theme.DisplayName}"))),
             new SettingsSection(
                 "startup",
                 "Запуск",
@@ -262,7 +304,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IPageHeader
                 "scan",
                 "Сканирование",
                 PackIconLucideKind.HardDrive,
-                "многопоточный обход число параллельных потоков потоки параллелизм учитывать учёт тип типа носителя ssd hdd читать чтение таблицу таблицы ntfs вместо обхода каталогов mft жёсткие ссылки движок администратор подкаталог только при сканировании диска целиком диск целиком освобождать освобождение прежний прежнего результат результата перед повторным сканом освободить предупреждать предупреждение перед повторным сканом повторный скан спрашивать возвращать возврат память памяти системе после скана вернуть замирание интенсивность тепловой подсветки тепловая подсветка выделять файлы в проводнике не запускать открытие файлов",
+                "многопоточный обход число параллельных потоков потоки параллелизм учитывать учёт тип типа носителя ssd hdd читать чтение таблицу таблицы ntfs вместо обхода каталогов mft жёсткие ссылки движок администратор подкаталог только при сканировании диска целиком диск целиком физический физического напрямую освобождать освобождение прежний прежнего результат результата перед повторным сканом освободить предупреждать предупреждение перед повторным сканом повторный скан спрашивать возвращать возврат память памяти системе после скана вернуть замирание интенсивность тепловой подсветки тепловая подсветка выделять файлы в проводнике не запускать открытие файлов",
                 [
                     new("parallel", "Многопоточность"),
                     new("mft", "Таблица NTFS"),

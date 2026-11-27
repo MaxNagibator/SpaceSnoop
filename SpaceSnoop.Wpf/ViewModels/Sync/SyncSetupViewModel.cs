@@ -18,6 +18,8 @@ public sealed partial class SyncSetupViewModel : ObservableObject
     private bool _suppressPersist;
     private int _leftCheckGeneration;
     private int _rightCheckGeneration;
+    private CancellationTokenSource? _leftCheckCts;
+    private CancellationTokenSource? _rightCheckCts;
 
     [ObservableProperty]
     private string _leftPath = string.Empty;
@@ -108,6 +110,10 @@ public sealed partial class SyncSetupViewModel : ObservableObject
 
     internal static Func<string, bool> DirectoryExists { get; set; } = Directory.Exists;
 
+    internal int NetworkDebounceMs { get; set; } = AppDefaults.PathProbeDebounceMs;
+
+    internal int ProbeTimeoutMs { get; set; } = AppDefaults.PathProbeTimeoutMs;
+
     internal Task PendingLeftCheck { get; private set; } = Task.CompletedTask;
 
     internal Task PendingRightCheck { get; private set; } = Task.CompletedTask;
@@ -130,10 +136,13 @@ public sealed partial class SyncSetupViewModel : ObservableObject
         Profiles = new(settings, dialogs, BuildCurrentProfile, RaiseProfileSelected, canRun, setStatus, uiDispatcher);
         LoadSettings();
         Profiles.Load();
+        RememberKnownPaths();
     }
 
     public void Apply(SyncProfile profile)
     {
+        NetworkDiscovery.Remember(profile.Left);
+        NetworkDiscovery.Remember(profile.Right);
         LeftPath = profile.Left;
         RightPath = profile.Right;
         Exclusions = profile.Exclusions;
@@ -164,48 +173,102 @@ public sealed partial class SyncSetupViewModel : ObservableObject
     {
         var trimmed = value.Trim();
         int generation;
+        CancellationTokenSource cts;
 
         lock (_checkGate)
         {
             generation = isLeft ? ++_leftCheckGeneration : ++_rightCheckGeneration;
+            var previous = isLeft ? _leftCheckCts : _rightCheckCts;
+            previous?.Cancel();
+            previous?.Dispose();
+
+            if (trimmed.Length == 0 || UncPath.IsIncompleteUnc(trimmed))
+            {
+                if (isLeft)
+                {
+                    _leftCheckCts = null;
+                }
+                else
+                {
+                    _rightCheckCts = null;
+                }
+
+                SetPathInvalid(isLeft, false);
+                return Task.CompletedTask;
+            }
+
+            cts = new();
+
+            if (isLeft)
+            {
+                _leftCheckCts = cts;
+            }
+            else
+            {
+                _rightCheckCts = cts;
+            }
         }
 
-        if (trimmed.Length == 0)
-        {
-            SetPathInvalid(isLeft, false);
-            return Task.CompletedTask;
-        }
-
-        return ProbePathAsync(trimmed, generation, isLeft, DirectoryExists);
+        return ProbePathAsync(trimmed, generation, isLeft, DirectoryExists, cts.Token);
     }
 
-    private async Task ProbePathAsync(string path, int generation, bool isLeft, Func<string, bool> existsProbe)
+    private async Task ProbePathAsync(
+        string path,
+        int generation,
+        bool isLeft,
+        Func<string, bool> existsProbe,
+        CancellationToken token)
     {
-        bool exists;
-
         try
         {
-            exists = await Task.Run(() => existsProbe(path)).ConfigureAwait(false);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or PathTooLongException)
-        {
-            exists = false;
-        }
+            if (UncPath.IsUnc(path) && NetworkDebounceMs > 0)
+            {
+                await Task.Delay(NetworkDebounceMs, token).ConfigureAwait(false);
+            }
 
-        if (IsCheckStale(isLeft, generation))
-        {
-            return;
-        }
+            var result = await PathProbe.CheckAsync(path, existsProbe, ProbeTimeoutMs, token).ConfigureAwait(false);
 
-        _uiDispatcher.Invoke(() =>
-        {
-            if (IsCheckStale(isLeft, generation))
+            if (result.Status == PathProbeStatus.Cancelled || IsCheckStale(isLeft, generation))
             {
                 return;
             }
 
-            SetPathInvalid(isLeft, !exists);
-        });
+            var exists = result.Status == PathProbeStatus.Exists;
+
+            if (exists)
+            {
+                NetworkDiscovery.Remember(path);
+            }
+
+            _uiDispatcher.Invoke(() =>
+            {
+                if (IsCheckStale(isLeft, generation))
+                {
+                    return;
+                }
+
+                SetPathInvalid(isLeft, !exists);
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+    }
+
+    private void RememberKnownPaths()
+    {
+        NetworkDiscovery.Remember(LeftPath);
+        NetworkDiscovery.Remember(RightPath);
+
+        foreach (var item in Profiles.Items)
+        {
+            if (!item.IsDefault)
+            {
+                NetworkDiscovery.Remember(item.Model.Left);
+                NetworkDiscovery.Remember(item.Model.Right);
+            }
+        }
     }
 
     private bool IsCheckStale(bool isLeft, int generation)
@@ -339,6 +402,7 @@ public sealed partial class SyncSetupViewModel : ObservableObject
 
     private SyncProfile BuildCurrentProfile(string id, string name, SyncProfile? existing = null)
     {
+        var mirrorTarget = Mirror ? SyncProfile.MirrorTarget(CurrentMode, CurrentWinner, LeftPath, RightPath) : null;
         return new()
         {
             Id = id,
@@ -347,6 +411,9 @@ public sealed partial class SyncSetupViewModel : ObservableObject
             Right = RightPath.Trim(),
             Mode = SelectedModeIndex,
             Mirror = Mirror,
+            PermanentNetworkDeleteTarget = string.Equals(existing?.PermanentNetworkDeleteTarget, mirrorTarget, StringComparison.Ordinal)
+                ? existing?.PermanentNetworkDeleteTarget
+                : null,
             Winner = CurrentWinner,
             Exclusions = Exclusions.Trim(),
             Interval = existing?.Interval ?? ScheduleInterval.Daily,

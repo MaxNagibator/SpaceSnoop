@@ -78,4 +78,26 @@ public class HeatColorTests
             Assert.That(color.G, Is.GreaterThan(color.B));
         }
     }
+
+    [Test]
+    public void Пользовательская_шкала_интерполирует_заданные_опорные_точки()
+    {
+        HeatStop[] stops =
+        [
+            new(0.00, System.Windows.Media.Color.FromRgb(0x10, 0x80, 0xC0)),
+            new(0.50, System.Windows.Media.Color.FromRgb(0x90, 0xA0, 0x50)),
+            new(1.00, System.Windows.Media.Color.FromRgb(0xF0, 0x40, 0x80)),
+        ];
+
+        var cool = HeatColor.From(0, AppDefaults.IntensityDefault, stops);
+        var mid = HeatColor.From(0.5, AppDefaults.IntensityDefault, stops);
+        var hot = HeatColor.From(1, AppDefaults.IntensityDefault, stops);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(cool, Is.EqualTo(stops[0].Color));
+            Assert.That(mid, Is.EqualTo(stops[1].Color));
+            Assert.That(hot, Is.EqualTo(stops[2].Color));
+        }
+    }
 }

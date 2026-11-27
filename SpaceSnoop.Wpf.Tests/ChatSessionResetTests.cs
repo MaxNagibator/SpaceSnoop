@@ -12,7 +12,7 @@ namespace SpaceSnoop.Wpf.Tests;
 public class ChatSessionResetTests
 {
     private string _directory = string.Empty;
-    private McpServerHost? _mcpServer;
+    private McpServerController? _mcpServer;
 
     [SetUp]
     public void SetUp()
@@ -160,7 +160,7 @@ public class ChatSessionResetTests
 
     private ChatGatesViewModel Gates(SettingsStore settings, AgentPreferences preferences, AgentBackends backends, ChatHistoryViewModel history, Action cancelActiveTurn)
     {
-        _mcpServer = new(new(settings), null!, new(settings), null!, NullLogger<McpServerHost>.Instance);
+        _mcpServer = new(new(settings), () => throw new InvalidOperationException());
 
         return new(
             backends,

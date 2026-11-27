@@ -13,6 +13,7 @@ internal sealed class ScanArchiveViewModel
     private readonly Func<ScanNodeViewModel?> _selectedNode;
     private readonly ScanMarksViewModel _marks;
     private readonly Action _reloadDrives;
+    private bool _archiveRequested;
 
     internal ScanArchiveViewModel(
         ArchiveProgressDialogFactory archiveDialogFactory,
@@ -64,28 +65,53 @@ internal sealed class ScanArchiveViewModel
 
     private async void OnArchiveRequested(ScanNodeViewModel node)
     {
-        if (node.Space is not DirectorySpace dir)
+        await OpenArchiveDialogAsync(node);
+    }
+
+    internal async Task OpenArchiveDialogAsync(ScanNodeViewModel node)
+    {
+        if (_archiveRequested || node.Space is not DirectorySpace dir || !IsAttachedToLiveRoot(node, dir))
         {
             return;
         }
 
-        var dialog = _archiveDialogFactory.Create(dir);
-
+        _archiveRequested = true;
         try
         {
-            await _dialogs.ShowAsync(dialog);
+            var dialog = await _archiveDialogFactory.CreateAsync(dir);
+
+            if (!IsAttachedToLiveRoot(node, dir))
+            {
+                return;
+            }
+
+            try
+            {
+                await _dialogs.ShowAsync(dialog);
+            }
+            finally
+            {
+                await dialog.StopAsync();
+            }
+
+            ApplyArchiveResult(dir, dialog);
         }
         finally
         {
-            await dialog.StopAsync();
+            _archiveRequested = false;
         }
+    }
 
-        ApplyArchiveResult(dir, dialog);
+    private bool IsAttachedToLiveRoot(ScanNodeViewModel node, DirectorySpace dir)
+    {
+        return node.Root is { } root
+            && _roots.Any(item => ReferenceEquals(item.Space, root))
+            && ScanNodeViewModel.IsAttachedToRoot(root, dir);
     }
 
     private void ApplyArchiveResult(DirectorySpace dir, ArchiveProgressDialogViewModel dialog)
     {
-        if (dialog.CreatedArchivePath is { } archivePath && ScanTreeEditor.AddArchiveToTree(_roots, dir, archivePath))
+        if (dialog.CreatedArchive is { } archive && ScanTreeEditor.AddArchiveToTree(_roots, dir, archive))
         {
             if (_treemap.TreemapRoot is not null)
             {

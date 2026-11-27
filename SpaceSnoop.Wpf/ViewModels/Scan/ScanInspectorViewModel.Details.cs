@@ -124,24 +124,52 @@ public sealed partial class ScanInspectorViewModel
     private void BuildTopChildren(DirectorySpace dir, ScanNodeViewModel node)
     {
         var limit = AppDefaults.TopChildrenLimit;
-        var totalRaw = dir.SubDirectories.Count + dir.Files.Count;
-        var queue = new PriorityQueue<(SpaceBase Space, long Size), (double Weight, int Index)>(
+        var subs = dir.SubDirectoriesArray;
+        var files = dir.FileEntries;
+        var totalRaw = subs.Length + files.Length;
+        var queue = new PriorityQueue<(SpaceBase? Space, int FileIndex, long Size), (double Weight, int Index)>(
             Math.Min(totalRaw, limit),
             ScanTopSelector.MinTopWeightComparer.Instance);
         var visibleCount = 0;
         var index = 0;
 
-        foreach (var sub in dir.SubDirectories)
+        for (var i = 0; i < subs.Length; i++)
         {
-            ConsiderTopChild(sub, node, limit, queue, ref visibleCount, ref index);
+            ConsiderTopChild(subs[i], node, limit, queue, ref visibleCount, ref index);
         }
 
-        foreach (var file in dir.Files)
+        if (files.Length > 0)
         {
-            ConsiderTopChild(file, node, limit, queue, ref visibleCount, ref index);
+            if (node.HasIgnoredItems)
+            {
+                if (node.IsVisible(dir))
+                {
+                    if (node.HasIgnoredFileIn(dir))
+                    {
+                        for (var i = 0; i < files.Length; i++)
+                        {
+                            ConsiderTopChild(dir.GetFile(i), node, limit, queue, ref visibleCount, ref index);
+                        }
+                    }
+                    else
+                    {
+                        for (var i = 0; i < files.Length; i++)
+                        {
+                            ConsiderTopFile(i, files[i].Size, limit, queue, ref visibleCount, ref index);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                for (var i = 0; i < files.Length; i++)
+                {
+                    ConsiderTopFile(i, files[i].Size, limit, queue, ref visibleCount, ref index);
+                }
+            }
         }
 
-        var topSpaces = new (SpaceBase Space, long Size)[queue.Count];
+        var topSpaces = new (SpaceBase? Space, int FileIndex, long Size)[queue.Count];
 
         for (var i = topSpaces.Length - 1; i >= 0; i--)
         {
@@ -153,9 +181,10 @@ public sealed partial class ScanInspectorViewModel
 
         for (var i = 0; i < topSpaces.Length; i++)
         {
-            var (child, size) = topSpaces[i];
+            var (child, fileIndex, size) = topSpaces[i];
+            var name = child is not null ? child.Name : dir.GetFileName(fileIndex);
             top[i] = new(
-                child.Name,
+                name,
                 SizeFormatter.Format(size),
                 ShareFormatter.Format(node.Weight > 0 ? size / node.Weight : 0),
                 max > 0 ? Math.Clamp((double)size / max, 0, 1) : 0,
@@ -175,7 +204,7 @@ public sealed partial class ScanInspectorViewModel
         SpaceBase candidate,
         ScanNodeViewModel node,
         int limit,
-        PriorityQueue<(SpaceBase Space, long Size), (double Weight, int Index)> queue,
+        PriorityQueue<(SpaceBase? Space, int FileIndex, long Size), (double Weight, int Index)> queue,
         ref int visibleCount,
         ref int index)
     {
@@ -197,11 +226,37 @@ public sealed partial class ScanInspectorViewModel
 
         if (queue.Count < limit)
         {
-            queue.Enqueue((candidate, size), (size, currentIndex));
+            queue.Enqueue((candidate, -1, size), (size, currentIndex));
         }
         else if (queue.TryPeek(out _, out var minKey) && size > minKey.Weight)
         {
-            queue.DequeueEnqueue((candidate, size), (size, currentIndex));
+            queue.DequeueEnqueue((candidate, -1, size), (size, currentIndex));
+        }
+    }
+
+    private static void ConsiderTopFile(
+        int fileIndex,
+        long size,
+        int limit,
+        PriorityQueue<(SpaceBase? Space, int FileIndex, long Size), (double Weight, int Index)> queue,
+        ref int visibleCount,
+        ref int index)
+    {
+        var currentIndex = index++;
+        visibleCount++;
+
+        if (limit <= 0)
+        {
+            return;
+        }
+
+        if (queue.Count < limit)
+        {
+            queue.Enqueue((null, fileIndex, size), (size, currentIndex));
+        }
+        else if (queue.TryPeek(out _, out var minKey) && size > minKey.Weight)
+        {
+            queue.DequeueEnqueue((null, fileIndex, size), (size, currentIndex));
         }
     }
 

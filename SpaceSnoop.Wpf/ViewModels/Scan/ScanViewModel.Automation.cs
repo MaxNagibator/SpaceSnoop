@@ -48,12 +48,17 @@ public sealed partial class ScanViewModel : IScanAutomation
         };
     }
 
-    internal void SelectPathForAutomation(string path)
+    internal void SelectPathForAutomation(string path, bool remember = true)
     {
-        if (!Drives.HasDrive(path))
+        if (remember)
         {
+            var known = Drives.HasDrive(path);
             Drives.AddDrive(path);
-            Drives.LoadDriveLabels();
+
+            if (!known)
+            {
+                Drives.LoadDriveLabels();
+            }
         }
 
         SelectedDrive = path;
@@ -61,22 +66,51 @@ public sealed partial class ScanViewModel : IScanAutomation
 
     internal Task ScanFromAutomationAsync(string path, CancellationToken cancellationToken)
     {
-        SelectPathForAutomation(path);
+        SelectPathForAutomation(path, remember: false);
 
         return ScanAsync(path, cancellationToken);
     }
 
     internal void ApplyScanResult(DirectorySpace result, TimeSpan elapsed, PerformanceTraversal? traversal, ScanNotes notes)
     {
-        _scanVersion++;
-        var previous = ScanTreeEditor.RemoveRoot(Roots, result.AbsolutePath);
-        var (transferred, lost) = ScanTreeEditor.TransferMarks(previous, result, Marks.HasMarked);
+        ApplyScanResultCore(result, elapsed, traversal, notes, DriveCapacity.TryRead(result.AbsolutePath));
+    }
 
-        var node = _nodeFactory.CreateRoot(result, Sort.State);
+    internal void ApplyScanResult(
+        DirectorySpace result,
+        TimeSpan elapsed,
+        PerformanceTraversal? traversal,
+        ScanNotes notes,
+        DriveCapacity? driveCapacity)
+    {
+        ApplyScanResultCore(result, elapsed, traversal, notes, driveCapacity);
+    }
+
+    private void ApplyScanResultCore(
+        DirectorySpace result,
+        TimeSpan elapsed,
+        PerformanceTraversal? traversal,
+        ScanNotes notes,
+        DriveCapacity? driveCapacity)
+    {
+        Interlocked.Increment(ref _scanVersion);
+        CancelPendingMemoryReturn();
+        var previous = ScanTreeEditor.RemoveRoot(Roots, result.AbsolutePath);
+        var (transferred, lost) = ScanTreeEditor.TransferMarks(previous, result, Marks.HasMarked, notes.UsnLostMarks);
+
+        var node = _nodeFactory.CreateRoot(result, Sort.State, driveCapacity);
         node.IsExpanded = true;
 
         Roots.Insert(0, node);
-        Treemap.SetRoot(node);
+
+        if (ViewMode == ScanViewMode.Treemap)
+        {
+            Treemap.SetRoot(node);
+        }
+        else
+        {
+            Treemap.Reset();
+        }
 
         LastScanElapsed = elapsed;
         LastScanParallelism = Math.Max(1, notes.Parallelism);
@@ -206,9 +240,9 @@ public sealed partial class ScanViewModel : IScanAutomation
         return MarkForAutomation(targets, mark);
     }
 
-    void IScanAutomation.SelectPathForAutomation(string path)
+    void IScanAutomation.SelectPathForAutomation(string path, bool remember)
     {
-        SelectPathForAutomation(path);
+        SelectPathForAutomation(path, remember);
     }
 
     void IScanAutomation.ReleaseBeforeScan(string path)
@@ -221,9 +255,19 @@ public sealed partial class ScanViewModel : IScanAutomation
         ApplyScanResult(result, elapsed, traversal, notes);
     }
 
-    Task IScanAutomation.ReturnScanMemoryAsync(DirectorySpace result, Action<string> reportPhase, CancellationToken cancellationToken)
+    void IScanAutomation.ApplyScanResult(
+        DirectorySpace result,
+        TimeSpan elapsed,
+        PerformanceTraversal? traversal,
+        ScanNotes notes,
+        DriveCapacity? driveCapacity)
     {
-        return ReturnScanMemoryAsync(result, reportPhase, cancellationToken);
+        ApplyScanResult(result, elapsed, traversal, notes, driveCapacity);
+    }
+
+    Task IScanAutomation.ReturnScanMemoryAsync(DirectorySpace result, bool usedMft, Action<string> reportPhase, CancellationToken cancellationToken)
+    {
+        return ReturnScanMemoryAsync(result, usedMft, reportPhase, cancellationToken);
     }
 
     Task IScanAutomation.ScanFromAutomationAsync(string path, CancellationToken cancellationToken)

@@ -95,6 +95,12 @@ internal static partial class AppLog
     public static partial void MftSkippedForSubdirectory(this ILogger logger, string path);
 
     [LoggerMessage(
+        EventId = 1023,
+        Level = LogLevel.Warning,
+        Message = "Обход по $MFT для «{Path}»: прямой режим физического диска не подошёл, используется чтение тома ({Reason})")]
+    public static partial void MftRawDiskFallback(this ILogger logger, string path, string reason);
+
+    [LoggerMessage(
         EventId = 1014,
         Level = LogLevel.Information,
         Message = "Прежний результат «{Path}» снят до повторного скана, сборка {CollectMs} мс")]
@@ -117,6 +123,12 @@ internal static partial class AppLog
         Level = LogLevel.Debug,
         Message = "Уплотнение после скана пропущено: нагрузка памяти {LoadBytes} Б ниже порога GC {ThresholdBytes} Б")]
     public static partial void ScanMemoryReturnSkipped(this ILogger logger, long loadBytes, long thresholdBytes);
+
+    [LoggerMessage(
+        EventId = 1022,
+        Level = LogLevel.Debug,
+        Message = "Запрошена фоновая сборка памяти после $MFT за {ElapsedMs} мс: куча {HeapBytes} Б, выделено ОС {CommittedBytes} Б")]
+    public static partial void ScanMftMemoryReclaimRequested(this ILogger logger, long elapsedMs, long heapBytes, long committedBytes);
 
     [LoggerMessage(EventId = 1019, Level = LogLevel.Information, Message = "Полный экспорт скана сохранён: {Path}, файлов {Files}, каталогов {Directories}")]
     public static partial void ScanExportCompleted(this ILogger logger, string path, int files, int directories);
@@ -402,6 +414,12 @@ internal static partial class AppLog
 
     [LoggerMessage(EventId = 1805, Level = LogLevel.Debug, Message = "Незавершённая загрузка не удалена: {Path}")]
     public static partial void UpdateTempFileLeft(this ILogger logger, Exception exception, string path);
+
+    [LoggerMessage(EventId = 1806, Level = LogLevel.Debug, Message = "Не удалось проверить обновления тем при запуске")]
+    public static partial void ThemeUpdateCheckFailed(this ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 1807, Level = LogLevel.Warning, Message = "Не удалось перезапустить приложение после обновления тем")]
+    public static partial void ThemeUpdateRestartFailed(this ILogger logger, Exception exception);
 
     [LoggerMessage(EventId = 1900, Level = LogLevel.Information, Message = "Пакетное сравнение начато: пар {Total}")]
     public static partial void OverviewCompareStarted(this ILogger logger, int total);

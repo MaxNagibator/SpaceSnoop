@@ -1,8 +1,10 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using SpaceSnoop.Core.Domain;
 using System.Collections.Concurrent;
 using System.IO.Enumeration;
 using System.Runtime.ExceptionServices;
+using System.Runtime.InteropServices;
 using System.Security;
 
 namespace SpaceSnoop.Core;
@@ -46,20 +48,23 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator>? logger = null)
     {
         ThrowIfLink(directory);
 
-        var root = CreateRoot(directory);
+        var store = new ScanTreeStore(1, singleWriter: true);
+        var writer = new FileSlabWriter(store);
+        var root = CreateRoot(directory, store);
         var children = new List<ScanChild>();
-        var files = new List<FileSpace>();
+        var files = new List<FileEntry>();
         var skips = new SkipJournal();
 
-        ReadDirectory(ToEnumerationPath(directory.FullName), root, progress, skips, cancel, children, files);
+        ReadDirectory(ToEnumerationPath(directory.FullName), root, store, writer, default, progress, skips, cancel, children, files);
         progress?.SetTopLevelTotal(children.Count);
 
         foreach (var child in children)
         {
-            ScanRecursive(child, files, progress, skips, cancel);
+            ScanRecursive(child, store, writer, files, progress, skips, cancel);
             progress?.CompleteTopLevel();
         }
 
+        store.Freeze();
         root.AggregateTotals();
         root.FixAbsolutePath(directory);
         return root;
@@ -111,10 +116,12 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator>? logger = null)
     {
         ThrowIfLink(directory);
 
-        var root = CreateRoot(directory);
+        var store = new ScanTreeStore(64);
+        var root = CreateRoot(directory, store);
 
-        ScanParallel(ToEnumerationPath(directory.FullName), root, Math.Max(1, maxDegreeOfParallelism), progress, cancel);
+        ScanParallel(ToEnumerationPath(directory.FullName), root, store, Math.Max(1, maxDegreeOfParallelism), progress, cancel);
 
+        store.Freeze();
         root.AggregateTotals();
         root.FixAbsolutePath(directory);
         return root;
@@ -130,7 +137,14 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator>? logger = null)
     /// <returns>Текст отказа для человека или <c>null</c>, если каталог можно сканировать.</returns>
     public static string? DescribeRootRefusal(DirectoryInfo directory)
     {
-        if (!IsReparsePoint(directory, out var path))
+        var path = Path.TrimEndingDirectorySeparator(directory.FullName);
+
+        if (UncPath.IsShareRoot(path))
+        {
+            return null;
+        }
+
+        if (!IsReparsePoint(directory, out _))
         {
             return null;
         }
@@ -208,23 +222,15 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator>? logger = null)
         throw new ScanRootLinkException(directory.FullName, refusal);
     }
 
-    private static DirectorySpace CreateRoot(DirectoryInfo directory)
-    {
-        return new(directory.Name, null, directory.CreationTime, directory.LastAccessTime);
-    }
-
-    private static FileSystemEnumerable<ScanEntry> Enumerate(string path)
+    private static DirectorySpace CreateRoot(DirectoryInfo directory, ScanTreeStore store)
     {
         return new(
-            path,
-            static (ref entry) => new(
-                entry.FileName.ToString(),
-                entry.Length,
-                entry.CreationTimeUtc.LocalDateTime,
-                entry.LastAccessTimeUtc.LocalDateTime,
-                entry.Attributes,
-                entry.IsDirectory),
-            Enumeration);
+            store,
+            store.Names.Intern(directory.Name),
+            null,
+            TimestampEncoding.FromDateTime(directory.CreationTime),
+            TimestampEncoding.FromDateTime(directory.LastAccessTime),
+            0);
     }
 
     private static bool IsTraversalError(Exception exception)
@@ -232,19 +238,26 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator>? logger = null)
         return exception is IOException or UnauthorizedAccessException or SecurityException or ArgumentException or NotSupportedException;
     }
 
-    private void ScanRecursive(ScanChild item, List<FileSpace> files, ScanProgress? progress, SkipJournal skips, CancellationToken cancel)
+    private void ScanRecursive(
+        ScanChild item,
+        ScanTreeStore store,
+        FileSlabWriter writer,
+        List<FileEntry> files,
+        ScanProgress? progress,
+        SkipJournal skips,
+        CancellationToken cancel)
     {
         var children = new List<ScanChild>();
 
-        ReadDirectory(item.Path, item.Node, progress, skips, cancel, children, files);
+        ReadDirectory(item.Path, item.Node, store, writer, default, progress, skips, cancel, children, files);
 
         foreach (var child in children)
         {
-            ScanRecursive(child, files, progress, skips, cancel);
+            ScanRecursive(child, store, writer, files, progress, skips, cancel);
         }
     }
 
-    private void ScanParallel(string rootPath, DirectorySpace root, int degree, ScanProgress? progress, CancellationToken cancel)
+    private void ScanParallel(string rootPath, DirectorySpace root, ScanTreeStore store, int degree, ScanProgress? progress, CancellationToken cancel)
     {
         using var run = new ScanRun(cancel);
         run.Queue.Add(new(rootPath, root), cancel);
@@ -255,7 +268,7 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator>? logger = null)
         {
             for (var index = 0; index < degree; index++)
             {
-                var thread = new Thread(() => Work(run, progress, cancel))
+                var thread = new Thread(() => Work(run, store, progress, cancel))
                 {
                     IsBackground = true,
                     Name = "SpaceSnoop scan",
@@ -280,17 +293,19 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator>? logger = null)
         run.Failure?.Throw();
     }
 
-    private void Work(ScanRun run, ScanProgress? progress, CancellationToken cancel)
+    private void Work(ScanRun run, ScanTreeStore store, ScanProgress? progress, CancellationToken cancel)
     {
+        var writer = new FileSlabWriter(store);
+        var nameCache = LocalNameCache.Create();
         var children = new List<ScanChild>();
-        var files = new List<FileSpace>();
+        var files = new List<FileEntry>();
 
         try
         {
             foreach (var item in run.Queue.GetConsumingEnumerable(run.Token))
             {
                 children.Clear();
-                ReadDirectory(item.Path, item.Node, progress, run.Skips, cancel, children, files);
+                ReadDirectory(item.Path, item.Node, store, writer, nameCache, progress, run.Skips, cancel, children, files);
 
                 run.Expect(children.Count);
 
@@ -330,43 +345,30 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator>? logger = null)
     private void ReadDirectory(
         string path,
         DirectorySpace node,
+        ScanTreeStore store,
+        FileSlabWriter writer,
+        LocalNameCache nameCache,
         ScanProgress? progress,
         SkipJournal skips,
         CancellationToken cancel,
         List<ScanChild> children,
-        List<FileSpace> files)
+        List<FileEntry> files)
     {
         cancel.ThrowIfCancellationRequested();
         progress?.EnterDirectory(path);
 
         var first = children.Count;
         files.Clear();
+        long ownSize;
+        DirectoryScanEnumerator? enumerator = null;
 
         try
         {
-            foreach (var entry in Enumerate(path))
+            enumerator = new(path, node, store, nameCache, _log, cancel, children, files);
+
+            while (enumerator.MoveNext())
             {
-                cancel.ThrowIfCancellationRequested();
-
-                if (entry.IsReparsePoint)
-                {
-                    var linkPath = Path.Join(path, entry.Name);
-
-                    if (ReparsePoint.IsLink(linkPath, entry.IsDirectory))
-                    {
-                        _log.ScanReparsePointSkipped(FromEnumerationPath(linkPath));
-                        continue;
-                    }
-                }
-
-                if (!entry.IsDirectory)
-                {
-                    files.Add(FileSpace.Create(entry, node));
-                    continue;
-                }
-
-                var child = new DirectorySpace(entry.Name, node, entry.CreationTime, entry.LastAccessTime);
-                children.Add(new(Path.Join(path, entry.Name), child));
+                _ = enumerator.Current;
             }
         }
         catch (Exception exception) when (IsTraversalError(exception))
@@ -383,6 +385,11 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator>? logger = null)
             node.Error();
             progress?.FailDirectory();
         }
+        finally
+        {
+            ownSize = enumerator?.OwnSize ?? 0L;
+            enumerator?.Dispose();
+        }
 
         var subDirectories = children.Count == first ? [] : new DirectorySpace[children.Count - first];
 
@@ -391,8 +398,96 @@ public class DiskSpaceCalculator(ILogger<DiskSpaceCalculator>? logger = null)
             subDirectories[i] = children[first + i].Node;
         }
 
-        node.SetScanned(files, subDirectories);
+        writer.WriteFiles(CollectionsMarshal.AsSpan(files), out var fileStart);
+        node.SetScanned(store, fileStart, files.Count, ownSize, subDirectories);
         progress?.AddFiles(files.Count, node.Size);
+    }
+
+    private sealed class DirectoryScanEnumerator : FileSystemEnumerator<byte>
+    {
+        private readonly string _path;
+        private readonly DirectorySpace _node;
+        private readonly ScanTreeStore _store;
+        private readonly LocalNameCache _nameCache;
+        private readonly ILogger _log;
+        private readonly CancellationToken _cancel;
+        private readonly List<ScanChild> _children;
+        private readonly List<FileEntry> _files;
+
+        public long OwnSize { get; private set; }
+
+        public DirectoryScanEnumerator(
+            string path,
+            DirectorySpace node,
+            ScanTreeStore store,
+            LocalNameCache nameCache,
+            ILogger log,
+            CancellationToken cancel,
+            List<ScanChild> children,
+            List<FileEntry> files)
+            : base(path, Enumeration)
+        {
+            _path = path;
+            _node = node;
+            _store = store;
+            _nameCache = nameCache;
+            _log = log;
+            _cancel = cancel;
+            _children = children;
+            _files = files;
+        }
+
+        protected override bool ShouldIncludeEntry(ref FileSystemEntry entry)
+        {
+            _cancel.ThrowIfCancellationRequested();
+
+            if ((entry.Attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                var linkPath = Path.Join(_path, entry.FileName);
+
+                if (ReparsePoint.IsLink(linkPath, entry.IsDirectory))
+                {
+                    _log.ScanReparsePointSkipped(FromEnumerationPath(linkPath));
+                    return false;
+                }
+            }
+
+            TimestampEncoding.FromDateTimeOffsets(
+                entry.CreationTimeUtc,
+                entry.LastAccessTimeUtc,
+                out var creationRaw,
+                out var lastAccessRaw,
+                out var flags);
+
+            var nameId = _nameCache.IsCreated
+                ? _nameCache.Intern(_store.Names, entry.FileName)
+                : _store.Names.Intern(entry.FileName);
+
+            if (!entry.IsDirectory)
+            {
+                _files.Add(
+                    new()
+                    {
+                        Size = entry.Length,
+                        CreationRaw = creationRaw,
+                        LastAccessRaw = lastAccessRaw,
+                        NameId = nameId,
+                        State = SpaceState.Added,
+                        Flags = flags,
+                    });
+                OwnSize += entry.Length;
+                return false;
+            }
+
+            var child = new DirectorySpace(_store, nameId, _node, creationRaw, lastAccessRaw, flags);
+            _children.Add(new(Path.Join(_path, entry.FileName), child));
+            return false;
+        }
+
+        protected override byte TransformEntry(ref FileSystemEntry entry)
+        {
+            return 0;
+        }
     }
 
     private readonly record struct ScanChild(string Path, DirectorySpace Node, ScanBranch? Branch = null);

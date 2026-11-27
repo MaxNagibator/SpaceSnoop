@@ -42,6 +42,19 @@ public sealed class ScanVisibility
                 .Sum(static item => item.TotalSize));
     }
 
+    internal bool HasIgnoredFileIn(DirectorySpace dir)
+    {
+        foreach (var item in _ignored)
+        {
+            if (item is FileSpace && ReferenceEquals(item.Parent, dir))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public int FileCountOf(DirectorySpace space)
     {
         return Math.Max(0, space.TotalFileCount - _excludedFiles.GetValueOrDefault(space));

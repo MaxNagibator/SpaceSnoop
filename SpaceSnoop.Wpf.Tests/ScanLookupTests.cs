@@ -112,6 +112,37 @@ public class ScanLookupTests
         }
     }
 
+    [Test]
+    public void Файлы_в_дереве_из_ScanTreeStore_находятся_с_учётом_регистра()
+    {
+        var store = new ScanTreeStore();
+        var writer = new FileSlabWriter(store);
+        var root = new DirectorySpace(store, store.Names.Intern(Root), null, 0, 0, 0);
+        var sub = new DirectorySpace(store, store.Names.Intern("docs"), root, 0, 0, 0);
+
+        writer.WriteFiles(
+            [
+                new FileEntry { Size = 10, NameId = store.Names.Intern("Report.txt"), State = SpaceState.Added },
+                new FileEntry { Size = 20, NameId = store.Names.Intern("report.txt"), State = SpaceState.Added },
+                new FileEntry { Size = 30, NameId = store.Names.Intern("unique.log"), State = SpaceState.Added },
+            ],
+            out var subStart);
+        sub.SetScanned(store, subStart, 3, 60, []);
+        root.SetScanned(store, 0, 0, 0, [sub]);
+        store.Freeze();
+        root.AggregateTotals();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(ScanLookup.Find([root], @"C:\Data\docs\unique.log")?.Name, Is.EqualTo("unique.log"));
+            Assert.That(ScanLookup.Find([root], @"C:\Data\docs\UNIQUE.LOG")?.Name, Is.EqualTo("unique.log"));
+            Assert.That(ScanLookup.Find([root], @"C:\Data\docs\report.txt")?.Name, Is.EqualTo("report.txt"));
+            Assert.That(ScanLookup.Find([root], @"C:\Data\docs\Report.txt")?.Name, Is.EqualTo("Report.txt"));
+            Assert.That(ScanLookup.Find([root], @"C:\Data\docs\REPORT.TXT"), Is.Null);
+            Assert.That(ScanLookup.Find([root], @"C:\Data\docs\missing.txt"), Is.Null);
+        }
+    }
+
     private static DirectorySpace BuildTree()
     {
         var root = new DirectorySpace(Root, null, DateTime.Now, DateTime.Now);

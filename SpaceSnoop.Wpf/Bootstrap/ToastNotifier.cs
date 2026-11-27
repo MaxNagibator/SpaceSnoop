@@ -64,6 +64,24 @@ public sealed class ToastNotifier
         _lastUndoToast = toast;
     }
 
+    public void Notify(
+        string message,
+        string actionText,
+        Action action,
+        StatusSeverity severity = StatusSeverity.Info,
+        TimeSpan? duration = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(actionText);
+        ArgumentNullException.ThrowIfNull(action);
+
+        if (!_prefs.EnableToastNotifications)
+        {
+            return;
+        }
+
+        _toasts.Show(message, actionText, action, severity, duration);
+    }
+
     private void OnToastsChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         if (_lastUndoToast is not null && !_toasts.Toasts.Contains(_lastUndoToast))

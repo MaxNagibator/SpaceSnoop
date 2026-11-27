@@ -212,7 +212,7 @@ public class AntigravityChatTests
         var preferences = _services.GetRequiredService<AgentPreferences>();
         var selector = new AgentModelSelector(preferences, _backends, NullLogger<AgentModelSelector>.Instance);
         return new(_backends, preferences, _services.GetRequiredService<ScanPreferences>(), selector,
-            _services.GetRequiredService<McpPreferences>(), _services.GetRequiredService<McpServerHost>(), _services.GetRequiredService<McpBridge>(),
+            _services.GetRequiredService<McpPreferences>(), _services.GetRequiredService<McpServerController>(), _services.GetRequiredService<Lazy<McpBridge>>(),
             new(NullLogger<ChatHistoryStore>.Instance, Path.Combine(_directory, ChatHistoryStore.FileName)),
             new(preferences, NullLogger<AgentTranscriptStore>.Instance, Path.Combine(_directory, "transcripts")),
             new NoopDialogs(), new FakeClipboard(), new FakeShellLauncher(), new FakeUiDispatcher(),

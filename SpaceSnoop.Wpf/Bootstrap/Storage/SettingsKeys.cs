@@ -25,6 +25,7 @@ public static class SettingsKeys
     public const string ScanMediaAware = "wpf.scan.media_aware";
     public const string ScanIntensity = "wpf.scan.intensity";
     public const string ScanLastDrive = "wpf.scan.last_drive";
+    public const string ScanRecentTargets = "wpf.scan.recent_targets";
     public const string ScanSortMode = "wpf.scan.sort_mode";
     public const string ScanSortInvert = "wpf.scan.sort_invert";
     public const string ScanTreemap = "wpf.scan.treemap";
@@ -38,6 +39,7 @@ public static class SettingsKeys
     public const string ScanDuplicatesEnabled = "wpf.scan.duplicates.enabled";
     public const string ScanMftEnabled = "wpf.scan.mft.enabled";
     public const string ScanMftRootOnly = "wpf.scan.mft.root_only";
+    public const string ScanMftRawDisk = "wpf.scan.mft.raw_disk";
     public const string ScanDuplicatesMinSize = "wpf.scan.duplicates.min_size_mb";
 
     public const string ScanInspectorCollapsed = "wpf.scan.inspector.collapsed";

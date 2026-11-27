@@ -37,7 +37,6 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
     [ObservableProperty]
     private string _exclusions = string.Empty;
 
-    [ObservableProperty]
     private int _selectedSort;
 
     public event EventHandler<bool>? RequestClose;
@@ -51,6 +50,45 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
     public IReadOnlyList<SegmentOption> Winners => SyncOptions.Winners;
 
     public IReadOnlyList<string> SortOptions { get; } = ["Имя (А–Я)", "Имя (Я–А)", "Сначала новые"];
+
+    public IReadOnlyList<SegmentOption> SortSegmentOptions { get; } =
+    [
+        new(PackIconLucideKind.ArrowDownAZ, "Имя (А–Я)", "Сортировать пары по имени от А до Я"),
+        new(PackIconLucideKind.ArrowUpZA, "Имя (Я–А)", "Сортировать пары по имени от Я до А"),
+        new(PackIconLucideKind.Sparkles, "Сначала новые", "Сначала пары, для которых ещё нет профиля"),
+    ];
+
+    public int SelectedSort
+    {
+        get => _selectedSort;
+        set
+        {
+            if (value < 0)
+            {
+                OnPropertyChanged();
+                return;
+            }
+
+            if (!SetProperty(ref _selectedSort, value))
+            {
+                return;
+            }
+
+            _settings.SetInt(SettingsKeys.BatchSort, value);
+
+            var sorted = ProfileBatch.Sort(Rows, value);
+
+            for (var index = 0; index < sorted.Count; index++)
+            {
+                var current = Rows.IndexOf(sorted[index]);
+
+                if (current != index)
+                {
+                    Rows.Move(current, index);
+                }
+            }
+        }
+    }
 
     public PackIconLucideKind DirectionIconKind => SelectedModeIndex switch
     {
@@ -397,23 +435,6 @@ public sealed partial class BatchCreateProfilesDialogViewModel : ObservableObjec
         lock (_rebuildGate)
         {
             return _closed || generation != _rebuildGeneration;
-        }
-    }
-
-    partial void OnSelectedSortChanged(int value)
-    {
-        _settings.SetInt(SettingsKeys.BatchSort, value);
-
-        var sorted = ProfileBatch.Sort(Rows, value);
-
-        for (var index = 0; index < sorted.Count; index++)
-        {
-            var current = Rows.IndexOf(sorted[index]);
-
-            if (current != index)
-            {
-                Rows.Move(current, index);
-            }
         }
     }
 

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.IO.Hashing;
+using System.Runtime.InteropServices;
 using System.Security;
 
 namespace SpaceSnoop.Core.Duplicates;
@@ -10,6 +11,7 @@ namespace SpaceSnoop.Core.Duplicates;
 public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
 {
     private const int BlockSize = 80 * 1024;
+    private const int MinHashBucketCount = 3;
     private const int HashThreshold = 8;
     private const int MaxReportedErrors = 50;
     private const int PrefixHashSize = 4 * 1024;
@@ -24,10 +26,19 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
 
     public DuplicateReport Find(DirectorySpace root, DuplicateOptions options, IProgress<OperationProgress>? progress, CancellationToken token)
     {
-        var bySize = new Dictionary<long, List<FileSpace>>();
-        var unreadable = Collect(root, Math.Max(1, options.MinSize), bySize, token);
+        var bySize = new Dictionary<long, SizeBucket>();
+        var unreadable = CollectRefs(root, Math.Max(1, options.MinSize), bySize, token);
 
-        var buckets = bySize.Values.Where(static x => x.Count > 1).ToList();
+        var buckets = new List<List<FileRef>>();
+
+        foreach (var entry in bySize.Values)
+        {
+            if (entry.Rest is not null)
+            {
+                buckets.Add(entry.Rest);
+            }
+        }
+
         var state = new FindState(progress);
         var found = new ConcurrentBag<DuplicateGroup>();
 
@@ -45,6 +56,8 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
                     found.Add(group);
                 }
             });
+
+        state.ReportFinal();
 
         var groups = found.OrderByDescending(static x => x.ReclaimableBytes)
             .ThenByDescending(static x => x.Size)
@@ -66,6 +79,34 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
 
     internal static int Collect(DirectorySpace root, long minSize, Dictionary<long, List<FileSpace>> bySize, CancellationToken token)
     {
+        var refsBySize = new Dictionary<long, SizeBucket>();
+        var unreadable = CollectRefs(root, minSize, refsBySize, token);
+
+        foreach (var (size, refs) in refsBySize)
+        {
+            if (!bySize.TryGetValue(size, out var bucket))
+            {
+                bucket = new(refs.Rest?.Count ?? 1);
+                bySize[size] = bucket;
+            }
+
+            if (refs.Rest is null)
+            {
+                bucket.Add(refs.First.Directory.GetFile(refs.First.Index));
+                continue;
+            }
+
+            for (var i = 0; i < refs.Rest.Count; i++)
+            {
+                bucket.Add(refs.Rest[i].Directory.GetFile(refs.Rest[i].Index));
+            }
+        }
+
+        return unreadable;
+    }
+
+    internal static int CollectRefs(DirectorySpace root, long minSize, Dictionary<long, SizeBucket> bySize, CancellationToken token)
+    {
         var unreadable = 0;
         var stack = new Stack<DirectorySpace>();
         stack.Push(root);
@@ -81,25 +122,39 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
                 unreadable++;
             }
 
-            foreach (var file in directory.Files)
+            var entries = directory.FileEntries;
+
+            for (var i = 0; i < entries.Length; i++)
             {
-                if (file.Size < minSize)
+                var size = entries[i].Size;
+
+                if (size < minSize)
                 {
                     continue;
                 }
 
-                if (!bySize.TryGetValue(file.Size, out var bucket))
-                {
-                    bucket = [];
-                    bySize[file.Size] = bucket;
-                }
+                ref var bucket = ref CollectionsMarshal.GetValueRefOrAddDefault(bySize, size, out var exists);
+                var fileRef = new FileRef(directory, i);
 
-                bucket.Add(file);
+                if (!exists)
+                {
+                    bucket.First = fileRef;
+                }
+                else if (bucket.Rest is null)
+                {
+                    bucket.Rest = [bucket.First, fileRef];
+                }
+                else
+                {
+                    bucket.Rest.Add(fileRef);
+                }
             }
 
-            foreach (var sub in directory.SubDirectories)
+            var subs = directory.SubDirectoriesArray;
+
+            for (var i = 0; i < subs.Length; i++)
             {
-                stack.Push(sub);
+                stack.Push(subs[i]);
             }
         }
 
@@ -116,7 +171,7 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
         return new(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, BlockSize, FileOptions.SequentialScan);
     }
 
-    private static Probe Examine(FileSpace space, string path, bool withHash, FindState state, CancellationToken token)
+    private static Probe Examine(FileRef file, string path, bool withHash, FindState state, CancellationToken token)
     {
         var symbolic = (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
 
@@ -124,7 +179,7 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
         var identity = FileIdentity.Read(stream.SafeFileHandle);
         var hash = withHash ? HashPrefix(stream, state, token) : (UInt128?)null;
 
-        return new(space, path, identity, hash, symbolic);
+        return new(file, path, identity, hash, symbolic);
     }
 
     private static UInt128 HashPrefix(FileStream stream, FindState state, CancellationToken token)
@@ -220,7 +275,19 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
 
         foreach (var cluster in clusters)
         {
-            var members = new List<DuplicateMember>();
+            var totalMembers = 0;
+
+            for (var i = 0; i < cluster.Count; i++)
+            {
+                totalMembers += cluster[i].Count;
+            }
+
+            if (totalMembers < 2)
+            {
+                continue;
+            }
+
+            var members = new List<DuplicateMember>(totalMembers);
             var distinct = 0;
 
             foreach (var links in cluster)
@@ -236,13 +303,10 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
                         distinct++;
                     }
 
-                    members.Add(new(links[index].Space, links[index].Path, kind));
+                    var probe = links[index];
+                    var space = probe.File.Directory.GetFile(probe.File.Index);
+                    members.Add(new(space, probe.Path, kind));
                 }
-            }
-
-            if (members.Count < 2)
-            {
-                continue;
             }
 
             groups.Add(
@@ -254,36 +318,37 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
         return groups;
     }
 
-    private List<DuplicateGroup> Resolve(List<FileSpace> bucket, DuplicateOptions options, FindState state, CancellationToken token)
+    private List<DuplicateGroup> Resolve(List<FileRef> bucket, DuplicateOptions options, FindState state, CancellationToken token)
     {
-        var withHash = bucket.Count > HashThreshold;
+        var fileSize = bucket[0].Directory.FileEntries[bucket[0].Index].Size;
+        var withHash = bucket.Count >= MinHashBucketCount;
         var physical = ProbeBucket(bucket, withHash, state, token);
 
-        if (withHash)
+        if (withHash && physical.Count > HashThreshold)
         {
-            Refine(physical, bucket[0].Size, state, token);
+            Refine(physical, fileSize, state, token);
         }
 
         var clusters = Cluster(physical, withHash, state, token);
 
-        return Build(bucket[0].Size, clusters, Math.Max(2, options.MemberLimit));
+        return Build(fileSize, clusters, Math.Max(2, options.MemberLimit));
     }
 
-    private List<List<Probe>> ProbeBucket(List<FileSpace> bucket, bool withHash, FindState state, CancellationToken token)
+    private List<List<Probe>> ProbeBucket(List<FileRef> bucket, bool withHash, FindState state, CancellationToken token)
     {
         var physical = new List<List<Probe>>();
         var byIdentity = new Dictionary<FileIdentity, List<Probe>>();
 
-        foreach (var space in bucket)
+        foreach (var fileRef in bucket)
         {
             token.ThrowIfCancellationRequested();
 
-            var path = space.AbsolutePath;
+            var path = Path.Combine(fileRef.Directory.AbsolutePath, fileRef.Directory.GetFileName(fileRef.Index));
             Probe probe;
 
             try
             {
-                probe = Examine(space, path, withHash, state, token);
+                probe = Examine(fileRef, path, withHash, state, token);
             }
             catch (Exception exception) when (IsReadError(exception))
             {
@@ -360,19 +425,83 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
     {
         var clusters = new List<List<List<Probe>>>();
 
+        if (!withHash || physical.Count < MinHashBucketCount)
+        {
+            foreach (var links in physical)
+            {
+                token.ThrowIfCancellationRequested();
+
+                var matched = MatchCluster(clusters, links[0], withHash, state, out var failed, token);
+
+                if (matched is not null)
+                {
+                    matched.Add(links);
+                }
+                else if (!failed)
+                {
+                    clusters.Add([links]);
+                }
+            }
+
+            return clusters;
+        }
+
+        var byDigest = new Dictionary<UInt128, List<List<List<Probe>>>>();
+        List<List<List<Probe>>>? unhashed = null;
+
         foreach (var links in physical)
         {
             token.ThrowIfCancellationRequested();
 
-            var matched = MatchCluster(clusters, links[0], withHash, state, out var failed, token);
+            var candidate = links[0];
 
-            if (matched is not null)
+            if (candidate.Digest is { } digest)
             {
-                matched.Add(links);
+                List<List<Probe>>? matched = null;
+                var matchFailed = false;
+
+                if (byDigest.TryGetValue(digest, out var digestClusters))
+                {
+                    matched = MatchCluster(digestClusters, candidate, false, state, out matchFailed, token);
+                }
+
+                if (matched is null && !matchFailed && unhashed is not null)
+                {
+                    matched = MatchCluster(unhashed, candidate, false, state, out matchFailed, token);
+                }
+
+                if (matched is not null)
+                {
+                    matched.Add(links);
+                }
+                else if (!matchFailed)
+                {
+                    List<List<Probe>> created = [links];
+                    clusters.Add(created);
+
+                    if (digestClusters is null)
+                    {
+                        digestClusters = [];
+                        byDigest[digest] = digestClusters;
+                    }
+
+                    digestClusters.Add(created);
+                }
             }
-            else if (!failed)
+            else
             {
-                clusters.Add([links]);
+                var matched = MatchCluster(clusters, candidate, false, state, out var failed, token);
+
+                if (matched is not null)
+                {
+                    matched.Add(links);
+                }
+                else if (!failed)
+                {
+                    List<List<Probe>> created = [links];
+                    clusters.Add(created);
+                    (unhashed ??= []).Add(created);
+                }
             }
         }
 
@@ -420,12 +549,26 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
         return null;
     }
 
-    private readonly record struct Probe(FileSpace Space, string Path, FileIdentity? Identity, UInt128? Digest, bool Symbolic);
+    internal readonly record struct FileRef(DirectorySpace Directory, int Index);
+
+    internal struct SizeBucket
+    {
+        public FileRef First;
+        public List<FileRef>? Rest;
+    }
+
+    private readonly record struct Probe(FileRef File, string Path, FileIdentity? Identity, UInt128? Digest, bool Symbolic);
 
     private sealed class FindState(IProgress<OperationProgress>? progress)
     {
+        private const long ReportIntervalMs = 50;
+
         private int _examined;
         private long _bytes;
+        private long _nextReportTick;
+        private int _lastReportedExamined;
+        private long _lastReportedBytes = -1;
+        private string? _lastPath;
 
         public ConcurrentQueue<string> Errors { get; } = new();
 
@@ -438,8 +581,44 @@ public sealed class DuplicateFinder(ILogger<DuplicateFinder>? logger = null)
 
         public void Advance(string path)
         {
+            Volatile.Write(ref _lastPath, path);
             var completed = Interlocked.Increment(ref _examined);
-            progress?.Report(new(completed, path, Interlocked.Read(ref _bytes)));
+
+            if (progress is null)
+            {
+                return;
+            }
+
+            var now = Environment.TickCount64;
+            var next = Volatile.Read(ref _nextReportTick);
+
+            if (now >= next && Interlocked.CompareExchange(ref _nextReportTick, now + ReportIntervalMs, next) == next)
+            {
+                var bytes = Interlocked.Read(ref _bytes);
+                Volatile.Write(ref _lastReportedExamined, completed);
+                Volatile.Write(ref _lastReportedBytes, bytes);
+                progress.Report(new(completed, path, bytes));
+            }
+        }
+
+        public void ReportFinal()
+        {
+            if (progress is null)
+            {
+                return;
+            }
+
+            var examined = Volatile.Read(ref _examined);
+            var bytes = Interlocked.Read(ref _bytes);
+
+            if (examined > 0
+                && (Volatile.Read(ref _lastReportedExamined) != examined
+                    || Volatile.Read(ref _lastReportedBytes) != bytes))
+            {
+                Volatile.Write(ref _lastReportedExamined, examined);
+                Volatile.Write(ref _lastReportedBytes, bytes);
+                progress.Report(new(examined, _lastPath ?? string.Empty, bytes));
+            }
         }
 
         public void Fail(string path, Exception exception)

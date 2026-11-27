@@ -29,7 +29,7 @@ public sealed partial class DeleteProgressDialogViewModel
         if (Items.Count > 0)
         {
             var started = Stopwatch.GetTimestamp() - (long)(Stopwatch.Frequency * AutomationChunkSeconds);
-            ApplyChunk(new(true, 1, 1, 0, Math.Min(Items.Count, ChunkSize) - 1, started));
+            ApplyChunk(new(true, 1, 1, 0, Math.Min(Items.Count, FirstChunkSize) - 1, started));
         }
     }
 

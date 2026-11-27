@@ -49,12 +49,19 @@
                         ToolTip="{Binding Hint}"
                         AutomationProperties.Name="{Binding AutomationName}" />
                 <keepshell:ThemeSwitcher Grid.Row="1"
-                                       Grid.ColumnSpan="2"
-                                       DataContext="{Binding Theme}"
-                                       ShowPreviews="True"
-                                       HorizontalAlignment="Left"
-                                       Margin="-8,10,0,-8" />
+                                         Grid.ColumnSpan="2"
+                                         DataContext="{Binding Theme}"
+                                         ShowPreviews="True"
+                                         HorizontalAlignment="Left"
+                                         Margin="0,10,0,0" />
             </Grid>
+
+            <keepshell:ThemePacksView Margin="0,2,0,0"
+                                      DataContext="{Binding ThemePacks}" />
+
+            <Border BorderBrush="{DynamicResource Border.Subtle}"
+                    BorderThickness="0,1,0,0"
+                    Margin="0,12,0,0" />
 
             <keepshell:SettingRowPanel Margin="0,16,0,0">
                 <StackPanel>

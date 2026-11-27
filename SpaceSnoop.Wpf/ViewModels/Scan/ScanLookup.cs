@@ -43,12 +43,29 @@ internal static class ScanLookup
             return;
         }
 
-        foreach (var sub in dir.SubDirectories)
+        var subs = dir.SubDirectoriesArray;
+
+        for (var i = 0; i < subs.Length; i++)
         {
-            Collect(sub, target, reachable);
+            Collect(subs[i], target, reachable);
         }
 
-        reachable.AddRange(dir.Files.Where(file => string.Equals(Normalize(file.AbsolutePath), target, StringComparison.OrdinalIgnoreCase)));
+        var remaining = target.AsSpan(current.Length + 1);
+
+        if (remaining.IndexOfAny('\\', '/') >= 0)
+        {
+            return;
+        }
+
+        var files = dir.FileEntries;
+
+        for (var i = 0; i < files.Length; i++)
+        {
+            if (dir.FileNameEquals(i, remaining, StringComparison.OrdinalIgnoreCase))
+            {
+                reachable.Add(dir.GetFile(i));
+            }
+        }
     }
 
     private static SpaceBase? Pick(List<SpaceBase> reachable, string target)

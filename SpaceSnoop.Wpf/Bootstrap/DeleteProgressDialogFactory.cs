@@ -12,8 +12,9 @@ public sealed class DeleteProgressDialogFactory(
     public DeleteProgressDialogViewModel Create(
         IReadOnlyList<SpaceBase> items,
         bool permanent,
-        Action<SpaceBase>? unmark = null)
+        Action<SpaceBase>? unmark = null,
+        IReadOnlySet<SpaceBase>? withoutRecycleBin = null)
     {
-        return new(items, permanent, monitor, operations, preferences, uiDispatcher, logger, unmark);
+        return new(items, permanent, monitor, operations, preferences, uiDispatcher, logger, unmark, withoutRecycleBin);
     }
 }

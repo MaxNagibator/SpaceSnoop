@@ -82,10 +82,10 @@ public static class ScanExport
         int entryLimit = DefaultEntryLimit)
     {
         var context = new Context(Math.Clamp(options.Depth, MinDepth, MaxDepth), Math.Max(1, entryLimit));
-        var counts = Walk(root, string.Empty, 1, context);
+        var counts = Walk(root, root, 1, context);
 
         var directories = DrainDirectories(context.Directories);
-        var files = DrainFiles(context.Files);
+        var files = DrainFiles(root, context.Files);
 
         return new()
         {
@@ -115,7 +115,7 @@ public static class ScanExport
     /// <see cref="DirectorySpace" /> пересчитывали бы поддерево на каждом узле) и попутно
     /// набирает крупнейшие записи.
     /// </summary>
-    private static Counts Walk(DirectorySpace directory, string relative, int depth, Context context)
+    private static Counts Walk(DirectorySpace root, DirectorySpace directory, int depth, Context context)
     {
         if (directory.State == SpaceState.Error)
         {
@@ -123,22 +123,35 @@ public static class ScanExport
 
             if (context.ErrorPaths.Count < ErrorPathLimit)
             {
+                var relative = BuildRelativePath(root, directory);
                 context.ErrorPaths.Add(relative.Length == 0 ? RootDirectoryName : relative);
             }
         }
 
-        var files = directory.Files.Count;
-        var directories = 0;
+        var fileEntries = directory.FileEntries;
+        var files = fileEntries.Length;
 
-        foreach (var file in directory.Files)
+        for (var i = 0; i < fileEntries.Length; i++)
         {
-            Push(context.Files, new(relative, file), file.Size, context.Limit);
+            var size = fileEntries[i].Size;
+
+            if (context.Files.Count < context.Limit)
+            {
+                context.Files.Enqueue(new(directory, i, size), size);
+            }
+            else if (context.Files.TryPeek(out _, out var min) && size > min)
+            {
+                context.Files.EnqueueDequeue(new(directory, i, size), size);
+            }
         }
 
-        foreach (var sub in directory.SubDirectories)
+        var subs = directory.SubDirectoriesArray;
+        var directories = 0;
+
+        for (var i = 0; i < subs.Length; i++)
         {
-            var path = relative.Length == 0 ? sub.Name : Path.Combine(relative, sub.Name);
-            var counts = Walk(sub, path, depth + 1, context);
+            var sub = subs[i];
+            var counts = Walk(root, sub, depth + 1, context);
 
             files += counts.Files;
             directories += counts.Directories + 1;
@@ -149,31 +162,53 @@ public static class ScanExport
             }
 
             context.DirectoriesSeen++;
+            var totalSize = sub.TotalSize;
 
-            Push(
-                context.Directories,
-                new(path, depth, sub.TotalSize, sub.Size, counts.Files, counts.Directories, sub.State == SpaceState.Error),
-                sub.TotalSize,
-                context.Limit);
+            if (context.Directories.Count < context.Limit)
+            {
+                context.Directories.Enqueue(
+                    new(BuildRelativePath(root, sub), depth, totalSize, sub.Size, counts.Files, counts.Directories, sub.State == SpaceState.Error),
+                    totalSize);
+            }
+            else if (context.Directories.TryPeek(out _, out var min) && totalSize > min)
+            {
+                context.Directories.EnqueueDequeue(
+                    new(BuildRelativePath(root, sub), depth, totalSize, sub.Size, counts.Files, counts.Directories, sub.State == SpaceState.Error),
+                    totalSize);
+            }
         }
 
         return new(files, directories);
     }
 
-    /// <summary>
-    /// Держит в очереди только <paramref name="limit" /> крупнейших элементов: наименьший
-    /// вытесняется сразу, поэтому дерево с миллионом файлов не материализуется списком.
-    /// </summary>
-    private static void Push<T>(PriorityQueue<T, long> queue, T item, long weight, int limit)
+    private static string BuildRelativePath(DirectorySpace root, DirectorySpace target)
     {
-        if (queue.Count < limit)
+        if (ReferenceEquals(target, root))
         {
-            queue.Enqueue(item, weight);
+            return string.Empty;
         }
-        else
+
+        var depth = 0;
+
+        for (SpaceBase? current = target; current is not null && !ReferenceEquals(current, root); current = current.Parent)
         {
-            queue.EnqueueDequeue(item, weight);
+            depth++;
         }
+
+        if (depth == 1)
+        {
+            return target.Name;
+        }
+
+        var segments = new string[depth];
+        var index = depth;
+
+        for (SpaceBase? current = target; current is not null && !ReferenceEquals(current, root); current = current.Parent)
+        {
+            segments[--index] = current.Name;
+        }
+
+        return Path.Combine(segments);
     }
 
     private static List<ScanExportDirectory> DrainDirectories(PriorityQueue<ScanExportDirectory, long> queue)
@@ -189,17 +224,19 @@ public static class ScanExport
         return items;
     }
 
-    private static List<ScanExportFile> DrainFiles(PriorityQueue<FileEntry, long> queue)
+    private static List<ScanExportFile> DrainFiles(DirectorySpace root, PriorityQueue<FileCandidate, long> queue)
     {
         var items = new List<ScanExportFile>(queue.Count);
 
         while (queue.TryDequeue(out var item, out _))
         {
-            var path = item.Directory.Length == 0
-                ? item.File.Name
-                : Path.Combine(item.Directory, item.File.Name);
+            var directoryPath = BuildRelativePath(root, item.Directory);
+            var fileName = item.Directory.GetFileName(item.FileIndex);
+            var path = directoryPath.Length == 0
+                ? fileName
+                : Path.Combine(directoryPath, fileName);
 
-            items.Add(new(path, item.File.Size));
+            items.Add(new(path, item.Size));
         }
 
         items.Sort(static (left, right) => right.Bytes.CompareTo(left.Bytes));
@@ -208,7 +245,7 @@ public static class ScanExport
 
     private readonly record struct Counts(int Files, int Directories);
 
-    private readonly record struct FileEntry(string Directory, FileSpace File);
+    private readonly record struct FileCandidate(DirectorySpace Directory, int FileIndex, long Size);
 
     private sealed class Context(int depth, int limit)
     {
@@ -218,7 +255,7 @@ public static class ScanExport
 
         public PriorityQueue<ScanExportDirectory, long> Directories { get; } = new();
 
-        public PriorityQueue<FileEntry, long> Files { get; } = new();
+        public PriorityQueue<FileCandidate, long> Files { get; } = new();
 
         public List<string> ErrorPaths { get; } = [];
 

@@ -3,66 +3,60 @@
 public sealed class PriorityRowPanel : Panel
 {
     private double _tailNatural;
+    private bool _hasCachedPlan;
+    private double _cachedAvailable;
+    private int _cachedCount;
+    private RowPlan _cachedPlan;
 
-    private static RowPlan Plan(double available, double fillMin, IReadOnlyList<double> optional, double tailMin, double tailMax)
+    protected override void OnVisualChildrenChanged(DependencyObject visualAdded, DependencyObject visualRemoved)
     {
-        var kept = new bool[optional.Count];
-        var used = 0d;
-
-        for (var i = 0; i < optional.Count; i++)
-        {
-            kept[i] = true;
-            used += optional[i];
-        }
-
-        tailMax = Math.Max(tailMin, tailMax);
-
-        for (var i = 0; i < optional.Count && (fillMin + used + tailMax) > available; i++)
-        {
-            kept[i] = false;
-            used -= optional[i];
-        }
-
-        var tail = Math.Min(Math.Clamp(available - used - fillMin, tailMin, tailMax), Math.Max(0, available));
-        var fill = Math.Max(0, available - used - tail);
-
-        return new(fill, kept, tail);
+        _hasCachedPlan = false;
+        base.OnVisualChildrenChanged(visualAdded, visualRemoved);
     }
 
     protected override Size MeasureOverride(Size availableSize)
     {
-        var children = InternalChildren;
+        _hasCachedPlan = false;
 
-        if (children.Count < 2)
+        var children = InternalChildren;
+        var count = children.Count;
+
+        if (count < 2)
         {
             return MeasureSingle(availableSize);
         }
 
         var height = 0d;
 
-        foreach (UIElement child in children)
+        for (var i = 0; i < count; i++)
         {
+            var child = children[i];
             child.Measure(new(double.PositiveInfinity, availableSize.Height));
             height = Math.Max(height, child.DesiredSize.Height);
         }
 
-        _tailNatural = children[^1].DesiredSize.Width;
+        _tailNatural = children[count - 1].DesiredSize.Width;
 
         if (double.IsPositiveInfinity(availableSize.Width))
         {
             var natural = 0d;
 
-            foreach (UIElement child in children)
+            for (var i = 0; i < count; i++)
             {
-                natural += child.DesiredSize.Width;
+                natural += children[i].DesiredSize.Width;
             }
 
-            return new(natural - children[^1].DesiredSize.Width + TailMax(children[^1]), height);
+            return new(natural - _tailNatural + TailMax(children[count - 1]), height);
         }
 
         var plan = PlanFor(availableSize.Width);
+        _cachedAvailable = availableSize.Width;
+        _cachedCount = count;
+        _cachedPlan = plan;
+        _hasCachedPlan = true;
+
         children[0].Measure(new(plan.FillWidth, availableSize.Height));
-        children[^1].Measure(new(plan.TailWidth, availableSize.Height));
+        children[count - 1].Measure(new(plan.TailWidth, availableSize.Height));
 
         return new(availableSize.Width, height);
     }
@@ -70,26 +64,31 @@ public sealed class PriorityRowPanel : Panel
     protected override Size ArrangeOverride(Size finalSize)
     {
         var children = InternalChildren;
+        var count = children.Count;
 
-        if (children.Count < 2)
+        if (count < 2)
         {
-            foreach (UIElement child in children)
+            for (var i = 0; i < count; i++)
             {
-                child.Arrange(new(finalSize));
+                children[i].Arrange(new(finalSize));
             }
 
             return finalSize;
         }
 
-        var plan = PlanFor(finalSize.Width);
+        var plan = _hasCachedPlan
+            && _cachedCount == count
+            && BitConverter.DoubleToInt64Bits(_cachedAvailable) == BitConverter.DoubleToInt64Bits(finalSize.Width)
+            ? _cachedPlan
+            : PlanFor(finalSize.Width);
 
         children[0].Arrange(new(0, 0, plan.FillWidth, finalSize.Height));
 
         var x = plan.FillWidth;
 
-        for (var i = 1; i < (children.Count - 1); i++)
+        for (var i = 1; i < (count - 1); i++)
         {
-            if (plan.Kept[i - 1])
+            if (plan.IsKept(i - 1))
             {
                 var width = children[i].DesiredSize.Width;
                 children[i].Arrange(new(x, 0, width, finalSize.Height));
@@ -101,7 +100,7 @@ public sealed class PriorityRowPanel : Panel
             }
         }
 
-        children[^1].Arrange(new(Math.Max(x, finalSize.Width - plan.TailWidth), 0, plan.TailWidth, finalSize.Height));
+        children[count - 1].Arrange(new(Math.Max(x, finalSize.Width - plan.TailWidth), 0, plan.TailWidth, finalSize.Height));
 
         return finalSize;
     }
@@ -120,10 +119,13 @@ public sealed class PriorityRowPanel : Panel
 
     private Size MeasureSingle(Size availableSize)
     {
+        var children = InternalChildren;
+        var count = children.Count;
         var size = new Size();
 
-        foreach (UIElement child in InternalChildren)
+        for (var i = 0; i < count; i++)
         {
+            var child = children[i];
             child.Measure(availableSize);
             size = child.DesiredSize;
         }
@@ -134,15 +136,39 @@ public sealed class PriorityRowPanel : Panel
     private RowPlan PlanFor(double available)
     {
         var children = InternalChildren;
-        var optional = new double[children.Count - 2];
+        var count = children.Count;
+        var optionalCount = count - 2;
+        var fillMin = MinOf(children[0]);
+        var tail = children[count - 1];
+        var tailMin = Math.Max(MinOf(tail), _tailNatural);
+        var tailMax = Math.Max(tailMin, TailMax(tail));
 
-        for (var i = 1; i < (children.Count - 1); i++)
+        var used = 0d;
+
+        for (var i = 1; i < (count - 1); i++)
         {
-            optional[i - 1] = children[i].DesiredSize.Width;
+            used += children[i].DesiredSize.Width;
         }
 
-        return Plan(available, MinOf(children[0]), optional, Math.Max(MinOf(children[^1]), _tailNatural), TailMax(children[^1]));
+        var firstKept = 0;
+
+        for (var i = 0; i < optionalCount && (fillMin + used + tailMax) > available; i++)
+        {
+            firstKept = i + 1;
+            used -= children[i + 1].DesiredSize.Width;
+        }
+
+        var tailWidth = Math.Min(Math.Clamp(available - used - fillMin, tailMin, tailMax), Math.Max(0, available));
+        var fillWidth = Math.Max(0, available - used - tailWidth);
+
+        return new(fillWidth, firstKept, tailWidth);
     }
 
-    private sealed record RowPlan(double FillWidth, IReadOnlyList<bool> Kept, double TailWidth);
+    private readonly record struct RowPlan(double FillWidth, int FirstKeptIndex, double TailWidth)
+    {
+        public bool IsKept(int index)
+        {
+            return index >= FirstKeptIndex;
+        }
+    }
 }

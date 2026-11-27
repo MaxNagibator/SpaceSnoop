@@ -41,6 +41,9 @@ internal static partial class CoreLog
         Message = "Синхронизация: {Action} «{RelativePath}» отклонено, конфликт вида объектов ({Conflict})")]
     public static partial void SyncTypeConflictBlocked(this ILogger logger, SyncAction action, string relativePath, FileTypeConflict conflict);
 
+    [LoggerMessage(EventId = 1519, Level = LogLevel.Information, Message = "Синхронизация: безвозвратное сетевое удаление ({Kind}) «{Path}»")]
+    public static partial void SyncPermanentNetworkDelete(this ILogger logger, string kind, string path);
+
     [LoggerMessage(EventId = 1530, Level = LogLevel.Information, Message = "Очистка проектов: начат каталог «{Path}»")]
     public static partial void ProjectCleanupTargetStarted(this ILogger logger, string path);
 
@@ -109,6 +112,28 @@ internal static partial class CoreLog
         long extraNames,
         long extraNameBytes,
         string report);
+
+    [LoggerMessage(
+        EventId = 1561,
+        Level = LogLevel.Information,
+        Message = "USN-индекс тома {Letter}: обновлено записей {UniqueRecords} (событий {Events}, открытых {OpenDirty}), {ElapsedMs:F1} мс")]
+    public static partial void MftUsnRefreshed(
+        this ILogger logger,
+        char letter,
+        int uniqueRecords,
+        int events,
+        int openDirty,
+        double elapsedMs);
+
+    [LoggerMessage(
+        EventId = 1562,
+        Level = LogLevel.Warning,
+        Message = "USN-индекс тома {Letter}: откат к полному чтению $MFT ({Reason}, код Win32 {Win32Error})")]
+    public static partial void MftUsnFallback(
+        this ILogger logger,
+        char letter,
+        string reason,
+        int win32Error);
 
     [LoggerMessage(EventId = 1570, Level = LogLevel.Information, Message = "Сетевой диск {LocalName} переподключён в сеансе администратора: «{RemotePath}»")]
     public static partial void NetworkDriveRestored(this ILogger logger, string localName, string remotePath);

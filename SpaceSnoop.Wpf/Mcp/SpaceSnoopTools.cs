@@ -52,9 +52,9 @@ public sealed class SpaceSnoopTools
 
     [McpServerTool(Name = "list_profiles")]
     [Description("Профили синхронизации из расписания: пути, направление, победитель, зеркало, исключения, периодичность и признак недоступности.")]
-    public static string ListProfiles(McpBridge bridge)
+    public static Task<string> ListProfilesAsync(McpBridge bridge, CancellationToken cancellationToken = default)
     {
-        return bridge.Insight.ListProfiles();
+        return bridge.Insight.ListProfilesAsync(cancellationToken);
     }
 
     [McpServerTool(Name = "get_performance")]

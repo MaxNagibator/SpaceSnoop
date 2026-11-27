@@ -37,6 +37,32 @@ public sealed partial class ScanTreemapViewModel : ObservableObject
         RebuildTiles();
     }
 
+    internal void Reset()
+    {
+        _treemapPath.Clear();
+        TreemapRoot = null;
+        TreemapBreadcrumbs.ReplaceAll([]);
+        RebuildTiles();
+    }
+
+    internal void RefreshMarks()
+    {
+        if (TreemapRoot is null)
+        {
+            return;
+        }
+
+        for (var i = 0; i < _treemapPath.Count; i++)
+        {
+            _treemapPath[i].RefreshOwnMarks();
+        }
+
+        for (var i = 0; i < TreemapTiles.Count; i++)
+        {
+            TreemapTiles[i].RefreshOwnMarks();
+        }
+    }
+
     internal void RebuildTiles()
     {
         if (TreemapRoot is null)
@@ -48,10 +74,7 @@ public sealed partial class ScanTreemapViewModel : ObservableObject
             return;
         }
 
-        TreemapRoot.EnsureLoaded();
-
-        var shown = ScanTopSelector.SelectTopWeightedNodes(
-            TreemapRoot.Children,
+        var shown = TreemapRoot.SelectTopChildNodes(
             AppDefaults.TreemapTileLimit,
             out var visibleCount);
 
@@ -106,10 +129,7 @@ public sealed partial class ScanTreemapViewModel : ObservableObject
 
             if (fallback is null)
             {
-                _treemapPath.Clear();
-                TreemapRoot = null;
-                TreemapBreadcrumbs.ReplaceAll([]);
-                RebuildTiles();
+                Reset();
             }
             else
             {

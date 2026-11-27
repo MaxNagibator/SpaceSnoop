@@ -112,8 +112,13 @@
                               Padding="14,8,14,14"
                               HorizontalScrollBarVisibility="Disabled"
                               VerticalScrollBarVisibility="Auto"
-                              Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}}">
-                    <scan:ScanInspectorDetails />
+                              Content="{Binding}"
+                              Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                    <ScrollViewer.ContentTemplate>
+                        <DataTemplate>
+                            <scan:ScanInspectorDetails />
+                        </DataTemplate>
+                    </ScrollViewer.ContentTemplate>
                 </ScrollViewer>
             </Grid>
         </Grid>

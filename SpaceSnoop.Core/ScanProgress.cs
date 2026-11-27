@@ -18,6 +18,7 @@ public sealed class ScanProgress
     private int _topLevelTotal;
     private int _topLevelCompleted;
     private volatile object _current = string.Empty;
+    private Action? _volumeReady;
 
     /// <summary>Каталогов пройдено (включая корень).</summary>
     public long DirectoriesScanned => Interlocked.Read(ref _directoriesScanned);
@@ -51,6 +52,23 @@ public sealed class ScanProgress
     public void Announce(string stage)
     {
         _current = new Stage(stage);
+    }
+
+    /// <summary>
+    /// Регистрирует одноразовый колбэк готовности тома после завершения стартового сброса DASD.
+    /// </summary>
+    /// <param name="callback">Действие, выполняемое после первого чтения за загрузочным сектором.</param>
+    public void OnVolumeReady(Action? callback)
+    {
+        Volatile.Write(ref _volumeReady, callback);
+    }
+
+    /// <summary>
+    /// Сообщает о завершении стартового обращения к тому и однократно запускает зарегистрированный колбэк.
+    /// </summary>
+    public void NotifyVolumeReady()
+    {
+        Interlocked.Exchange(ref _volumeReady, null)?.Invoke();
     }
 
     /// <summary>
@@ -126,6 +144,29 @@ public sealed class ScanProgress
             Volatile.Read(ref _topLevelCompleted),
             current is string path ? DiskSpaceCalculator.FromEnumerationPath(path) : ((Stage)current).Text,
             current is Stage);
+    }
+
+    internal void AddBatch(int directories, int files, long bytes, string? currentPath)
+    {
+        if (directories > 0)
+        {
+            Interlocked.Add(ref _directoriesScanned, directories);
+        }
+
+        if (files > 0)
+        {
+            Interlocked.Add(ref _filesScanned, files);
+        }
+
+        if (bytes > 0)
+        {
+            Interlocked.Add(ref _bytesScanned, bytes);
+        }
+
+        if (currentPath is not null)
+        {
+            _current = currentPath;
+        }
     }
 
     private sealed record Stage(string Text);

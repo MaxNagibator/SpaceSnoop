@@ -1,16 +1,29 @@
 ﻿namespace SpaceSnoop.Core.Domain;
 
-public abstract class SpaceBase(string name, SpaceBase? parent, DateTime creationDate, DateTime lastAccessTime)
+public abstract class SpaceBase
 {
-    /// <summary>
-    /// Родительская директория.
-    /// </summary>
-    public SpaceBase? Parent { get; protected set; } = parent;
+    protected long CreationRaw;
+    protected long LastAccessRaw;
+    protected int NodeTag = -1;
+    protected byte Flags;
+
+    private SpaceBase? _parent;
+    private long _size;
+    private SpaceState _state = SpaceState.Added;
 
     /// <summary>
     /// Название директории.
     /// </summary>
-    public string Name { get; } = name;
+    public abstract string Name { get; }
+
+    /// <summary>
+    /// Родительская директория.
+    /// </summary>
+    public SpaceBase? Parent
+    {
+        get => GetParent();
+        protected set => SetParent(value);
+    }
 
     /// <summary>
     /// Полный путь до директории.
@@ -20,17 +33,21 @@ public abstract class SpaceBase(string name, SpaceBase? parent, DateTime creatio
     /// <summary>
     /// Дата создания директории.
     /// </summary>
-    public DateTime CreationDate { get; } = creationDate;
+    public virtual DateTime CreationDate => TimestampEncoding.ToDateTime(CreationRaw, Flags);
 
     /// <summary>
     /// Время последнего доступа к директории.
     /// </summary>
-    public DateTime LastAccessTime { get; } = lastAccessTime;
+    public virtual DateTime LastAccessTime => TimestampEncoding.ToDateTime(LastAccessRaw, Flags);
 
     /// <summary>
     /// Размер.
     /// </summary>
-    public long Size { get; protected set; }
+    public long Size
+    {
+        get => GetSize();
+        protected set => SetSize(value);
+    }
 
     /// <summary>
     /// Занимаемый размер.
@@ -42,9 +59,26 @@ public abstract class SpaceBase(string name, SpaceBase? parent, DateTime creatio
     /// </summary>
     public string SizeText => SizeFormatter.Format(Size);
 
-    public SpaceState State { get; private set; } = SpaceState.Added;
+    public SpaceState State
+    {
+        get => GetState();
+        private set => SetState(value);
+    }
 
     public bool IsDeleted => State == SpaceState.Deleted;
+
+    protected SpaceBase(SpaceBase? parent, DateTime creationDate, DateTime lastAccessTime)
+        : this(parent, TimestampEncoding.FromDateTime(creationDate), TimestampEncoding.FromDateTime(lastAccessTime), 0)
+    {
+    }
+
+    protected SpaceBase(SpaceBase? parent, long creationRaw, long lastAccessRaw, byte flags)
+    {
+        _parent = parent;
+        CreationRaw = creationRaw;
+        LastAccessRaw = lastAccessRaw;
+        Flags = flags;
+    }
 
     /// <summary>
     /// Возвращает строку, представляющую информацию о директории для tooltip.
@@ -113,6 +147,36 @@ public abstract class SpaceBase(string name, SpaceBase? parent, DateTime creatio
         State = SpaceState.Error;
     }
 
+    protected virtual SpaceBase? GetParent()
+    {
+        return _parent;
+    }
+
+    protected virtual void SetParent(SpaceBase? value)
+    {
+        _parent = value;
+    }
+
+    protected virtual SpaceState GetState()
+    {
+        return _state;
+    }
+
+    protected virtual void SetState(SpaceState value)
+    {
+        _state = value;
+    }
+
+    protected virtual long GetSize()
+    {
+        return _size;
+    }
+
+    protected virtual void SetSize(long value)
+    {
+        _size = value;
+    }
+
     protected virtual void RestoreInner()
     {
     }
@@ -121,19 +185,23 @@ public abstract class SpaceBase(string name, SpaceBase? parent, DateTime creatio
     {
     }
 
-    private string GetAbsolutePath()
+    protected virtual string GetAbsolutePath()
     {
-        var segments = new List<string>();
-        var current = this;
+        var depth = 0;
 
-        while (current is not null)
+        for (var current = this; current is not null; current = current.Parent)
         {
-            segments.Add(current.Name);
-            current = current.Parent;
+            depth++;
         }
 
-        var result = segments.ToArray();
-        result.AsSpan().Reverse();
-        return Path.Combine(result);
+        var segments = new string[depth];
+        var index = depth;
+
+        for (var current = this; current is not null; current = current.Parent)
+        {
+            segments[--index] = current.Name;
+        }
+
+        return Path.Combine(segments);
     }
 }

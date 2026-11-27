@@ -74,7 +74,7 @@ public partial class BindingSmokeTests
         settings.SetBool(SettingsKeys.ScanDuplicatesEnabled, true);
         SyncProfileStore.Save(settings, GalleryFixtures.Profiles(_fixture));
 
-        AppThemes.Register();
+        AppThemes.Register(typeof(App).Assembly);
         ThemeManager.Apply(AppThemes.LightKey);
         ViewLocator.InstallIntoApplication();
 
@@ -579,36 +579,76 @@ public partial class BindingSmokeTests
             Settle();
 
             var view = Descendant<ScanView>(_window) ?? throw new InvalidOperationException("Страница скана не найдена.");
+            var targets = (ItemsControl)(ViewCapture.Find(_window, "Targets") ?? throw new InvalidOperationException("Плитки дисков не найдены."));
             var start = (Button)(ViewCapture.Find(_window, "StartButton") ?? throw new InvalidOperationException("Кнопка «Сканировать» не найдена."));
             var scroll = (ScrollViewer)(ViewCapture.Find(_window, "PickerScroll") ?? throw new InvalidOperationException("Прокрутка выбора цели не найдена."));
-            var button = start.TransformToAncestor(_window).TransformBounds(new(start.RenderSize));
             var area = view.TransformToAncestor(_window).TransformBounds(new(view.RenderSize));
-            var scrollBounds = scroll.TransformToAncestor(_window).TransformBounds(new(scroll.RenderSize));
 
-            using (Assert.EnterMultipleScope())
+            if (firstRun)
             {
-                Assert.That(scroll.ScrollableHeight, Is.GreaterThan(0), "Выбор цели влез целиком – кейс ничего не проверяет.");
-                Assert.That(area.Bottom, Is.LessThanOrEqualTo(_window.ActualHeight + 0.5), "Страница скана выше окна – край страницы не край видимой области.");
-                Assert.That(start.IsVisible, Is.True, "Кнопка «Сканировать» не показана.");
-                Assert.That(start.IsEnabled, Is.EqualTo(!firstRun), "При открытом первом запуске кнопка сканирования не должна быть активна.");
-                Assert.That(button.Top, Is.GreaterThanOrEqualTo(area.Top), "Кнопка «Сканировать» выше страницы.");
-                Assert.That(
-                    button.Bottom,
-                    Is.LessThanOrEqualTo(area.Bottom + 0.5),
-                    $"Кнопка «Сканировать» уходит за нижний край страницы на {button.Bottom - area.Bottom:F0} px.");
+                var card = Descendant<FirstRunCard>(scroll) ?? throw new InvalidOperationException("Карточка первого запуска не найдена.");
+                var skipButton = Descendants<Button>(card).Single(static btn => Equals(btn.Content, "Пропустить"));
+                var doneButton = Descendants<Button>(card).Single(static btn => Equals(btn.Content, "Готово"));
 
-                if (firstRun)
+                scroll.ScrollToBottom();
+                Settle();
+
+                var scrollBounds = scroll.TransformToAncestor(_window).TransformBounds(new(scroll.RenderSize));
+                var skipBounds = skipButton.TransformToAncestor(_window).TransformBounds(new(skipButton.RenderSize));
+                var doneBounds = doneButton.TransformToAncestor(_window).TransformBounds(new(doneButton.RenderSize));
+
+                using (Assert.EnterMultipleScope())
                 {
-                    var card = Descendant<FirstRunCard>(scroll) ?? throw new InvalidOperationException("Карточка первого запуска не найдена.");
-                    var doneButton = Descendants<Button>(card).Single(static btn => Equals(btn.Content, "Готово"));
-                    var doneBounds = doneButton.TransformToAncestor(_window).TransformBounds(new(doneButton.RenderSize));
-
+                    Assert.That(area.Bottom, Is.LessThanOrEqualTo(_window.ActualHeight + 0.5), "Страница скана выше окна – край страницы не край видимой области.");
+                    Assert.That(card.IsVisible, Is.True, "Карточка первого запуска не показана.");
+                    Assert.That(skipButton.IsVisible, Is.True, "Кнопка «Пропустить» карточки первого запуска не показана.");
                     Assert.That(doneButton.IsVisible, Is.True, "Кнопка «Готово» карточки первого запуска не показана.");
-                    Assert.That(doneBounds.Top, Is.GreaterThanOrEqualTo(scrollBounds.Top - 0.5), "Кнопка «Готово» выше области прокрутки.");
+                    Assert.That(skipBounds.Top, Is.GreaterThanOrEqualTo(scrollBounds.Top - 0.5), "Кнопка «Пропустить» обрезана сверху.");
+                    Assert.That(skipBounds.Bottom, Is.LessThanOrEqualTo(scrollBounds.Bottom + 0.5), "Кнопка «Пропустить» недостижима прокруткой.");
+                    Assert.That(doneBounds.Top, Is.GreaterThanOrEqualTo(scrollBounds.Top - 0.5), "Кнопка «Готово» обрезана сверху.");
+                    Assert.That(doneBounds.Bottom, Is.LessThanOrEqualTo(scrollBounds.Bottom + 0.5), "Кнопка «Готово» недостижима прокруткой.");
+                    Assert.That(targets.IsVisible, Is.False, "Плитки дисков не должны показываться при открытой карточке первого запуска.");
+                    Assert.That(start.IsVisible, Is.False, "Кнопка «Сканировать» не должна показываться при открытой карточке первого запуска.");
+                    Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
+                }
+
+                page.FirstRun.DismissCommand.Execute(null);
+                Settle();
+
+                var buttonAfterDismiss = start.TransformToAncestor(_window).TransformBounds(new(start.RenderSize));
+
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(card.IsVisible, Is.False, "Карточка первого запуска осталась видна после «Готово».");
+                    Assert.That(targets.IsVisible, Is.True, "Плитки дисков не показались после закрытия карточки.");
+                    Assert.That(start.IsVisible, Is.True, "Кнопка «Сканировать» не показалась после закрытия карточки.");
+                    Assert.That(start.IsEnabled, Is.True, "Кнопка «Сканировать» осталась недоступной после закрытия карточки.");
+                    Assert.That(scroll.ScrollableHeight, Is.GreaterThan(0), "Выбор цели влез целиком – кейс ничего не проверяет.");
+                    Assert.That(buttonAfterDismiss.Top, Is.GreaterThanOrEqualTo(area.Top), "Кнопка «Сканировать» выше страницы.");
                     Assert.That(
-                        doneBounds.Bottom,
-                        Is.LessThanOrEqualTo(scrollBounds.Bottom + 0.5),
-                        $"Кнопка «Готово» не видна без прокрутки в окне 900×600 (нижний край {doneBounds.Bottom:F0} > {scrollBounds.Bottom:F0}).");
+                        buttonAfterDismiss.Bottom,
+                        Is.LessThanOrEqualTo(area.Bottom + 0.5),
+                        $"Кнопка «Сканировать» уходит за нижний край страницы на {buttonAfterDismiss.Bottom - area.Bottom:F0} px.");
+                    Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
+                }
+            }
+            else
+            {
+                var button = start.TransformToAncestor(_window).TransformBounds(new(start.RenderSize));
+
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(scroll.ScrollableHeight, Is.GreaterThan(0), "Выбор цели влез целиком – кейс ничего не проверяет.");
+                    Assert.That(area.Bottom, Is.LessThanOrEqualTo(_window.ActualHeight + 0.5), "Страница скана выше окна – край страницы не край видимой области.");
+                    Assert.That(targets.IsVisible, Is.True, "Плитки дисков не показаны.");
+                    Assert.That(start.IsVisible, Is.True, "Кнопка «Сканировать» не показана.");
+                    Assert.That(start.IsEnabled, Is.True, "Кнопка «Сканировать» должна быть активна.");
+                    Assert.That(button.Top, Is.GreaterThanOrEqualTo(area.Top), "Кнопка «Сканировать» выше страницы.");
+                    Assert.That(
+                        button.Bottom,
+                        Is.LessThanOrEqualTo(area.Bottom + 0.5),
+                        $"Кнопка «Сканировать» уходит за нижний край страницы на {button.Bottom - area.Bottom:F0} px.");
+                    Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
                 }
             }
         }
@@ -1078,8 +1118,8 @@ public partial class BindingSmokeTests
             var ignoredRow = Descendants<TreeViewItem>(_window).Single(item => ReferenceEquals(item.DataContext, node));
             Assert.That(ignoredRow.IsSelected, Is.True);
             Assert.That(
-                Descendants<PackIconLucide>(ignoredRow)
-                    .Any(static icon => icon.Kind == PackIconLucideKind.EyeOff && icon.IsVisible),
+                Descendants<System.Windows.Shapes.Path>(ignoredRow)
+                    .Any(static icon => IconGeometry.GetKind(icon) == PackIconLucideKind.EyeOff && icon.IsVisible),
                 Is.True);
 
             Assert.That(scan.SelectedNode, Is.SameAs(node));
@@ -1645,13 +1685,13 @@ public partial class BindingSmokeTests
             Settle();
 
             details = Descendants<Expander>(_window).Single(expander => expander.IsVisible && Equals(expander.Header, header));
-            var row = Ancestor<SettingRowPanel>(details) ?? throw new InvalidOperationException($"Раскрытие «{header}» стоит не в строке формы.");
-            var before = Tops(row);
+            var (container, targets) = ResolveTargets(details, header);
+            var before = Tops(container, targets);
 
             details.IsExpanded = true;
             Settle();
 
-            Assert.That(Tops(row), Is.EqualTo(before), $"Раскрытие «{header}» сдвинуло контрол строки.");
+            Assert.That(Tops(container, targets), Is.EqualTo(before), $"Раскрытие «{header}» сдвинуло контрол строки.");
         }
         finally
         {
@@ -1660,9 +1700,32 @@ public partial class BindingSmokeTests
             Settle();
         }
 
-        static double[] Tops(SettingRowPanel row)
+        static (Visual Container, FrameworkElement[] Targets) ResolveTargets(Expander details, string header)
         {
-            return [.. row.Children.Cast<FrameworkElement>().Skip(1).Select(child => Math.Round(child.TransformToAncestor(row).Transform(default).Y, 1))];
+            if (Ancestor<SettingRowPanel>(details) is { } row)
+            {
+                return (row, [.. row.Children.Cast<FrameworkElement>().Skip(1)]);
+            }
+
+            if (VisualTreeHelper.GetParent(details) is Panel parent)
+            {
+                var index = parent.Children.IndexOf(details);
+                if (index > 0 && parent.Children[index - 1] is Panel controlRow)
+                {
+                    var items = controlRow.Children.Cast<FrameworkElement>().ToArray();
+                    if (items.Length > 0)
+                    {
+                        return (parent, items);
+                    }
+                }
+            }
+
+            throw new InvalidOperationException($"Раскрытие «{header}» стоит не рядом с контролом строки.");
+        }
+
+        static double[] Tops(Visual container, FrameworkElement[] targets)
+        {
+            return [.. targets.Select(child => Math.Round(child.TransformToAncestor(container).Transform(default).Y, 1))];
         }
     }
 

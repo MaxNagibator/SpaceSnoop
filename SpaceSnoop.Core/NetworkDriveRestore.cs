@@ -9,7 +9,7 @@ public sealed class NetworkDriveRestore : IDisposable
     private const string ExtendedPrefix = @"\\?\";
 
     private readonly CancellationTokenSource _shutdown = new();
-    private volatile Task<IReadOnlyDictionary<char, Task<DriveRestoreResult>>>? _letters;
+    private volatile Task<RestoreState>? _letters;
 
     public void Start(bool isElevated, ILogger logger)
     {
@@ -24,14 +24,14 @@ public sealed class NetworkDriveRestore : IDisposable
         }
 
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(_shutdown.Token, cancellationToken);
-        var letters = await lettersTask.WaitAsync(linked.Token).ConfigureAwait(false);
+        var state = await lettersTask.WaitAsync(linked.Token).ConfigureAwait(false);
 
-        if (letters.Count == 0)
+        if (state.ByLetter.Count == 0)
         {
             yield break;
         }
 
-        await foreach (var completed in Task.WhenEach(letters.Values).WithCancellation(linked.Token).ConfigureAwait(false))
+        await foreach (var completed in Task.WhenEach(state.ByLetter.Values).WithCancellation(linked.Token).ConfigureAwait(false))
         {
             yield return await completed.ConfigureAwait(false);
         }
@@ -39,19 +39,27 @@ public sealed class NetworkDriveRestore : IDisposable
 
     public Task WaitForPathAsync(string path, TimeSpan timeout, CancellationToken cancellationToken = default)
     {
-        if (_letters is not { } lettersTask || !TryGetDriveLetter(path, out var letter))
+        if (_letters is not { } stateTask)
         {
             return Task.CompletedTask;
         }
 
-        if (lettersTask.IsCompletedSuccessfully)
+        var hasLetter = TryGetDriveLetter(path, out var letter);
+        string? shareRoot = null;
+
+        if (!hasLetter && !UncPath.TryParseShareRoot(path, out shareRoot))
         {
-            return lettersTask.Result.TryGetValue(letter, out var pending) && !pending.IsCompleted
-                ? WaitCoreAsync(lettersTask, letter, timeout, cancellationToken)
+            return Task.CompletedTask;
+        }
+
+        if (stateTask.IsCompletedSuccessfully)
+        {
+            return HasPendingTask(stateTask.Result, hasLetter, letter, shareRoot)
+                ? WaitCoreAsync(stateTask, hasLetter, letter, shareRoot, timeout, cancellationToken)
                 : Task.CompletedTask;
         }
 
-        return WaitCoreAsync(lettersTask, letter, timeout, cancellationToken);
+        return WaitCoreAsync(stateTask, hasLetter, letter, shareRoot, timeout, cancellationToken);
     }
 
     public void Dispose()
@@ -113,7 +121,7 @@ public sealed class NetworkDriveRestore : IDisposable
         return true;
     }
 
-    private static IReadOnlyDictionary<char, Task<DriveRestoreResult>> StartLetters(
+    private static RestoreState StartLetters(
         Func<IReadOnlyList<PersistentDrive>> readPersistent,
         Func<IEnumerable<string>> presentDrives,
         Func<PersistentDrive, int> connect,
@@ -124,22 +132,54 @@ public sealed class NetworkDriveRestore : IDisposable
 
         if (missing.Count == 0)
         {
-            return new Dictionary<char, Task<DriveRestoreResult>>();
+            return RestoreState.Empty;
         }
 
-        var tasks = new Dictionary<char, Task<DriveRestoreResult>>(missing.Count);
+        var byLetter = new Dictionary<char, Task<DriveRestoreResult>>(missing.Count);
+        var byShareRoot = new Dictionary<string, List<Task<DriveRestoreResult>>>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var drive in missing)
         {
-            tasks[char.ToUpperInvariant(drive.LocalName[0])] = Task.Run(() => NetworkDrives.Restore(drive, connect, logger), cancellationToken);
+            var task = Task.Run(() => NetworkDrives.Restore(drive, connect, logger), cancellationToken);
+            byLetter[char.ToUpperInvariant(drive.LocalName[0])] = task;
+
+            if (UncPath.TryParseShareRoot(drive.RemotePath, out var shareRoot))
+            {
+                if (!byShareRoot.TryGetValue(shareRoot, out var list))
+                {
+                    list = [];
+                    byShareRoot[shareRoot] = list;
+                }
+
+                list.Add(task);
+            }
         }
 
-        return tasks;
+        var shareMap = byShareRoot.ToDictionary(
+            static x => x.Key,
+            static IReadOnlyList<Task<DriveRestoreResult>> (x) => x.Value,
+            StringComparer.OrdinalIgnoreCase);
+
+        return new(byLetter, shareMap);
+    }
+
+    private static bool HasPendingTask(RestoreState state, bool hasLetter, char letter, string? shareRoot)
+    {
+        if (hasLetter)
+        {
+            return state.ByLetter.TryGetValue(letter, out var pending) && !pending.IsCompleted;
+        }
+
+        return shareRoot is not null
+            && state.ByShareRoot.TryGetValue(shareRoot, out var tasks)
+            && tasks.Any(static x => !x.IsCompleted);
     }
 
     private async Task WaitCoreAsync(
-        Task<IReadOnlyDictionary<char, Task<DriveRestoreResult>>> lettersTask,
+        Task<RestoreState> stateTask,
+        bool hasLetter,
         char letter,
+        string? shareRoot,
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
@@ -148,15 +188,34 @@ public sealed class NetworkDriveRestore : IDisposable
 
         try
         {
-            var letters = await lettersTask.WaitAsync(combined.Token).ConfigureAwait(false);
+            var state = await stateTask.WaitAsync(combined.Token).ConfigureAwait(false);
 
-            if (letters.TryGetValue(letter, out var restoreTask))
+            if (hasLetter)
             {
-                await restoreTask.WaitAsync(combined.Token).ConfigureAwait(false);
+                if (state.ByLetter.TryGetValue(letter, out var restoreTask))
+                {
+                    await restoreTask.WaitAsync(combined.Token).ConfigureAwait(false);
+                }
+
+                return;
+            }
+
+            if (shareRoot is not null && state.ByShareRoot.TryGetValue(shareRoot, out var tasks))
+            {
+                await Task.WhenAll(tasks).WaitAsync(combined.Token).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && !_shutdown.IsCancellationRequested)
         {
         }
+    }
+
+    private sealed record RestoreState(
+        IReadOnlyDictionary<char, Task<DriveRestoreResult>> ByLetter,
+        IReadOnlyDictionary<string, IReadOnlyList<Task<DriveRestoreResult>>> ByShareRoot)
+    {
+        public static RestoreState Empty { get; } = new(
+            new Dictionary<char, Task<DriveRestoreResult>>(),
+            new Dictionary<string, IReadOnlyList<Task<DriveRestoreResult>>>(StringComparer.OrdinalIgnoreCase));
     }
 }

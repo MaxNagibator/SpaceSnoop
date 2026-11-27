@@ -140,4 +140,40 @@ public class SystemThemeTests
         ThemeManager.Register(ThemeManager.DefaultDark with { Key = key });
         Assert.That(AppThemes.StartupKey(settings, false), Is.EqualTo(key));
     }
+
+    [Test]
+    public void Повреждённый_пакет_темы_при_старте_отклоняется_и_откатывает_к_системной()
+    {
+        AppThemes.Register();
+        var dir = Path.Combine(Path.GetTempPath(), "SpaceSnoop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            const string packageId = "KeepShell.Themes.Corrupt";
+            var packPath = Path.Combine(dir, packageId + ".theme.zip");
+            File.WriteAllText(packPath, "not-a-valid-zip");
+
+            var rejected = new List<string>();
+            var loader = new ThemePackLoader(dir, (path, _) => rejected.Add(path));
+            var settings = new MemorySettings();
+            settings.SetValue(SettingsKeys.Theme, "corrupt-theme");
+            settings.SetValue(ThemePackLoader.SettingsKeyName, packageId);
+
+            var startup = AppThemes.StartupKey(settings, false, loader);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(startup, Is.EqualTo(AppThemes.SystemKey));
+                Assert.That(rejected, Contains.Item(packPath));
+                Assert.That(settings.GetStringValue(SettingsKeys.Theme), Is.EqualTo("corrupt-theme"));
+            });
+        }
+        finally
+        {
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, true);
+            }
+        }
+    }
 }

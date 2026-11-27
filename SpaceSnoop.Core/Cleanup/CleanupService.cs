@@ -421,10 +421,25 @@ public sealed class CleanupService(ILogger<CleanupService>? logger = null)
                 return (freed, deleted, skipped, true);
             }
 
-            if (Changed(file, now, target.MinimumAge))
+            var check = InspectBeforeDelete(file, now, target.MinimumAge, out var checkError);
+
+            if (check == FileCheckOutcome.Missing)
+            {
+                continue;
+            }
+
+            if (check == FileCheckOutcome.Changed)
             {
                 skipped++;
                 Report(errors, $"«{file.FullName}»: файл изменился после обхода");
+                continue;
+            }
+
+            if (check == FileCheckOutcome.Failed && checkError is not null)
+            {
+                _logger.CleanupFileFailed(checkError, file.FullName);
+                skipped++;
+                Report(errors, $"«{file.FullName}»: {checkError.Message}");
                 continue;
             }
 
@@ -433,6 +448,10 @@ public sealed class CleanupService(ILogger<CleanupService>? logger = null)
             try
             {
                 File.Delete(file.FullName);
+            }
+            catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
+            {
+                continue;
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException)
             {
@@ -459,23 +478,55 @@ public sealed class CleanupService(ILogger<CleanupService>? logger = null)
     }
 
     // TODO: подмену на другой файл с тем же размером и mtime здесь не отличить – закрывается удалением по дескриптору, заводить при появлении цели в недоверенном каталоге
-    private static bool Changed(FileInfo file, DateTime now, TimeSpan minimumAge)
+    private static FileCheckOutcome InspectBeforeDelete(FileInfo file, DateTime now, TimeSpan minimumAge, out Exception? error)
     {
+        error = null;
+
         try
         {
+            var attributes = File.GetAttributes(file.FullName);
+
+            if ((attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                return FileCheckOutcome.Changed;
+            }
+
             var fresh = new FileInfo(file.FullName);
 
-            return !fresh.Exists
-                || IsReparsePoint(fresh)
+            if (!fresh.Exists)
+            {
+                return FileCheckOutcome.Missing;
+            }
+
+            if (IsReparsePoint(fresh)
                 || IsFresh(fresh, now, minimumAge)
                 || fresh.Length != file.Length
-                || fresh.LastWriteTimeUtc != file.LastWriteTimeUtc;
+                || fresh.LastWriteTimeUtc != file.LastWriteTimeUtc)
+            {
+                return FileCheckOutcome.Changed;
+            }
+
+            return FileCheckOutcome.Ready;
+        }
+        catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return FileCheckOutcome.Missing;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException)
         {
             Debug.WriteLine(exception);
-            return true;
+            error = exception;
+            return FileCheckOutcome.Failed;
         }
+    }
+
+    private enum FileCheckOutcome
+    {
+        None = 0,
+        Ready = 1,
+        Missing = 2,
+        Changed = 3,
+        Failed = 4,
     }
 
     private (int Skipped, bool Cancelled) RemoveEmptyDirectories(List<string> directories, List<string> errors, CancellationToken token)
@@ -500,6 +551,10 @@ public sealed class CleanupService(ILogger<CleanupService>? logger = null)
                 }
 
                 Directory.Delete(directory, false);
+            }
+            catch (DirectoryNotFoundException)
+            {
+                continue;
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException)
             {

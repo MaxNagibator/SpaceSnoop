@@ -12,7 +12,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
     private readonly AgentBackends _backends;
     private readonly AgentPreferences _preferences;
     private readonly ScanPreferences _scan;
-    private readonly McpBridge _bridge;
+    private readonly Lazy<McpBridge> _bridge;
     private readonly AgentTranscriptStore _transcripts;
     private readonly IDialogService _dialogs;
     private readonly IClipboardService _clipboard;
@@ -72,8 +72,8 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         ScanPreferences scan,
         AgentModelSelector agentModel,
         McpPreferences mcp,
-        McpServerHost mcpServer,
-        McpBridge bridge,
+        McpServerController mcpServer,
+        Lazy<McpBridge> bridge,
         ChatHistoryStore history,
         AgentTranscriptStore transcripts,
         IDialogService dialogs,
@@ -119,7 +119,6 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
 
         Gates.PropertyChanged += OnGatesPropertyChanged;
         Gates.NavigationRequested += OnNavigationRequested;
-        bridge.NavigationDeferred += Gates.OnNavigationDeferred;
     }
 
     public void PrepareQuestion(string question)
@@ -391,7 +390,7 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
         {
             ToolPolicy = AgentToolPolicy.ApplicationMcp,
             Prompt = prompt,
-            Context = _bridge.DescribeContext(),
+            Context = _bridge.Value.DescribeContext(),
             ResumeSessionId = History.SessionId,
             SystemPrompt = AgentPrompt.Build(mutations, backend.HasBuiltInShell),
             Model = _preferences.ModelFor(backend.Kind) is { Length: > 0 } model ? model : null,
@@ -405,7 +404,8 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
 
         History.SessionDropped = false;
         IsBusy = true;
-        _bridge.DeferNavigation = true;
+        _bridge.Value.NavigationDeferred += Gates.OnNavigationDeferred;
+        _bridge.Value.DeferNavigation = true;
 
         return new(assistant, backend, request, _cts.Token, transcript, resumedFromDisk);
     }
@@ -460,7 +460,8 @@ public sealed partial class ChatViewModel : ObservableObject, IPageHeader
     {
         turn.Assistant.IsStreaming = false;
         IsBusy = false;
-        _bridge.DeferNavigation = false;
+        _bridge.Value.DeferNavigation = false;
+        _bridge.Value.NavigationDeferred -= Gates.OnNavigationDeferred;
         _cts?.Dispose();
         _cts = null;
 

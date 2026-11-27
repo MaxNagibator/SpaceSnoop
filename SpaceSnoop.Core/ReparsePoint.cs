@@ -10,9 +10,11 @@ internal static class ReparsePoint
     private const uint NameSurrogateBit = 0x2000_0000;
     private const uint MountPointTag = 0xA000_0003;
     private const uint FsctlGetReparsePoint = 0x0009_00A8;
+    private const uint FileReadAttributes = 0x0080;
     private const uint FileShareAll = 0x7;
     private const uint OpenExisting = 3;
     private const uint OpenReparsePointFlags = 0x0200_0000 | 0x0020_0000;
+    private const int FileAttributeTagInfoClass = 9;
     private const int MaximumReparseDataSize = 16 * 1024;
     private const int MountPointHeaderSize = 16;
     private const string VolumePrefix = @"\??\Volume{";
@@ -63,6 +65,64 @@ internal static class ReparsePoint
             : ExtendedPrefix + path;
     }
 
+    internal static bool TryGetTag(string path, out uint tag)
+    {
+        tag = 0;
+
+        var handle = FindFirstFile(Extended(path), out var data);
+
+        if (handle == InvalidHandle)
+        {
+            return TryGetTagByHandle(path, out tag);
+        }
+
+        FindClose(handle);
+
+        if ((data.dwFileAttributes & (uint)FileAttributes.ReparsePoint) == 0)
+        {
+            return false;
+        }
+
+        tag = data.dwReserved0;
+        return true;
+    }
+
+    internal static bool TryGetTagByHandle(string path, out uint tag)
+    {
+        tag = 0;
+
+        using var handle = CreateFile(
+            Extended(path),
+            FileReadAttributes,
+            FileShareAll,
+            IntPtr.Zero,
+            OpenExisting,
+            OpenReparsePointFlags,
+            IntPtr.Zero);
+
+        if (handle.IsInvalid)
+        {
+            return false;
+        }
+
+        if (!GetFileInformationByHandleEx(
+                handle,
+                FileAttributeTagInfoClass,
+                out var info,
+                Marshal.SizeOf<FileAttributeTagInfoData>()))
+        {
+            return false;
+        }
+
+        if ((info.FileAttributes & (uint)FileAttributes.ReparsePoint) == 0)
+        {
+            return false;
+        }
+
+        tag = info.ReparseTag;
+        return true;
+    }
+
     private static string? TryReadMountTarget(string path)
     {
         using var handle = CreateFile(Extended(path), 0, FileShareAll, IntPtr.Zero, OpenExisting, OpenReparsePointFlags, IntPtr.Zero);
@@ -87,28 +147,6 @@ internal static class ReparsePoint
         return (start + length) > returned ? null : Encoding.Unicode.GetString(buffer, start, length);
     }
 
-    private static bool TryGetTag(string path, out uint tag)
-    {
-        tag = 0;
-
-        var handle = FindFirstFile(Extended(path), out var data);
-
-        if (handle == InvalidHandle)
-        {
-            return false;
-        }
-
-        FindClose(handle);
-
-        if ((data.dwFileAttributes & (uint)FileAttributes.ReparsePoint) == 0)
-        {
-            return false;
-        }
-
-        tag = data.dwReserved0;
-        return true;
-    }
-
     [DllImport("kernel32.dll", EntryPoint = "FindFirstFileW", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr FindFirstFile(string lpFileName, out Win32FindData lpFindFileData);
 
@@ -126,6 +164,14 @@ internal static class ReparsePoint
         IntPtr hTemplateFile);
 
     [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetFileInformationByHandleEx(
+        SafeFileHandle hFile,
+        int fileInformationClass,
+        out FileAttributeTagInfoData lpFileInformation,
+        int dwBufferSize);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool DeviceIoControl(
         SafeFileHandle hDevice,
         uint dwIoControlCode,
@@ -137,28 +183,19 @@ internal static class ReparsePoint
         IntPtr lpOverlapped);
 
     [StructLayout(LayoutKind.Sequential)]
-    private struct FileTime
+    private struct FileAttributeTagInfoData
     {
-        public uint dwLowDateTime;
-        public uint dwHighDateTime;
+        public uint FileAttributes;
+        public uint ReparseTag;
     }
 
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    private struct Win32FindData
+    [StructLayout(LayoutKind.Explicit, Size = 592)]
+    internal struct Win32FindData
     {
+        [FieldOffset(0)]
         public uint dwFileAttributes;
-        public FileTime ftCreationTime;
-        public FileTime ftLastAccessTime;
-        public FileTime ftLastWriteTime;
-        public uint nFileSizeHigh;
-        public uint nFileSizeLow;
+
+        [FieldOffset(36)]
         public uint dwReserved0;
-        public uint dwReserved1;
-
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
-        public string cFileName;
-
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 14)]
-        public string cAlternateFileName;
     }
 }

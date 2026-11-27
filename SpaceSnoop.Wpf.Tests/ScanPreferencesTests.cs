@@ -1,4 +1,5 @@
-﻿using KeepShell.Testing;
+﻿using KeepShell.Bootstrap;
+using KeepShell.Testing;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Bootstrap.Storage;
 using SpaceSnoop.Wpf.ViewModels.Scan;
@@ -118,6 +119,33 @@ public class ScanPreferencesTests
         var preferences = new ScanPreferences(new MemorySettings());
 
         Assert.That(preferences.MftRootOnly, Is.True);
+    }
+
+    [Test]
+    public void Прямое_чтение_физического_диска_выключено_по_умолчанию_и_сохраняется()
+    {
+        var settings = new MemorySettings();
+        var preferences = new ScanPreferences(settings);
+
+        Assert.That(preferences.MftRawDisk, Is.False);
+
+        preferences.MftRawDisk = true;
+
+        var reloaded = new ScanPreferences(settings);
+        Assert.That(reloaded.MftRawDisk, Is.True);
+        Assert.That(((ISettingsStore)settings).GetBool(SettingsKeys.ScanMftRawDisk), Is.True);
+    }
+
+    [TestCase("false", false)]
+    [TestCase("true", true)]
+    public void Сохранённый_режим_физического_диска_переживает_чтение(string stored, bool expected)
+    {
+        var settings = new MemorySettings();
+        settings.SetValue(SettingsKeys.ScanMftRawDisk, stored);
+
+        var preferences = new ScanPreferences(settings);
+
+        Assert.That(preferences.MftRawDisk, Is.EqualTo(expected));
     }
 
     private static bool ReadMemoryFlag(ScanPreferences preferences, string key)

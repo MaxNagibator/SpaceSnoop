@@ -44,7 +44,12 @@ public sealed class ScanNodeFactory(ScanPreferences preferences, AgentPreference
 
     public ScanNodeViewModel CreateRoot(SpaceBase space, ScanSortState sort)
     {
-        return new(space, space.TotalSize, space.TotalSize, space, DriveCapacity.TryRead(space.AbsolutePath), sort, this);
+        return CreateRoot(space, sort, DriveCapacity.TryRead(space.AbsolutePath));
+    }
+
+    public ScanNodeViewModel CreateRoot(SpaceBase space, ScanSortState sort, DriveCapacity? driveCapacity)
+    {
+        return new(space, space.TotalSize, space.TotalSize, space, driveCapacity, sort, this);
     }
 
     public void RequestArchive(ScanNodeViewModel node)

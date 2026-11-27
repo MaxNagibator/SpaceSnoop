@@ -56,10 +56,12 @@ public sealed partial class SyncViewModel : ObservableObject, IPageHeader, IPage
         PerformanceOperations performance,
         IFilePicker filePicker,
         IUiDispatcher uiDispatcher,
-        IAppNavigator navigator)
+        IAppNavigator navigator,
+        Action<SyncProfileRun>? onProfileRunCompleted = null)
     {
         _settings = settings;
         _navigator = navigator;
+        ProfileRunCompleted += onProfileRunCompleted;
 
         Session = new(dialogs, logger, notifier, performance, uiDispatcher, summary => SummaryText = summary);
         Session.PropertyChanged += OnSessionPropertyChanged;

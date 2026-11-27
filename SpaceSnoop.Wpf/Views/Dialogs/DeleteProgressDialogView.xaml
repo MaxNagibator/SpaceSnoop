@@ -15,127 +15,17 @@
              AutomationProperties.Name="{Binding Title}">
 
     <UserControl.Resources>
-        <Style x:Key="RowGlyph"
-               TargetType="iconPacks:PackIconLucide">
-            <Setter Property="Width"
-                    Value="14" />
-            <Setter Property="Height"
-                    Value="14" />
-            <Setter Property="VerticalAlignment"
-                    Value="Center" />
-            <Setter Property="Margin"
-                    Value="0,0,9,0" />
-            <Setter Property="Kind"
-                    Value="File" />
-            <Setter Property="Foreground"
-                    Value="{DynamicResource Fg.Muted}" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsDirectory}"
-                             Value="True">
-                    <Setter Property="Kind"
-                            Value="Folder" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding State}"
-                             Value="Deleting">
-                    <Setter Property="Kind"
-                            Value="LoaderCircle" />
-                    <Setter Property="Foreground"
-                            Value="{DynamicResource Accent.Text}" />
-                </DataTrigger>
-                <MultiDataTrigger>
-                    <MultiDataTrigger.Conditions>
-                        <Condition Binding="{Binding State}"
-                                   Value="Deleting" />
-                        <Condition Binding="{Binding Source={x:Static SystemParameters.ClientAreaAnimation}}"
-                                   Value="True" />
-                    </MultiDataTrigger.Conditions>
-                    <MultiDataTrigger.EnterActions>
-                        <BeginStoryboard x:Name="RowGlyphSpin">
-                            <Storyboard>
-                                <DoubleAnimation Storyboard.TargetProperty="(RenderTransform).(RotateTransform.Angle)"
-                                                 From="0"
-                                                 To="360"
-                                                 Duration="0:0:1.1"
-                                                 RepeatBehavior="Forever" />
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </MultiDataTrigger.EnterActions>
-                    <MultiDataTrigger.ExitActions>
-                        <StopStoryboard BeginStoryboardName="RowGlyphSpin" />
-                    </MultiDataTrigger.ExitActions>
-                </MultiDataTrigger>
-                <DataTrigger Binding="{Binding State}"
-                             Value="Done">
-                    <Setter Property="Kind"
-                            Value="CircleCheck" />
-                    <Setter Property="Foreground"
-                            Value="{DynamicResource State.SuccessText}" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding State}"
-                             Value="Failed">
-                    <Setter Property="Kind"
-                            Value="CircleX" />
-                    <Setter Property="Foreground"
-                            Value="{DynamicResource State.ErrorText}" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="RowParent"
-               TargetType="TextBlock">
-            <Setter Property="VerticalAlignment"
-                    Value="Center" />
-            <Setter Property="Margin"
-                    Value="10,0,0,0" />
-            <Setter Property="TextTrimming"
-                    Value="CharacterEllipsis" />
-            <Setter Property="FontSize"
-                    Value="{DynamicResource Font.Size.Caption}" />
-            <Setter Property="Foreground"
-                    Value="{DynamicResource Fg.Muted}" />
-        </Style>
-
-        <Style x:Key="RowPath"
-               TargetType="TextBlock">
-            <Setter Property="VerticalAlignment"
-                    Value="Center" />
-            <Setter Property="TextTrimming"
-                    Value="CharacterEllipsis" />
-            <Setter Property="FontFamily"
-                    Value="{DynamicResource Font.Mono}" />
-            <Setter Property="FontSize"
-                    Value="{DynamicResource Font.Size.S}" />
-            <Setter Property="Foreground"
-                    Value="{DynamicResource Fg.Secondary}" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding State}"
-                             Value="Done">
-                    <Setter Property="Foreground"
-                            Value="{DynamicResource Fg.Muted}" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding State}"
-                             Value="Failed">
-                    <Setter Property="Foreground"
-                            Value="{DynamicResource State.ErrorText}" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="RowError"
-               TargetType="TextBlock">
-            <Setter Property="Margin"
-                    Value="0,1,0,0" />
-            <Setter Property="TextTrimming"
-                    Value="CharacterEllipsis" />
-            <Setter Property="FontSize"
-                    Value="{DynamicResource Font.Size.Caption}" />
-            <Setter Property="Foreground"
-                    Value="{DynamicResource State.ErrorText}" />
-        </Style>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary
+                    Source="pack://application:,,,/SpaceSnoop.Wpf;component/Views/Dialogs/DeleteRowStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
     </UserControl.Resources>
 
     <Grid Margin="22">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -170,6 +60,32 @@
         </Grid>
 
         <Border Grid.Row="2"
+                Background="{DynamicResource State.ErrorSoft}"
+                CornerRadius="{DynamicResource Radius.M}"
+                Padding="10,8"
+                Margin="0,12,0,0"
+                Visibility="{Binding ForcedByNetwork, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <iconPacks:PackIconLucide Grid.Column="0"
+                                          Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
+                                          Width="15"
+                                          Height="15"
+                                          VerticalAlignment="Top"
+                                          Margin="0,1,9,0"
+                                          Foreground="{DynamicResource State.ErrorText}" />
+                <TextBlock Grid.Column="1"
+                           Text="{Binding NetworkWarningText}"
+                           TextWrapping="Wrap"
+                           FontSize="{DynamicResource Font.Size.S}"
+                           Foreground="{DynamicResource State.ErrorText}" />
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="3"
                 Style="{StaticResource Card.Inset}"
                 Padding="6"
                 Margin="0,14,0,0"
@@ -214,6 +130,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
                             <iconPacks:PackIconLucide Grid.Column="0"
@@ -249,7 +166,14 @@
                                            Visibility="{Binding ErrorSummary, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
                             </Grid>
 
-                            <Grid Grid.Column="2"
+                            <Border Grid.Column="2"
+                                    Style="{StaticResource RowModeBadge}"
+                                    ToolTip="{Binding ModeToolTip}"
+                                    Visibility="{Binding DataContext.IsMixed, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                                <TextBlock Text="{Binding ModeBadgeText}" />
+                            </Border>
+
+                            <Grid Grid.Column="3"
                                   Margin="14,0,2,0"
                                   VerticalAlignment="Center">
                                 <TextBlock
@@ -262,7 +186,7 @@
                                            Foreground="{DynamicResource Fg.Muted}" />
                             </Grid>
 
-                            <Button Grid.Column="3"
+                            <Button Grid.Column="4"
                                     Style="{StaticResource Button.Icon}"
                                     Command="{Binding DataContext.ExcludeCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                     CommandParameter="{Binding}"
@@ -291,7 +215,7 @@
             </ItemsControl>
         </Border>
 
-        <StackPanel Grid.Row="3"
+        <StackPanel Grid.Row="4"
                     Margin="0,14,0,0"
                     Visibility="{Binding IsIdle, Converter={StaticResource InverseBoolToVisibility}, FallbackValue=Collapsed}">
             <Grid>
@@ -390,7 +314,7 @@
                        Visibility="{Binding DiagnosticsText, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
         </StackPanel>
 
-        <Grid Grid.Row="4"
+        <Grid Grid.Row="5"
               Margin="0,18,0,0">
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Right"
@@ -414,7 +338,7 @@
                                                   Height="14"
                                                   VerticalAlignment="Center"
                                                   Margin="0,0,6,0" />
-                        <TextBlock Text="Удалить" />
+                        <TextBlock Text="{Binding StartButtonText}" />
                     </StackPanel>
                 </Button>
             </StackPanel>

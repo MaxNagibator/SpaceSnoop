@@ -280,7 +280,24 @@ public sealed partial class SyncQuickProfilesViewModel(
                 return null;
             }
 
-            var refusal = await Task.Run(() => SyncRootsCheck.Refusal(left, right));
+            if (UncPath.IsIncompleteUnc(left) || UncPath.IsIncompleteUnc(right))
+            {
+                uiDispatcher.Invoke(() => dialogs.Warning("Профиль синхронизации", "Укажите полный сетевой путь вида \\\\сервер\\шара."));
+                return null;
+            }
+
+            string? refusal;
+
+            try
+            {
+                refusal = await Task.Run(() => SyncRootsCheck.Refusal(left, right))
+                    .WaitAsync(TimeSpan.FromMilliseconds(AppDefaults.PathProbeTimeoutMs));
+            }
+            catch (TimeoutException)
+            {
+                uiDispatcher.Invoke(() => dialogs.Warning("Профиль синхронизации", "Сетевой каталог не отвечает (превышено время ожидания)."));
+                return null;
+            }
             var current = capture(id, name, existing);
 
             if (current.Left != left || current.Right != right)

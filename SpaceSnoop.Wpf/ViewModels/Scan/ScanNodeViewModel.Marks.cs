@@ -32,23 +32,33 @@ public sealed partial class ScanNodeViewModel
 
     internal IEnumerable<ScanNodeViewModel> RealizedChildren => _children?.Where(static child => !ReferenceEquals(child, Dummy)) ?? [];
 
+    internal void SyncUnloadedChildren()
+    {
+        if (_loaded)
+        {
+            return;
+        }
+
+        _previewTiles = null;
+
+        if (HasChildren)
+        {
+            if (_children is null || _children.Count == 0)
+            {
+                Children.Add(Dummy);
+            }
+        }
+        else if (_children is { Count: > 0 })
+        {
+            _children.Clear();
+        }
+    }
+
     internal static bool IsAttachedToRoot(SpaceBase root, SpaceBase candidate)
     {
         for (var current = candidate; !ReferenceEquals(current, root); current = current.Parent)
         {
-            if (current.Parent is not DirectorySpace parent)
-            {
-                return false;
-            }
-
-            var attached = current switch
-            {
-                DirectorySpace subDir => parent.SubDirectories.Contains(subDir, ReferenceEqualityComparer.Instance),
-                FileSpace file => parent.Files.Contains(file, ReferenceEqualityComparer.Instance),
-                _ => false,
-            };
-
-            if (!attached)
+            if (current.Parent is not DirectorySpace parent || !parent.ContainsChild(current))
             {
                 return false;
             }
@@ -68,6 +78,30 @@ public sealed partial class ScanNodeViewModel
         }
 
         return false;
+    }
+
+    internal static void RestoreRecursive(SpaceBase space)
+    {
+        if (space is DirectorySpace dir)
+        {
+            dir.RestoreRecursive();
+            return;
+        }
+
+        if (space.IsDeleted)
+        {
+            space.Restore();
+        }
+    }
+
+    private static bool HasAddedChild(DirectorySpace dir)
+    {
+        return dir.HasAddedChild();
+    }
+
+    private static bool HasMarkedChild(DirectorySpace dir)
+    {
+        return dir.HasMarkedChild();
     }
 
     internal void RefreshOwnMarks()
@@ -173,10 +207,16 @@ public sealed partial class ScanNodeViewModel
         }
 
         var before = _factory?.CaptureMarks(dir, Root ?? dir);
+        var subs = dir.SubDirectoriesArray;
 
-        foreach (var child in EnumerateChildren(dir))
+        for (var i = 0; i < subs.Length; i++)
         {
-            child.Delete();
+            subs[i].Delete();
+        }
+
+        for (var i = 0; i < dir.FileCount; i++)
+        {
+            dir.GetFile(i).Delete();
         }
 
         ApplyMarkChange(before);
@@ -191,10 +231,21 @@ public sealed partial class ScanNodeViewModel
         }
 
         var before = _factory?.CaptureMarks(dir, Root ?? dir);
+        var subs = dir.SubDirectoriesArray;
 
-        foreach (var child in EnumerateChildren(dir))
+        for (var i = 0; i < subs.Length; i++)
         {
-            RestoreRecursive(child);
+            RestoreRecursive(subs[i]);
+        }
+
+        var files = dir.FileEntries;
+
+        for (var i = 0; i < files.Length; i++)
+        {
+            if (files[i].IsDeleted)
+            {
+                dir.GetFile(i).Restore();
+            }
         }
 
         ApplyMarkChange(before);

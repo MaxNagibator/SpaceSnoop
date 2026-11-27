@@ -265,6 +265,7 @@ public class ScanNodeVisibilityTests
             rootDomain.AddFile(new(filePath));
         }
 
+        _scan.ViewMode = ScanViewMode.Treemap;
         _scan.ApplyScanResult(rootDomain, TimeSpan.FromSeconds(1), null, ScanNotes.ForTraversal(1));
         var rootNode = _scan.Roots[0];
         _scan.SelectSingle(rootNode);

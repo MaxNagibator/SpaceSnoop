@@ -35,11 +35,24 @@ public sealed partial class ScanViewModel
 
     public string CancelledCaption => $"Сканирование {CancelledPath} остановлено";
 
-    public bool HasTarget => !string.IsNullOrWhiteSpace(SelectedDrive);
+    public bool IsIncompleteUncTarget => UncPath.IsIncompleteUnc(SelectedDrive);
 
-    public string StartCaption => HasTarget
-        ? $"Сканировать {DriveItem.ShortName(SelectedDrive)}"
-        : "Выберите диск или каталог";
+    public bool HasTarget => !string.IsNullOrWhiteSpace(SelectedDrive) && !IsIncompleteUncTarget;
+
+    public string StartCaption
+    {
+        get
+        {
+            if (IsIncompleteUncTarget)
+            {
+                return @"Укажите \\сервер\шару";
+            }
+
+            return HasTarget
+                ? $"Сканировать {DriveItem.ShortName(SelectedDrive)}"
+                : "Выберите диск или каталог";
+        }
+    }
 
     private string OtherRootsSuffix => Roots.Count > 1 ? $" и ещё {Roots.Count - 1}" : string.Empty;
 
@@ -59,11 +72,11 @@ public sealed partial class ScanViewModel
         }
 
         SetPreparing(true);
-        bool exists;
+        PathProbeResult probe;
 
         try
         {
-            exists = await Task.Run(() => ScanTargetProbe.DirectoryExists(path), CancellationToken.None);
+            probe = await ScanTargetProbe.CheckAsync(path, CancellationToken.None);
         }
         finally
         {
@@ -75,10 +88,16 @@ public sealed partial class ScanViewModel
             return;
         }
 
-        if (!exists)
+        if (probe.Status == PathProbeStatus.TimedOut)
+        {
+            _uiDispatcher.Invoke(() => _dialogs.Warning("Сканирование", ScanTargetProbe.FormatTimeoutMessage(path)));
+            return;
+        }
+
+        if (probe.Status != PathProbeStatus.Exists)
         {
             ScanWasCancelled = false;
-            _dialogs.Warning("Сканирование", $"Папка {path} не найдена: её удалили, переименовали или диск отключён. Выберите для сканирования другую папку.");
+            _uiDispatcher.Invoke(() => _dialogs.Warning("Сканирование", $"Папка {path} не найдена: её удалили, переименовали или диск отключён. Выберите для сканирования другую папку."));
             return;
         }
 

@@ -102,6 +102,90 @@ public class SyncPlanFreshnessTests
         Assert.That(await confirmation, Is.Null);
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task Безвозвратное_удаление_требует_предупреждения_в_показанном_подтверждении(bool warnBeforeConfirmation)
+    {
+        var left = Path.Combine(_root, "left");
+        var right = Path.Combine(_root, "right");
+        var target = Path.Combine(right, "extra.txt");
+        await File.WriteAllTextAsync(target, "данные");
+
+        var network = warnBeforeConfirmation;
+        bool SupportsBin(string path) =>
+            !network || !string.Equals(path, right, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(path, target, StringComparison.OrdinalIgnoreCase);
+
+        var previousProbe = SyncPlanNarrative.SupportsRecycleBin;
+        SyncPlanNarrative.SupportsRecycleBin = SupportsBin;
+        try
+        {
+            var warningShown = false;
+            var dialogs = new NoopDialogs(show: dialog =>
+            {
+                if (dialog is not ConfirmDialogViewModel confirm)
+                {
+                    return false;
+                }
+
+                warningShown = confirm.Warning?.Contains(SyncPlanNarrative.NetworkDeleteWarning, StringComparison.Ordinal) is true;
+                network = true;
+                confirm.ChooseCommand.Execute(confirm.Choices[^1]);
+                return true;
+            });
+            var page = CreatePage(dialogs, new(NullLogger<SyncEngine>.Instance, SupportsBin));
+            var automation = (ISyncAutomation)page;
+            automation.LeftPath = left;
+            automation.RightPath = right;
+            automation.Mode = SyncMode.LeftToRight;
+            page.Setup.Mirror = true;
+            await automation.CompareFromAutomationAsync(CancellationToken.None);
+
+            await page.Operations.SyncCommand.ExecuteAsync(null);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(warningShown, Is.EqualTo(warnBeforeConfirmation));
+                Assert.That(File.Exists(target), Is.EqualTo(!warnBeforeConfirmation));
+            }
+        }
+        finally
+        {
+            SyncPlanNarrative.SupportsRecycleBin = previousProbe;
+        }
+    }
+
+    [Test]
+    public async Task Сетевое_удаление_из_автоматизации_возвращает_причину_отказа_без_диалога()
+    {
+        var left = Path.Combine(_root, "left");
+        var right = Path.Combine(_root, "right");
+        var target = Path.Combine(right, "extra.txt");
+        await File.WriteAllTextAsync(target, "данные");
+
+        var dialogs = new NoopDialogs();
+        var sync = new ExecuteSyncUseCase(
+            NullLogger<SyncEngine>.Instance,
+            path => !string.Equals(path, target, StringComparison.OrdinalIgnoreCase));
+        var page = CreatePage(dialogs, sync);
+        var automation = (ISyncAutomation)page;
+        automation.LeftPath = left;
+        automation.RightPath = right;
+        automation.Mode = SyncMode.LeftToRight;
+        page.Setup.Mirror = true;
+        await automation.CompareFromAutomationAsync(CancellationToken.None);
+
+        var failure = await Assert.ThrowsAsync<SyncPlanStaleException>(() => automation.SyncFromAutomationAsync(CancellationToken.None));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(failure!.Message, Does.Contain("корзину Windows"));
+            Assert.That(dialogs.LastErrorMessage, Is.Null);
+            Assert.That(page.Operations.PlanFreshness, Is.EqualTo(SyncPlanFreshness.Interrupted));
+            Assert.That(File.Exists(target), Is.True);
+        }
+    }
+
     [Test]
     public async Task Правка_исключений_во_время_синхронизации_сбрасывает_сравнение_только_по_её_завершении()
     {
@@ -198,10 +282,10 @@ public class SyncPlanFreshnessTests
         return page;
     }
 
-    private static SyncViewModel CreatePage()
+    private static SyncViewModel CreatePage(NoopDialogs? dialogs = null, ExecuteSyncUseCase? sync = null)
     {
         var settings = new MemorySettings();
-        var dialogs = new NoopDialogs();
+        dialogs ??= new();
         var shell = new ShellPreferences(settings);
 
         return new(
@@ -211,7 +295,7 @@ public class SyncPlanFreshnessTests
             new(settings),
             NullLogger<SyncViewModel>.Instance,
             new(NullLogger<DirectoryComparer>.Instance),
-            new(NullLogger<SyncEngine>.Instance),
+            sync ?? new(NullLogger<SyncEngine>.Instance),
             new(new(), shell),
             new(TestDiagnostics.Monitor()),
             new FakeFilePicker(),

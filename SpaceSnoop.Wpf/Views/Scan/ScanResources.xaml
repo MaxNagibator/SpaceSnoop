@@ -1,7 +1,40 @@
 ﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:conv="clr-namespace:SpaceSnoop.Wpf.Converters">
+                    xmlns:conv="clr-namespace:SpaceSnoop.Wpf.Converters"
+                    xmlns:views="clr-namespace:SpaceSnoop.Wpf.Views"
+                    xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks">
 
     <conv:FractionToWidthConverter x:Key="FractionToWidth" />
     <conv:HeatBrushConverter x:Key="HeatBrush" />
+
+    <Style x:Key="ScanTreeNodeIcon"
+           TargetType="Path">
+        <Setter Property="Width"
+                Value="14" />
+        <Setter Property="Height"
+                Value="14" />
+        <Setter Property="VerticalAlignment"
+                Value="Center" />
+        <Setter Property="Margin"
+                Value="0,0,8,0" />
+        <Setter Property="Stretch"
+                Value="Uniform" />
+        <Setter Property="UseLayoutRounding"
+                Value="False" />
+        <Setter Property="SnapsToDevicePixels"
+                Value="False" />
+        <Setter Property="views:IconGeometry.Kind"
+                Value="{x:Static iconPacks:PackIconLucideKind.File}" />
+        <Setter Property="Fill"
+                Value="{DynamicResource Fg.Muted}" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsDirectory}"
+                         Value="True">
+                <Setter Property="views:IconGeometry.Kind"
+                        Value="{x:Static iconPacks:PackIconLucideKind.Folder}" />
+                <Setter Property="Fill"
+                        Value="{DynamicResource Fg.Secondary}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
 </ResourceDictionary>

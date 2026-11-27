@@ -38,13 +38,18 @@ public interface IScanAutomation
 
     int MarkForAutomation(IReadOnlyList<SpaceBase> targets, bool mark);
 
-    void SelectPathForAutomation(string path);
+    void SelectPathForAutomation(string path, bool remember = true);
 
     void ReleaseBeforeScan(string path);
 
     void ApplyScanResult(DirectorySpace result, TimeSpan elapsed, PerformanceTraversal? traversal, ScanNotes notes);
 
-    Task ReturnScanMemoryAsync(DirectorySpace result, Action<string> reportPhase, CancellationToken cancellationToken);
+    void ApplyScanResult(DirectorySpace result, TimeSpan elapsed, PerformanceTraversal? traversal, ScanNotes notes, DriveCapacity? driveCapacity)
+    {
+        ApplyScanResult(result, elapsed, traversal, notes);
+    }
+
+    Task ReturnScanMemoryAsync(DirectorySpace result, bool usedMft, Action<string> reportPhase, CancellationToken cancellationToken);
 
     Task ScanFromAutomationAsync(string path, CancellationToken cancellationToken);
 

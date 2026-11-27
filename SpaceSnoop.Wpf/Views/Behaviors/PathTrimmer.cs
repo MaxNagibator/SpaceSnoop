@@ -1,5 +1,8 @@
-﻿using System.Globalization;
+﻿using System.Buffers;
+using System.ComponentModel;
+using System.Globalization;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Windows.Media;
 
 namespace SpaceSnoop.Wpf.Views.Behaviors;
@@ -9,6 +12,9 @@ public static class PathTrimmer
     private const string Ellipsis = "…";
 
     private static readonly char[] PathSeparators = [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar];
+    private static readonly SearchValues<char> PathSeparatorSearch = SearchValues.Create(PathSeparators);
+    private static readonly DependencyPropertyDescriptor? TextTrimmingDescriptor = DependencyPropertyDescriptor.FromProperty(TextBlock.TextTrimmingProperty, typeof(TextBlock));
+    private static readonly ConditionalWeakTable<TextBlock, TrimState> States = new();
 
     public static readonly DependencyProperty FullPathProperty = DependencyProperty.RegisterAttached(
         "FullPath",
@@ -34,6 +40,60 @@ public static class PathTrimmer
         }
     }
 
+    private static void OnTextTrimmingChanged(object? sender, EventArgs e)
+    {
+        if (sender is TextBlock textBlock)
+        {
+            Apply(textBlock);
+        }
+    }
+
+    private static void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBlock textBlock)
+        {
+            WatchTextTrimming(textBlock);
+            Apply(textBlock);
+        }
+    }
+
+    private static void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBlock textBlock)
+        {
+            UnwatchTextTrimming(textBlock);
+        }
+    }
+
+    private static void WatchTextTrimming(TextBlock textBlock)
+    {
+        if (TextTrimmingDescriptor is null)
+        {
+            return;
+        }
+
+        var state = States.GetOrCreateValue(textBlock);
+
+        if (state.WatchingTextTrimming)
+        {
+            return;
+        }
+
+        TextTrimmingDescriptor.AddValueChanged(textBlock, OnTextTrimmingChanged);
+        state.WatchingTextTrimming = true;
+    }
+
+    private static void UnwatchTextTrimming(TextBlock textBlock)
+    {
+        if (TextTrimmingDescriptor is null || !States.TryGetValue(textBlock, out var state) || !state.WatchingTextTrimming)
+        {
+            return;
+        }
+
+        TextTrimmingDescriptor.RemoveValueChanged(textBlock, OnTextTrimmingChanged);
+        state.WatchingTextTrimming = false;
+    }
+
     private static void OnFullPathChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (d is not TextBlock textBlock)
@@ -42,7 +102,20 @@ public static class PathTrimmer
         }
 
         textBlock.SizeChanged -= OnSizeChanged;
-        textBlock.SizeChanged += OnSizeChanged;
+        textBlock.Loaded -= OnLoaded;
+        textBlock.Unloaded -= OnUnloaded;
+
+        if (!string.IsNullOrEmpty(e.NewValue as string))
+        {
+            textBlock.SizeChanged += OnSizeChanged;
+            textBlock.Loaded += OnLoaded;
+            textBlock.Unloaded += OnUnloaded;
+            WatchTextTrimming(textBlock);
+        }
+        else
+        {
+            UnwatchTextTrimming(textBlock);
+        }
 
         Apply(textBlock);
     }
@@ -50,26 +123,73 @@ public static class PathTrimmer
     private static void Apply(TextBlock textBlock)
     {
         var full = GetFullPath(textBlock) ?? string.Empty;
-        var available = textBlock.ActualWidth;
 
-        if (available <= 1 || string.IsNullOrEmpty(full))
+        if (string.IsNullOrEmpty(full))
         {
-            textBlock.Text = full;
+            SetTextIfChanged(textBlock, string.Empty);
             return;
         }
 
-        textBlock.Text = MeasureWidth(textBlock, full) <= available
+        if (textBlock.TextTrimming != TextTrimming.None && !full.AsSpan().ContainsAny(PathSeparatorSearch))
+        {
+            SetTextIfChanged(textBlock, full);
+            return;
+        }
+
+        var available = textBlock.ActualWidth;
+
+        if (available <= 1)
+        {
+            SetTextIfChanged(textBlock, full);
+            return;
+        }
+
+        var fontFamily = textBlock.FontFamily;
+        var fontStyle = textBlock.FontStyle;
+        var fontWeight = textBlock.FontWeight;
+        var fontStretch = textBlock.FontStretch;
+        var fontSize = textBlock.FontSize;
+        var flowDirection = textBlock.FlowDirection;
+        var pixelsPerDip = VisualTreeHelper.GetDpi(textBlock).PixelsPerDip;
+
+        var state = States.GetOrCreateValue(textBlock);
+
+        if (state.Matches(full, available, fontFamily, fontStyle, fontWeight, fontStretch, fontSize, flowDirection, pixelsPerDip)
+            && string.Equals(textBlock.Text, state.Result, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var typeface = state.GetOrCreateTypeface(fontFamily, fontStyle, fontWeight, fontStretch);
+        var result = MeasureWidth(full, typeface, fontSize, flowDirection, pixelsPerDip) <= available
             ? full
-            : Shorten(textBlock, full, available);
+            : Shorten(full, available, typeface, fontSize, flowDirection, pixelsPerDip);
+
+        state.Update(full, available, fontSize, flowDirection, pixelsPerDip, result);
+        SetTextIfChanged(textBlock, result);
     }
 
-    private static string Shorten(TextBlock textBlock, string path, double available)
+    private static void SetTextIfChanged(TextBlock textBlock, string value)
+    {
+        if (!string.Equals(textBlock.Text, value, StringComparison.Ordinal))
+        {
+            textBlock.Text = value;
+        }
+    }
+
+    private static string Shorten(
+        string path,
+        double available,
+        Typeface typeface,
+        double fontSize,
+        FlowDirection flowDirection,
+        double pixelsPerDip)
     {
         var parts = path.Split(PathSeparators);
 
         if (parts.Length <= 2)
         {
-            return TrimMiddleByChars(textBlock, path, available);
+            return TrimMiddleByChars(path, available, typeface, fontSize, flowDirection, pixelsPerDip);
         }
 
         var root = parts[0];
@@ -83,7 +203,7 @@ public static class PathTrimmer
             var candidateTail = $"{parts[i]}{Path.DirectorySeparatorChar}{accumulated}";
             var candidate = $"{root}{Path.DirectorySeparatorChar}{Ellipsis}{Path.DirectorySeparatorChar}{candidateTail}";
 
-            if (MeasureWidth(textBlock, candidate) > available)
+            if (MeasureWidth(candidate, typeface, fontSize, flowDirection, pixelsPerDip) > available)
             {
                 break;
             }
@@ -92,17 +212,21 @@ public static class PathTrimmer
             best = candidate;
         }
 
-        if (MeasureWidth(textBlock, best) <= available)
+        if (MeasureWidth(best, typeface, fontSize, flowDirection, pixelsPerDip) <= available)
         {
             return best;
         }
 
-        path = best;
-
-        return TrimMiddleByChars(textBlock, path, available);
+        return TrimMiddleByChars(best, available, typeface, fontSize, flowDirection, pixelsPerDip);
     }
 
-    private static string TrimMiddleByChars(TextBlock textBlock, string text, double available)
+    private static string TrimMiddleByChars(
+        string text,
+        double available,
+        Typeface typeface,
+        double fontSize,
+        FlowDirection flowDirection,
+        double pixelsPerDip)
     {
         var low = 0;
         var high = text.Length;
@@ -115,7 +239,7 @@ public static class PathTrimmer
             var tail = keep - head;
             var candidate = string.Concat(text.AsSpan(0, head), Ellipsis, text.AsSpan(text.Length - tail));
 
-            if (MeasureWidth(textBlock, candidate) <= available)
+            if (MeasureWidth(candidate, typeface, fontSize, flowDirection, pixelsPerDip) <= available)
             {
                 result = candidate;
                 low = keep + 1;
@@ -129,20 +253,99 @@ public static class PathTrimmer
         return result;
     }
 
-    private static double MeasureWidth(TextBlock textBlock, string text)
+    private static double MeasureWidth(
+        string text,
+        Typeface typeface,
+        double fontSize,
+        FlowDirection flowDirection,
+        double pixelsPerDip)
     {
-        var typeface = new Typeface(textBlock.FontFamily, textBlock.FontStyle, textBlock.FontWeight, textBlock.FontStretch);
-        var pixelsPerDip = VisualTreeHelper.GetDpi(textBlock).PixelsPerDip;
-
         var formatted = new FormattedText(
             text,
             CultureInfo.CurrentUICulture,
-            textBlock.FlowDirection,
+            flowDirection,
             typeface,
-            textBlock.FontSize,
+            fontSize,
             Brushes.Black,
             pixelsPerDip);
 
         return formatted.Width;
+    }
+
+    private sealed class TrimState
+    {
+        private FontFamily? _fontFamily;
+        private FontStyle _fontStyle;
+        private FontWeight _fontWeight;
+        private FontStretch _fontStretch;
+        private Typeface? _typeface;
+
+        private string? _full;
+        private double _available;
+        private double _fontSize;
+        private FlowDirection _flowDirection;
+        private double _pixelsPerDip;
+
+        public string? Result { get; private set; }
+
+        public bool WatchingTextTrimming { get; set; }
+
+        public bool Matches(
+            string full,
+            double available,
+            FontFamily fontFamily,
+            FontStyle fontStyle,
+            FontWeight fontWeight,
+            FontStretch fontStretch,
+            double fontSize,
+            FlowDirection flowDirection,
+            double pixelsPerDip)
+        {
+            return Result is not null
+                && string.Equals(_full, full, StringComparison.Ordinal)
+                && BitConverter.DoubleToInt64Bits(_available) == BitConverter.DoubleToInt64Bits(available)
+                && BitConverter.DoubleToInt64Bits(_fontSize) == BitConverter.DoubleToInt64Bits(fontSize)
+                && _flowDirection == flowDirection
+                && BitConverter.DoubleToInt64Bits(_pixelsPerDip) == BitConverter.DoubleToInt64Bits(pixelsPerDip)
+                && _fontStyle == fontStyle
+                && _fontWeight == fontWeight
+                && _fontStretch == fontStretch
+                && Equals(_fontFamily, fontFamily);
+        }
+
+        public Typeface GetOrCreateTypeface(FontFamily fontFamily, FontStyle fontStyle, FontWeight fontWeight, FontStretch fontStretch)
+        {
+            if (_typeface is not null
+                && _fontStyle == fontStyle
+                && _fontWeight == fontWeight
+                && _fontStretch == fontStretch
+                && Equals(_fontFamily, fontFamily))
+            {
+                return _typeface;
+            }
+
+            _fontFamily = fontFamily;
+            _fontStyle = fontStyle;
+            _fontWeight = fontWeight;
+            _fontStretch = fontStretch;
+            _typeface = new(fontFamily, fontStyle, fontWeight, fontStretch);
+            return _typeface;
+        }
+
+        public void Update(
+            string full,
+            double available,
+            double fontSize,
+            FlowDirection flowDirection,
+            double pixelsPerDip,
+            string result)
+        {
+            _full = full;
+            _available = available;
+            _fontSize = fontSize;
+            _flowDirection = flowDirection;
+            _pixelsPerDip = pixelsPerDip;
+            Result = result;
+        }
     }
 }

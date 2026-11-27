@@ -11,11 +11,13 @@ using SpaceSnoop.Wpf.ViewModels;
 using SpaceSnoop.Wpf.ViewModels.Cleanup;
 using SpaceSnoop.Wpf.ViewModels.Overview;
 using SpaceSnoop.Wpf.ViewModels.Schedule;
+using SpaceSnoop.Wpf.ViewModels.Settings;
 using SpaceSnoop.Wpf.ViewModels.Sync;
 using SpaceSnoop.Wpf.Views;
 using SpaceSnoop.Wpf.Views.Overview;
 using SpaceSnoop.Wpf.Views.Scan;
 using SpaceSnoop.Wpf.Views.Schedule;
+using SpaceSnoop.Wpf.Views.Settings;
 using SpaceSnoop.Wpf.Views.Sync;
 using System.Windows;
 using System.Windows.Automation;
@@ -217,7 +219,7 @@ public partial class BindingSmokeTests
                 var moreContent = (FrameworkElement)(morePopup.Child ?? throw new InvalidOperationException("Содержимое панели «Ещё» не построено."));
                 moreContent.UpdateLayout();
                 Settle();
-                AssertSegmentedWithin(moreContent, expectedCount: 2, "Синхронизация – Ещё");
+                AssertSegmentedWithin(moreContent, expectedCount: 3, "Синхронизация – Ещё");
             }
             finally
             {
@@ -271,7 +273,7 @@ public partial class BindingSmokeTests
             try
             {
                 var scheduleView = Descendant<ScheduleView>(_window) ?? throw new InvalidOperationException("Страница расписания не найдена.");
-                AssertSegmentedWithin(scheduleView, expectedCount: 4, "Расписание – пакетная панель и карточка профиля");
+                AssertSegmentedWithin(scheduleView, expectedCount: 6, "Расписание – пакетная панель и карточка профиля");
             }
             finally
             {
@@ -313,6 +315,94 @@ public partial class BindingSmokeTests
             sync.Setup.SelectedModeIndex = oldSyncMode;
             overviewRow.SelectedModeIndex = oldOverviewMode;
             settings.SetInt(SettingsKeys.BatchMode, oldBatchMode);
+            preferences.FontScale = oldScale;
+            _window.Width = oldWidth;
+            _window.Height = oldHeight;
+            Settle();
+        }
+    }
+
+    [Test]
+    public void Сегментированные_переключатели_настроек_помещаются_в_узком_окне_и_не_сбрасываются_в_null()
+    {
+        var preferences = _services.GetRequiredService<ShellPreferences>();
+        var settings = _services.GetRequiredService<SettingsViewModel>();
+        var (oldWidth, oldHeight, oldScale, oldSection) = (_window.Width, _window.Height, preferences.FontScale, settings.Sections.SelectedPath);
+
+        try
+        {
+            _window.Width = SmallWindowWidth;
+            _window.Height = SmallWindowHeight;
+            preferences.FontScale = FontScaleManager.MaxScale;
+            Assert.That(_shell.TryNavigate(SectionKey.Settings), Is.True, "Страница «Настройки» не открылась.");
+
+            var sections = new (string Key, int ExpectedCount, string Scope, Func<FrameworkElement?> FindCard)[]
+            {
+                ("startup", 2, "Настройки – Запуск", () => Descendant<SettingsStartupCard>(_window)),
+                ("sync", 1, "Настройки – Синхронизация", () => Descendant<SettingsExclusionsCard>(_window)),
+                ("delete", 1, "Настройки – Удаление", () => Descendant<SettingsDeleteCard>(_window)),
+                ("archive", 1, "Настройки – Архивация", () => Descendant<SettingsArchiveCard>(_window)),
+            };
+
+            foreach (var (key, expectedCount, scope, findCard) in sections)
+            {
+                settings.Sections.SelectCommand.Execute(settings.Sections[key]);
+                Settle();
+                var card = findCard() ?? throw new InvalidOperationException($"Карточка «{scope}» не показана.");
+                AssertSegmentedWithin(card, expectedCount, scope);
+
+                var segmentedStyle = (Style)card.FindResource("ListBox.Segmented");
+                foreach (var listBox in Descendants<ListBox>(card).Where(lb => lb.IsVisible && ReferenceEquals(lb.Style, segmentedStyle)))
+                {
+                    var initial = listBox.SelectedItem;
+                    listBox.SelectedItem = null;
+                    Settle();
+
+                    Assert.That(listBox.SelectedItem, Is.EqualTo(initial), $"Снятие выбора в «{AutomationProperties.GetName(listBox)}» оставило ListBox пустым.");
+                    var container = (ListBoxItem?)listBox.ItemContainerGenerator.ContainerFromItem(initial);
+                    Assert.That(container?.IsSelected, Is.True, $"Контейнер выбранного пункта «{AutomationProperties.GetName(listBox)}» потерял IsSelected.");
+                }
+            }
+
+            var changed = new List<string>();
+            settings.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName is not null)
+                {
+                    changed.Add(args.PropertyName);
+                }
+            };
+
+            var expectedStartup = settings.SelectedStartupOption;
+            var expectedAdmin = settings.SelectedStartupAdminOption;
+            var expectedDelete = settings.SelectedDeleteModeOption;
+            var expectedCompression = settings.SelectedCompressionOption;
+            var expectedGit = settings.SelectedGitFolderOption;
+
+            settings.SelectedStartupOption = null!;
+            settings.SelectedStartupAdminOption = null!;
+            settings.SelectedDeleteModeOption = null!;
+            settings.SelectedCompressionOption = null!;
+            settings.SelectedGitFolderOption = null!;
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(settings.SelectedStartupOption, Is.EqualTo(expectedStartup));
+                Assert.That(settings.SelectedStartupAdminOption, Is.EqualTo(expectedAdmin));
+                Assert.That(settings.SelectedDeleteModeOption, Is.EqualTo(expectedDelete));
+                Assert.That(settings.SelectedCompressionOption, Is.EqualTo(expectedCompression));
+                Assert.That(settings.SelectedGitFolderOption, Is.EqualTo(expectedGit));
+                Assert.That(changed, Does.Contain(nameof(SettingsViewModel.SelectedStartupOption)));
+                Assert.That(changed, Does.Contain(nameof(SettingsViewModel.SelectedStartupAdminOption)));
+                Assert.That(changed, Does.Contain(nameof(SettingsViewModel.SelectedDeleteModeOption)));
+                Assert.That(changed, Does.Contain(nameof(SettingsViewModel.SelectedCompressionOption)));
+                Assert.That(changed, Does.Contain(nameof(SettingsViewModel.SelectedGitFolderOption)));
+                Assert.That(_sink.Errors, Is.Empty, () => string.Join(Environment.NewLine, _sink.Errors));
+            }
+        }
+        finally
+        {
+            settings.Sections.Restore(oldSection);
             preferences.FontScale = oldScale;
             _window.Width = oldWidth;
             _window.Height = oldHeight;

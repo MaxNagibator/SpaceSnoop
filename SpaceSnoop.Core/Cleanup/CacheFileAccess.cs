@@ -43,6 +43,13 @@ internal static class CacheFileAccess
         }
     }
 
+    internal static SafeFileHandle OpenFileForReadAndDelete(string path)
+    {
+        var handle = CreateFile(ReparsePoint.Extended(path), 0x80010000, 1, nint.Zero, 3, 0x00200000, nint.Zero);
+        CheckHandle(handle, path);
+        return handle;
+    }
+
     internal static CacheFileStamp Read(SafeFileHandle handle, string path)
     {
         if (!GetFileInformationByHandle(handle, out var info))

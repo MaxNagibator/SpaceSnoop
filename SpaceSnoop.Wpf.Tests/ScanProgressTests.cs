@@ -254,6 +254,121 @@ public class ScanProgressTests
         }
     }
 
+    [Test]
+    public void Отложенный_таймер_прогресса_запускается_после_готовности_тома_и_игнорируется_после_финиша()
+    {
+        var dispatcher = new FakeUiDispatcher();
+        var viewModel = new ScanProgressViewModel(new(TestDiagnostics.Monitor()), dispatcher);
+        var timer = dispatcher.Timers.Single();
+
+        var progress = viewModel.Begin(new(@"C:\"), @"C:\", 4, estimatedTotalBytes: 4096, deferTimer: true);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(timer.IsRunning, Is.False);
+            Assert.That(timer.Starts, Is.Zero);
+            Assert.That(viewModel.PendingEstimate.IsCompleted, Is.True);
+        }
+
+        progress.NotifyVolumeReady();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(timer.IsRunning, Is.True);
+            Assert.That(timer.Starts, Is.EqualTo(1));
+        }
+
+        viewModel.Finish();
+        Assert.That(timer.IsRunning, Is.False);
+
+        progress.NotifyVolumeReady();
+        Assert.That(timer.IsRunning, Is.False);
+        Assert.That(timer.Starts, Is.EqualTo(1));
+
+        var second = viewModel.Begin(new(@"C:\"), @"C:\", 4, estimatedTotalBytes: 4096, deferTimer: true);
+        viewModel.Finish();
+        second.NotifyVolumeReady();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(timer.IsRunning, Is.False);
+            Assert.That(timer.Starts, Is.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public void Отключение_фонового_замера_в_Begin_не_дёргает_чтение_тома()
+    {
+        var previous = ScanProgressViewModel.VolumeUsedReader;
+        var readerCalls = 0;
+
+        ScanProgressViewModel.VolumeUsedReader = _ =>
+        {
+            Interlocked.Increment(ref readerCalls);
+            return 10_000L;
+        };
+
+        try
+        {
+            var viewModel = new ScanProgressViewModel(new(TestDiagnostics.Monitor()), new FakeUiDispatcher());
+            viewModel.Begin(new(@"C:\"), @"C:\", 1, estimatedTotalBytes: null, deferTimer: true, probeEstimate: false);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(Volatile.Read(ref readerCalls), Is.Zero);
+                Assert.That(viewModel.PendingEstimate.IsCompleted, Is.True);
+            }
+
+            viewModel.Finish();
+        }
+        finally
+        {
+            ScanProgressViewModel.VolumeUsedReader = previous;
+        }
+    }
+
+    [Test]
+    public async Task Асинхронная_оценка_тома_переиспользует_идущий_замер_и_отменяется_сразу()
+    {
+        var previous = ScanProgressViewModel.VolumeUsedReader;
+        var readerCalls = 0;
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+
+        ScanProgressViewModel.VolumeUsedReader = _ =>
+        {
+            Interlocked.Increment(ref readerCalls);
+            entered.Set();
+            release.Wait(TimeSpan.FromSeconds(10));
+            return 12_345L;
+        };
+
+        try
+        {
+            using var cancelFirst = new CancellationTokenSource();
+            var first = ScanProgressViewModel.EstimateTotalBytesAsync(new(@"Z:\"), cancelFirst.Token);
+
+            Assert.That(entered.Wait(TimeSpan.FromSeconds(5)), Is.True);
+
+            var second = ScanProgressViewModel.EstimateTotalBytesAsync(new(@"z:\"), CancellationToken.None);
+            await cancelFirst.CancelAsync();
+
+            await Assert.CatchAsync<OperationCanceledException>(() => first);
+            Assert.That(Volatile.Read(ref readerCalls), Is.EqualTo(1));
+
+            release.Set();
+            var measured = await second.WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.That(measured, Is.EqualTo(12_345L));
+            Assert.That(Volatile.Read(ref readerCalls), Is.EqualTo(1));
+        }
+        finally
+        {
+            release.Set();
+            ScanProgressViewModel.VolumeUsedReader = previous;
+        }
+    }
+
     [TestCase(0L, 0L, false)]
     [TestCase(100L, 0L, false)]
     [TestCase(0L, 100L, false)]
@@ -263,5 +378,26 @@ public class ScanProgressTests
     public void Уплотнение_после_скана_требует_высокой_нагрузки_памяти(long load, long threshold, bool expected)
     {
         Assert.That(ScanViewModel.ShouldReturnScanMemory(load, threshold), Is.EqualTo(expected));
+    }
+
+    [TestCase(false, false, 0L, 100L, nameof(ScanMemoryAction.None))]
+    [TestCase(false, false, 100L, 100L, nameof(ScanMemoryAction.None))]
+    [TestCase(false, true, 0L, 100L, nameof(ScanMemoryAction.ReclaimMft))]
+    [TestCase(false, true, 100L, 100L, nameof(ScanMemoryAction.ReclaimMft))]
+    [TestCase(true, false, 99L, 100L, nameof(ScanMemoryAction.None))]
+    [TestCase(true, false, 100L, 100L, nameof(ScanMemoryAction.Compact))]
+    [TestCase(true, false, 100L, 0L, nameof(ScanMemoryAction.None))]
+    [TestCase(true, true, 0L, 100L, nameof(ScanMemoryAction.Compact))]
+    [TestCase(true, true, 100L, 100L, nameof(ScanMemoryAction.Compact))]
+    public void Выбор_действия_возврата_памяти_учитывает_настройку_MFT_и_давление(
+        bool returnMemoryAfterScan,
+        bool usedMft,
+        long loadBytes,
+        long thresholdBytes,
+        string expected)
+    {
+        Assert.That(
+            ScanViewModel.SelectScanMemoryAction(returnMemoryAfterScan, usedMft, loadBytes, thresholdBytes),
+            Is.EqualTo(Enum.Parse<ScanMemoryAction>(expected)));
     }
 }

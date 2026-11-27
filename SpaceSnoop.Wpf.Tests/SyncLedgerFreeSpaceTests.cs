@@ -9,6 +9,7 @@ using System.ComponentModel;
 namespace SpaceSnoop.Wpf.Tests;
 
 [TestFixture]
+[NonParallelizable]
 public class SyncLedgerFreeSpaceTests
 {
     [Test]
@@ -41,6 +42,88 @@ public class SyncLedgerFreeSpaceTests
             if (e.PropertyName == nameof(SyncLedgerViewModel.PlanVolumeHint) && !page.Ledger.PlanVolumeHint.Contains("неизвестно"))
             {
                 hinted.TrySetResult();
+            }
+        }
+    }
+
+    [Test]
+    public async Task Подсказки_плана_не_вызывают_SupportsRecycleBin_на_потоке_UI_и_обновляются_из_фона()
+    {
+        var page = CreatePage();
+        var root = Path.GetPathRoot(Path.GetTempPath())!;
+        var left = Path.Combine(root, "SpaceSnoopMissing", "Left");
+        var right = Path.Combine(root, "SpaceSnoopMissing", "Right");
+        var comparison = new DirectoryComparison(string.Empty, string.Empty);
+        comparison.Files.Add(
+            new("old.bin", "old.bin")
+            {
+                Status = ComparisonStatus.RightOnly,
+                Action = SyncAction.DeleteRight,
+                RightSize = 2048,
+            });
+
+        var uiThread = Environment.CurrentManagedThreadId;
+        var uiThreadCalls = 0;
+        using var allowProbe = new ManualResetEventSlim();
+        var updated = new TaskCompletionSource();
+        var previousProbe = SyncPlanNarrative.SupportsRecycleBin;
+
+        SyncPlanNarrative.SupportsRecycleBin = path =>
+        {
+            if (Environment.CurrentManagedThreadId == uiThread)
+            {
+                Interlocked.Increment(ref uiThreadCalls);
+            }
+
+            if (string.Equals(path, right, StringComparison.OrdinalIgnoreCase))
+            {
+                allowProbe.Wait(TimeSpan.FromSeconds(10));
+                return false;
+            }
+
+            return true;
+        };
+
+        try
+        {
+            page.Ledger.PropertyChanged += OnLedgerChanged;
+            page.Setup.LeftPath = left;
+            page.Setup.RightPath = right;
+            page.Setup.Mirror = true;
+            page.Operations.AdoptComparison(new(left, right, comparison));
+
+            var initialPlanHint = page.Ledger.PlanVolumeHint;
+            var initialSyncHint = page.Ledger.SyncCommandHint;
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(Volatile.Read(ref uiThreadCalls), Is.Zero);
+                Assert.That(initialPlanHint, Does.Contain("в корзину"));
+                Assert.That(initialSyncHint, Does.Contain("в корзину"));
+            }
+
+            allowProbe.Set();
+            await updated.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(Volatile.Read(ref uiThreadCalls), Is.Zero);
+                Assert.That(page.Ledger.PlanVolumeHint, Does.Contain("удаление").And.Not.Contain("в корзину"));
+                Assert.That(page.Ledger.SyncCommandHint, Does.Contain("безвозвратно"));
+            }
+        }
+        finally
+        {
+            allowProbe.Set();
+            SyncPlanNarrative.SupportsRecycleBin = previousProbe;
+        }
+
+        void OnLedgerChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(SyncLedgerViewModel.PlanVolumeHint)
+                && page.Ledger.PlanVolumeHint.Contains("удаление"))
+            {
+                updated.TrySetResult();
             }
         }
     }

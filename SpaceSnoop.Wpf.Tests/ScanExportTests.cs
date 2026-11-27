@@ -6,6 +6,7 @@ using SpaceSnoop.Core.Domain;
 using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.Bootstrap.Storage;
 using SpaceSnoop.Wpf.ViewModels;
+using SpaceSnoop.Wpf.ViewModels.Cleanup;
 using SpaceSnoop.Wpf.ViewModels.Scan;
 
 namespace SpaceSnoop.Wpf.Tests;
@@ -115,6 +116,7 @@ public class ScanExportTests
         var navBlockedDuringExport = false;
         var settingsBlockedDuringExport = false;
         var selectBlockedDuringExport = false;
+        var dockerBlockedDuringExport = false;
         var statusDuringExport = string.Empty;
 
         _scan.PropertyChanged += (_, args) =>
@@ -125,6 +127,7 @@ public class ScanExportTests
             {
                 statusDuringExport = _scan.StatusCaption ?? string.Empty;
                 navBlockedDuringExport = !_shell.TryNavigate(SectionKey.Logs) && _shell.Selected?.Key == SectionKey.Scan;
+                dockerBlockedDuringExport = !_shell.TryNavigate(SectionKey.Docker);
 
                 _shell.OpenSettingsCommand.Execute(null);
                 settingsBlockedDuringExport = _shell.Selected?.Key == SectionKey.Scan;
@@ -150,6 +153,8 @@ public class ScanExportTests
         {
             Assert.That(statusDuringExport, Does.StartWith("Сохранение полного скана:"));
             Assert.That(navBlockedDuringExport, Is.True);
+            Assert.That(dockerBlockedDuringExport, Is.True);
+            Assert.That(_services.GetRequiredService<CleanupPageViewModel>().IsDockerActive, Is.False);
             Assert.That(settingsBlockedDuringExport, Is.True);
             Assert.That(selectBlockedDuringExport, Is.True);
             Assert.That(changedProperties, Does.Contain(nameof(ScanViewModel.CancelCommand)));

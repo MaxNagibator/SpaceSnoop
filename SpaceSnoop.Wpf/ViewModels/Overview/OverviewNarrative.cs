@@ -1,7 +1,49 @@
-﻿namespace SpaceSnoop.Wpf.ViewModels.Overview;
+﻿using SpaceSnoop.Wpf.ViewModels.Sync;
+
+namespace SpaceSnoop.Wpf.ViewModels.Overview;
 
 internal static class OverviewNarrative
 {
+    internal static bool HasNetworkDeleteOrOverwrite(CompareDirectoriesRequest request, ComparisonResult? comparison, bool recycleOverwritten)
+    {
+        return SyncPlanNarrative.TargetsWithoutRecycleBin(
+            request.LeftPath,
+            request.RightPath,
+            request.Mode,
+            request.Mirror,
+            recycleOverwritten)
+            || (comparison is not null && SyncPlanNarrative.HasNetworkDeleteOrOverwrite(comparison, recycleOverwritten));
+    }
+
+    internal static string? BuildSyncWarning(IEnumerable<OverviewRowViewModel> rows, bool permanentNetwork)
+    {
+        var incomplete = DescribeIncomplete(rows);
+        var network = permanentNetwork
+            ? $"{SyncPlanNarrative.NetworkDeleteWarning}. Перед запуском каталоги будут сравнены заново."
+            : null;
+
+        return string.Join(
+            ' ',
+            new[]
+            {
+                network, incomplete,
+            }.OfType<string>()) is { Length: > 0 } warning
+            ? warning
+            : null;
+    }
+
+    internal static string FormatUncError(Exception exception, string left, string right)
+    {
+        if (UncPath.IsUnc(left))
+        {
+            return NetworkErrorText.Describe(exception, left, AdminElevation.IsElevated);
+        }
+
+        return UncPath.IsUnc(right)
+            ? NetworkErrorText.Describe(exception, right, AdminElevation.IsElevated)
+            : exception.Message;
+    }
+
     internal static (int Synced, int Failed, int Skipped) Tally(OverviewRowViewModel row)
     {
         return row.Status switch
@@ -76,7 +118,7 @@ internal static class OverviewNarrative
         return $"Синхронизировано профилей: {tally.Synced}, c ошибками: {tally.Failed}, пропущено: {tally.Skipped}";
     }
 
-    internal static IReadOnlyList<ConfirmLine> BuildRowLines(OverviewRowViewModel row, PlannedActions? planned)
+    internal static IReadOnlyList<ConfirmLine> BuildRowLines(OverviewRowViewModel row, PlannedActions? planned, bool permanentNetwork = false)
     {
         List<ConfirmLine> lines =
         [
@@ -85,12 +127,15 @@ internal static class OverviewNarrative
             new ConfirmGapLine()
         ];
 
-        AddPlanLines(lines, planned, "Файлы будут скопированы по направлению профиля, удаления – в корзину.");
+        var fallback = permanentNetwork
+            ? "Файлы будут скопированы по направлению профиля, удаления на сетевом хранилище – безвозвратно."
+            : "Файлы будут скопированы по направлению профиля, удаления – в корзину.";
+        AddPlanLines(lines, planned, fallback, permanentNetwork);
 
         return lines;
     }
 
-    internal static IReadOnlyList<ConfirmLine> BuildBatchLines(int count, int excluded, PlannedActions? planned)
+    internal static IReadOnlyList<ConfirmLine> BuildBatchLines(int count, int excluded, PlannedActions? planned, bool permanentNetwork = false)
     {
         List<ConfirmLine> lines = [new ConfirmMetricLine("Профилей в пакете", $"{count:N0}", string.Empty)];
 
@@ -101,7 +146,10 @@ internal static class OverviewNarrative
 
         lines.Add(new ConfirmGapLine());
 
-        AddPlanLines(lines, planned, "Файлы будут скопированы по направлению каждого профиля, удаления – в корзину.");
+        var fallback = permanentNetwork
+            ? "Файлы будут скопированы по направлению каждого профиля, удаления на сетевом хранилище – безвозвратно."
+            : "Файлы будут скопированы по направлению каждого профиля, удаления – в корзину.";
+        AddPlanLines(lines, planned, fallback, permanentNetwork);
 
         return lines;
     }
@@ -135,7 +183,7 @@ internal static class OverviewNarrative
         return (caption, severity);
     }
 
-    private static void AddPlanLines(List<ConfirmLine> lines, PlannedActions? planned, string fallback)
+    private static void AddPlanLines(List<ConfirmLine> lines, PlannedActions? planned, string fallback, bool permanentNetwork)
     {
         if (planned is null)
         {
@@ -143,6 +191,6 @@ internal static class OverviewNarrative
             return;
         }
 
-        lines.AddRange(SyncPlanNarrative.BuildPlanLines(planned, null, []));
+        lines.AddRange(SyncPlanNarrative.BuildPlanLines(planned, null, [], permanentNetwork: permanentNetwork));
     }
 }

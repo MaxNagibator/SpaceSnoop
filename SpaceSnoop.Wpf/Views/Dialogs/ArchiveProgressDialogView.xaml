@@ -95,6 +95,13 @@
                                Margin="0,12,0,0"
                                TextWrapping="Wrap"
                                Style="{StaticResource TextBlock.Subtle}" />
+
+                    <CheckBox IsChecked="{Binding ConfirmPermanentOriginalDelete, Mode=TwoWay}"
+                              Margin="0,10,0,0"
+                              Visibility="{Binding NeedsPermanentOriginalConfirm, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                        <TextBlock Text="Удалить исходный каталог безвозвратно после проверки архива (корзина недоступна)"
+                                   TextWrapping="Wrap" />
+                    </CheckBox>
                 </StackPanel>
             </Border>
 

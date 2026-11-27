@@ -8,14 +8,18 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
     private readonly ArchiveService _service;
     private readonly ILogger _logger;
     private readonly Action<string, bool> _deleteDirectory;
+    private readonly Func<string, ArchiveFileMetadata> _readArchiveMetadata;
     private readonly OperationProgressState _packProgress = new();
     private readonly OperationProgressState _verifyProgress = new();
     private readonly OperationProgressState _coverageProgress = new();
     private readonly UiProgressPoller _progressPoller;
 
+    internal static Func<string, bool> SupportsRecycleBin { get; set; } = RecycleBin.SupportsRecycleBin;
+
     private volatile ArchivePhase _phase;
     private volatile CoverageTotals _coverageTotals = CoverageTotals.Empty;
     private bool _packed;
+    private bool _deletingOriginal;
     private int _packTotal;
     private int _verifyTotal;
     private int _phaseTotal;
@@ -29,6 +33,10 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
     [ObservableProperty]
     private string _sourceSize;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FateText))]
+    private bool _confirmPermanentOriginalDelete;
+
     public override string Title => "Упаковка в архив";
 
     public string ActionText => "Упаковать";
@@ -37,11 +45,17 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
 
     public string TargetName { get; }
 
-    public string FateText { get; }
+    public bool NeedsPermanentOriginalConfirm { get; }
+
+    public string FateText => DescribeFate();
+
+    private bool DeleteOriginalEffective => _request.DeleteOriginal && (!NeedsPermanentOriginalConfirm || ConfirmPermanentOriginalDelete);
 
     public bool OriginalDeleted { get; private set; }
 
     public string? CreatedArchivePath { get; private set; }
+
+    internal ArchiveFileMetadata? CreatedArchive { get; private set; }
 
     public bool IsIndeterminate => _phaseTotal == 0;
 
@@ -61,21 +75,32 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
         ArchiveService service,
         IUiDispatcher uiDispatcher,
         ILogger logger,
-        Action<string, bool> deleteDirectory)
+        Action<string, bool> deleteDirectory,
+        bool? needsPermanentConfirm = null,
+        Func<string, ArchiveFileMetadata>? readArchiveMetadata = null)
     {
         _request = request;
         _service = service;
         _logger = logger;
         _deleteDirectory = deleteDirectory;
+        _readArchiveMetadata = readArchiveMetadata ?? ReadArchiveMetadata;
         _progressPoller = new(uiDispatcher, OnProgressTick);
 
         SourceName = Path.GetFileName(request.SourcePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
         SourceSize = $"≈ {SizeFormatter.Format(request.TotalBytes)} · ≈ {request.EstimatedFiles:N0} {Plural.Word(request.EstimatedFiles, "файл", "файла", "файлов")}";
         TargetName = Path.GetFileName(request.TargetPath);
-        FateText = request.DeleteOriginal
-            ? "Архив будет прочитан целиком с проверкой контрольных сумм, и только потом оригинал отправится в корзину."
-            : "Оригинал останется на месте.";
+        NeedsPermanentOriginalConfirm = request.DeleteOriginal && request.Interactive
+            && (needsPermanentConfirm ?? RequiresPermanentConfirmation(request.SourcePath));
     }
+
+    internal static ArchiveFileMetadata ReadArchiveMetadata(string path)
+    {
+        FileInfo info = new(path);
+        var length = info.Length;
+        return new(info.Name, length, info.CreationTime, info.LastAccessTime);
+    }
+
+    internal static bool RequiresPermanentConfirmation(string sourcePath) => !SupportsRecycleBin(sourcePath);
 
     internal void ShowRunningForAutomation(int packed, int total, long bytes, string current)
     {
@@ -92,7 +117,7 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
         _packed = true;
         _packTotal = total;
         _resultSummary = Summarize(compressed, bytes);
-        OriginalDeleted = _request.DeleteOriginal;
+        OriginalDeleted = DeleteOriginalEffective;
 
         CountText = $"{total} / {total}";
         ProgressValue = 1d;
@@ -110,163 +135,16 @@ public sealed partial class ArchiveProgressDialogViewModel : OperationDialogView
         IsRunning = false;
         IsFinished = false;
         OriginalDeleted = false;
+        ConfirmPermanentOriginalDelete = false;
         CreatedArchivePath = null;
+        CreatedArchive = null;
         _packed = false;
+        _deletingOriginal = false;
         _phase = ArchivePhase.None;
         _coverageTotals = CoverageTotals.Empty;
         _coverageProgress.Reset();
         _resultSummary = string.Empty;
         SetPhaseTotal(0);
-    }
-
-    protected override async Task ExecuteAsync(CancellationToken token)
-    {
-        var stage = new Progress<ArchiveStageUpdate>(OnStage);
-
-        _packProgress.Reset();
-        _verifyProgress.Reset();
-        _coverageProgress.Reset();
-
-        await using (_progressPoller.StartScope())
-        {
-            await Task.Run(() => ExecuteZip(stage, token), token);
-        }
-    }
-
-    protected override void OnStarting()
-    {
-        _logger.ArchiveStarted(_request.SourcePath);
-    }
-
-    protected override void OnFinished()
-    {
-        if (Cancelled)
-        {
-            _logger.ArchiveCancelled(_request.SourcePath);
-            return;
-        }
-
-        if (Failure is { } failure)
-        {
-            _logger.ArchiveFailed(failure, _request.SourcePath);
-            return;
-        }
-
-        _logger.ArchiveFinished(_request.SourcePath, _resultSummary);
-    }
-
-    protected override string BuildSummary()
-    {
-        if (Cancelled)
-        {
-            return _packed
-                ? $"Отменено на проверке: архив {TargetName} создан, но не проверен. Оригинал не тронут."
-                : "Отменено.";
-        }
-
-        if (Failure is { } failure)
-        {
-            return $"Ошибка: {failure.Message}";
-        }
-
-        if (_coverageIssue is { } issue)
-        {
-            return $"Архив {_resultSummary} создан, но каталог покрыт не полностью: {issue}. Оригинал оставлен на месте.";
-        }
-
-        if (_unreadableIssue is { } skipped)
-        {
-            return $"Архив {_resultSummary}. Оригинал на месте: {skipped} – этих данных в архиве нет.";
-        }
-
-        return OriginalDeleted
-            ? $"Готово. Архив {_resultSummary}. Оригинал → в корзину."
-            : $"Готово. Архив {_resultSummary}.";
-    }
-
-    private static string Summarize(long compressed, long original)
-    {
-        var ratio = original > 0 ? (1 - ((double)compressed / original)) * 100 : 0;
-
-        return $"{SizeFormatter.Format(compressed)} (было {SizeFormatter.Format(original)}, −{ratio:F0} %)";
-    }
-
-    private void ExecuteZip(IProgress<ArchiveStageUpdate> stage, CancellationToken token)
-    {
-        var content = _service.Collect(_request.SourcePath, token);
-        _phase = ArchivePhase.Packing;
-        stage.Report(new(ArchiveStage.Packing, content.Files.Count, content.Files.Count + content.EmptyDirectories.Count, content.Bytes));
-
-        if (content.Unreadable.Count > 0)
-        {
-            _unreadableIssue = content.Unreadable.Count > 1
-                ? $"не прочитано каталогов: {content.Unreadable.Count}, первый «{content.Unreadable[0]}»"
-                : $"не прочитан каталог «{content.Unreadable[0]}»";
-        }
-
-        var stats = _service.ZipFiles(_request.SourcePath, content, _request.TargetPath, _request.Level, _packProgress, token);
-
-        _packed = true;
-        _verifyTotal = stats.Count;
-
-        if (_request.DeleteOriginal)
-        {
-            _phase = ArchivePhase.Verifying;
-        }
-
-        var (ok, detail) = _service.VerifyZip(_request.TargetPath, stats, _request.DeleteOriginal, _verifyProgress, token);
-
-        if (!ok)
-        {
-            _logger.ArchiveVerifyFailed(_request.TargetPath, detail);
-            _service.SafeDelete(_request.TargetPath);
-            throw new InvalidOperationException($"Архив не прошёл проверку ({detail}); оригинал не тронут.");
-        }
-
-        token.ThrowIfCancellationRequested();
-
-        if (_request.DeleteOriginal)
-        {
-            _coverageProgress.Reset();
-            _coverageTotals = CoverageTotals.Empty;
-            _phase = ArchivePhase.Coverage;
-            stage.Report(new(ArchiveStage.Coverage, 0, 0, 0));
-
-            var coverage = _service.VerifyCoverage(
-                _request.SourcePath,
-                _request.TargetPath,
-                _coverageProgress,
-                (files, bytes) =>
-                {
-                    _coverageTotals = new(files, bytes);
-                    stage.Report(new(ArchiveStage.Coverage, files, files, bytes));
-                },
-                token);
-
-            if (!coverage.Ok)
-            {
-                _coverageIssue = coverage.Detail;
-                _logger.ArchiveVerifyFailed(_request.TargetPath, coverage.Detail);
-            }
-        }
-
-        var compressed = new FileInfo(_request.TargetPath).Length;
-        _resultSummary = Summarize(compressed, stats.Bytes);
-        CreatedArchivePath = _request.TargetPath;
-
-        if (!_request.DeleteOriginal || _coverageIssue is not null || _unreadableIssue is not null)
-        {
-            return;
-        }
-
-        token.ThrowIfCancellationRequested();
-        _phase = ArchivePhase.None;
-        stage.Report(new(ArchiveStage.Deleting, 0, 0, 0));
-        _deleteDirectory(_request.SourcePath, _request.Interactive);
-        OriginalDeleted = true;
-
-        var totals = _coverageTotals;
-        stage.Report(new(ArchiveStage.Finished, totals.Files, Math.Max(_verifyTotal, 1), totals.Bytes));
     }
 
     private void OnStage(ArchiveStageUpdate update)
@@ -432,3 +310,5 @@ internal enum ArchivePhase
 }
 
 public readonly record struct ArchiveStageUpdate(ArchiveStage Stage, int Files, int Entries, long Bytes);
+
+internal readonly record struct ArchiveFileMetadata(string Name, long Length, DateTime CreationTime, DateTime LastAccessTime);

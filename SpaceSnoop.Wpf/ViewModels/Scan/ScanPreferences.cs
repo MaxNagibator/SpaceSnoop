@@ -28,6 +28,9 @@ public sealed partial class ScanPreferences : ObservableObject
     private bool _mftRootOnly = AppDefaults.ScanMftRootOnlyDefault;
 
     [ObservableProperty]
+    private bool _mftRawDisk = AppDefaults.ScanMftRawDiskDefault;
+
+    [ObservableProperty]
     private bool _releaseBeforeRescan = AppDefaults.ScanReleaseBeforeRescanDefault;
 
     [ObservableProperty]
@@ -68,6 +71,7 @@ public sealed partial class ScanPreferences : ObservableObject
         RevealFiles = _settings.GetBool(SettingsKeys.ScanRevealFiles);
         MftEnabled = _settings.GetBool(SettingsKeys.ScanMftEnabled);
         MftRootOnly = _settings.GetBool(SettingsKeys.ScanMftRootOnly, AppDefaults.ScanMftRootOnlyDefault);
+        MftRawDisk = _settings.GetBool(SettingsKeys.ScanMftRawDisk, AppDefaults.ScanMftRawDiskDefault);
         ReleaseBeforeRescan = _settings.GetBool(SettingsKeys.ScanReleaseBeforeRescan, AppDefaults.ScanReleaseBeforeRescanDefault);
         ConfirmRescan = _settings.GetBool(SettingsKeys.ScanConfirmRescan, AppDefaults.ScanConfirmRescanDefault);
         ReturnMemoryAfterScan = _settings.GetBool(SettingsKeys.ScanReturnMemoryAfterScan);
@@ -153,6 +157,14 @@ public sealed partial class ScanPreferences : ObservableObject
         if (!_suppressPersist)
         {
             _settings.SetBool(SettingsKeys.ScanMftRootOnly, value);
+        }
+    }
+
+    partial void OnMftRawDiskChanged(bool value)
+    {
+        if (!_suppressPersist)
+        {
+            _settings.SetBool(SettingsKeys.ScanMftRawDisk, value);
         }
     }
 

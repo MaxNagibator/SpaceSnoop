@@ -1,11 +1,15 @@
 ﻿using KeepShell.Diagnostics;
 using System.Diagnostics;
 using System.IO;
+using System.Security;
 
 namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
 
 internal sealed class DeleteOperationDiagnostics
 {
+    internal static Action<IReadOnlyList<string>> RecycleChunk { get; set; } = RecycleBin.DeleteSilent;
+
+    internal static Action<string> RecycleSingle { get; set; } = RecycleBin.DeleteSilent;
     private readonly bool _permanent;
     private readonly int _totalItems;
     private readonly long _totalBytes;
@@ -81,7 +85,12 @@ internal sealed class DeleteOperationDiagnostics
 
     public DeleteBatchCallbacks BuildCallbacks()
     {
-        return _permanent
+        return BuildCallbacks(_permanent);
+    }
+
+    public DeleteBatchCallbacks BuildCallbacks(bool permanent)
+    {
+        return permanent
             ? new(TimedPathExists, TimedDeletePermanentChunk, TimedDeletePermanent)
             : new(TimedPathExists, TimedRecycleChunk, TimedRecycleSingle);
     }
@@ -144,7 +153,19 @@ internal sealed class DeleteOperationDiagnostics
 
     private static bool PathExists(string path)
     {
-        return Directory.Exists(path) || File.Exists(path);
+        if (Directory.Exists(path) || File.Exists(path))
+        {
+            return true;
+        }
+
+        try
+        {
+            return (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or PathTooLongException or SecurityException)
+        {
+            return false;
+        }
     }
 
     private static void DeletePermanent(string path)
@@ -188,13 +209,13 @@ internal sealed class DeleteOperationDiagnostics
 
     private void TimedRecycleChunk(IReadOnlyList<string> paths)
     {
-        MeasureDelete(RecycleBin.DeleteSilent, paths);
+        MeasureDelete(RecycleChunk, paths);
     }
 
     private void TimedRecycleSingle(string path)
     {
         Interlocked.Increment(ref _fallbackCalls);
-        MeasureDelete(RecycleBin.DeleteSilent, path);
+        MeasureDelete(RecycleSingle, path);
     }
 
     private void TimedDeletePermanentChunk(IReadOnlyList<string> paths)

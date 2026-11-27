@@ -1,4 +1,5 @@
-﻿using SpaceSnoop.Core.Mft;
+﻿using SpaceSnoop.Core;
+using SpaceSnoop.Core.Mft;
 
 namespace SpaceSnoop.Tests;
 
@@ -7,6 +8,44 @@ public class MftReaderVolumeTests
 {
     private const int Records = 32;
     private const char Letter = 'T';
+
+    [Test]
+    public void Готовность_тома_сообщается_после_чтения_собственной_записи_MFT()
+    {
+        var image = new MftVolumeBuilder()
+            .Record(20, new MftRecordBuilder().FileName(MftLayout.RootRecord, 1, "отчёт.pdf").ResidentData(128))
+            .Build(Records);
+
+        var progress = new ScanProgress();
+        var readyCalls = 0;
+        var readyAtSecondRead = -1;
+        var readyAtThirdRead = -1;
+
+        progress.OnVolumeReady(() => Interlocked.Increment(ref readyCalls));
+
+        var volume = new MftCountingVolume(
+            image,
+            x =>
+            {
+                if (x == 2)
+                {
+                    readyAtSecondRead = Volatile.Read(ref readyCalls);
+                }
+                else if (x == 3)
+                {
+                    readyAtThirdRead = Volatile.Read(ref readyCalls);
+                }
+            });
+
+        MftReader.Read(volume, Letter, 1, 4096, progress, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(readyAtSecondRead, Is.Zero);
+            Assert.That(readyAtThirdRead, Is.EqualTo(1));
+            Assert.That(Volatile.Read(ref readyCalls), Is.EqualTo(1));
+        }
+    }
 
     [Test]
     public void Записи_тома_читаются_подряд()
@@ -23,7 +62,7 @@ public class MftReaderVolumeTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(table.Entries, Has.Length.EqualTo(Records));
-            Assert.That(table.Entries[20].Name, Is.EqualTo("отчёт.pdf"));
+            Assert.That(table.GetName(20), Is.EqualTo("отчёт.pdf"));
             Assert.That(table.Entries[20].Size, Is.EqualTo(128));
             Assert.That(table.Entries[21].IsDirectory, Is.True);
             Assert.That(table.Statistics.RecordsScanned, Is.EqualTo(Records));
@@ -46,10 +85,10 @@ public class MftReaderVolumeTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(table.Entries[1].Name, Is.EqualTo("на-границе.bin"));
+            Assert.That(table.GetName(1), Is.EqualTo("на-границе.bin"));
             Assert.That(table.Entries[1].Size, Is.EqualTo(64));
-            Assert.That(table.Entries[2].Name, Is.EqualTo("следом.bin"));
-            Assert.That(table.Entries[20].Name, Is.EqualTo("далеко.bin"));
+            Assert.That(table.GetName(2), Is.EqualTo("следом.bin"));
+            Assert.That(table.GetName(20), Is.EqualTo("далеко.bin"));
             Assert.That(table.Statistics.RecordsScanned, Is.EqualTo(Records));
             Assert.That(table.Statistics.Damaged, Is.Zero);
         }
@@ -85,7 +124,7 @@ public class MftReaderVolumeTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(table.Entries[20].Name, Is.EqualTo("огромный.iso"));
+            Assert.That(table.GetName(20), Is.EqualTo("огромный.iso"));
             Assert.That(table.Entries[20].Parent, Is.EqualTo(MftLayout.RootRecord));
             Assert.That(table.Entries[20].Names, Is.EqualTo(1));
             Assert.That(table.Entries[20].Size, Is.EqualTo(9_000_000_000));
@@ -139,7 +178,7 @@ public class MftReaderVolumeTests
         }
 
         var table = Read(builder.Build(Records), 4, 1024);
-        var names = table.Entries.Select(x => x.Name).ToArray()[MftLayout.FirstUserRecord..];
+        var names = Enumerable.Range(MftLayout.FirstUserRecord, Records - MftLayout.FirstUserRecord).Select(table.GetName).ToArray();
         var sizes = table.Entries.Select(x => x.Size).ToArray();
 
         using (Assert.EnterMultipleScope())
@@ -196,10 +235,10 @@ public class MftReaderVolumeTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(table.Entries[20].Name, Is.EqualTo("первое.dll"));
+            Assert.That(table.GetName(20), Is.EqualTo("первое.dll"));
             Assert.That(table.Entries[20].Names, Is.EqualTo(3));
             Assert.That(
-                table.Alternates[20].Select(x => x.Name),
+                table.Alternates[20].Select(x => table.Names.GetString(x.NameId)),
                 Is.EqualTo(
                     new[]
                     {
@@ -322,9 +361,9 @@ public class MftReaderVolumeTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(table.Entries[20].Name, Is.EqualTo("во-втором-экстенте.bin"));
+            Assert.That(table.GetName(20), Is.EqualTo("во-втором-экстенте.bin"));
             Assert.That(table.Entries[20].Size, Is.EqualTo(48));
-            Assert.That(table.Entries[Records - 1].Name, Is.EqualTo("последняя.bin"));
+            Assert.That(table.GetName(Records - 1), Is.EqualTo("последняя.bin"));
             Assert.That(table.Entries[Records - 1].Size, Is.EqualTo(64));
             Assert.That(table.Statistics.RecordsScanned, Is.EqualTo(Records));
             Assert.That(table.Statistics.Damaged, Is.Zero);
@@ -348,9 +387,9 @@ public class MftReaderVolumeTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(table.Entries, Has.Length.EqualTo(Records));
-            Assert.That(table.Entries[20].Name, Is.EqualTo("во-втором-экстенте.bin"));
+            Assert.That(table.GetName(20), Is.EqualTo("во-втором-экстенте.bin"));
             Assert.That(table.Entries[20].Size, Is.EqualTo(48));
-            Assert.That(table.Entries[Records - 1].Name, Is.EqualTo("последняя.bin"));
+            Assert.That(table.GetName(Records - 1), Is.EqualTo("последняя.bin"));
             Assert.That(table.Statistics.RecordsScanned, Is.EqualTo(Records));
             Assert.That(table.Statistics.Damaged, Is.Zero);
         }

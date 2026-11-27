@@ -14,6 +14,7 @@ public static class AppDefaults
     public const bool ScanMediaAwareDefault = true;
     public const int ScanParallelismPerCore = 2;
     public const int ScanParallelismDefaultCeiling = 16;
+    public const int ScanNetworkParallelismCap = 8;
     public const ScanSortField ScanSortModeDefault = ScanSortField.Size;
     public const bool ScanSortInvertDefault = true;
     public const bool ScanTreemapDefault = false;
@@ -29,6 +30,7 @@ public static class AppDefaults
     public const bool ScanDuplicatesEnabledDefault = false;
     public const bool ScanMftEnabledDefault = false;
     public const bool ScanMftRootOnlyDefault = true;
+    public const bool ScanMftRawDiskDefault = false;
 
     public const int ScanDuplicatesMinSizeMbDefault = 1;
 
@@ -103,6 +105,9 @@ public static class AppDefaults
 
     public const int VolumeSpaceTimeoutMs = 1500;
     public const int StorageMediaTimeoutMs = 3000;
+    public const int PathProbeTimeoutMs = 3000;
+    public const int PathProbeDebounceMs = 250;
+    public const int NetworkDiscoveryCacheSeconds = 30;
 
     public const int ViewCaptureLimit = 20;
     public const int ViewCaptureNamesHint = 20;

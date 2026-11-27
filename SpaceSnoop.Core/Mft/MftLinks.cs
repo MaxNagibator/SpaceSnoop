@@ -3,6 +3,8 @@
 internal sealed class MftLinks(int[] firstChild, int[] nextSibling)
 {
     private const int MaxDepth = 512;
+    private const int ParallelThreshold = 65_536;
+    private const int MaxWorkers = 8;
 
     public int[] FirstChild { get; } = firstChild;
 
@@ -11,50 +13,144 @@ internal sealed class MftLinks(int[] firstChild, int[] nextSibling)
     public static MftLinks Build(MftTable table, CancellationToken cancel)
     {
         var entries = table.Entries;
-        var firstChild = new int[entries.Length];
-        var nextSibling = new int[entries.Length];
-
-        Array.Fill(firstChild, -1);
-        Array.Fill(nextSibling, -1);
-
+        var firstChild = GC.AllocateUninitializedArray<int>(entries.Length);
+        var nextSibling = GC.AllocateUninitializedArray<int>(entries.Length);
         var links = new MftLinks(firstChild, nextSibling);
 
-        for (var index = entries.Length - 1; index >= MftLayout.FirstUserRecord; index--)
+        if (entries.Length < ParallelThreshold)
         {
-            if ((index & 0xFFFF) == 0)
+            Array.Fill(firstChild, -1);
+            Array.Fill(nextSibling, -1);
+
+            for (var index = entries.Length - 1; index >= MftLayout.FirstUserRecord; index--)
             {
-                cancel.ThrowIfCancellationRequested();
-            }
-
-            ref var entry = ref entries[index];
-
-            if (!entry.Exists)
-            {
-                continue;
-            }
-
-            if (entry.IsLink)
-            {
-                table.Statistics.SkippedLinks++;
-                entry.Name = null;
-                continue;
-            }
-
-            if (!IsValidParent(entries, index, entry.Parent, entry.ParentSequence, table.Statistics))
-            {
-                table.Statistics.Detached++;
-
-                if (!entry.IsDirectory)
+                if ((index & 0xFFFF) == 0)
                 {
-                    table.Statistics.OrphanFiles++;
-                    table.Statistics.OrphanBytes += entry.Size;
+                    cancel.ThrowIfCancellationRequested();
                 }
 
-                entry.Name = null;
-                continue;
+                ref var entry = ref entries[index];
+
+                if (!entry.Exists)
+                {
+                    continue;
+                }
+
+                if (entry.IsLink)
+                {
+                    table.Statistics.SkippedLinks++;
+                    entry.ClearName();
+                    continue;
+                }
+
+                if (!IsValidParent(entries, index, entry.Parent, entry.ParentSequence, table.Statistics))
+                {
+                    table.Statistics.Detached++;
+
+                    if (!entry.IsDirectory)
+                    {
+                        table.Statistics.OrphanFiles++;
+                        table.Statistics.OrphanBytes += entry.Size;
+                    }
+
+                    entry.ClearName();
+                    continue;
+                }
+
+                links.Attach(index, entry.Parent);
             }
 
-            links.Attach(index, entry.Parent);
+            return links;
+        }
+
+        var chunkCount = Math.Min(MaxWorkers, Math.Max(1, Environment.ProcessorCount));
+        var options = new ParallelOptions
+        {
+            CancellationToken = cancel,
+            MaxDegreeOfParallelism = chunkCount,
+        };
+
+        Parallel.For(
+            0,
+            chunkCount,
+            options,
+            x =>
+            {
+                var start = (int)((long)entries.Length * x / chunkCount);
+                var end = (int)((long)entries.Length * (x + 1) / chunkCount);
+                firstChild.AsSpan(start, end - start).Fill(-1);
+                nextSibling.AsSpan(start, end - start).Fill(-1);
+            });
+
+        var chunkStats = new MftStatistics[chunkCount];
+        var chunkClear = new List<int>[chunkCount];
+        var total = entries.Length - MftLayout.FirstUserRecord;
+
+        Parallel.For(
+            0,
+            chunkCount,
+            options,
+            x =>
+            {
+                var start = MftLayout.FirstUserRecord + (int)((long)total * x / chunkCount);
+                var end = MftLayout.FirstUserRecord + (int)((long)total * (x + 1) / chunkCount);
+                var localStats = new MftStatistics();
+                var toClear = new List<int>();
+                chunkStats[x] = localStats;
+                chunkClear[x] = toClear;
+
+                for (var index = end - 1; index >= start; index--)
+                {
+                    if ((index & 0xFFFF) == 0)
+                    {
+                        cancel.ThrowIfCancellationRequested();
+                    }
+
+                    ref readonly var entry = ref entries[index];
+
+                    if (!entry.Exists)
+                    {
+                        continue;
+                    }
+
+                    if (entry.IsLink)
+                    {
+                        localStats.SkippedLinks++;
+                        toClear.Add(index);
+                        continue;
+                    }
+
+                    if (!IsValidParent(entries, index, entry.Parent, entry.ParentSequence, localStats))
+                    {
+                        localStats.Detached++;
+
+                        if (!entry.IsDirectory)
+                        {
+                            localStats.OrphanFiles++;
+                            localStats.OrphanBytes += entry.Size;
+                        }
+
+                        toClear.Add(index);
+                        continue;
+                    }
+
+                    nextSibling[index] = Interlocked.Exchange(ref firstChild[entry.Parent], index);
+                }
+            });
+
+        for (var chunk = chunkCount - 1; chunk >= 0; chunk--)
+        {
+            table.Statistics.Add(chunkStats[chunk]);
+        }
+
+        for (var chunk = 0; chunk < chunkCount; chunk++)
+        {
+            var toClear = chunkClear[chunk];
+
+            for (var i = 0; i < toClear.Count; i++)
+            {
+                entries[toClear[i]].ClearName();
+            }
         }
 
         return links;
@@ -99,7 +195,7 @@ internal sealed class MftLinks(int[] firstChild, int[] nextSibling)
                 Detach(index, entry.Parent);
                 entry.Parent = candidate.Parent;
                 entry.ParentSequence = candidate.ParentSequence;
-                entry.Name = candidate.Name;
+                entry.SetName(candidate.NameId);
                 Attach(index, candidate.Parent);
                 table.Statistics.Rehomed++;
                 break;
@@ -110,62 +206,177 @@ internal sealed class MftLinks(int[] firstChild, int[] nextSibling)
     public void DropUnreachable(MftTable table, CancellationToken cancel)
     {
         var entries = table.Entries;
-        var reachable = new bool[entries.Length];
+        var reachable = new ulong[(entries.Length + 63) >> 6];
         var stack = new Stack<int>();
-        stack.Push(MftLayout.RootRecord);
 
-        for (var index = 0; index < Math.Min(entries.Length, MftLayout.FirstUserRecord); index++)
+        if (entries.Length > MftLayout.RootRecord)
+        {
+            SetReachable(reachable, MftLayout.RootRecord);
+            stack.Push(MftLayout.RootRecord);
+        }
+
+        SeedSystemDirectories(entries, reachable, stack);
+        MarkReachable(stack, reachable, cancel);
+        SweepUnreachable(table, reachable, cancel);
+    }
+
+    internal static bool IsReachable(ulong[] reachable, int index)
+    {
+        return (reachable[index >> 6] & (1UL << (index & 63))) != 0;
+    }
+
+    internal static void SetReachable(ulong[] reachable, int index)
+    {
+        reachable[index >> 6] |= 1UL << (index & 63);
+    }
+
+    internal static bool TryMarkReachable(ulong[] reachable, int index)
+    {
+        var word = index >> 6;
+        var mask = 1UL << (index & 63);
+
+        return (Volatile.Read(ref reachable[word]) & mask) == 0
+            && (Interlocked.Or(ref reachable[word], mask) & mask) == 0;
+    }
+
+    internal void FinishUnreachable(MftTable table, ulong[] reachable, CancellationToken cancel)
+    {
+        var entries = table.Entries;
+        var stack = new Stack<int>();
+
+        SeedSystemDirectories(entries, reachable, stack);
+        MarkReachable(stack, reachable, cancel);
+        SweepUnreachable(table, reachable, cancel);
+    }
+
+    private static void SeedSystemDirectories(MftEntry[] entries, ulong[] reachable, Stack<int> stack)
+    {
+        var limit = Math.Min(entries.Length, MftLayout.FirstUserRecord);
+
+        for (var index = 0; index < limit; index++)
         {
             if (index != MftLayout.RootRecord
                 && entries[index].Exists
                 && entries[index].IsDirectory
-                && !entries[index].IsLink)
+                && !entries[index].IsLink
+                && !IsReachable(reachable, index))
             {
+                SetReachable(reachable, index);
                 stack.Push(index);
             }
         }
+    }
 
+    private void MarkReachable(Stack<int> stack, ulong[] reachable, CancellationToken cancel)
+    {
         while (stack.Count > 0)
         {
             cancel.ThrowIfCancellationRequested();
 
             for (var child = FirstChild[stack.Pop()]; child >= 0; child = NextSibling[child])
             {
-                if (reachable[child])
+                if (IsReachable(reachable, child))
                 {
                     continue;
                 }
 
-                reachable[child] = true;
-                stack.Push(child);
+                SetReachable(reachable, child);
+
+                if (FirstChild[child] >= 0)
+                {
+                    stack.Push(child);
+                }
             }
         }
+    }
 
-        for (var index = MftLayout.FirstUserRecord; index < entries.Length; index++)
+    private static void SweepUnreachable(MftTable table, ulong[] reachable, CancellationToken cancel)
+    {
+        var entries = table.Entries;
+
+        if (entries.Length < ParallelThreshold)
         {
-            if ((index & 0xFFFF) == 0)
+            for (var index = MftLayout.FirstUserRecord; index < entries.Length; index++)
             {
-                cancel.ThrowIfCancellationRequested();
+                if ((index & 0xFFFF) == 0)
+                {
+                    cancel.ThrowIfCancellationRequested();
+                }
+
+                ref var entry = ref entries[index];
+
+                if (!entry.Exists || IsReachable(reachable, index))
+                {
+                    continue;
+                }
+
+                table.Statistics.Detached++;
+                table.Statistics.Unreachable++;
+                table.Statistics.RecordDetached(index, entry.Parent, "ветка");
+
+                if (!entry.IsDirectory)
+                {
+                    table.Statistics.OrphanFiles++;
+                    table.Statistics.OrphanBytes += entry.Size;
+                }
+
+                entry.ClearName();
             }
 
-            ref var entry = ref entries[index];
+            return;
+        }
 
-            if (!entry.Exists || reachable[index])
+        var chunkCount = Math.Min(MaxWorkers, Math.Max(1, Environment.ProcessorCount));
+        var chunkStats = new MftStatistics[chunkCount];
+        var total = entries.Length - MftLayout.FirstUserRecord;
+        var options = new ParallelOptions
+        {
+            CancellationToken = cancel,
+            MaxDegreeOfParallelism = chunkCount,
+        };
+
+        Parallel.For(
+            0,
+            chunkCount,
+            options,
+            x =>
             {
-                continue;
-            }
+                var start = MftLayout.FirstUserRecord + (int)((long)total * x / chunkCount);
+                var end = MftLayout.FirstUserRecord + (int)((long)total * (x + 1) / chunkCount);
+                var localStats = new MftStatistics();
+                chunkStats[x] = localStats;
 
-            table.Statistics.Detached++;
-            table.Statistics.Unreachable++;
-            table.Statistics.RecordDetached(index, entry.Parent, "ветка");
+                for (var index = start; index < end; index++)
+                {
+                    if ((index & 0xFFFF) == 0)
+                    {
+                        cancel.ThrowIfCancellationRequested();
+                    }
 
-            if (!entry.IsDirectory)
-            {
-                table.Statistics.OrphanFiles++;
-                table.Statistics.OrphanBytes += entry.Size;
-            }
+                    ref var entry = ref entries[index];
 
-            entry.Name = null;
+                    if (!entry.Exists || IsReachable(reachable, index))
+                    {
+                        continue;
+                    }
+
+                    localStats.Detached++;
+                    localStats.Unreachable++;
+                    localStats.RecordDetached(index, entry.Parent, "ветка");
+
+                    if (!entry.IsDirectory)
+                    {
+                        localStats.OrphanFiles++;
+                        localStats.OrphanBytes += entry.Size;
+                    }
+
+                    entry.ClearName();
+                }
+            });
+
+        for (var chunk = 0; chunk < chunkCount; chunk++)
+        {
+            table.Statistics.Add(chunkStats[chunk]);
         }
     }
 

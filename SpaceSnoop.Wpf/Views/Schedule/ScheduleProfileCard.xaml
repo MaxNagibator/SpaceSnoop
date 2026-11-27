@@ -2,6 +2,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SpaceSnoop.Wpf.ViewModels.Sync"
+             xmlns:behaviors="clr-namespace:SpaceSnoop.Wpf.Views.Behaviors"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -120,11 +121,23 @@
                            Style="{StaticResource TextBlock.Subtle}"
                            Margin="0,6,0,0" />
 
-                <Border Background="{DynamicResource State.WarningSoft}"
-                        CornerRadius="{DynamicResource Radius.M}"
+                <Border CornerRadius="{DynamicResource Radius.M}"
                         Padding="10,6"
                         Margin="0,8,0,0"
                         Visibility="{Binding MirrorWarning, Converter={StaticResource BoolToVisibility}}">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background"
+                                    Value="{DynamicResource State.WarningSoft}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding MirrorTargetWithoutRecycleBin}"
+                                             Value="True">
+                                    <Setter Property="Background"
+                                            Value="{DynamicResource State.ErrorSoft}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
@@ -135,10 +148,23 @@
                                                   Width="15"
                                                   Height="15"
                                                   VerticalAlignment="Top"
-                                                  Margin="0,1,9,0"
-                                                  Foreground="{DynamicResource State.WarningText}" />
+                                                  Margin="0,1,9,0">
+                            <iconPacks:PackIconLucide.Style>
+                                <Style TargetType="iconPacks:PackIconLucide">
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource State.WarningText}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding MirrorTargetWithoutRecycleBin}"
+                                                     Value="True">
+                                            <Setter Property="Foreground"
+                                                    Value="{DynamicResource State.ErrorText}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </iconPacks:PackIconLucide.Style>
+                        </iconPacks:PackIconLucide>
                         <TextBlock Grid.Column="1"
-                                   Text="Включено «Зеркало»: лишние файлы на приёмнике удаляются в корзину без подтверждения."
+                                   Text="{Binding MirrorWarningText}"
                                    TextWrapping="Wrap"
                                    FontSize="{DynamicResource Font.Size.S}"
                                    Foreground="{DynamicResource Fg.Secondary}" />
@@ -293,6 +319,7 @@
                     </Grid.ColumnDefinitions>
                     <TextBox Grid.Column="0"
                              Text="{Binding LeftPath, UpdateSourceTrigger=PropertyChanged}"
+                             behaviors:PathSuggest.Enabled="{Binding PathSuggest}"
                              Style="{StaticResource Schedule.PathBox}" />
                     <Button Grid.Column="1"
                             Style="{StaticResource Button.Ghost}"
@@ -315,6 +342,7 @@
                     </Grid.ColumnDefinitions>
                     <TextBox Grid.Column="0"
                              Text="{Binding RightPath, UpdateSourceTrigger=PropertyChanged}"
+                             behaviors:PathSuggest.Enabled="{Binding PathSuggest}"
                              Style="{StaticResource Schedule.PathBox}" />
                     <Button Grid.Column="1"
                             Style="{StaticResource Button.Ghost}"
@@ -352,37 +380,61 @@
                           IsEnabled="{Binding MirrorApplicable}"
                           Margin="0,14,0,0" />
 
+                <Border Background="{DynamicResource State.ErrorSoft}"
+                        CornerRadius="{DynamicResource Radius.M}"
+                        Padding="10,6"
+                        Margin="0,8,0,0"
+                        Visibility="{Binding MirrorTargetWithoutRecycleBin, Converter={StaticResource BoolToVisibility}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <iconPacks:PackIconLucide Grid.Column="0"
+                                                  Kind="{x:Static iconPacks:PackIconLucideKind.TriangleAlert}"
+                                                  Width="15"
+                                                  Height="15"
+                                                  VerticalAlignment="Top"
+                                                  Margin="0,1,9,0"
+                                                  Foreground="{DynamicResource State.ErrorText}" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding MirrorWarningText}"
+                                   TextWrapping="Wrap"
+                                   FontSize="{DynamicResource Font.Size.S}"
+                                   Foreground="{DynamicResource Fg.Secondary}" />
+                    </Grid>
+                </Border>
+
+                <CheckBox IsChecked="{Binding AllowPermanentNetworkDelete, Mode=TwoWay}"
+                          Visibility="{Binding CanAllowPermanentNetworkDelete, Converter={StaticResource BoolToVisibility}}"
+                          Margin="0,8,0,0">
+                    <TextBlock Text="Разрешить безвозвратное удаление на сетевом приёмнике при запуске профиля"
+                               TextWrapping="Wrap" />
+                </CheckBox>
+
                 <TextBlock Text="Исключения (через запятую)"
                            Style="{StaticResource Schedule.FormLabel}" />
                 <TextBox Text="{Binding Exclusions, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource TextBox.Toolbar}" />
 
-                <Grid Margin="0,14,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0">
-                        <TextBlock Text="Периодичность"
-                                   Style="{StaticResource Form.Label}" />
-                        <ComboBox Style="{StaticResource ComboBox.Form}"
-                                  ItemsSource="{Binding Intervals}"
-                                  SelectedIndex="{Binding SelectedIntervalIndex}"
-                                  HorizontalAlignment="Left"
-                                  Width="240"
-                                  Margin="0,6,0,0" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1"
-                                Visibility="{Binding TimeApplicable, Converter={StaticResource BoolToVisibility}}">
-                        <TextBlock Text="Время (ЧЧ:ММ)"
-                                   Style="{StaticResource Form.Label}" />
-                        <TextBox Text="{Binding Time, UpdateSourceTrigger=PropertyChanged}"
-                                 Style="{StaticResource TextBox.Toolbar}"
-                                 Width="110"
-                                 HorizontalAlignment="Left"
-                                 Margin="0,6,0,0" />
-                    </StackPanel>
-                </Grid>
+                <TextBlock Text="Периодичность"
+                           Style="{StaticResource Schedule.FormLabel}" />
+                <ListBox Style="{StaticResource ListBox.Segmented}"
+                         ItemsSource="{Binding IntervalOptions}"
+                         SelectedIndex="{Binding SelectedIntervalIndex}"
+                         HorizontalAlignment="Left"
+                         AutomationProperties.Name="Периодичность" />
+
+                <StackPanel Margin="0,14,0,0"
+                            Visibility="{Binding TimeApplicable, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Text="Время (ЧЧ:ММ)"
+                               Style="{StaticResource Form.Label}" />
+                    <TextBox Text="{Binding Time, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource TextBox.Toolbar}"
+                             Width="110"
+                             HorizontalAlignment="Left"
+                             Margin="0,6,0,0" />
+                </StackPanel>
 
                 <TextBlock Style="{StaticResource Schedule.Message}" />
 

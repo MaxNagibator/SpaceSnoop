@@ -5,7 +5,7 @@ using System.IO;
 
 namespace SpaceSnoop.Wpf.Mcp;
 
-internal sealed class McpScanTools(
+internal sealed partial class McpScanTools(
     IScanAutomation scan,
     ScanPreferences scanPreferences,
     ScanRunner runner,
@@ -21,7 +21,6 @@ internal sealed class McpScanTools(
     private const string BusyReason = "страница занята операцией";
     private const string ScanBusyMessage = "Страница «Сканирование» сейчас занята другой операцией.";
     private const string MarkTool = "mark_for_deletion";
-    private const string ArchiveTool = "archive_directory";
     private static readonly TimeSpan NetworkDriveTimeout = TimeSpan.FromSeconds(AppDefaults.McpNetworkDriveTimeoutSeconds);
 
     public async Task<string> ScanAsync(string path, int depth, int entryLimit, bool show, CancellationToken cancellationToken)
@@ -64,7 +63,7 @@ internal sealed class McpScanTools(
 
             var phases = new ScanPhases();
 
-            var (tree, model, run, notes) = await Task.Run(
+            var (tree, model, run, notes, capacity) = await Task.Run(
                     () =>
                     {
                         probe.ReportPhase(BackgroundScanProbe.OperationName);
@@ -93,8 +92,9 @@ internal sealed class McpScanTools(
                         };
 
                         phases.ExportMs = stopwatch.ElapsedMilliseconds;
+                        var driveCapacity = show ? DriveCapacity.TryRead(outcome.Root.AbsolutePath) : null;
 
-                        return (outcome.Root, built, walked, outcome.Notes);
+                        return (outcome.Root, built, walked, outcome.Notes, driveCapacity);
                     },
                     cancellationToken)
                 .ConfigureAwait(false);
@@ -115,7 +115,7 @@ internal sealed class McpScanTools(
                             "Страница «Сканирование» занялась другой операцией, пока шёл обход – результат не показан. Повторите с show=false, чтобы получить данные без окна.");
                     }
 
-                    scan.ApplyScanResult(tree, run.Elapsed, run.Traversal, notes);
+                    scan.ApplyScanResult(tree, run.Elapsed, run.Traversal, notes, capacity);
                     scan.SelectPathForAutomation(tree.AbsolutePath);
                     navigator.DeferOrNavigate(SectionKey.Scan);
                     notifier.Notify($"Агент показал сканирование: {tree.AbsolutePath} · {tree.TotalSizeText}");
@@ -124,7 +124,7 @@ internal sealed class McpScanTools(
                 phases.ApplyMs = stopwatch.ElapsedMilliseconds;
 
                 await operations.FlushFramesAsync().ConfigureAwait(false);
-                await McpDispatch.Run(() => scan.ReturnScanMemoryAsync(tree, probe.ReportPhase, cancellationToken)).ConfigureAwait(false);
+                await McpDispatch.Run(() => scan.ReturnScanMemoryAsync(tree, notes.UsedMft && !notes.UsedUsn, probe.ReportPhase, cancellationToken)).ConfigureAwait(false);
             }
 
             probe.ReportPhase("Сериализация сканирования");
@@ -240,41 +240,6 @@ internal sealed class McpScanTools(
         return McpDispatch.Run(() => MarkOnScanPage(wanted, mark));
     }
 
-    public async Task<string> ArchiveDirectoryAsync(string path, bool deleteOriginal, bool dryRun, CancellationToken cancellationToken)
-    {
-        path = path.Trim();
-
-        if (dryRun)
-        {
-            logger.McpToolInvoked(ArchiveTool, $"«{path}», план");
-
-            return McpDispatch.Run(() => BuildArchivePlan(path, deleteOriginal));
-        }
-
-        McpGuards.RequireMutations(preferences, logger, ArchiveTool);
-
-        var (prepared, run) = McpDispatch.Run(() => PrepareArchiveRun(path, deleteOriginal, cancellationToken));
-
-        var outcome = await run.ConfigureAwait(false);
-
-        return McpDispatch.Run(() =>
-        {
-            if (outcome.ArchivePath is null)
-            {
-                throw new McpException($"Архив не создан: {outcome.StatusText}");
-            }
-
-            return McpFormat.Serialize(
-                new McpArchiveResult(
-                    prepared.SourcePath,
-                    outcome.ArchivePath,
-                    prepared.EstimatedFiles,
-                    outcome.OriginalDeleted,
-                    outcome.StatusText,
-                    state.ReadScanState()));
-        });
-    }
-
     internal static McpDuplicates DescribeDuplicates(string root, long minSize, DuplicateReport report)
     {
         return new(
@@ -325,7 +290,7 @@ internal sealed class McpScanTools(
 
         if (target.Length > 0)
         {
-            scan.SelectPathForAutomation(target);
+            scan.SelectPathForAutomation(target, remember: false);
         }
 
         var deferred = navigator.DeferOrNavigate(SectionKey.Scan);
@@ -402,64 +367,6 @@ internal sealed class McpScanTools(
         }
 
         return (targets, missing, rejected);
-    }
-
-    private string BuildArchivePlan(string path, bool deleteOriginal)
-    {
-        var (_, request) = PrepareArchive(path, deleteOriginal);
-
-        return McpFormat.Serialize(
-            new McpArchivePlan(
-                request.SourcePath,
-                request.TargetPath,
-                request.EstimatedFiles,
-                request.TotalBytes,
-                SizeFormatter.Format(request.TotalBytes),
-                request.DeleteOriginal));
-    }
-
-    private (ArchiveRequest Request, Task<ArchiveOutcome> Run) PrepareArchiveRun(string path, bool deleteOriginal, CancellationToken cancellationToken)
-    {
-        if (scan.IsScanning)
-        {
-            logger.McpToolRejected(ArchiveTool, BusyReason);
-            throw new McpException(ScanBusyMessage);
-        }
-
-        var (dir, request) = PrepareArchive(path, deleteOriginal);
-        logger.McpMutationRequested(
-            ArchiveTool,
-            $"«{request.SourcePath}» → «{request.TargetPath}», файлов ≈{request.EstimatedFiles}, оригинал в корзину {request.DeleteOriginal}");
-
-        notifier.Notify($"Агент упаковывает в архив: {request.SourcePath}", StatusSeverity.Warning);
-
-        return (request, scan.ArchiveFromAutomationAsync(dir, request, cancellationToken));
-    }
-
-    private (DirectorySpace Dir, ArchiveRequest Request) PrepareArchive(string path, bool deleteOriginal)
-    {
-        if (path.Length == 0)
-        {
-            throw new McpException("Путь к каталогу должен быть задан.");
-        }
-
-        if (scan.FindForAutomation(path) is not { } space)
-        {
-            throw new McpException(
-                $"Каталог «{path}» не найден в открытом сканировании. Упаковывается только то, что уже отсканировано: откройте дерево через open_scan с scan=true.");
-        }
-
-        if (space is not DirectorySpace dir)
-        {
-            throw new McpException($"«{path}» – файл, а упаковать можно только каталог.");
-        }
-
-        if (scan.IsScanRoot(space) || dir.Parent is not DirectorySpace)
-        {
-            throw new McpException($"«{path}» – корень сканирования, архив некуда положить. Выберите подкаталог.");
-        }
-
-        return (dir, scan.CreateArchiveRequest(dir, deleteOriginal));
     }
 
     private sealed class ScanPhases

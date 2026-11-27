@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using SpaceSnoop.Core.Domain;
 using SpaceSnoop.Wpf.Bootstrap.Schedule;
 using SpaceSnoop.Wpf.ViewModels.Schedule;
+using SpaceSnoop.Wpf.ViewModels.Sync;
 
 namespace SpaceSnoop.Wpf.Tests;
 
@@ -448,6 +449,49 @@ public class ScheduleBulkTests
             Assert.That(scheduler.Applied, Is.Empty);
             Assert.That(profile.IsEditing, Is.EqualTo(remove));
             Assert.That(SyncProfileStore.Load(settings).Select(model => model.Name), Does.Not.Contain("Правка"));
+        }
+    }
+
+    [Test]
+    public void Снятие_выбора_сегмента_периодичности_игнорируется_и_восстанавливает_значение()
+    {
+        var settings = Seed();
+        var vm = Create(settings);
+        var profile = vm.Profiles[0];
+        var profileChanged = new List<string>();
+        var bulkChanged = new List<string>();
+
+        profile.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName is not null)
+            {
+                profileChanged.Add(args.PropertyName);
+            }
+        };
+
+        vm.Bulk.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName is not null)
+            {
+                bulkChanged.Add(args.PropertyName);
+            }
+        };
+
+        profile.SelectedIntervalIndex = 1;
+        profileChanged.Clear();
+        profile.SelectedIntervalIndex = -1;
+
+        profile.IsSelected = true;
+        vm.Bulk.IntervalIndex = 2;
+        bulkChanged.Clear();
+        vm.Bulk.IntervalIndex = -1;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(profile.SelectedIntervalIndex, Is.EqualTo(1));
+            Assert.That(profileChanged, Does.Contain(nameof(SyncProfileViewModel.SelectedIntervalIndex)));
+            Assert.That(vm.Bulk.IntervalIndex, Is.EqualTo(2));
+            Assert.That(bulkChanged, Does.Contain(nameof(ScheduleBulkViewModel.IntervalIndex)));
         }
     }
 

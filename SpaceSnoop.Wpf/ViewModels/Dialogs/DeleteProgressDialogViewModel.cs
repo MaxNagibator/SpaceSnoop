@@ -2,13 +2,12 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.IO;
 
 namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
 
 public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewModelBase
 {
-    private readonly bool _permanent;
+    private readonly bool _basePermanent;
     private readonly PerformanceMonitor _monitor;
     private readonly PerformanceOperations _operations;
     private readonly ShellPreferences _preferences;
@@ -16,6 +15,15 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
     private readonly ILogger _logger;
     private readonly Action<SpaceBase>? _unmark;
     private readonly string _runId = Guid.NewGuid().ToString("N")[..8];
+
+    private bool _allPermanent;
+    private bool _forcedByNetwork;
+    private bool _isMixed;
+    private int _networkCount;
+    private int _recycleCount;
+    private int _permanentCount;
+    private long _recycleBytes;
+    private long _permanentBytes;
 
     private long _totalBytes;
     private DeleteOperationDiagnostics _diagnostics;
@@ -57,13 +65,43 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
 
     public override string Title => "Удаление";
 
-    public string ActionVerb { get; }
+    public string ActionVerb => IsMixed
+        ? "перемещены в корзину или удалены безвозвратно"
+        : _allPermanent
+            ? "удалены безвозвратно"
+            : "перемещены в корзину";
 
-    public string IntroText => $"Будут {ActionVerb}: {Plural.Format(Items.Count, "объект", "объекта", "объектов")} · {SizeFormatter.Format(_totalBytes)}";
+    public bool ForcedByNetwork
+    {
+        get => _forcedByNetwork;
+        private set => SetProperty(ref _forcedByNetwork, value);
+    }
 
-    public string CancelHint => _permanent
-        ? "Остановка сработает после текущего объекта – удаление каталога со всем содержимым прервать нельзя."
-        : $"Остановка сработает в конце текущей пачки – это {Plural.Format(ChunkSize, "объект", "объекта", "объектов")}, обычно доли секунды.";
+    public bool IsMixed
+    {
+        get => _isMixed;
+        private set => SetProperty(ref _isMixed, value);
+    }
+
+    public string NetworkWarningText => IsMixed
+        ? "На сетевом хранилище нет корзины Windows – сетевые объекты будут удалены безвозвратно, локальные – в корзину"
+        : "На сетевом хранилище нет корзины Windows – удаление необратимо";
+
+    public string StartButtonText => IsMixed
+        ? "Удалить (часть безвозвратно)"
+        : _allPermanent
+            ? "Удалить безвозвратно"
+            : "Удалить";
+
+    public string IntroText => IsMixed
+        ? $"В корзину: {Plural.Format(_recycleCount, "объект", "объекта", "объектов")} · {SizeFormatter.Format(_recycleBytes)}, безвозвратно: {Plural.Format(_permanentCount, "объект", "объекта", "объектов")} · {SizeFormatter.Format(_permanentBytes)}"
+        : $"Будут {ActionVerb}: {Plural.Format(Items.Count, "объект", "объекта", "объектов")} · {SizeFormatter.Format(_totalBytes)}";
+
+    public string CancelHint => IsMixed
+        ? $"Остановка сработает после текущей пачки в корзину (до {Plural.Format(RecycleChunkSize, "объект", "объекта", "объектов")}) или текущего сетевого объекта."
+        : _allPermanent
+            ? "Остановка сработает после текущего объекта – удаление каталога со всем содержимым прервать нельзя."
+            : $"Остановка сработает в конце текущей пачки – это {Plural.Format(RecycleChunkSize, "объект", "объекта", "объектов")}, обычно доли секунды.";
 
     public string CancelCaption => CancelRequested ? "Остановка запрошена…" : "Остановить удаление";
 
@@ -75,7 +113,9 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
 
     protected override bool HasFailedItems => _failed > 0;
 
-    private int ChunkSize => Math.Clamp(_permanent ? 1 : AppDefaults.DeleteRecycleChunkSize, 1, Math.Max(Items.Count, 1));
+    private int RecycleChunkSize => Math.Clamp(AppDefaults.DeleteRecycleChunkSize, 1, Math.Max(_recycleCount, 1));
+
+    private int FirstChunkSize => Items.Count > 0 && Items[0].IsPermanent ? 1 : RecycleChunkSize;
 
     public DeleteProgressDialogViewModel(
         IReadOnlyList<SpaceBase> items,
@@ -85,24 +125,63 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
         ShellPreferences preferences,
         IUiDispatcher uiDispatcher,
         ILogger logger,
-        Action<SpaceBase>? unmark = null)
+        Action<SpaceBase>? unmark = null,
+        IReadOnlySet<SpaceBase>? withoutRecycleBin = null)
     {
-        _permanent = permanent;
+        _basePermanent = permanent;
         _monitor = monitor;
         _operations = operations;
         _preferences = preferences;
         _progressPoller = new(uiDispatcher, OnProgressTick);
         _logger = logger;
         _unmark = unmark;
-        Items = new(items.Select(static item => new DeleteRowViewModel(item)));
-        SelectedItem = Items.FirstOrDefault();
-        _totalBytes = items.Sum(static item => item.TotalSize);
-        _diagnostics = new(permanent, Items.Count, _totalBytes, monitor, operations, preferences);
 
-        ActionVerb = permanent ? "удалены безвозвратно" : "перемещены в корзину";
-        CountText = $"0 / {Items.Count}";
+        var count = items.Count;
+        var rows = new DeleteRowViewModel[count];
+        var widestSizeText = string.Empty;
 
-        WidestSizeText = Items.Select(static row => row.SizeText).MaxBy(static text => text.Length) ?? string.Empty;
+        for (var i = 0; i < count; i++)
+        {
+            var item = items[i];
+            var isWithoutRecycleBin = withoutRecycleBin?.Contains(item) ?? false;
+            var isRowPermanent = permanent || isWithoutRecycleBin;
+            var row = new DeleteRowViewModel(item, isRowPermanent, isWithoutRecycleBin);
+            rows[i] = row;
+
+            if (isWithoutRecycleBin)
+            {
+                _networkCount++;
+            }
+
+            if (isRowPermanent)
+            {
+                _permanentCount++;
+                _permanentBytes += row.SizeBytes;
+            }
+            else
+            {
+                _recycleCount++;
+                _recycleBytes += row.SizeBytes;
+            }
+
+            if (row.SizeText.Length > widestSizeText.Length)
+            {
+                widestSizeText = row.SizeText;
+            }
+        }
+
+        _totalBytes = _recycleBytes + _permanentBytes;
+        _forcedByNetwork = _networkCount > 0;
+        _isMixed = !permanent && _recycleCount > 0 && _permanentCount > 0;
+        _allPermanent = permanent || (count > 0 && _recycleCount == 0);
+
+        Items = new(rows);
+        SelectedItem = count > 0 ? Items[0] : null;
+        _diagnostics = new(_allPermanent, count, _totalBytes, monitor, operations, preferences);
+
+        CountText = $"0 / {count}";
+
+        WidestSizeText = widestSizeText;
         _freedText = SizeFormatter.Format(0);
     }
 
@@ -138,51 +217,6 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
         return end;
     }
 
-    protected override async Task ExecuteAsync(CancellationToken token)
-    {
-        var progress = new DeleteProgressState(Items.Count);
-        _progress = progress;
-        var deletedItems = new List<SpaceBase>(Items.Count);
-        DeletedItems = deletedItems;
-
-        try
-        {
-            await Task.Run(() => RunDeletion(deletedItems, progress, token), token);
-        }
-        finally
-        {
-            await _progressPoller.StopAsync();
-            _progress = null;
-            ClearPulse();
-        }
-    }
-
-    protected override void OnStarting()
-    {
-        ExcludeCommand.NotifyCanExecuteChanged();
-        SelectPreviousCommand.NotifyCanExecuteChanged();
-        SelectNextCommand.NotifyCanExecuteChanged();
-        _diagnostics = new(_permanent, Items.Count, _totalBytes, _monitor, _operations, _preferences);
-        _diagnostics.Start();
-        _progressPoller.Start();
-        _logger.DeletionStarted(_runId, Items.Count, SizeFormatter.Format(_totalBytes), _permanent);
-    }
-
-    protected override void OnFinished()
-    {
-        _progressPoller.Stop();
-
-        _diagnostics.Finish(_processed, _freedBytes, !Cancelled && Failure is null);
-        DiagnosticsText = null;
-
-        if (Failure is { } failure)
-        {
-            _logger.DeletionFailed(failure, _runId, _processed, Items.Count);
-        }
-
-        _logger.DeletionFinished(_runId, Cancelled, _deleted, _failed, SizeFormatter.Format(_freedBytes));
-    }
-
     protected override bool CanStart()
     {
         return base.CanStart() && Items.Count > 0;
@@ -196,28 +230,6 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
         {
             OnPropertyChanged(nameof(CancelCaption));
         }
-    }
-
-    protected override string BuildSummary()
-    {
-        if (Failure is { } failure)
-        {
-            return $"Ошибка: {failure.Message}";
-        }
-
-        var verb = _permanent ? "Удалено безвозвратно" : "Перемещено в корзину";
-        var head = Cancelled ? "Отменено." : "Готово.";
-        if (!Cancelled && _failed > 0)
-        {
-            head = "Завершено с ошибками.";
-        }
-
-        var errors = _failed > 0 ? $" Ошибок: {_failed}." : string.Empty;
-        var partial = _permanent && Items.Any(static row => row.IsDirectory && row.State == DeleteRowState.Failed)
-            ? " Каталоги с ошибкой могли быть удалены частично. Повторите сканирование оставшихся данных."
-            : string.Empty;
-
-        return $"{head} {verb}: {_deleted} из {Items.Count}. Освобождено: {SizeFormatter.Format(_freedBytes)}.{errors}{partial}";
     }
 
     private void OnProgressTick()
@@ -243,13 +255,6 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
         ApplyChunk(snapshot.Chunk);
 
         DiagnosticsText = _diagnostics.Report(_processed, _freedBytes);
-    }
-
-    private static string DescribeRange(in DeleteChunkInfo chunk)
-    {
-        return chunk.FirstIndex == chunk.LastIndex
-            ? $"{chunk.FirstIndex + 1}"
-            : $"{chunk.FirstIndex + 1}–{chunk.LastIndex + 1}";
     }
 
     private void ApplyChunk(in DeleteChunkProgress chunk)
@@ -294,140 +299,5 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
         CountText = $"{completed} / {Items.Count}";
         FreedText = SizeFormatter.Format(freed);
         ProgressValue = Items.Count > 0 ? Math.Clamp((double)_processed / Items.Count, 0d, 1d) : 0d;
-    }
-
-    private void RunDeletion(List<SpaceBase> deletedItems, DeleteProgressState progress, CancellationToken token)
-    {
-        var logPath = Path.Combine(AppStorage.DataDirectory, AppInfo.DeletionLogFileName);
-        long freed = 0;
-        var completed = 0;
-        var failed = 0;
-        var journalBroken = false;
-        var paths = new string[Items.Count];
-
-        for (var i = 0; i < paths.Length; i++)
-        {
-            paths[i] = Items[i].Path;
-        }
-
-        var writer = new StreamWriter(logPath, true);
-
-        try
-        {
-            Journal($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Удаление {Items.Count} элемент(ов) ({(_permanent ? "безвозвратно" : "в корзину")})");
-
-            DeleteBatch.Run(
-                paths,
-                ChunkSize,
-                _diagnostics.BuildCallbacks(),
-                new(OnStarting, OnResult, OnChunkStarting, OnChunkFinished),
-                token);
-        }
-        finally
-        {
-            try
-            {
-                writer.Dispose();
-            }
-            catch (Exception exception)
-            {
-                ReportJournalFailure(exception);
-            }
-        }
-
-        void Journal(string line)
-        {
-            if (journalBroken)
-            {
-                return;
-            }
-
-            try
-            {
-                writer.WriteLine(line);
-            }
-            catch (Exception exception)
-            {
-                ReportJournalFailure(exception);
-            }
-        }
-
-        void ReportJournalFailure(Exception exception)
-        {
-            if (journalBroken)
-            {
-                return;
-            }
-
-            journalBroken = true;
-
-            try
-            {
-                _logger.DeletionLogWriteFailed(exception, logPath);
-            }
-            catch (Exception)
-            {
-            }
-        }
-
-        void OnStarting(int index)
-        {
-            progress.Report(new(index, DeleteRowState.Deleting, null, freed, completed, failed));
-        }
-
-        void OnChunkStarting(DeleteChunkInfo chunk)
-        {
-            progress.ReportChunkStarted(chunk);
-            _logger.DeleteChunkStarted(_runId, chunk.Ordinal, chunk.Total, DescribeRange(chunk));
-        }
-
-        void OnChunkFinished(DeleteChunkOutcome outcome)
-        {
-            progress.ReportChunkFinished();
-
-            var chunk = outcome.Chunk;
-            var range = DescribeRange(chunk);
-
-            _logger.DeleteChunkFinished(_runId, chunk.Ordinal, chunk.Total, range, outcome.ElapsedMs, outcome.RetriedOneByOne);
-
-            if (outcome.ElapsedMs >= AppDefaults.DeleteChunkWarnMs)
-            {
-                _logger.DeleteChunkSlow(_runId, chunk.Ordinal, chunk.Total, range, outcome.ElapsedMs, AppDefaults.DeleteChunkWarnMs);
-            }
-        }
-
-        void OnResult(DeleteItemResult result)
-        {
-            var path = paths[result.Index];
-
-            switch (result.Status)
-            {
-                case DeleteItemStatus.Removed:
-                    Journal(path);
-                    completed++;
-                    freed += Items[result.Index].Space.TotalSize;
-                    deletedItems.Add(Items[result.Index].Space);
-                    progress.Report(new(result.Index, DeleteRowState.Done, null, freed, completed, failed));
-                    break;
-
-                case DeleteItemStatus.Missing:
-                    Journal($"ПРОПУЩЕНО (не найден) {path}");
-                    _logger.DeleteItemMissing(path);
-                    failed++;
-                    progress.Report(new(result.Index, DeleteRowState.Failed, "Путь не найден", freed, completed, failed));
-                    break;
-
-                case DeleteItemStatus.Failed when result.Failure is { } failure:
-                    Journal($"ОШИБКА {path}: {failure.Message}");
-                    _logger.DeleteItemFailed(failure, path);
-                    failed++;
-                    progress.Report(new(result.Index, DeleteRowState.Failed, failure.Message, freed, completed, failed));
-                    break;
-
-                default:
-                    progress.Report(new(result.Index, DeleteRowState.Pending, null, freed, completed, failed));
-                    break;
-            }
-        }
     }
 }
