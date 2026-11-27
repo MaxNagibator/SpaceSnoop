@@ -26,7 +26,7 @@ internal sealed class MftUsnVolumeIndex
 
     // TODO: файлы, открытые на запись до первого скана (до NextUsn), не попадают в _openDirtyFrns до CLOSE; при воспроизводимом расхождении – добавить проверку открытых дескрипторов.
     private readonly HashSet<ulong> _openDirtyFrns = [];
-    private readonly Dictionary<int, (int ExtraCount, long FileSize)> _hardlinks = [];
+    private readonly Dictionary<int, HardlinkRecord> _hardlinks = [];
     private readonly List<MftUsnEvent> _eventsBuffer = [];
     private readonly int _maxDeltaRecords;
     private Dictionary<string, int>? _postFreezeNames;
@@ -65,6 +65,7 @@ internal sealed class MftUsnVolumeIndex
         _frnSequence = capture.FrnSequence;
 
         var entries = table.Entries;
+        var alternates = table.Alternates;
         var limit = Math.Min(entries.Length, _frnLocation.Length);
 
         for (var rec = 0; rec < limit; rec++)
@@ -83,7 +84,25 @@ internal sealed class MftUsnVolumeIndex
 
             var extra = entry.Names - 1;
             var size = entry.IsDirectory ? 0L : entry.Size;
-            _hardlinks[rec] = (extra, size);
+            HardlinkTarget[] links;
+
+            if (alternates.TryGetValue(rec, out var altList) && altList.Count > 0)
+            {
+                links = new HardlinkTarget[1 + altList.Count];
+                links[0] = new(entry.Parent, entry.ParentSequence, entry.NameId);
+
+                for (var i = 0; i < altList.Count; i++)
+                {
+                    var alt = altList[i];
+                    links[i + 1] = new(alt.Parent, alt.ParentSequence, alt.NameId);
+                }
+            }
+            else
+            {
+                links = [new(entry.Parent, entry.ParentSequence, entry.NameId)];
+            }
+
+            _hardlinks[rec] = new(extra, size, links);
             ExtraNames += extra;
             ExtraNameBytes += size * extra;
         }
@@ -308,6 +327,86 @@ internal sealed class MftUsnVolumeIndex
         return true;
     }
 
+    public DirectorySpace ResolveSubtreeRoot(
+        int dirIndex,
+        DirectoryInfo directory,
+        out long extraNames,
+        out long extraNameBytes)
+    {
+        lock (Store.FacadeLock)
+        {
+            if (dirIndex == 0 || _hardlinks.Count == 0)
+            {
+                extraNames = ExtraNames;
+                extraNameBytes = ExtraNameBytes;
+                return Store.GetOrCreateDirectoryFacadeLocked(dirIndex);
+            }
+
+            List<RehomedLink>? rehomed = null;
+            long subExtraNames = 0;
+            long subExtraNameBytes = 0;
+
+            foreach (var (rec, info) in _hardlinks)
+            {
+                var loc = _frnLocation[rec];
+
+                if (loc == int.MinValue)
+                {
+                    continue;
+                }
+
+                var currentDirIdx = loc >= 0 ? loc : ~loc;
+
+                if (IsDirInSubtreeLocked(currentDirIdx, dirIndex))
+                {
+                    subExtraNames += info.ExtraCount;
+                    subExtraNameBytes += info.FileSize * info.ExtraCount;
+                    continue;
+                }
+
+                var isDir = loc >= 0;
+
+                for (var i = 0; i < info.Links.Length; i++)
+                {
+                    var link = info.Links[i];
+
+                    if (!IsUsableParent(link.ParentRec, link.ParentSequence))
+                    {
+                        continue;
+                    }
+
+                    var targetParentDirIdx = _frnLocation[link.ParentRec];
+
+                    if (!IsDirInSubtreeLocked(targetParentDirIdx, dirIndex))
+                    {
+                        continue;
+                    }
+
+                    if (isDir && IsDirInSubtreeLocked(targetParentDirIdx, loc))
+                    {
+                        continue;
+                    }
+
+                    rehomed ??= [];
+                    rehomed.Add(new(rec, loc, targetParentDirIdx, link.NameId));
+                    subExtraNames += info.ExtraCount;
+                    subExtraNameBytes += info.FileSize * info.ExtraCount;
+                    break;
+                }
+            }
+
+            extraNames = subExtraNames;
+            extraNameBytes = subExtraNameBytes;
+
+            if (rehomed is null || rehomed.Count == 0)
+            {
+                return Store.GetOrCreateDirectoryFacadeLocked(dirIndex);
+            }
+
+            return MaterializeSubtreeWithRehomeLocked(dirIndex, directory, rehomed);
+        }
+    }
+
     private static bool TryFetchRecords(
         IMftUsnSource source,
         int[] recList,
@@ -337,6 +436,15 @@ internal sealed class MftUsnVolumeIndex
                 return false;
             }
 
+            if (fresh.IsIncomplete)
+            {
+                fetched = null;
+                staleOpenFrns = null;
+                error = MftUsnErrorKind.IoError;
+                win32Error = 0;
+                return false;
+            }
+
             if (openByRec is not null && openByRec.TryGetValue(rec, out var openFrn))
             {
                 var openSeq = (ushort)(openFrn >> MftLayout.ReferenceMaskBits);
@@ -359,6 +467,15 @@ internal sealed class MftUsnVolumeIndex
                 {
                     fresh = fresh with { Size = liveSize, SizeKnown = true };
                 }
+            }
+
+            if (fresh.Exists && !fresh.IsDirectory && !fresh.IsLink && !fresh.SizeKnown)
+            {
+                fetched = null;
+                staleOpenFrns = null;
+                error = MftUsnErrorKind.IoError;
+                win32Error = 0;
+                return false;
             }
 
             records[i] = fresh;
@@ -1098,7 +1215,25 @@ internal sealed class MftUsnVolumeIndex
             return;
         }
 
-        _hardlinks[rec] = (extraCount, fileSize);
+        HardlinkTarget[] links;
+
+        if (fresh.Alternates is { Count: > 0 } alts)
+        {
+            links = new HardlinkTarget[1 + alts.Count];
+            links[0] = new(fresh.PrimaryParent, fresh.PrimaryParentSequence, InternName(fresh.PrimaryName));
+
+            for (var i = 0; i < alts.Count; i++)
+            {
+                var alt = alts[i];
+                links[i + 1] = new(alt.Parent, alt.ParentSequence, InternName(alt.Name));
+            }
+        }
+        else
+        {
+            links = [new(fresh.PrimaryParent, fresh.PrimaryParentSequence, InternName(fresh.PrimaryName))];
+        }
+
+        _hardlinks[rec] = new(extraCount, fileSize, links);
         ExtraNames += extraCount;
         ExtraNameBytes += fileSize * extraCount;
     }
@@ -1111,6 +1246,216 @@ internal sealed class MftUsnVolumeIndex
             ExtraNameBytes -= prev.FileSize * prev.ExtraCount;
         }
     }
+
+    private bool IsDirInSubtreeLocked(int candidateDirIndex, int subtreeRootDirIndex)
+    {
+        var cur = candidateDirIndex;
+
+        for (var depth = 0; depth < MaxDepth; depth++)
+        {
+            if (cur == subtreeRootDirIndex)
+            {
+                return true;
+            }
+
+            if (cur <= 0)
+            {
+                return false;
+            }
+
+            ref readonly var d = ref Store.GetDirectoryRef(cur);
+
+            if (d.IsDetached)
+            {
+                return false;
+            }
+
+            cur = d.ParentIndex;
+        }
+
+        return false;
+    }
+
+    private DirectorySpace MaterializeSubtreeWithRehomeLocked(
+        int rootSrcDirIndex,
+        DirectoryInfo directory,
+        List<RehomedLink> rehomed)
+    {
+        var subStore = new ScanTreeStore(16, singleWriter: true);
+        var nameCache = LocalNameCache.Create();
+        var dirMap = new Dictionary<int, int>();
+        var queue = new Queue<(int SrcDirIdx, int DstParentIdx, int OverrideNameId)>();
+
+        var rootNameId = subStore.Names.Intern(directory.Name);
+        queue.Enqueue((rootSrcDirIndex, -1, rootNameId));
+
+        CloneQueuedDirectoriesLocked(subStore, nameCache, dirMap, queue);
+
+        for (var i = 0; i < rehomed.Count; i++)
+        {
+            var item = rehomed[i];
+
+            if (!dirMap.TryGetValue(item.TargetParentDirIndex, out var dstParentIdx))
+            {
+                continue;
+            }
+
+            if (item.CurrentLoc >= 0)
+            {
+                if (!dirMap.ContainsKey(item.CurrentLoc))
+                {
+                    var rehomedDirNameId = nameCache.Intern(subStore.Names, Store.Names.GetUtf8(item.NameId));
+                    queue.Enqueue((item.CurrentLoc, dstParentIdx, rehomedDirNameId));
+                    CloneQueuedDirectoriesLocked(subStore, nameCache, dirMap, queue);
+                }
+
+                continue;
+            }
+
+            var oldParentDirIdx = ~item.CurrentLoc;
+
+            if (!TryFindFileEntryByNameIdLocked(oldParentDirIdx, _frnNameId[item.Record], out var srcFile))
+            {
+                continue;
+            }
+
+            var rehomedFile = srcFile;
+            rehomedFile.NameId = nameCache.Intern(subStore.Names, Store.Names.GetUtf8(item.NameId));
+            ref var dstParent = ref subStore.GetDirectoryRef(dstParentIdx);
+            subStore.AppendFile(ref dstParent.FileStart, ref dstParent.FileCount, in rehomedFile);
+            dstParent.Size += rehomedFile.Size;
+        }
+
+        for (var idx = subStore.DirectoryCount - 1; idx >= 0; idx--)
+        {
+            ref var d = ref subStore.GetDirectoryRef(idx);
+            var totalSize = d.Size;
+            var totalFiles = d.FileCount;
+            var totalDirs = d.SubDirCount;
+
+            for (var child = d.FirstChildDir; child >= 0;)
+            {
+                ref readonly var childEntry = ref subStore.GetDirectoryRef(child);
+                totalSize += childEntry.TotalSize;
+                totalFiles += childEntry.TotalFileCount;
+                totalDirs += childEntry.TotalDirCount;
+                child = childEntry.NextSiblingDir;
+            }
+
+            d.TotalSize = totalSize;
+            d.TotalFileCount = totalFiles;
+            d.TotalDirCount = totalDirs;
+        }
+
+        subStore.Names.Freeze();
+        return subStore.GetOrCreateDirectoryFacade(0);
+    }
+
+    private void CloneQueuedDirectoriesLocked(
+        ScanTreeStore subStore,
+        LocalNameCache nameCache,
+        Dictionary<int, int> dirMap,
+        Queue<(int SrcDirIdx, int DstParentIdx, int OverrideNameId)> queue)
+    {
+        while (queue.Count > 0)
+        {
+            var (srcDirIdx, dstParentIdx, overrideNameId) = queue.Dequeue();
+
+            if (dirMap.ContainsKey(srcDirIdx))
+            {
+                continue;
+            }
+
+            ref readonly var srcDir = ref Store.GetDirectoryRef(srcDirIdx);
+            var dstDirIdx = subStore.AllocateDirectorySlot();
+            dirMap[srcDirIdx] = dstDirIdx;
+
+            var nameId = overrideNameId >= 0
+                ? overrideNameId
+                : nameCache.Intern(subStore.Names, Store.Names.GetUtf8(srcDir.NameId));
+
+            ref var dstDir = ref subStore.GetDirectoryRef(dstDirIdx);
+            dstDir = new()
+            {
+                NameId = nameId,
+                ParentIndex = dstParentIdx,
+                FirstChildDir = -1,
+                NextSiblingDir = -1,
+                CreationRaw = srcDir.CreationRaw,
+                LastAccessRaw = srcDir.LastAccessRaw,
+                TotalFileCount = -1,
+                TotalDirCount = -1,
+                State = srcDir.State,
+                Flags = (byte)(srcDir.Flags & ~DirectoryEntry.DetachedFlag),
+            };
+
+            if (dstParentIdx >= 0)
+            {
+                subStore.LinkChildDirectory(dstParentIdx, dstDirIdx);
+            }
+
+            if (srcDir.FileCount > 0)
+            {
+                var srcFiles = Store.GetSpan(srcDir.FileStart, srcDir.FileCount);
+                var copied = new FileEntry[srcFiles.Length];
+                long ownSize = 0;
+
+                for (var i = 0; i < srcFiles.Length; i++)
+                {
+                    var f = srcFiles[i];
+                    f.NameId = nameCache.Intern(subStore.Names, Store.Names.GetUtf8(f.NameId));
+                    copied[i] = f;
+                    ownSize += f.Size;
+                }
+
+                var handle = subStore.WriteLarge(copied);
+                ref var updatedDst = ref subStore.GetDirectoryRef(dstDirIdx);
+                updatedDst.FileStart = handle;
+                updatedDst.FileCount = copied.Length;
+                updatedDst.Size = ownSize;
+            }
+
+            for (var child = srcDir.FirstChildDir; child >= 0;)
+            {
+                ref readonly var childEntry = ref Store.GetDirectoryRef(child);
+
+                if (!childEntry.IsDetached)
+                {
+                    queue.Enqueue((child, dstDirIdx, -1));
+                }
+
+                child = childEntry.NextSiblingDir;
+            }
+        }
+    }
+
+    private bool TryFindFileEntryByNameIdLocked(int dirIndex, int nameId, out FileEntry entry)
+    {
+        ref readonly var dirEntry = ref Store.GetDirectoryRef(dirIndex);
+
+        if (dirEntry.FileCount > 0)
+        {
+            var files = Store.GetSpan(dirEntry.FileStart, dirEntry.FileCount);
+
+            for (var i = 0; i < files.Length; i++)
+            {
+                if (files[i].NameId == nameId)
+                {
+                    entry = files[i];
+                    return true;
+                }
+            }
+        }
+
+        entry = default;
+        return false;
+    }
+
+    private readonly record struct HardlinkTarget(int ParentRec, ushort ParentSequence, int NameId);
+
+    private readonly record struct HardlinkRecord(int ExtraCount, long FileSize, HardlinkTarget[] Links);
+
+    private readonly record struct RehomedLink(int Record, int CurrentLoc, int TargetParentDirIndex, int NameId);
 
     private void EnsureRecordCapacity(int maxRec)
     {

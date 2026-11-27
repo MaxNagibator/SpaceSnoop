@@ -56,6 +56,8 @@ internal readonly struct MftUsnRecord
     public long LastAccessFileTime { get; init; }
 
     public int TotalNameCount { get; init; }
+
+    public bool IsIncomplete { get; init; }
 }
 
 internal interface IMftUsnSource : IDisposable

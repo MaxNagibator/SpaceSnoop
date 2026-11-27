@@ -161,6 +161,7 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
         ObjectDisposedException.ThrowIf(_disposed, this);
         nextUsn = startUsn;
 
+        var cursorUsn = startUsn;
         var input = new ReadUsnJournalDataV0
         {
             StartUsn = startUsn,
@@ -174,7 +175,7 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
         while (true)
         {
             cancel.ThrowIfCancellationRequested();
-            input.StartUsn = nextUsn;
+            input.StartUsn = cursorUsn;
 
             if (!DeviceIoControlReadUsn(
                     _volumeHandle,
@@ -188,6 +189,7 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
             {
                 win32Error = Marshal.GetLastWin32Error();
                 error = ClassifyWin32Error(win32Error);
+                nextUsn = startUsn;
                 return false;
             }
 
@@ -195,13 +197,15 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
             {
                 error = MftUsnErrorKind.IoError;
                 win32Error = 0;
+                nextUsn = startUsn;
                 return false;
             }
 
-            if (!ParseUsnJournalBuffer(_usnBuffer.AsSpan(0, returned), destination, out var batchNextUsn))
+            if (!ParseUsnJournalBuffer(_usnBuffer.AsSpan(0, returned), destination, out var batchNextUsn, out var parseError))
             {
-                error = MftUsnErrorKind.IoError;
+                error = parseError;
                 win32Error = 0;
+                nextUsn = startUsn;
                 return false;
             }
 
@@ -209,18 +213,20 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
             {
                 error = MftUsnErrorKind.DeltaLimitExceeded;
                 win32Error = 0;
+                nextUsn = startUsn;
                 return false;
             }
 
-            if (returned == 8 || batchNextUsn == nextUsn)
+            if (returned == 8 || batchNextUsn == cursorUsn)
             {
-                nextUsn = batchNextUsn;
+                cursorUsn = batchNextUsn;
                 break;
             }
 
-            nextUsn = batchNextUsn;
+            cursorUsn = batchNextUsn;
         }
 
+        nextUsn = cursorUsn;
         error = MftUsnErrorKind.None;
         win32Error = 0;
         return true;
@@ -271,6 +277,14 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
         {
             error = _extensionState.Error;
             win32Error = _extensionState.Win32Error;
+            record = default;
+            return false;
+        }
+
+        if (record.IsIncomplete)
+        {
+            error = MftUsnErrorKind.IoError;
+            win32Error = 0;
             record = default;
             return false;
         }
@@ -355,13 +369,25 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
         List<MftUsnEvent> destination,
         out long nextUsn)
     {
+        return ParseUsnJournalBuffer(buffer, destination, out nextUsn, out _);
+    }
+
+    internal static bool ParseUsnJournalBuffer(
+        ReadOnlySpan<byte> buffer,
+        List<MftUsnEvent> destination,
+        out long nextUsn,
+        out MftUsnErrorKind error)
+    {
+        nextUsn = 0;
+
         if (buffer.Length < 8)
         {
-            nextUsn = 0;
+            error = MftUsnErrorKind.IoError;
             return false;
         }
 
-        nextUsn = BinaryPrimitives.ReadInt64LittleEndian(buffer);
+        var parsedNextUsn = BinaryPrimitives.ReadInt64LittleEndian(buffer);
+        var initialCount = destination.Count;
         var offset = 8;
 
         while (offset <= buffer.Length - UsnRecordV2MinBytes)
@@ -370,22 +396,36 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
 
             if (recLen < UsnRecordV2MinBytes || recLen > (uint)(buffer.Length - offset))
             {
+                destination.RemoveRange(initialCount, destination.Count - initialCount);
+                error = MftUsnErrorKind.IoError;
                 return false;
             }
 
             var majorVersion = BinaryPrimitives.ReadUInt16LittleEndian(buffer[(offset + 4)..]);
 
-            if (majorVersion == 2)
+            if (majorVersion != 2)
             {
-                var frn = BinaryPrimitives.ReadUInt64LittleEndian(buffer[(offset + 8)..]);
-                var reason = BinaryPrimitives.ReadUInt32LittleEndian(buffer[(offset + 40)..]);
-                destination.Add(new MftUsnEvent(frn, reason));
+                destination.RemoveRange(initialCount, destination.Count - initialCount);
+                error = MftUsnErrorKind.NotSupported;
+                return false;
             }
 
+            var frn = BinaryPrimitives.ReadUInt64LittleEndian(buffer[(offset + 8)..]);
+            var reason = BinaryPrimitives.ReadUInt32LittleEndian(buffer[(offset + 40)..]);
+            destination.Add(new MftUsnEvent(frn, reason));
             offset += (int)recLen;
         }
 
-        return offset == buffer.Length;
+        if (offset != buffer.Length)
+        {
+            destination.RemoveRange(initialCount, destination.Count - initialCount);
+            error = MftUsnErrorKind.IoError;
+            return false;
+        }
+
+        nextUsn = parsedNextUsn;
+        error = MftUsnErrorKind.None;
+        return true;
     }
 
     internal static MftUsnRecord ParseFileRecordBuffer(ReadOnlySpan<byte> outputBuffer, int requestedRecordNumber)
@@ -398,9 +438,14 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
         int requestedRecordNumber,
         MftRecordSliceFetcher? fetchExtension)
     {
-        if (requestedRecordNumber < 0 || !TryExtractRecordSlice(outputBuffer, requestedRecordNumber, out var rec))
+        if (requestedRecordNumber < 0)
         {
             return default;
+        }
+
+        if (!TryExtractRecordSlice(outputBuffer, requestedRecordNumber, out var rec, out var corrupt))
+        {
+            return corrupt ? new MftUsnRecord { IsIncomplete = true } : default;
         }
 
         var flags = BinaryPrimitives.ReadUInt16LittleEndian(rec[0x16..]);
@@ -421,7 +466,7 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
 
         if (attrOffset < MftLayout.UpdateSequenceMinOffset || attrOffset > rec.Length)
         {
-            return default;
+            return new MftUsnRecord { IsIncomplete = true };
         }
 
         var seq = BinaryPrimitives.ReadUInt16LittleEndian(rec[MftLayout.RecordSequenceOffset..]);
@@ -432,14 +477,21 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
 
         ParseAttributes(rec, attrOffset, ref state, ref attrListBytes);
 
-        if (!attrListBytes.IsEmpty && fetchExtension is not null)
+        if (!attrListBytes.IsEmpty)
         {
-            ResolveAttributeListExtensions(
-                attrListBytes,
-                requestedRecordNumber,
-                seq,
-                fetchExtension,
-                ref state);
+            if (fetchExtension is null)
+            {
+                state.IsIncomplete = true;
+            }
+            else
+            {
+                ResolveAttributeListExtensions(
+                    attrListBytes,
+                    requestedRecordNumber,
+                    seq,
+                    fetchExtension,
+                    ref state);
+            }
         }
 
         return state.ToRecord(seq);
@@ -485,12 +537,14 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
     private static bool TryExtractRecordSlice(
         ReadOnlySpan<byte> outputBuffer,
         int expectedRecordNumber,
-        out ReadOnlySpan<byte> record)
+        out ReadOnlySpan<byte> record,
+        out bool corrupt)
     {
         record = default;
 
         if (outputBuffer.Length < FileRecordOutputHeaderBytes + MftRecordMinHeaderBytes)
         {
+            corrupt = true;
             return false;
         }
 
@@ -499,6 +553,7 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
 
         if (returnedRec != expectedRecordNumber)
         {
+            corrupt = false;
             return false;
         }
 
@@ -506,6 +561,7 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
 
         if (recLen < MftRecordMinHeaderBytes || recLen > (uint)(outputBuffer.Length - FileRecordOutputHeaderBytes))
         {
+            corrupt = true;
             return false;
         }
 
@@ -513,10 +569,12 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
 
         if (!"FILE"u8.SequenceEqual(slice[..4]))
         {
+            corrupt = true;
             return false;
         }
 
         record = slice;
+        corrupt = false;
         return true;
     }
 
@@ -541,6 +599,7 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
 
             if (len < ResidentHeaderBytes || len > (uint)(rec.Length - pos))
             {
+                state.IsIncomplete = true;
                 break;
             }
 
@@ -560,16 +619,24 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
 
                     break;
 
-                case MftLayout.AttributeList when !nonResident && attrListBytes.IsEmpty:
-                    if (TryGetResidentValue(attr, out var listValue))
+                case MftLayout.AttributeList:
+                    if (nonResident || !attrListBytes.IsEmpty || !TryGetResidentValue(attr, out var listValue))
+                    {
+                        state.IsIncomplete = true;
+                    }
+                    else
                     {
                         attrListBytes = listValue;
                     }
 
                     break;
 
-                case MftLayout.AttributeFileName when !nonResident:
-                    if (TryGetResidentValue(attr, out var fnValue))
+                case MftLayout.AttributeFileName:
+                    if (nonResident || !TryGetResidentValue(attr, out var fnValue))
+                    {
+                        state.IsIncomplete = true;
+                    }
+                    else
                     {
                         ReadFileName(fnValue, ref state);
                     }
@@ -606,6 +673,7 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
 
             if (entryLen < AttributeListEntryBytes || entryLen > attrListBytes.Length - pos)
             {
+                state.IsIncomplete = true;
                 break;
             }
 
@@ -620,20 +688,35 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
                 || entryType == MftLayout.AttributeReparsePoint
                 || entryType == MftLayout.AttributeStandardInformation;
 
-            if (relevant
-                && targetRecLong != baseRecordNumber
-                && targetRecLong is > 0 and <= int.MaxValue)
+            if (relevant && targetRecLong != baseRecordNumber)
             {
+                if (targetRecLong is <= 0 or > int.MaxValue)
+                {
+                    state.IsIncomplete = true;
+                    return;
+                }
+
                 var targetRec = (int)targetRecLong;
                 fetched ??= [];
 
-                if (fetched.Add(targetRec) && fetchExtension(targetRec, out var extOutBuf))
+                if (fetched.Add(targetRec))
                 {
+                    if (!fetchExtension(targetRec, out var extOutBuf))
+                    {
+                        state.IsIncomplete = true;
+                        return;
+                    }
+
                     ParseExtensionOutput(extOutBuf, targetRec, targetSeq, baseRecordNumber, baseSequence, ref state);
                 }
             }
 
             pos += entryLen;
+        }
+
+        if (pos != attrListBytes.Length)
+        {
+            state.IsIncomplete = true;
         }
     }
 
@@ -645,8 +728,9 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
         ushort baseSequence,
         ref ParsedRecordState state)
     {
-        if (!TryExtractRecordSlice(outputBuffer, expectedExtRecord, out var ext))
+        if (!TryExtractRecordSlice(outputBuffer, expectedExtRecord, out var ext, out _))
         {
+            state.IsIncomplete = true;
             return;
         }
 
@@ -654,6 +738,7 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
 
         if ((flags & MftLayout.RecordInUse) == 0)
         {
+            state.IsIncomplete = true;
             return;
         }
 
@@ -661,6 +746,7 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
 
         if (!MftLayout.SameGeneration(extSeq, expectedExtSequence))
         {
+            state.IsIncomplete = true;
             return;
         }
 
@@ -668,6 +754,7 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
 
         if (extBaseRef == 0)
         {
+            state.IsIncomplete = true;
             return;
         }
 
@@ -676,6 +763,7 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
 
         if (extBaseRec != baseRecordNumber || !MftLayout.SameGeneration(baseSequence, extBaseSeq))
         {
+            state.IsIncomplete = true;
             return;
         }
 
@@ -683,6 +771,7 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
 
         if (attrOffset < MftLayout.UpdateSequenceMinOffset || attrOffset > ext.Length)
         {
+            state.IsIncomplete = true;
             return;
         }
 
@@ -757,6 +846,7 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
         {
             if (attr.Length < NonResidentHeaderBytes)
             {
+                state.IsIncomplete = true;
                 return;
             }
 
@@ -771,6 +861,7 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
         {
             if (attr.Length < ResidentHeaderBytes)
             {
+                state.IsIncomplete = true;
                 return;
             }
 
@@ -779,6 +870,7 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
 
             if (valOff > (uint)attr.Length || valLen > (uint)attr.Length - valOff)
             {
+                state.IsIncomplete = true;
                 return;
             }
 
@@ -787,6 +879,7 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
 
         if (size < 0)
         {
+            state.IsIncomplete = true;
             return;
         }
 
@@ -909,6 +1002,7 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
         public long FallbackCreationFileTime;
         public long FallbackLastAccessFileTime;
         public bool HasFileNameTimes;
+        public bool IsIncomplete;
 
         private bool _hasPrimary;
         private MftUsnNameEntry _primary;
@@ -963,7 +1057,7 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
         {
             if (!_hasPrimary && !_hasDosFallback)
             {
-                return default;
+                return IsIncomplete ? new MftUsnRecord { IsIncomplete = true } : default;
             }
 
             var chosen = _hasPrimary ? _primary : _dosFallback;
@@ -988,6 +1082,7 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
                 CreationFileTime = creation,
                 LastAccessFileTime = lastAccess,
                 TotalNameCount = totalNameCount,
+                IsIncomplete = IsIncomplete,
             };
         }
 

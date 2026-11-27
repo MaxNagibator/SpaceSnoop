@@ -895,6 +895,227 @@ public class MftUsnIndexTests
         }
     }
 
+    [Test]
+    public void TryRefresh_SubfolderScanFromUsnCache_RehomesAlternativeHardlinksInsideSubfolder()
+    {
+        var image = new MftVolumeBuilder()
+            .Record(MftLayout.RootRecord, new MftRecordBuilder().AsDirectory().FileName(MftLayout.RootRecord, 1, "."))
+            .Record(20, new MftRecordBuilder().AsDirectory().FileName(MftLayout.RootRecord, 1, "Other"))
+            .Record(21, new MftRecordBuilder().AsDirectory().FileName(MftLayout.RootRecord, 1, "Sub"))
+            .Record(22, new MftRecordBuilder().AsDirectory().FileName(21, 1, "Nested"))
+            .Record(
+                30,
+                new MftRecordBuilder()
+                    .FileName(20, 1, "primary.bin")
+                    .FileName(22, 1, "rehomed.bin")
+                    .NonResidentData(4096))
+            .Build(64);
+
+        var source = new FakeUsnSource(journalId: 100UL, serial: 1u, firstUsn: 0, nextUsn: 100);
+        var scanner = CreateScanner(source);
+
+        var cold = scanner.Calculate(new MftMemoryVolume(image), new DirectoryInfo(@"T:\"), 'T', 2, 4096, null);
+        Assert.That(cold.UsedUsn, Is.False);
+        Assert.That(scanner.HasUsnCacheFor(@"T:\"), Is.True);
+
+        var subCached = scanner.Calculate(new MftMemoryVolume(image), new DirectoryInfo(@"T:\Sub"), 'T', 2, 4096, null);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(subCached.UsedUsn, Is.True);
+            Assert.That(subCached.Root.AbsolutePath, Is.EqualTo(@"T:\Sub"));
+            Assert.That(subCached.Root.TotalSize, Is.EqualTo(4096));
+            Assert.That(subCached.Root.TotalFileCount, Is.EqualTo(1));
+            Assert.That(subCached.Root.TotalDirectoryCount, Is.EqualTo(1));
+            Assert.That(subCached.Root.SubDirectories.Single().Files.Single().Name, Is.EqualTo("rehomed.bin"));
+            Assert.That(subCached.ExtraNames, Is.EqualTo(1));
+            Assert.That(subCached.ExtraNameBytes, Is.EqualTo(4096));
+            Assert.That(cold.Root.SubDirectories.Single(static x => x.Name == "Other").Files.Single().Name, Is.EqualTo("primary.bin"));
+        }
+
+        source.SetRecord(
+            31,
+            new MftUsnRecord
+            {
+                Exists = true,
+                Sequence = 1,
+                PrimaryParent = 20,
+                PrimaryParentSequence = 1,
+                PrimaryName = "other2.bin",
+                Alternates = [new MftUsnNameEntry(21, 1, "sub2.bin", 1)],
+                Size = 1024,
+                SizeKnown = true,
+                TotalNameCount = 2,
+            });
+        source.QueueEvent(MakeFrn(31, 1), FileCreateReason | HardlinkChangeReason | CloseReason);
+        source.AdvanceUsn(200);
+
+        var subAfterAdd = scanner.Calculate(new MftMemoryVolume(image), new DirectoryInfo(@"T:\Sub"), 'T', 2, 4096, null);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(subAfterAdd.UsedUsn, Is.True);
+            Assert.That(subAfterAdd.Root.TotalSize, Is.EqualTo(5120));
+            Assert.That(subAfterAdd.Root.TotalFileCount, Is.EqualTo(2));
+            Assert.That(subAfterAdd.Root.Files.Single().Name, Is.EqualTo("sub2.bin"));
+            Assert.That(subAfterAdd.ExtraNames, Is.EqualTo(2));
+            Assert.That(subAfterAdd.ExtraNameBytes, Is.EqualTo(5120));
+        }
+
+        source.SetRecord(
+            31,
+            new MftUsnRecord
+            {
+                Exists = true,
+                Sequence = 1,
+                PrimaryParent = 20,
+                PrimaryParentSequence = 1,
+                PrimaryName = "other2.bin",
+                Size = 1024,
+                SizeKnown = true,
+                TotalNameCount = 1,
+            });
+        source.QueueEvent(MakeFrn(31, 1), HardlinkChangeReason | CloseReason);
+        source.AdvanceUsn(300);
+
+        var subAfterUnlink = scanner.Calculate(new MftMemoryVolume(image), new DirectoryInfo(@"T:\Sub"), 'T', 2, 4096, null);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(subAfterUnlink.UsedUsn, Is.True);
+            Assert.That(subAfterUnlink.Root.TotalSize, Is.EqualTo(4096));
+            Assert.That(subAfterUnlink.Root.TotalFileCount, Is.EqualTo(1));
+            Assert.That(subAfterUnlink.Root.Files, Is.Empty);
+            Assert.That(subAfterUnlink.ExtraNames, Is.EqualTo(1));
+            Assert.That(subAfterUnlink.ExtraNameBytes, Is.EqualTo(4096));
+        }
+    }
+
+    [TestCase("damaged")]
+    [TestCase("partial")]
+    [TestCase("nameless")]
+    [TestCase("detached")]
+    [TestCase("unknownSize")]
+    public void TryRefresh_IncompleteMftScan_IsNotCachedInUsnCache(string mode)
+    {
+        var builder = new MftVolumeBuilder()
+            .Record(MftLayout.RootRecord, new MftRecordBuilder().AsDirectory().FileName(MftLayout.RootRecord, 1, "."))
+            .Record(20, new MftRecordBuilder().FileName(MftLayout.RootRecord, 1, "good.bin").ResidentData(100));
+
+        switch (mode)
+        {
+            case "damaged":
+                builder.Record(21, new MftRecordBuilder().WithoutSignature().FileName(MftLayout.RootRecord, 1, "bad.bin"));
+                break;
+            case "partial":
+                builder.Record(21, new MftRecordBuilder().FileName(MftLayout.RootRecord, 1, "part.bin").BrokenAttribute());
+                break;
+            case "nameless":
+                builder.Record(21, new MftRecordBuilder().ResidentData(50));
+                break;
+            case "detached":
+                builder.Record(21, new MftRecordBuilder().FileName(45, 1, "orphan.bin").ResidentData(50));
+                break;
+            case "unknownSize":
+                builder.Record(21, new MftRecordBuilder().FileName(MftLayout.RootRecord, 1, "nosize.bin"));
+                break;
+        }
+
+        var image = builder.Build(64);
+        var source = new FakeUsnSource(journalId: 100UL, serial: 1u, firstUsn: 0, nextUsn: 100);
+        var scanner = CreateScanner(source);
+
+        var first = scanner.Calculate(new MftMemoryVolume(image), new DirectoryInfo(@"T:\"), 'T', 2, 4096, null);
+        var second = scanner.Calculate(new MftMemoryVolume(image), new DirectoryInfo(@"T:\"), 'T', 2, 4096, null);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first.IsComplete, Is.False);
+            Assert.That(first.UsedUsn, Is.False);
+            Assert.That(scanner.HasUsnCacheFor(@"T:\"), Is.False);
+            Assert.That(second.UsedUsn, Is.False);
+            Assert.That(second.IsComplete, Is.False);
+        }
+    }
+
+    [Test]
+    public void TryRefresh_NonV2DeltaAndIncompleteDeltaRecords_RejectWithoutMutatingTreeOrCursor()
+    {
+        var image = new MftVolumeBuilder()
+            .Record(MftLayout.RootRecord, new MftRecordBuilder().AsDirectory().FileName(MftLayout.RootRecord, 1, "."))
+            .Record(20, new MftRecordBuilder().AsDirectory().FileName(MftLayout.RootRecord, 1, "Data"))
+            .Record(21, new MftRecordBuilder().FileName(20, 1, "keep.bin").NonResidentData(8192))
+            .Build(64);
+
+        var table = MftReader.Read(new MftMemoryVolume(image), 'T', 1, 4096, null, CancellationToken.None);
+        var links = MftLinks.Build(table, CancellationToken.None);
+        var reachable = new ulong[(table.Entries.Length + 63) >> 6];
+        MftLinks.SetReachable(reachable, MftLayout.RootRecord);
+        var capture = new MftUsnMaterializeCapture(table.Entries.Length);
+        var root = MftScanner.Materialize(table, links, MftLayout.RootRecord, new DirectoryInfo(@"T:\"), new MftSubtreeTotals(), reachable, null, CancellationToken.None, capture);
+
+        var source = new FakeUsnSource(journalId: 100UL, serial: 1u, firstUsn: 0, nextUsn: 100);
+        var index = new MftUsnVolumeIndex(root.Store!, new MftUsnJournalInfo(100UL, 0, 100, 0, 1u), table, capture);
+
+        source.ReadError = (MftUsnErrorKind.NotSupported, 0);
+        source.AdvanceUsn(200);
+        var nonV2Ok = index.TryRefresh(source, out var nonV2Summary, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(nonV2Ok, Is.False);
+            Assert.That(nonV2Summary.ErrorKind, Is.EqualTo(MftUsnErrorKind.NotSupported));
+            Assert.That(index.CursorUsn, Is.EqualTo(100));
+            Assert.That(root.TotalSize, Is.EqualTo(8192));
+            Assert.That(root.TotalFileCount, Is.EqualTo(1));
+        }
+
+        var nonResidentAttrListRaw = new MftRecordBuilder()
+            .WithSequence(1)
+            .AttributeListRuns(64, [0x11, 0x01, 0x05, 0x00])
+            .FileName(20, 1, "keep.bin")
+            .Build();
+        MftLayout.ApplyFixup(nonResidentAttrListRaw, 512);
+        var wrapped = new byte[12 + nonResidentAttrListRaw.Length];
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(wrapped, MakeFrn(21, 1));
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(wrapped.AsSpan(8), nonResidentAttrListRaw.Length);
+        nonResidentAttrListRaw.CopyTo(wrapped.AsSpan(12));
+        var parsedNonResident = MftUsnNativeSource.ParseFileRecordBuffer(wrapped, 21);
+
+        source.SetRecord(21, parsedNonResident);
+        source.QueueEvent(MakeFrn(21, 1), HardlinkChangeReason | CloseReason);
+        source.AdvanceUsn(300);
+
+        var incompleteOk = index.TryRefresh(source, out var incompleteSummary, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(incompleteOk, Is.False);
+            Assert.That(incompleteSummary.ErrorKind, Is.EqualTo(MftUsnErrorKind.IoError));
+            Assert.That(index.CursorUsn, Is.EqualTo(100));
+            Assert.That(root.TotalSize, Is.EqualTo(8192));
+            Assert.That(root.TotalFileCount, Is.EqualTo(1));
+            Assert.That(root.SubDirectories.Single().Files.Single().Name, Is.EqualTo("keep.bin"));
+        }
+
+        var scanner = CreateScanner(source);
+        _ = scanner.Calculate(new MftMemoryVolume(image), new DirectoryInfo(@"T:\"), 'T', 2, 4096, null);
+        Assert.That(scanner.HasUsnCacheFor(@"T:\"), Is.True);
+
+        source.SetRecord(21, parsedNonResident);
+        source.QueueEvent(MakeFrn(21, 1), HardlinkChangeReason | CloseReason);
+        source.AdvanceUsn(400);
+
+        var fallback = scanner.Calculate(new MftMemoryVolume(image), new DirectoryInfo(@"T:\"), 'T', 2, 4096, null);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(fallback.UsedUsn, Is.False);
+            Assert.That(fallback.Root.TotalSize, Is.EqualTo(8192));
+            Assert.That(fallback.Root.TotalFileCount, Is.EqualTo(1));
+        }
+    }
+
     private static MftScanner CreateScanner(FakeUsnSource source, int maxDeltaRecords = MftUsnVolumeIndex.DefaultMaxDeltaRecords)
     {
         return new(

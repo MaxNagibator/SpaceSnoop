@@ -983,7 +983,7 @@ public sealed class MftScanner
                 actualMode,
                 fallbackReason);
 
-            if (captureUsn)
+            if (captureUsn && result.IsComplete)
             {
                 var usnIndex = new MftUsnVolumeIndex(root.Store!, journalBefore!.Value, table, usnCapture!, _maxUsnDeltaRecords);
 
@@ -1003,6 +1003,10 @@ public sealed class MftScanner
                         catchupSummary.FailureReason ?? catchupSummary.ErrorKind.ToString(),
                         catchupSummary.Win32Error);
                 }
+            }
+            else if (start == MftLayout.RootRecord && !result.IsComplete)
+            {
+                InvalidateUsnCache(directory.FullName);
             }
 
             _log.MftScanCompleted(directory.FullName, table.Entries.Length, result.ExtraNames, result.ExtraNameBytes, result.Report);
@@ -1081,13 +1085,13 @@ public sealed class MftScanner
                 return false;
             }
 
-            var root = session.Index.Store.GetOrCreateDirectoryFacade(dirIndex);
+            var root = session.Index.ResolveSubtreeRoot(dirIndex, directory, out var extraNames, out var extraNameBytes);
             root.FixAbsolutePath(directory);
 
             if (progress is not null)
             {
                 progress.NotifyVolumeReady();
-                var subCount = session.Index.Store.GetDirectoryRef(dirIndex).SubDirCount;
+                var subCount = root.Store!.GetDirectoryRef(root.DirIndex).SubDirCount;
                 progress.SetTopLevelTotal(subCount);
                 progress.AddBatch(root.TotalDirectoryCount + 1, root.TotalFileCount, root.TotalSize, directory.FullName);
 
@@ -1104,8 +1108,8 @@ public sealed class MftScanner
             result = session.BaseResult with
             {
                 Root = root,
-                ExtraNames = session.Index.ExtraNames,
-                ExtraNameBytes = session.Index.ExtraNameBytes,
+                ExtraNames = extraNames,
+                ExtraNameBytes = extraNameBytes,
                 ReadMode = session.BaseResult.ReadMode,
                 FallbackReason = null,
                 UsedUsn = true,

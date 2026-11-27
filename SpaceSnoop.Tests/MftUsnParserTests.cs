@@ -191,24 +191,59 @@ public class MftUsnParserTests
     }
 
     [Test]
-    public void Non_resident_attribute_list_leaves_size_unknown_safely()
+    public void Non_resident_attribute_list_marks_record_incomplete()
     {
-        var raw = new MftRecordBuilder()
+        var withNameRaw = new MftRecordBuilder()
             .WithSequence(2)
             .AttributeListRuns(64, [0x11, 0x01, 0x05, 0x00])
             .FileName(Parent, 1, "biglist.bin")
             .Build();
-        var output = WrapFileRecordOutput(raw, returnedRecordNumber: 120, sequence: 2);
+        var withNameOut = WrapFileRecordOutput(withNameRaw, returnedRecordNumber: 120, sequence: 2);
 
-        var parsed = MftUsnNativeSource.ParseFileRecordBuffer(output, 120);
+        var namelessRaw = new MftRecordBuilder()
+            .WithSequence(2)
+            .AttributeListRuns(64, [0x11, 0x01, 0x05, 0x00])
+            .Build();
+        var namelessOut = WrapFileRecordOutput(namelessRaw, returnedRecordNumber: 121, sequence: 2);
+
+        var parsedWithName = MftUsnNativeSource.ParseFileRecordBuffer(withNameOut, 120);
+        var parsedNameless = MftUsnNativeSource.ParseFileRecordBuffer(namelessOut, 121);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(parsed.Exists, Is.True);
-            Assert.That(parsed.PrimaryName, Is.EqualTo("biglist.bin"));
-            Assert.That(parsed.SizeKnown, Is.False);
-            Assert.That(parsed.Size, Is.Zero);
+            Assert.That(parsedWithName.IsIncomplete, Is.True);
+            Assert.That(parsedWithName.Exists, Is.True);
+            Assert.That(parsedWithName.PrimaryName, Is.EqualTo("biglist.bin"));
+            Assert.That(parsedWithName.SizeKnown, Is.False);
+            Assert.That(parsedWithName.Size, Is.Zero);
+
+            Assert.That(parsedNameless.IsIncomplete, Is.True);
+            Assert.That(parsedNameless.Exists, Is.False);
         }
+    }
+
+    [Test]
+    public void Resident_attribute_list_with_missing_extension_marks_record_incomplete()
+    {
+        const int baseRec = 125;
+        const ushort baseSeq = 3;
+        var baseRaw = new MftRecordBuilder()
+            .WithSequence(baseSeq)
+            .AttributeList(new MftListEntry(MftLayout.AttributeData, 0, 126))
+            .FileName(Parent, 1, "missing_ext.bin")
+            .Build();
+        var baseOut = WrapFileRecordOutput(baseRaw, baseRec, baseSeq);
+
+        var parsed = MftUsnNativeSource.ParseFileRecordBuffer(
+            baseOut,
+            baseRec,
+            (int _, out ReadOnlySpan<byte> buf) =>
+            {
+                buf = default;
+                return false;
+            });
+
+        Assert.That(parsed.IsIncomplete, Is.True);
     }
 
     [Test]
@@ -343,14 +378,12 @@ public class MftUsnParserTests
         }
 
         const int rec1Len = 64;
-        const int rec2Len = 72;
-        const int rec3Len = 64;
-        var validBuffer = new byte[8 + rec1Len + rec2Len + rec3Len];
+        const int rec2Len = 64;
+        var validBuffer = new byte[8 + rec1Len + rec2Len];
         BinaryPrimitives.WriteInt64LittleEndian(validBuffer, 9000L);
 
         WriteUsnRecord(validBuffer.AsSpan(8, rec1Len), rec1Len, majorVersion: 2, frn: 0x0002_0000_0000_0050UL, reason: 0x00000100u);
-        WriteUsnRecord(validBuffer.AsSpan(8 + rec1Len, rec2Len), rec2Len, majorVersion: 3, frn: 0x0001_0000_0000_0051UL, reason: 0x00000200u);
-        WriteUsnRecord(validBuffer.AsSpan(8 + rec1Len + rec2Len, rec3Len), rec3Len, majorVersion: 2, frn: 0x0003_0000_0000_0052UL, reason: 0x80000002u);
+        WriteUsnRecord(validBuffer.AsSpan(8 + rec1Len, rec2Len), rec2Len, majorVersion: 2, frn: 0x0003_0000_0000_0052UL, reason: 0x80000002u);
 
         var ok = MftUsnNativeSource.ParseUsnJournalBuffer(validBuffer, events, out var nextUsn);
 
@@ -359,16 +392,16 @@ public class MftUsnParserTests
         validBuffer.CopyTo(truncatedBuffer.AsSpan());
         WriteUsnRecord(truncatedBuffer.AsSpan(validBuffer.Length, truncatedTailLen), declaredLen: 128, majorVersion: 2, frn: 0x0004_0000_0000_0053UL, reason: 0x1u);
         var truncatedEvents = new List<MftUsnEvent>();
-        var truncatedOk = MftUsnNativeSource.ParseUsnJournalBuffer(truncatedBuffer, truncatedEvents, out _);
+        var truncatedOk = MftUsnNativeSource.ParseUsnJournalBuffer(truncatedBuffer, truncatedEvents, out var truncatedNext);
 
         var trailingGarbageBuffer = new byte[validBuffer.Length + 12];
         validBuffer.CopyTo(trailingGarbageBuffer.AsSpan());
-        var trailingOk = MftUsnNativeSource.ParseUsnJournalBuffer(trailingGarbageBuffer, new List<MftUsnEvent>(), out _);
+        var trailingOk = MftUsnNativeSource.ParseUsnJournalBuffer(trailingGarbageBuffer, new List<MftUsnEvent>(), out var trailingNext);
 
         var tinyRecLenBuffer = new byte[8 + 64];
         BinaryPrimitives.WriteInt64LittleEndian(tinyRecLenBuffer, 9001L);
         WriteUsnRecord(tinyRecLenBuffer.AsSpan(8, 64), declaredLen: 32, majorVersion: 2, frn: 0x0005_0000_0000_0054UL, reason: 0x1u);
-        var tinyRecLenOk = MftUsnNativeSource.ParseUsnJournalBuffer(tinyRecLenBuffer, new List<MftUsnEvent>(), out _);
+        var tinyRecLenOk = MftUsnNativeSource.ParseUsnJournalBuffer(tinyRecLenBuffer, new List<MftUsnEvent>(), out var tinyNext);
 
         using (Assert.EnterMultipleScope())
         {
@@ -378,8 +411,41 @@ public class MftUsnParserTests
             Assert.That(events[0], Is.EqualTo(new MftUsnEvent(0x0002_0000_0000_0050UL, 0x00000100u)));
             Assert.That(events[1], Is.EqualTo(new MftUsnEvent(0x0003_0000_0000_0052UL, 0x80000002u)));
             Assert.That(truncatedOk, Is.False);
+            Assert.That(truncatedNext, Is.Zero);
+            Assert.That(truncatedEvents, Is.Empty);
             Assert.That(trailingOk, Is.False);
+            Assert.That(trailingNext, Is.Zero);
             Assert.That(tinyRecLenOk, Is.False);
+            Assert.That(tinyNext, Is.Zero);
+        }
+    }
+
+    [TestCase((ushort)1)]
+    [TestCase((ushort)3)]
+    [TestCase((ushort)4)]
+    public void Usn_buffer_rejects_non_v2_records_without_advancing_cursor_or_emitting_events(ushort majorVersion)
+    {
+        const int rec1Len = 64;
+        const int rec2Len = 80;
+        const int rec3Len = 64;
+        var buffer = new byte[8 + rec1Len + rec2Len + rec3Len];
+        BinaryPrimitives.WriteInt64LittleEndian(buffer, 9500L);
+
+        WriteUsnRecord(buffer.AsSpan(8, rec1Len), rec1Len, majorVersion: 2, frn: 0x0002_0000_0000_0050UL, reason: 0x00000100u);
+        WriteUsnRecord(buffer.AsSpan(8 + rec1Len, rec2Len), rec2Len, majorVersion, frn: 0x0001_0000_0000_0051UL, reason: 0x00000200u);
+        WriteUsnRecord(buffer.AsSpan(8 + rec1Len + rec2Len, rec3Len), rec3Len, majorVersion: 2, frn: 0x0003_0000_0000_0052UL, reason: 0x80000002u);
+
+        var existingEvent = new MftUsnEvent(0x0001_0000_0000_0010UL, 0x1u);
+        var events = new List<MftUsnEvent> { existingEvent };
+
+        var ok = MftUsnNativeSource.ParseUsnJournalBuffer(buffer, events, out var nextUsn, out var error);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(ok, Is.False);
+            Assert.That(error, Is.EqualTo(MftUsnErrorKind.NotSupported));
+            Assert.That(nextUsn, Is.Zero);
+            Assert.That(events, Is.EqualTo(new[] { existingEvent }));
         }
     }
 
