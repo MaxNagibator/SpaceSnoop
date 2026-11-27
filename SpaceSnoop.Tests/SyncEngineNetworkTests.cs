@@ -362,6 +362,174 @@ public class SyncEngineNetworkTests
         }
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void Безвозвратное_удаление_снимает_ReadOnly_через_дескриптор_только_если_файл_не_изменился(bool tamperAfterCompare)
+    {
+        var file = Path.Combine(_rightDir, "ro.txt");
+        File.WriteAllText(file, "same");
+        var originalTime = File.GetLastWriteTime(file);
+        File.SetAttributes(file, FileAttributes.ReadOnly);
+
+        var comparer = new DirectoryComparer(new(string.Empty), NullLogger<DirectoryComparer>.Instance);
+        var comparison = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
+        comparison.ApplyMode(SyncMode.LeftToRight, mirror: true);
+
+        if (tamperAfterCompare)
+        {
+            File.SetAttributes(file, FileAttributes.Normal);
+            File.WriteAllText(file, "changed-length");
+            File.SetLastWriteTime(file, originalTime);
+            File.SetAttributes(file, FileAttributes.ReadOnly);
+        }
+
+        var engine = new SyncEngine(
+            NullLogger<SyncEngine>.Instance,
+            showDeleteUi: false,
+            recycleOverwritten: false,
+            allowPermanentNetworkDelete: true,
+            supportsRecycleBin: static _ => false);
+
+        try
+        {
+            var report = engine.Execute(comparison, CancellationToken.None);
+
+            using (Assert.EnterMultipleScope())
+            {
+                if (tamperAfterCompare)
+                {
+                    Assert.That(report.Errors, Has.Count.EqualTo(1));
+                    Assert.That(report.DeletedCount, Is.Zero);
+                    Assert.That(File.Exists(file), Is.True);
+                    Assert.That(File.GetAttributes(file) & FileAttributes.ReadOnly, Is.EqualTo(FileAttributes.ReadOnly));
+                }
+                else
+                {
+                    Assert.That(report.Errors, Is.Empty);
+                    Assert.That(report.DeletedCount, Is.EqualTo(1));
+                    Assert.That(File.Exists(file), Is.False);
+                }
+            }
+        }
+        finally
+        {
+            if (File.Exists(file))
+            {
+                File.SetAttributes(file, FileAttributes.Normal);
+            }
+        }
+    }
+
+    [Test]
+    public void Безвозвратное_удаление_отказывает_для_занятого_файла_из_за_эксклюзивного_дескриптора()
+    {
+        var file = Path.Combine(_rightDir, "locked.txt");
+        File.WriteAllText(file, "busy");
+        var comparer = new DirectoryComparer(new(string.Empty), NullLogger<DirectoryComparer>.Instance);
+        var comparison = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
+        comparison.ApplyMode(SyncMode.LeftToRight, mirror: true);
+
+        var engine = new SyncEngine(
+            NullLogger<SyncEngine>.Instance,
+            showDeleteUi: false,
+            recycleOverwritten: false,
+            allowPermanentNetworkDelete: true,
+            supportsRecycleBin: static _ => false);
+
+        SyncReport report;
+        using (new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            report = engine.Execute(comparison, CancellationToken.None);
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.Errors, Has.Count.EqualTo(1));
+            Assert.That(report.DeletedCount, Is.Zero);
+            Assert.That(File.Exists(file), Is.True);
+        }
+    }
+
+    [Test]
+    public void Отмена_при_безвозвратном_удалении_поддерева_останавливается_между_файлами_и_сохраняет_частичный_отчёт()
+    {
+        var doomedDir = Directory.CreateDirectory(Path.Combine(_rightDir, "extra")).FullName;
+        var files = new[]
+        {
+            Path.Combine(doomedDir, "01.txt"),
+            Path.Combine(doomedDir, "02.txt"),
+            Path.Combine(doomedDir, "03.txt"),
+        };
+
+        foreach (var file in files)
+        {
+            File.WriteAllText(file, "payload");
+        }
+
+        var comparer = new DirectoryComparer(new(string.Empty), NullLogger<DirectoryComparer>.Instance);
+        var comparison = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
+        comparison.ApplyMode(SyncMode.LeftToRight, mirror: true);
+
+        var engine = new SyncEngine(
+            NullLogger<SyncEngine>.Instance,
+            showDeleteUi: false,
+            recycleOverwritten: false,
+            allowPermanentNetworkDelete: true,
+            supportsRecycleBin: static _ => false);
+
+        var report = new SyncReport();
+        using var cts = new CancellationTokenSource();
+        var progress = new InlineProgress(_ => cts.Cancel());
+
+        Assert.Throws<OperationCanceledException>(() => engine.Execute(comparison, report, cts.Token, progress));
+
+        var remaining = Directory.GetFiles(doomedDir);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.Errors, Is.Empty);
+            Assert.That(report.DeletedCount, Is.EqualTo(1));
+            Assert.That(report.Applied, Has.Count.EqualTo(1));
+            Assert.That(report.DeletedBytes, Is.EqualTo(7));
+            Assert.That(remaining, Has.Length.EqualTo(2));
+            Assert.That(Directory.Exists(doomedDir), Is.True);
+        }
+    }
+
+    [Test]
+    public void Отмена_между_удалением_пустых_подкаталогов_останавливается_до_родителя()
+    {
+        var doomedDir = Directory.CreateDirectory(Path.Combine(_rightDir, "extra")).FullName;
+        var sub1 = Directory.CreateDirectory(Path.Combine(doomedDir, "sub1")).FullName;
+        var sub2 = Directory.CreateDirectory(Path.Combine(doomedDir, "sub2")).FullName;
+
+        var comparer = new DirectoryComparer(new(string.Empty), NullLogger<DirectoryComparer>.Instance);
+        var comparison = comparer.Compare(_leftDir, _rightDir, CancellationToken.None);
+        comparison.ApplyMode(SyncMode.LeftToRight, mirror: true);
+
+        var engine = new SyncEngine(
+            NullLogger<SyncEngine>.Instance,
+            showDeleteUi: false,
+            recycleOverwritten: false,
+            allowPermanentNetworkDelete: true,
+            supportsRecycleBin: static _ => false);
+
+        var report = new SyncReport();
+        using var cts = new CancellationTokenSource();
+        var progress = new InlineProgress(_ => cts.Cancel());
+
+        Assert.Throws<OperationCanceledException>(() => engine.Execute(comparison, report, cts.Token, progress));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.Errors, Is.Empty);
+            Assert.That(report.DeletedCount, Is.EqualTo(1));
+            Assert.That(report.Applied, Has.Count.EqualTo(1));
+            Assert.That(Directory.Exists(doomedDir), Is.True);
+            Assert.That(Directory.Exists(sub1) != Directory.Exists(sub2), Is.True);
+        }
+    }
+
     private void TryCreateJunction(string link, string target)
     {
         var start = new ProcessStartInfo("cmd.exe", $"/c mklink /J \"{link}\" \"{target}\"")

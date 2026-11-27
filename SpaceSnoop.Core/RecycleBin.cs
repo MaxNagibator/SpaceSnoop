@@ -51,7 +51,9 @@ public static class RecycleBin
     private const uint OpenExisting = 3;
     private const uint FlagBackupSemantics = 0x0200_0000;
     private const uint VolumeNameDos = 0;
+    private const uint SigdnFileSysPath = 0x80058000;
     private const int InitialBuffer = 512;
+    private const int ShortPathLimit = 259;
     private const string LongUncPrefix = @"\\?\UNC\";
     private const string LongPrefix = @"\\?\";
 
@@ -90,7 +92,7 @@ public static class RecycleBin
 
         try
         {
-            fullPath = Path.GetFullPath(path.Trim());
+            fullPath = ResolveExactFullPath(path);
         }
         catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException or SecurityException)
         {
@@ -102,7 +104,7 @@ public static class RecycleBin
             return false;
         }
 
-        var root = Path.GetPathRoot(fullPath);
+        var root = Path.GetPathRoot(StripLongPrefix(fullPath));
 
         if (!string.IsNullOrEmpty(root) && getDriveType(root) == DriveType.Network)
         {
@@ -121,7 +123,7 @@ public static class RecycleBin
             return false;
         }
 
-        var normalizedFinal = finalPath.StartsWith(LongPrefix, StringComparison.Ordinal) ? finalPath[LongPrefix.Length..] : finalPath;
+        var normalizedFinal = StripLongPrefix(finalPath);
         var finalRoot = Path.GetPathRoot(normalizedFinal);
 
         return string.IsNullOrEmpty(finalRoot) || getDriveType(finalRoot) != DriveType.Network;
@@ -148,12 +150,23 @@ public static class RecycleBin
                 throw new ArgumentException("Пустой путь в списке на удаление.", nameof(paths));
             }
 
-            if (!supportsRecycleBin(path))
+            string fullPath;
+
+            try
             {
-                throw new RecycleBinUnavailableException(path);
+                fullPath = ResolveExactFullPath(path);
+            }
+            catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException or SecurityException)
+            {
+                throw new RecycleBinUnavailableException(path, RecycleBinUnavailableException.Describe(path), exception);
             }
 
-            fullPaths[i] = Path.GetFullPath(path.Trim());
+            if (!supportsRecycleBin(fullPath))
+            {
+                throw new RecycleBinUnavailableException(fullPath);
+            }
+
+            fullPaths[i] = fullPath;
         }
 
         recycleItems(fullPaths);
@@ -176,30 +189,34 @@ public static class RecycleBin
 
     internal static void DeleteFilePermanently(string path)
     {
-        if (!File.Exists(path))
+        var exact = ExtendedForWin32(path);
+
+        if (!File.Exists(exact))
         {
             return;
         }
 
-        var attributes = File.GetAttributes(path);
+        var attributes = File.GetAttributes(exact);
 
         if ((attributes & FileAttributes.ReparsePoint) == 0 && (attributes & FileAttributes.ReadOnly) != 0)
         {
-            File.SetAttributes(path, attributes & ~FileAttributes.ReadOnly);
+            File.SetAttributes(exact, attributes & ~FileAttributes.ReadOnly);
         }
 
-        File.Delete(path);
+        File.Delete(exact);
     }
 
     internal static void DeleteDirectoryPermanently(string path)
     {
-        if (!Directory.Exists(path))
+        var exact = ExtendedForWin32(path);
+
+        if (!Directory.Exists(exact))
         {
             return;
         }
 
         var stack = new Stack<(DirectoryInfo Directory, bool Expanded)>();
-        stack.Push((new(path), false));
+        stack.Push((new(exact), false));
 
         while (stack.Count > 0)
         {
@@ -226,23 +243,25 @@ public static class RecycleBin
 
             foreach (var file in current.EnumerateFiles())
             {
+                var filePath = ExtendedForWin32(file.FullName);
+
                 if ((file.Attributes & FileAttributes.ReparsePoint) == 0 && (file.Attributes & FileAttributes.ReadOnly) != 0)
                 {
-                    file.Attributes &= ~FileAttributes.ReadOnly;
+                    File.SetAttributes(filePath, file.Attributes & ~FileAttributes.ReadOnly);
                 }
 
-                File.Delete(file.FullName);
+                File.Delete(filePath);
             }
 
             foreach (var sub in current.EnumerateDirectories())
             {
                 if (IsReparseLink(sub))
                 {
-                    Directory.Delete(sub.FullName, false);
+                    Directory.Delete(ExtendedForWin32(sub.FullName), false);
                     continue;
                 }
 
-                stack.Push((sub, false));
+                stack.Push((new(ExtendedForWin32(sub.FullName)), false));
             }
         }
     }
@@ -285,13 +304,171 @@ public static class RecycleBin
         }
     }
 
+    private static string ResolveExactFullPath(string path)
+    {
+        if (path.IndexOf('\0') >= 0)
+        {
+            throw new ArgumentException("Путь содержит недопустимый символ.", nameof(path));
+        }
+
+        if (UncPath.IsUnc(path) || path.StartsWith(LongPrefix, StringComparison.Ordinal))
+        {
+            return path;
+        }
+
+        if (Path.IsPathFullyQualified(path) && !path.Contains('/') && !HasDotSegments(path))
+        {
+            return path;
+        }
+
+        if (!HasTrailingSpaceOrDotSegment(path))
+        {
+            return Path.GetFullPath(path);
+        }
+
+        return NormalizeSegmentsPreservingWhitespace(path);
+    }
+
+    private static string StripLongPrefix(string path)
+    {
+        return path.StartsWith(LongPrefix, StringComparison.Ordinal) ? path[LongPrefix.Length..] : path;
+    }
+
+    private static string ExtendedForWin32(string path)
+    {
+        if (path.StartsWith(LongPrefix, StringComparison.Ordinal) || !Path.IsPathFullyQualified(path))
+        {
+            return path;
+        }
+
+        if (path.Length <= ShortPathLimit && !HasTrailingSpaceOrDotSegment(path))
+        {
+            return path;
+        }
+
+        return path.StartsWith(@"\\", StringComparison.Ordinal)
+            ? LongUncPrefix + path[2..]
+            : LongPrefix + path;
+    }
+
+    private static bool HasDotSegments(string path)
+    {
+        var span = path.AsSpan();
+
+        while (span.Length > 0)
+        {
+            var sep = span.IndexOfAny('\\', '/');
+            var segment = sep >= 0 ? span[..sep] : span;
+
+            if (segment is "." or "..")
+            {
+                return true;
+            }
+
+            if (sep < 0)
+            {
+                break;
+            }
+
+            span = span[(sep + 1)..];
+        }
+
+        return false;
+    }
+
+    private static bool HasTrailingSpaceOrDotSegment(string path)
+    {
+        var span = path.AsSpan();
+
+        while (span.Length > 0)
+        {
+            var sep = span.IndexOfAny('\\', '/');
+            var segment = sep >= 0 ? span[..sep] : span;
+
+            if (segment.Length > 0 && segment is not "." and not ".." && (segment[^1] == ' ' || segment[^1] == '.'))
+            {
+                return true;
+            }
+
+            if (sep < 0)
+            {
+                break;
+            }
+
+            span = span[(sep + 1)..];
+        }
+
+        return false;
+    }
+
+    private static string NormalizeSegmentsPreservingWhitespace(string path)
+    {
+        string root;
+        string remainder;
+
+        if (Path.IsPathFullyQualified(path))
+        {
+            root = Path.GetPathRoot(path)!.Replace('/', '\\');
+            remainder = path[root.Length..];
+        }
+        else if (path.Length >= 2 && path[1] == ':' && char.IsAsciiLetter(path[0]))
+        {
+            var driveBase = Path.GetFullPath(string.Concat(path.AsSpan(0, 2), "."));
+            root = driveBase;
+            remainder = path[2..];
+        }
+        else
+        {
+            root = Environment.CurrentDirectory;
+            remainder = path;
+        }
+
+        var segments = new List<string>();
+        var baseRoot = Path.GetPathRoot(root)!;
+        var baseRemainder = root[baseRoot.Length..];
+
+        foreach (var part in baseRemainder.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            segments.Add(part);
+        }
+
+        foreach (var part in remainder.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (part == ".")
+            {
+                continue;
+            }
+
+            if (part == "..")
+            {
+                if (segments.Count > 0)
+                {
+                    segments.RemoveAt(segments.Count - 1);
+                }
+
+                continue;
+            }
+
+            segments.Add(part);
+        }
+
+        var trailingSeparator = path.EndsWith('\\') || path.EndsWith('/');
+        var joined = segments.Count == 0
+            ? baseRoot
+            : baseRoot.EndsWith('\\')
+                ? baseRoot + string.Join('\\', segments)
+                : baseRoot + "\\" + string.Join('\\', segments);
+
+        return trailingSeparator && !joined.EndsWith('\\') ? joined + "\\" : joined;
+    }
+
     private static string? ReadFinalPath(string fullPath)
     {
         var current = Path.TrimEndingDirectorySeparator(fullPath);
 
         while (!string.IsNullOrEmpty(current))
         {
-            using var handle = CreateFileW(current, FileReadAttributes, ShareAll, IntPtr.Zero, OpenExisting, FlagBackupSemantics, IntPtr.Zero);
+            using var handle = CreateFileW(ExtendedForWin32(current), FileReadAttributes, ShareAll, IntPtr.Zero, OpenExisting, FlagBackupSemantics, IntPtr.Zero);
 
             if (!handle.IsInvalid)
             {
@@ -363,8 +540,14 @@ public static class RecycleBin
 
             foreach (var path in paths)
             {
+                if (HasTrailingSpaceOrDotSegment(path))
+                {
+                    throw new IOException($"Путь «{path}» содержит пробел или точку в конце имени – удаление в корзину отменено.");
+                }
+
                 SHCreateItemFromParsingName(path, nint.Zero, ref itemId, out var item);
                 items.Add(item);
+                VerifyShellItemName(item, path);
                 operation.DeleteItem(item, nint.Zero);
             }
 
@@ -379,7 +562,7 @@ public static class RecycleBin
                 throw new IOException(failureMessage);
             }
 
-            if (paths.FirstOrDefault(static x => File.Exists(x) || Directory.Exists(x)) is { } remaining)
+            if (paths.FirstOrDefault(static x => File.Exists(ExtendedForWin32(x)) || Directory.Exists(ExtendedForWin32(x))) is { } remaining)
             {
                 throw new IOException($"Не удалось удалить в корзину «{remaining}».");
             }
@@ -392,6 +575,26 @@ public static class RecycleBin
             }
 
             Marshal.FinalReleaseComObject(operation);
+        }
+    }
+
+    private static void VerifyShellItemName(IShellItem item, string expectedPath)
+    {
+        item.GetDisplayName(SigdnFileSysPath, out var actualPath);
+        var expectedName = Path.GetFileName(Path.TrimEndingDirectorySeparator(expectedPath));
+        var actualName = Path.GetFileName(Path.TrimEndingDirectorySeparator(actualPath));
+
+        if (expectedName.Contains('~') || string.IsNullOrEmpty(expectedName))
+        {
+            return;
+        }
+
+        var parent = Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(actualPath));
+        var comparer = string.IsNullOrEmpty(parent) ? StringComparer.OrdinalIgnoreCase : PathCase.ComparerFor(parent);
+
+        if (!comparer.Equals(actualName, expectedName))
+        {
+            throw new IOException($"Оболочка Windows изменила путь «{expectedPath}» на «{actualPath}» – удаление в корзину отменено.");
         }
     }
 
@@ -434,6 +637,11 @@ public static class RecycleBin
     [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     private interface IShellItem
     {
+        void BindToHandler(nint pbc, ref Guid bhid, ref Guid riid, out nint ppv);
+        void GetParent(out IShellItem ppsi);
+        void GetDisplayName(uint sigdnName, [MarshalAs(UnmanagedType.LPWStr)] out string ppszName);
+        void GetAttributes(uint sfgaoMask, out uint psfgaoAttribs);
+        void Compare(IShellItem psi, uint hint, out int piOrder);
     }
 
     [ComImport]

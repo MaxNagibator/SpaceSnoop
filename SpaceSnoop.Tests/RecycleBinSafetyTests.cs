@@ -175,4 +175,108 @@ public class RecycleBinSafetyTests
 
         Assert.That(File.Exists(file), Is.True);
     }
+
+    [TestCase("report.txt", "report.txt\u00A0")]
+    [TestCase("report.txt", "report.txt ")]
+    [TestCase("report.txt", " report.txt")]
+    public void DeleteSilent_и_SupportsRecycleBin_не_обрезают_пробельные_символы_и_передают_одинаковый_путь(
+        string plainName,
+        string whitespaceName)
+    {
+        var whitespacePath = Path.Combine(_tempDir, whitespaceName);
+        var plainPath = Path.Combine(_tempDir, plainName);
+        string? checkedPath = null;
+        IReadOnlyList<string>? recycledPaths = null;
+
+        RecycleBin.DeleteSilent(
+            [whitespacePath],
+            x =>
+            {
+                checkedPath = x;
+                return true;
+            },
+            x => recycledPaths = x);
+
+        var finalProbedPaths = new List<string>();
+        var supported = RecycleBin.SupportsRecycleBin(
+            whitespacePath,
+            static _ => DriveType.Fixed,
+            x =>
+            {
+                finalProbedPaths.Add(x);
+                return x == plainPath ? @"\\?\UNC\nas\share\target.txt" : null;
+            });
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(checkedPath, Is.EqualTo(whitespacePath));
+            Assert.That(recycledPaths, Is.EqualTo(new[] { whitespacePath }));
+            Assert.That(finalProbedPaths, Is.EqualTo(new[] { whitespacePath }));
+            Assert.That(supported, Is.True);
+        }
+    }
+
+    [TestCase(" report.txt", " report.txt")]
+    [TestCase(@"sub\report.txt ", @"sub\report.txt ")]
+    [TestCase(@".\report.txt" + "\u00A0", "report.txt\u00A0")]
+    public void DeleteSilent_для_относительного_пути_сохраняет_пробелы_и_совпадает_с_SupportsRecycleBin(
+        string relativeInput,
+        string expectedRelative)
+    {
+        var expectedPath = Path.Combine(Environment.CurrentDirectory, expectedRelative);
+        string? checkedPath = null;
+        IReadOnlyList<string>? recycledPaths = null;
+
+        RecycleBin.DeleteSilent(
+            [relativeInput],
+            x =>
+            {
+                checkedPath = x;
+                return true;
+            },
+            x => recycledPaths = x);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(checkedPath, Is.EqualTo(expectedPath));
+            Assert.That(recycledPaths, Is.EqualTo(new[] { expectedPath }));
+        }
+    }
+
+    [Test]
+    public void DeleteSilent_удаляет_файл_с_неразрывным_пробелом_и_не_трогает_соседний_без_пробела()
+    {
+        var plainPath = Path.Combine(_tempDir, "report.txt");
+        var nbspPath = Path.Combine(_tempDir, "report.txt\u00A0");
+        File.WriteAllText(plainPath, "keep");
+        File.WriteAllText(nbspPath, "delete");
+
+        RecycleBin.DeleteSilent(nbspPath);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.Exists(plainPath), Is.True);
+            Assert.That(File.ReadAllText(plainPath), Is.EqualTo("keep"));
+            Assert.That(File.Exists(nbspPath), Is.False);
+        }
+    }
+
+    [Test]
+    public void DeleteSilent_с_хвостовым_ASCII_пробелом_не_перенаправляется_на_соседний_файл()
+    {
+        var plainPath = Path.Combine(_tempDir, "report.txt");
+        var trailingSpacePath = Path.Combine(_tempDir, "report.txt ");
+        var extendedTrailingSpacePath = @"\\?\" + trailingSpacePath;
+        File.WriteAllText(plainPath, "keep");
+        File.WriteAllText(extendedTrailingSpacePath, "space");
+
+        Assert.Throws<IOException>(() => RecycleBin.DeleteSilent(trailingSpacePath));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.Exists(plainPath), Is.True);
+            Assert.That(File.ReadAllText(plainPath), Is.EqualTo("keep"));
+            Assert.That(File.Exists(extendedTrailingSpacePath), Is.True);
+        }
+    }
 }
