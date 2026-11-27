@@ -132,6 +132,34 @@
             <Setter Property="Foreground"
                     Value="{DynamicResource State.ErrorText}" />
         </Style>
+
+        <Style x:Key="RowModeBadge"
+               TargetType="Border"
+               BasedOn="{StaticResource Badge}">
+            <Setter Property="Margin"
+                    Value="10,0,0,0" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Setter Property="Background"
+                    Value="{DynamicResource Bg.SurfaceMute}" />
+            <Setter Property="BorderBrush"
+                    Value="{DynamicResource Border.Subtle}" />
+            <Setter Property="TextElement.Foreground"
+                    Value="{DynamicResource Fg.Secondary}" />
+            <Setter Property="TextElement.FontSize"
+                    Value="{DynamicResource Font.Size.Caption}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsPermanent}"
+                             Value="True">
+                    <Setter Property="Background"
+                            Value="{DynamicResource State.ErrorSoft}" />
+                    <Setter Property="BorderBrush"
+                            Value="{DynamicResource State.Error}" />
+                    <Setter Property="TextElement.Foreground"
+                            Value="{DynamicResource State.ErrorText}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
 
     <Grid Margin="22">
@@ -189,7 +217,7 @@
                                           Margin="0,1,9,0"
                                           Foreground="{DynamicResource State.ErrorText}" />
                 <TextBlock Grid.Column="1"
-                           Text="На сетевом хранилище нет корзины Windows – удаление необратимо"
+                           Text="{Binding NetworkWarningText}"
                            TextWrapping="Wrap"
                            FontSize="{DynamicResource Font.Size.S}"
                            Foreground="{DynamicResource State.ErrorText}" />
@@ -241,6 +269,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
                             <iconPacks:PackIconLucide Grid.Column="0"
@@ -276,7 +305,14 @@
                                            Visibility="{Binding ErrorSummary, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed, TargetNullValue=Collapsed}" />
                             </Grid>
 
-                            <Grid Grid.Column="2"
+                            <Border Grid.Column="2"
+                                    Style="{StaticResource RowModeBadge}"
+                                    ToolTip="{Binding ModeToolTip}"
+                                    Visibility="{Binding DataContext.IsMixed, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                                <TextBlock Text="{Binding ModeBadgeText}" />
+                            </Border>
+
+                            <Grid Grid.Column="3"
                                   Margin="14,0,2,0"
                                   VerticalAlignment="Center">
                                 <TextBlock
@@ -289,7 +325,7 @@
                                            Foreground="{DynamicResource Fg.Muted}" />
                             </Grid>
 
-                            <Button Grid.Column="3"
+                            <Button Grid.Column="4"
                                     Style="{StaticResource Button.Icon}"
                                     Command="{Binding DataContext.ExcludeCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                     CommandParameter="{Binding}"

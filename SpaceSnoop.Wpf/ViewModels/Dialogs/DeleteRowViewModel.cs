@@ -1,6 +1,9 @@
 ﻿namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
 
-public sealed partial class DeleteRowViewModel(SpaceBase space) : ObservableObject
+public sealed partial class DeleteRowViewModel(
+    SpaceBase space,
+    bool isPermanent = false,
+    bool isWithoutRecycleBin = false) : ObservableObject
 {
     private const int ErrorSummaryLimit = 100;
 
@@ -20,9 +23,21 @@ public sealed partial class DeleteRowViewModel(SpaceBase space) : ObservableObje
 
     public string ParentPath { get; } = System.IO.Path.GetDirectoryName(space.AbsolutePath) ?? string.Empty;
 
+    public long SizeBytes { get; } = space.TotalSize;
+
     public string SizeText { get; } = SizeFormatter.Format(space.TotalSize);
 
     public bool IsDirectory { get; } = space is DirectorySpace;
+
+    public bool IsPermanent { get; } = isPermanent;
+
+    public bool IsWithoutRecycleBin { get; } = isWithoutRecycleBin;
+
+    public string ModeBadgeText => IsPermanent ? "Безвозвратно" : "В корзину";
+
+    public string ModeToolTip => IsPermanent
+        ? "На сетевом хранилище нет корзины Windows – объект будет удалён безвозвратно"
+        : "Объект будет перемещён в корзину";
 
     public string? ErrorSummary => Shorten(Error);
 

@@ -85,7 +85,12 @@ internal sealed class DeleteOperationDiagnostics
 
     public DeleteBatchCallbacks BuildCallbacks()
     {
-        return _permanent
+        return BuildCallbacks(_permanent);
+    }
+
+    public DeleteBatchCallbacks BuildCallbacks(bool permanent)
+    {
+        return permanent
             ? new(TimedPathExists, TimedDeletePermanentChunk, TimedDeletePermanent)
             : new(TimedPathExists, TimedRecycleChunk, TimedRecycleSingle);
     }

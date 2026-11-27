@@ -57,13 +57,10 @@ public sealed partial class DeleteProgressDialogViewModel
         }
 
         Items.RemoveAt(index);
-        _totalBytes = Math.Max(0, _totalBytes - target.Space.TotalSize);
         CountText = $"0 / {Items.Count}";
         SelectedItem = Items.Count > 0 ? Items[Math.Min(index, Items.Count - 1)] : null;
-        RefreshNetworkMode();
+        RefreshModeAfterExclude(target);
 
-        OnPropertyChanged(nameof(IntroText));
-        OnPropertyChanged(nameof(CancelHint));
         StartCommand.NotifyCanExecuteChanged();
         ExcludeCommand.NotifyCanExecuteChanged();
         SelectPreviousCommand.NotifyCanExecuteChanged();
@@ -75,24 +72,46 @@ public sealed partial class DeleteProgressDialogViewModel
         }
     }
 
-    private void RefreshNetworkMode()
+    private void RefreshModeAfterExclude(DeleteRowViewModel excluded)
     {
-        if (!ForcedByNetwork)
+        if (excluded.IsWithoutRecycleBin)
         {
-            return;
+            _networkCount = Math.Max(0, _networkCount - 1);
         }
 
-        var anyNetwork = Items.Any(row => _withoutRecycleBin!.Contains(row.Space));
-        ForcedByNetwork = anyNetwork;
-        var nextPermanent = _basePermanent || anyNetwork;
-
-        if (_permanent == nextPermanent)
+        if (excluded.IsPermanent)
         {
-            return;
+            _permanentCount = Math.Max(0, _permanentCount - 1);
+            _permanentBytes = Math.Max(0, _permanentBytes - excluded.SizeBytes);
+        }
+        else
+        {
+            _recycleCount = Math.Max(0, _recycleCount - 1);
+            _recycleBytes = Math.Max(0, _recycleBytes - excluded.SizeBytes);
         }
 
-        _permanent = nextPermanent;
-        OnPropertyChanged(nameof(ActionVerb));
-        OnPropertyChanged(nameof(StartButtonText));
+        _totalBytes = _recycleBytes + _permanentBytes;
+
+        var nextForcedByNetwork = _networkCount > 0;
+        var nextIsMixed = !_basePermanent && _recycleCount > 0 && _permanentCount > 0;
+        var nextAllPermanent = _basePermanent || (Items.Count > 0 && _recycleCount == 0);
+
+        var modeChanged = _forcedByNetwork != nextForcedByNetwork
+            || _isMixed != nextIsMixed
+            || _allPermanent != nextAllPermanent;
+
+        ForcedByNetwork = nextForcedByNetwork;
+        IsMixed = nextIsMixed;
+        _allPermanent = nextAllPermanent;
+
+        if (modeChanged)
+        {
+            OnPropertyChanged(nameof(ActionVerb));
+            OnPropertyChanged(nameof(StartButtonText));
+            OnPropertyChanged(nameof(NetworkWarningText));
+        }
+
+        OnPropertyChanged(nameof(IntroText));
+        OnPropertyChanged(nameof(CancelHint));
     }
 }

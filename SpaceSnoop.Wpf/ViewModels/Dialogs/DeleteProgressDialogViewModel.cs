@@ -9,7 +9,6 @@ namespace SpaceSnoop.Wpf.ViewModels.Dialogs;
 public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewModelBase
 {
     private readonly bool _basePermanent;
-    private readonly IReadOnlySet<SpaceBase>? _withoutRecycleBin;
     private readonly PerformanceMonitor _monitor;
     private readonly PerformanceOperations _operations;
     private readonly ShellPreferences _preferences;
@@ -18,8 +17,14 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
     private readonly Action<SpaceBase>? _unmark;
     private readonly string _runId = Guid.NewGuid().ToString("N")[..8];
 
-    private bool _permanent;
+    private bool _allPermanent;
     private bool _forcedByNetwork;
+    private bool _isMixed;
+    private int _networkCount;
+    private int _recycleCount;
+    private int _permanentCount;
+    private long _recycleBytes;
+    private long _permanentBytes;
 
     private long _totalBytes;
     private DeleteOperationDiagnostics _diagnostics;
@@ -61,7 +66,11 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
 
     public override string Title => "Удаление";
 
-    public string ActionVerb => _permanent ? "удалены безвозвратно" : "перемещены в корзину";
+    public string ActionVerb => IsMixed
+        ? "перемещены в корзину или удалены безвозвратно"
+        : _allPermanent
+            ? "удалены безвозвратно"
+            : "перемещены в корзину";
 
     public bool ForcedByNetwork
     {
@@ -69,13 +78,31 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
         private set => SetProperty(ref _forcedByNetwork, value);
     }
 
-    public string StartButtonText => _permanent ? "Удалить безвозвратно" : "Удалить";
+    public bool IsMixed
+    {
+        get => _isMixed;
+        private set => SetProperty(ref _isMixed, value);
+    }
 
-    public string IntroText => $"Будут {ActionVerb}: {Plural.Format(Items.Count, "объект", "объекта", "объектов")} · {SizeFormatter.Format(_totalBytes)}";
+    public string NetworkWarningText => IsMixed
+        ? "На сетевом хранилище нет корзины Windows – сетевые объекты будут удалены безвозвратно, локальные – в корзину"
+        : "На сетевом хранилище нет корзины Windows – удаление необратимо";
 
-    public string CancelHint => _permanent
-        ? "Остановка сработает после текущего объекта – удаление каталога со всем содержимым прервать нельзя."
-        : $"Остановка сработает в конце текущей пачки – это {Plural.Format(ChunkSize, "объект", "объекта", "объектов")}, обычно доли секунды.";
+    public string StartButtonText => IsMixed
+        ? "Удалить (часть безвозвратно)"
+        : _allPermanent
+            ? "Удалить безвозвратно"
+            : "Удалить";
+
+    public string IntroText => IsMixed
+        ? $"В корзину: {Plural.Format(_recycleCount, "объект", "объекта", "объектов")} · {SizeFormatter.Format(_recycleBytes)}, безвозвратно: {Plural.Format(_permanentCount, "объект", "объекта", "объектов")} · {SizeFormatter.Format(_permanentBytes)}"
+        : $"Будут {ActionVerb}: {Plural.Format(Items.Count, "объект", "объекта", "объектов")} · {SizeFormatter.Format(_totalBytes)}";
+
+    public string CancelHint => IsMixed
+        ? $"Остановка сработает после текущей пачки в корзину (до {Plural.Format(RecycleChunkSize, "объект", "объекта", "объектов")}) или текущего сетевого объекта."
+        : _allPermanent
+            ? "Остановка сработает после текущего объекта – удаление каталога со всем содержимым прервать нельзя."
+            : $"Остановка сработает в конце текущей пачки – это {Plural.Format(RecycleChunkSize, "объект", "объекта", "объектов")}, обычно доли секунды.";
 
     public string CancelCaption => CancelRequested ? "Остановка запрошена…" : "Остановить удаление";
 
@@ -87,7 +114,9 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
 
     protected override bool HasFailedItems => _failed > 0;
 
-    private int ChunkSize => Math.Clamp(_permanent ? 1 : AppDefaults.DeleteRecycleChunkSize, 1, Math.Max(Items.Count, 1));
+    private int RecycleChunkSize => Math.Clamp(AppDefaults.DeleteRecycleChunkSize, 1, Math.Max(_recycleCount, 1));
+
+    private int FirstChunkSize => Items.Count > 0 && Items[0].IsPermanent ? 1 : RecycleChunkSize;
 
     public DeleteProgressDialogViewModel(
         IReadOnlyList<SpaceBase> items,
@@ -101,11 +130,6 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
         IReadOnlySet<SpaceBase>? withoutRecycleBin = null)
     {
         _basePermanent = permanent;
-        _withoutRecycleBin = withoutRecycleBin;
-        var forcedByNetwork = withoutRecycleBin is { Count: > 0 };
-        var effectivePermanent = permanent || forcedByNetwork;
-        _permanent = effectivePermanent;
-        _forcedByNetwork = forcedByNetwork;
         _monitor = monitor;
         _operations = operations;
         _preferences = preferences;
@@ -115,15 +139,31 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
 
         var count = items.Count;
         var rows = new DeleteRowViewModel[count];
-        long totalBytes = 0;
         var widestSizeText = string.Empty;
 
         for (var i = 0; i < count; i++)
         {
             var item = items[i];
-            var row = new DeleteRowViewModel(item);
+            var isWithoutRecycleBin = withoutRecycleBin?.Contains(item) ?? false;
+            var isRowPermanent = permanent || isWithoutRecycleBin;
+            var row = new DeleteRowViewModel(item, isRowPermanent, isWithoutRecycleBin);
             rows[i] = row;
-            totalBytes += item.TotalSize;
+
+            if (isWithoutRecycleBin)
+            {
+                _networkCount++;
+            }
+
+            if (isRowPermanent)
+            {
+                _permanentCount++;
+                _permanentBytes += row.SizeBytes;
+            }
+            else
+            {
+                _recycleCount++;
+                _recycleBytes += row.SizeBytes;
+            }
 
             if (row.SizeText.Length > widestSizeText.Length)
             {
@@ -131,10 +171,14 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
             }
         }
 
+        _totalBytes = _recycleBytes + _permanentBytes;
+        _forcedByNetwork = _networkCount > 0;
+        _isMixed = !permanent && _recycleCount > 0 && _permanentCount > 0;
+        _allPermanent = permanent || (count > 0 && _recycleCount == 0);
+
         Items = new(rows);
         SelectedItem = count > 0 ? Items[0] : null;
-        _totalBytes = totalBytes;
-        _diagnostics = new(effectivePermanent, count, totalBytes, monitor, operations, preferences);
+        _diagnostics = new(_allPermanent, count, _totalBytes, monitor, operations, preferences);
 
         CountText = $"0 / {count}";
 
@@ -198,10 +242,10 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
         ExcludeCommand.NotifyCanExecuteChanged();
         SelectPreviousCommand.NotifyCanExecuteChanged();
         SelectNextCommand.NotifyCanExecuteChanged();
-        _diagnostics = new(_permanent, Items.Count, _totalBytes, _monitor, _operations, _preferences);
+        _diagnostics = new(_allPermanent, Items.Count, _totalBytes, _monitor, _operations, _preferences);
         _diagnostics.Start();
         _progressPoller.Start();
-        _logger.DeletionStarted(_runId, Items.Count, SizeFormatter.Format(_totalBytes), _permanent);
+        _logger.DeletionStarted(_runId, Items.Count, SizeFormatter.Format(_totalBytes), _permanentCount > 0);
     }
 
     protected override void OnFinished()
@@ -241,7 +285,6 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
             return $"Ошибка: {failure.Message}";
         }
 
-        var verb = _permanent ? "Удалено безвозвратно" : "Перемещено в корзину";
         var head = Cancelled ? "Отменено." : "Готово.";
         if (!Cancelled && _failed > 0)
         {
@@ -249,10 +292,18 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
         }
 
         var errors = _failed > 0 ? $" Ошибок: {_failed}." : string.Empty;
-        var partial = _permanent && Items.Any(static row => row.IsDirectory && row.State == DeleteRowState.Failed)
+        var partial = Items.Any(static row => row.IsPermanent && row.IsDirectory && row.State == DeleteRowState.Failed)
             ? " Каталоги с ошибкой могли быть удалены частично. Повторите сканирование оставшихся данных."
             : string.Empty;
 
+        if (IsMixed)
+        {
+            var recycledDone = Items.Count(static row => !row.IsPermanent && row.State == DeleteRowState.Done);
+            var permanentDone = Items.Count(static row => row.IsPermanent && row.State == DeleteRowState.Done);
+            return $"{head} В корзину: {recycledDone} из {_recycleCount}, безвозвратно: {permanentDone} из {_permanentCount}. Освобождено: {SizeFormatter.Format(_freedBytes)}.{errors}{partial}";
+        }
+
+        var verb = _allPermanent ? "Удалено безвозвратно" : "Перемещено в корзину";
         return $"{head} {verb}: {_deleted} из {Items.Count}. Освобождено: {SizeFormatter.Format(_freedBytes)}.{errors}{partial}";
     }
 
@@ -332,6 +383,34 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
         ProgressValue = Items.Count > 0 ? Math.Clamp((double)_processed / Items.Count, 0d, 1d) : 0d;
     }
 
+    private List<DeleteBatchSegment> BuildSegments(
+        in DeleteBatchCallbacks recycleCallbacks,
+        in DeleteBatchCallbacks permanentCallbacks)
+    {
+        var segments = new List<DeleteBatchSegment>();
+        var index = 0;
+
+        while (index < Items.Count)
+        {
+            var start = index;
+            var permanent = Items[index].IsPermanent;
+            index++;
+
+            while (index < Items.Count && Items[index].IsPermanent == permanent)
+            {
+                index++;
+            }
+
+            segments.Add(new(
+                start,
+                index - start,
+                permanent ? 1 : AppDefaults.DeleteRecycleChunkSize,
+                permanent ? permanentCallbacks : recycleCallbacks));
+        }
+
+        return segments;
+    }
+
     private void RunDeletion(List<SpaceBase> deletedItems, DeleteProgressState progress, CancellationToken token)
     {
         var logPath = Path.Combine(AppStorage.DataDirectory, AppInfo.DeletionLogFileName);
@@ -339,6 +418,7 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
         var completed = 0;
         var failed = 0;
         var journalBroken = false;
+        var isMixed = IsMixed;
         var paths = new string[Items.Count];
 
         for (var i = 0; i < paths.Length; i++)
@@ -346,16 +426,23 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
             paths[i] = Items[i].Path;
         }
 
+        var recycleCallbacks = _diagnostics.BuildCallbacks(false);
+        var permanentCallbacks = _diagnostics.BuildCallbacks(true);
+        var segments = BuildSegments(recycleCallbacks, permanentCallbacks);
         var writer = new StreamWriter(logPath, true);
 
         try
         {
-            Journal($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Удаление {Items.Count} элемент(ов) ({(_permanent ? "безвозвратно" : "в корзину")})");
+            var modeLabel = isMixed
+                ? $"в корзину: {_recycleCount}, безвозвратно: {_permanentCount}"
+                : _allPermanent
+                    ? "безвозвратно"
+                    : "в корзину";
+            Journal($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Удаление {Items.Count} элемент(ов) ({modeLabel})");
 
-            DeleteBatch.Run(
+            DeleteBatch.RunSegments(
                 paths,
-                ChunkSize,
-                _diagnostics.BuildCallbacks(),
+                segments,
                 new(OnStarting, OnResult, OnChunkStarting, OnChunkFinished),
                 token);
         }
@@ -439,7 +526,7 @@ public sealed partial class DeleteProgressDialogViewModel : OperationDialogViewM
             switch (result.Status)
             {
                 case DeleteItemStatus.Removed:
-                    Journal(path);
+                    Journal(isMixed ? $"{(Items[result.Index].IsPermanent ? "БЕЗВОЗВРАТНО" : "В КОРЗИНУ")} {path}" : path);
                     completed++;
                     freed += Items[result.Index].Space.TotalSize;
                     deletedItems.Add(Items[result.Index].Space);

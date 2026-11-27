@@ -18,6 +18,12 @@ internal readonly record struct DeleteBatchProgress(
     Action<DeleteChunkInfo> ChunkStarting,
     Action<DeleteChunkOutcome> ChunkFinished);
 
+internal readonly record struct DeleteBatchSegment(
+    int Start,
+    int Count,
+    int ChunkSize,
+    DeleteBatchCallbacks Callbacks);
+
 internal readonly record struct DeleteItemResult(int Index, DeleteItemStatus Status, Exception? Failure);
 
 internal static class DeleteBatch
@@ -29,51 +35,82 @@ internal static class DeleteBatch
         in DeleteBatchProgress progress,
         CancellationToken token)
     {
-        var size = Math.Max(1, chunkSize);
-        var total = (paths.Count + size - 1) / size;
-        var pending = new List<int>(size);
+        RunSegments(paths, [new(0, paths.Count, Math.Max(1, chunkSize), callbacks)], progress, token);
+    }
+
+    internal static void RunSegments(
+        IReadOnlyList<string> paths,
+        IReadOnlyList<DeleteBatchSegment> segments,
+        in DeleteBatchProgress progress,
+        CancellationToken token)
+    {
+        var total = 0;
+
+        foreach (var segment in segments)
+        {
+            if (segment.Count <= 0)
+            {
+                continue;
+            }
+
+            var size = Math.Max(1, segment.ChunkSize);
+            total += (segment.Count + size - 1) / size;
+        }
+
+        var pending = new List<int>();
         var ordinal = 0;
 
-        for (var start = 0; start < paths.Count; start += size)
+        foreach (var segment in segments)
         {
-            token.ThrowIfCancellationRequested();
-
-            pending.Clear();
-            var end = Math.Min(start + size, paths.Count);
-            var chunk = new DeleteChunkInfo(++ordinal, total, start, end - 1);
-            var timestamp = Stopwatch.GetTimestamp();
-            var retried = false;
-            var announced = false;
-
-            try
+            if (segment.Count <= 0)
             {
-                progress.ChunkStarting(chunk);
-                announced = true;
-
-                for (var index = start; index < end; index++)
-                {
-                    progress.Starting(index);
-
-                    if (callbacks.Exists(paths[index]))
-                    {
-                        pending.Add(index);
-                    }
-                    else
-                    {
-                        progress.Result(new(index, DeleteItemStatus.Missing, null));
-                    }
-                }
-
-                if (pending.Count > 0)
-                {
-                    RunChunk(paths, pending, callbacks, progress.Result, ref retried, token);
-                }
+                continue;
             }
-            finally
+
+            var size = Math.Max(1, segment.ChunkSize);
+            var segmentEnd = Math.Min(segment.Start + segment.Count, paths.Count);
+
+            for (var start = segment.Start; start < segmentEnd; start += size)
             {
-                if (announced)
+                token.ThrowIfCancellationRequested();
+
+                pending.Clear();
+                var end = Math.Min(start + size, segmentEnd);
+                var chunk = new DeleteChunkInfo(++ordinal, total, start, end - 1);
+                var timestamp = Stopwatch.GetTimestamp();
+                var retried = false;
+                var announced = false;
+
+                try
                 {
-                    progress.ChunkFinished(new(chunk, ElapsedMilliseconds(timestamp), retried));
+                    progress.ChunkStarting(chunk);
+                    announced = true;
+
+                    for (var index = start; index < end; index++)
+                    {
+                        progress.Starting(index);
+
+                        if (segment.Callbacks.Exists(paths[index]))
+                        {
+                            pending.Add(index);
+                        }
+                        else
+                        {
+                            progress.Result(new(index, DeleteItemStatus.Missing, null));
+                        }
+                    }
+
+                    if (pending.Count > 0)
+                    {
+                        RunChunk(paths, pending, segment.Callbacks, progress.Result, ref retried, token);
+                    }
+                }
+                finally
+                {
+                    if (announced)
+                    {
+                        progress.ChunkFinished(new(chunk, ElapsedMilliseconds(timestamp), retried));
+                    }
                 }
             }
         }
