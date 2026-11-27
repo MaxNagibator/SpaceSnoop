@@ -247,6 +247,58 @@ public class MftUsnParserTests
     }
 
     [Test]
+    public void In_use_nameless_base_record_and_broken_file_name_mark_record_incomplete()
+    {
+        var namelessBaseRaw = new MftRecordBuilder()
+            .WithSequence(4)
+            .ResidentData(128)
+            .Build();
+        var namelessBaseOut = WrapFileRecordOutput(namelessBaseRaw, returnedRecordNumber: 126, sequence: 4);
+        var parsedNamelessBase = MftUsnNativeSource.ParseFileRecordBuffer(namelessBaseOut, 126);
+
+        var zeroLenNameRaw = new MftRecordBuilder()
+            .WithSequence(4)
+            .FileName(Parent, 1, string.Empty)
+            .ResidentData(64)
+            .Build();
+        var zeroLenNameOut = WrapFileRecordOutput(zeroLenNameRaw, returnedRecordNumber: 127, sequence: 4);
+        var parsedZeroLenName = MftUsnNativeSource.ParseFileRecordBuffer(zeroLenNameOut, 127);
+
+        var shortNameValue = new byte[16];
+        var shortNameRaw = BuildRecordWithResidentAttribute(MftLayout.AttributeFileName, shortNameValue, sequence: 4);
+        var shortNameOut = WrapFileRecordOutput(shortNameRaw, returnedRecordNumber: 128, sequence: 4);
+        var parsedShortName = MftUsnNativeSource.ParseFileRecordBuffer(shortNameOut, 128);
+
+        var truncatedNameValue = new byte[0x42 + 4];
+        BinaryPrimitives.WriteUInt64LittleEndian(truncatedNameValue, (ulong)Parent | (1UL << MftLayout.ReferenceMaskBits));
+        truncatedNameValue[0x40] = 10;
+        truncatedNameValue[0x41] = 1;
+        var truncatedNameRaw = BuildRecordWithResidentAttribute(MftLayout.AttributeFileName, truncatedNameValue, sequence: 4);
+        var truncatedNameOut = WrapFileRecordOutput(truncatedNameRaw, returnedRecordNumber: 129, sequence: 4);
+        var parsedTruncatedName = MftUsnNativeSource.ParseFileRecordBuffer(truncatedNameOut, 129);
+
+        var hugeParentValue = new byte[0x42 + 2];
+        BinaryPrimitives.WriteUInt64LittleEndian(hugeParentValue, ((ulong)int.MaxValue + 1UL) | (1UL << MftLayout.ReferenceMaskBits));
+        hugeParentValue[0x40] = 1;
+        hugeParentValue[0x41] = 1;
+        hugeParentValue[0x42] = (byte)'a';
+        var hugeParentRaw = BuildRecordWithResidentAttribute(MftLayout.AttributeFileName, hugeParentValue, sequence: 4);
+        var hugeParentOut = WrapFileRecordOutput(hugeParentRaw, returnedRecordNumber: 130, sequence: 4);
+        var parsedHugeParent = MftUsnNativeSource.ParseFileRecordBuffer(hugeParentOut, 130);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(parsedNamelessBase.Exists, Is.False);
+            Assert.That(parsedNamelessBase.IsIncomplete, Is.True);
+
+            Assert.That(parsedZeroLenName.IsIncomplete, Is.True);
+            Assert.That(parsedShortName.IsIncomplete, Is.True);
+            Assert.That(parsedTruncatedName.IsIncomplete, Is.True);
+            Assert.That(parsedHugeParent.IsIncomplete, Is.True);
+        }
+    }
+
+    [Test]
     public void Hardlink_namespace_priority_excludes_dos_and_counts_distinct_links()
     {
         var raw = new MftRecordBuilder()
@@ -462,6 +514,22 @@ public class MftUsnParserTests
     public void Win32_error_classification_maps_expected_kinds(int win32Error, int expectedKind)
     {
         Assert.That(MftUsnNativeSource.ClassifyWin32Error(win32Error), Is.EqualTo((MftUsnErrorKind)expectedKind));
+    }
+
+    private static byte[] BuildRecordWithResidentAttribute(uint type, ReadOnlySpan<byte> value, ushort sequence)
+    {
+        var raw = new MftRecordBuilder().WithSequence(sequence).ResidentData(32).Build();
+        var attrOffset = BinaryPrimitives.ReadUInt16LittleEndian(raw.AsSpan(0x14));
+        var len = (0x18 + value.Length + 7) & ~7;
+        var attr = raw.AsSpan(attrOffset, len);
+        attr.Clear();
+        BinaryPrimitives.WriteUInt32LittleEndian(attr, type);
+        BinaryPrimitives.WriteUInt32LittleEndian(attr[4..], (uint)len);
+        BinaryPrimitives.WriteUInt32LittleEndian(attr[0x10..], (uint)value.Length);
+        BinaryPrimitives.WriteUInt16LittleEndian(attr[0x14..], 0x18);
+        value.CopyTo(attr[0x18..]);
+        BinaryPrimitives.WriteUInt32LittleEndian(raw.AsSpan(attrOffset + len), MftLayout.AttributeEnd);
+        return raw;
     }
 
     private static byte[] WrapFileRecordOutput(byte[] rawRecord, int returnedRecordNumber, ushort sequence, bool applyFixup = true)

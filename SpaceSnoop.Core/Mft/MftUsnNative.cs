@@ -804,6 +804,7 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
     {
         if (fnValue.Length < FileNameHeaderBytes)
         {
+            state.IsIncomplete = true;
             return;
         }
 
@@ -813,6 +814,7 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
 
         if (nameLen == 0 || fnValue.Length < requiredBytes)
         {
+            state.IsIncomplete = true;
             return;
         }
 
@@ -821,6 +823,7 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
 
         if (parentLong > int.MaxValue)
         {
+            state.IsIncomplete = true;
             return;
         }
 
@@ -1057,7 +1060,7 @@ internal sealed class MftUsnNativeSource : IMftUsnSource
         {
             if (!_hasPrimary && !_hasDosFallback)
             {
-                return IsIncomplete ? new MftUsnRecord { IsIncomplete = true } : default;
+                return new MftUsnRecord { IsIncomplete = true };
             }
 
             var chosen = _hasPrimary ? _primary : _dosFallback;

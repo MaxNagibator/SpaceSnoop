@@ -1114,6 +1114,33 @@ public class MftUsnIndexTests
             Assert.That(fallback.Root.TotalSize, Is.EqualTo(8192));
             Assert.That(fallback.Root.TotalFileCount, Is.EqualTo(1));
         }
+
+        var namelessRaw = new MftRecordBuilder()
+            .WithSequence(1)
+            .NonResidentData(8192)
+            .Build();
+        MftLayout.ApplyFixup(namelessRaw, 512);
+        var namelessWrapped = new byte[12 + namelessRaw.Length];
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(namelessWrapped, MakeFrn(21, 1));
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(namelessWrapped.AsSpan(8), namelessRaw.Length);
+        namelessRaw.CopyTo(namelessWrapped.AsSpan(12));
+        var parsedNameless = MftUsnNativeSource.ParseFileRecordBuffer(namelessWrapped, 21);
+
+        source.SetRecord(21, parsedNameless);
+        source.QueueEvent(MakeFrn(21, 1), HardlinkChangeReason | CloseReason);
+        source.AdvanceUsn(500);
+
+        var namelessOk = index.TryRefresh(source, out var namelessSummary, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(namelessOk, Is.False);
+            Assert.That(namelessSummary.ErrorKind, Is.EqualTo(MftUsnErrorKind.IoError));
+            Assert.That(index.CursorUsn, Is.EqualTo(100));
+            Assert.That(root.TotalSize, Is.EqualTo(8192));
+            Assert.That(root.TotalFileCount, Is.EqualTo(1));
+            Assert.That(root.SubDirectories.Single().Files.Single().Name, Is.EqualTo("keep.bin"));
+        }
     }
 
     private static MftScanner CreateScanner(FakeUsnSource source, int maxDeltaRecords = MftUsnVolumeIndex.DefaultMaxDeltaRecords)
