@@ -1,4 +1,6 @@
-﻿using KeepShell.Testing;
+﻿using KeepShell.Bootstrap;
+using KeepShell.Services;
+using KeepShell.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using SpaceSnoop.Core;
 using SpaceSnoop.Core.Domain;
@@ -6,6 +8,7 @@ using SpaceSnoop.Wpf.Bootstrap;
 using SpaceSnoop.Wpf.ViewModels.Dialogs;
 using SpaceSnoop.Wpf.ViewModels.Scan;
 using SpaceSnoop.Wpf.ViewModels.Settings;
+using SpaceSnoop.Wpf.ViewModels.Sync;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO.Compression;
@@ -444,6 +447,96 @@ public class ArchiveDialogTests
         {
             SynchronizationContext.SetSynchronizationContext(previous);
         }
+    }
+
+    [Test]
+    public async Task Архивация_корня_папки_и_подкаталога_после_FixAbsolutePath_открывает_диалог()
+    {
+        var (archive, dialogs, roots, rootNode, subNode) = CreateArchiveTargetTree(_source);
+
+        await archive.OpenArchiveDialogAsync(rootNode);
+        await archive.OpenArchiveDialogAsync(subNode);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(rootNode.Space!.Parent, Is.Not.Null);
+            Assert.That(roots, Has.Count.EqualTo(1));
+            Assert.That(dialogs.ShowCount, Is.EqualTo(2));
+        }
+    }
+
+    [Test]
+    public async Task Архивация_устаревшего_или_отсоединённого_узла_не_открывает_диалог()
+    {
+        var (archive, dialogs, roots, rootNode, subNode) = CreateArchiveTargetTree(_source);
+
+        ((DirectorySpace)rootNode.Space!).Remove(subNode.Space!);
+        await archive.OpenArchiveDialogAsync(subNode);
+
+        roots.Clear();
+        await archive.OpenArchiveDialogAsync(rootNode);
+
+        Assert.That(dialogs.ShowCount, Is.Zero);
+    }
+
+    private static (
+        ScanArchiveViewModel Archive,
+        NoopDialogs Dialogs,
+        ObservableCollection<ScanNodeViewModel> Roots,
+        ScanNodeViewModel RootNode,
+        ScanNodeViewModel SubNode) CreateArchiveTargetTree(string sourcePath)
+    {
+        ISettingsStore settings = new MemorySettings();
+        var dialogs = new NoopDialogs();
+        var uiDispatcher = new FakeUiDispatcher();
+        var nodeFactory = new ScanNodeFactory(new ScanPreferences(settings), new AgentPreferences(settings), new FakeShellLauncher());
+        var rootSpace = new DiskSpaceCalculator().Calculate(new DirectoryInfo(sourcePath));
+        ObservableCollection<ScanNodeViewModel> roots = [nodeFactory.CreateRoot(rootSpace, new(), null)];
+        var rootNode = roots[0];
+        rootNode.EnsureLoaded();
+        var subNode = rootNode.Children.Single(static child => child.Name == "nested");
+
+        var treemap = new ScanTreemapViewModel(roots);
+        var inspector = new ScanInspectorViewModel(settings, new FakeClipboard());
+        var marks = new ScanMarksViewModel(
+            dialogs,
+            null!,
+            new OperationPreferences(settings),
+            NullLogger.Instance,
+            nodeFactory,
+            roots,
+            null!,
+            treemap,
+            () => null,
+            _ =>
+            {
+            },
+            () =>
+            {
+            },
+            () => false,
+            () =>
+            {
+            });
+        var factory = new ArchiveProgressDialogFactory(
+            new ArchiveService(),
+            new OperationPreferences(settings),
+            uiDispatcher,
+            NullLogger<ArchiveProgressDialogViewModel>.Instance);
+        var archive = new ScanArchiveViewModel(
+            factory,
+            dialogs,
+            nodeFactory,
+            roots,
+            treemap,
+            inspector,
+            () => null,
+            marks,
+            () =>
+            {
+            });
+
+        return (archive, dialogs, roots, rootNode, subNode);
     }
 
     private ArchiveProgressDialogViewModel Dialog(

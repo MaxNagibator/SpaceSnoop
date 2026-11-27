@@ -65,7 +65,12 @@ internal sealed class ScanArchiveViewModel
 
     private async void OnArchiveRequested(ScanNodeViewModel node)
     {
-        if (_archiveRequested || node.Space is not DirectorySpace dir)
+        await OpenArchiveDialogAsync(node);
+    }
+
+    internal async Task OpenArchiveDialogAsync(ScanNodeViewModel node)
+    {
+        if (_archiveRequested || node.Space is not DirectorySpace dir || !IsAttachedToLiveRoot(node, dir))
         {
             return;
         }
@@ -74,30 +79,34 @@ internal sealed class ScanArchiveViewModel
         try
         {
             var dialog = await _archiveDialogFactory.CreateAsync(dir);
-            var root = dir;
-            while (root.Parent is DirectorySpace parent)
+
+            if (!IsAttachedToLiveRoot(node, dir))
             {
-                root = parent;
+                return;
             }
 
-            if (_roots.Any(item => ReferenceEquals(item.Space, root)))
+            try
             {
-                try
-                {
-                    await _dialogs.ShowAsync(dialog);
-                }
-                finally
-                {
-                    await dialog.StopAsync();
-                }
-
-                ApplyArchiveResult(dir, dialog);
+                await _dialogs.ShowAsync(dialog);
             }
+            finally
+            {
+                await dialog.StopAsync();
+            }
+
+            ApplyArchiveResult(dir, dialog);
         }
         finally
         {
             _archiveRequested = false;
         }
+    }
+
+    private bool IsAttachedToLiveRoot(ScanNodeViewModel node, DirectorySpace dir)
+    {
+        return node.Root is { } root
+            && _roots.Any(item => ReferenceEquals(item.Space, root))
+            && ScanNodeViewModel.IsAttachedToRoot(root, dir);
     }
 
     private void ApplyArchiveResult(DirectorySpace dir, ArchiveProgressDialogViewModel dialog)
